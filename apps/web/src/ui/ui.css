@@ -1,0 +1,484 @@
+/*
+ * Components from Design.html, board "Botones, campos y controles".
+ *
+ * Each interactive state has a real selector and a [data-state] twin, so the
+ * design-system page can pin a control in hover, pressed or focus.
+ * Locked controls ([data-locked]) keep their size and place, switch to a dashed
+ * border and carry the reason in their aria-label.
+ */
+
+/* Touch target: anything smaller than 44 px grows an invisible hit area. */
+.ro-btn,
+.ro-icon-btn,
+.ro-toggle,
+.ro-segmented__option,
+.ro-chip__remove {
+  position: relative;
+}
+
+.ro-btn::after,
+.ro-icon-btn::after,
+.ro-toggle::after,
+.ro-segmented__option::after,
+.ro-chip__remove::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--control-touch));
+  height: max(100%, var(--control-touch));
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- Button ---------- */
+
+.ro-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-standard);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition);
+}
+
+.ro-btn--compact {
+  height: var(--control-compact);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+
+.ro-btn--prominent {
+  height: var(--control-prominent);
+  padding: 0 var(--space-5);
+  border-radius: 9px;
+  font-size: 15px;
+}
+
+.ro-btn:focus-visible,
+.ro-btn[data-state='focus'] {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Primary: brass, text always dark */
+.ro-btn--primary {
+  background: var(--brass);
+  color: var(--on-brass);
+}
+.ro-btn--primary:hover,
+.ro-btn--primary[data-state='hover'] {
+  background: var(--brass-hover);
+}
+.ro-btn--primary:active,
+.ro-btn--primary[data-state='pressed'] {
+  background: var(--brass-pressed);
+  box-shadow: var(--shadow-pressed-brass);
+}
+
+/* Secondary */
+.ro-btn--secondary {
+  border-color: var(--color-border-strong);
+  color: var(--text-primary);
+}
+.ro-btn--secondary:hover,
+.ro-btn--secondary[data-state='hover'] {
+  border-color: var(--color-border-hover);
+  background: var(--color-selected);
+}
+.ro-btn--secondary:active,
+.ro-btn--secondary[data-state='pressed'] {
+  border-color: var(--color-border-hover);
+  background: var(--color-pressed);
+  box-shadow: var(--shadow-pressed);
+}
+
+/* Ghost */
+.ro-btn--ghost {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.ro-btn--ghost:hover,
+.ro-btn--ghost[data-state='hover'] {
+  background: var(--color-hover);
+  color: var(--text-primary);
+}
+.ro-btn--ghost:active,
+.ro-btn--ghost[data-state='pressed'] {
+  background: var(--color-pressed);
+  color: var(--text-primary);
+}
+
+/* Sync: teal outline; its focus ring is brass so it never blends with the border */
+.ro-btn--sync {
+  border-color: var(--sync);
+  color: var(--sync-ink);
+}
+.ro-btn--sync:hover,
+.ro-btn--sync[data-state='hover'] {
+  background: var(--sync-hover-bg);
+  color: var(--sync-hover-ink);
+}
+.ro-btn--sync:active,
+.ro-btn--sync[data-state='pressed'] {
+  border-color: var(--sync-soft-border);
+  background: var(--sync-pressed-bg);
+  box-shadow: var(--shadow-pressed);
+}
+.ro-btn--sync:focus-visible,
+.ro-btn--sync[data-state='focus'] {
+  outline-color: var(--brass);
+}
+
+/* Destructive */
+.ro-btn--destructive {
+  border-color: var(--alert-border);
+  color: var(--alert-ink);
+}
+.ro-btn--destructive:hover,
+.ro-btn--destructive[data-state='hover'] {
+  border-color: var(--alert);
+  background: var(--alert-hover-bg);
+  color: var(--alert-hover-ink);
+}
+.ro-btn--destructive:active,
+.ro-btn--destructive[data-state='pressed'] {
+  background: var(--alert-pressed-bg);
+  box-shadow: var(--shadow-pressed);
+}
+
+/* Locked, whatever the variant */
+.ro-btn[data-locked],
+.ro-btn[data-locked]:hover,
+.ro-btn[data-locked]:active {
+  border: 1px dashed var(--disabled-border);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+.ro-btn--primary[data-locked],
+.ro-btn--primary[data-locked]:hover,
+.ro-btn--primary[data-locked]:active {
+  background: var(--disabled-bg);
+}
+
+/* ---------- Icon button ---------- */
+
+.ro-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--control-touch);
+  height: var(--control-touch);
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-control);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+.ro-icon-btn:hover,
+.ro-icon-btn[data-state='hover'] {
+  border-color: var(--color-border-hover);
+  color: var(--text-primary);
+}
+.ro-icon-btn:active,
+.ro-icon-btn[data-state='pressed'] {
+  background: var(--color-pressed);
+  box-shadow: var(--shadow-pressed);
+}
+.ro-icon-btn[data-state='focus'] {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.ro-icon-btn--compact {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.ro-icon-btn--prominent {
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brass);
+  color: var(--on-brass);
+}
+.ro-icon-btn--prominent:hover,
+.ro-icon-btn--prominent[data-state='hover'] {
+  background: var(--brass-hover);
+  color: var(--on-brass);
+}
+.ro-icon-btn--prominent:active,
+.ro-icon-btn--prominent[data-state='pressed'] {
+  background: var(--brass-pressed);
+  box-shadow: var(--shadow-pressed-brass);
+}
+
+.ro-icon-btn[data-locked],
+.ro-icon-btn[data-locked]:hover,
+.ro-icon-btn[data-locked]:active {
+  border: 1px dashed var(--disabled-border);
+  background: var(--disabled-bg);
+  box-shadow: none;
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* ---------- Icon ---------- */
+
+.ro-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ---------- Text field ---------- */
+
+.ro-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ro-field__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.ro-field__input {
+  height: var(--control-standard);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+.ro-field__input::placeholder {
+  color: var(--text-muted);
+}
+.ro-field__input.ro-mono {
+  letter-spacing: 0.14em;
+}
+.ro-field__input:focus-visible,
+.ro-field__input[data-state='focus'] {
+  border-color: var(--sync);
+  box-shadow: 0 0 0 3px var(--sync-glow);
+  outline: none;
+}
+
+.ro-field[data-invalid] .ro-field__label,
+.ro-field__error {
+  color: var(--alert-ink);
+}
+.ro-field__error {
+  font-size: 11.5px;
+}
+.ro-field[data-invalid] .ro-field__input {
+  border-color: var(--alert);
+}
+
+.ro-field[data-locked] .ro-field__label {
+  color: var(--text-disabled-label);
+}
+.ro-field[data-locked] .ro-field__input {
+  border-style: dashed;
+  border-color: var(--disabled-border);
+  background: var(--disabled-field-bg);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* ---------- Toggle ---------- */
+
+.ro-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  padding: 0 3px;
+  border: 1px solid var(--color-border-hover);
+  border-radius: 13px;
+  background: var(--color-canvas);
+  cursor: pointer;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition);
+}
+.ro-toggle__thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-border-hover);
+  transition: transform var(--transition);
+}
+.ro-toggle[aria-checked='true'] {
+  border-color: var(--brass);
+  background: var(--brass);
+}
+.ro-toggle[aria-checked='true'] .ro-toggle__thumb {
+  background: var(--on-brass);
+  transform: translateX(20px);
+}
+.ro-toggle[data-state='focus'] {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.ro-toggle[data-locked],
+.ro-toggle[data-locked][aria-checked='true'] {
+  border: 1px dashed var(--disabled-border);
+  background: var(--disabled-field-bg);
+  cursor: not-allowed;
+}
+.ro-toggle[data-locked] .ro-toggle__thumb {
+  background: var(--disabled-border);
+}
+
+.ro-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ro-toggle-row__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ---------- Segmented control ---------- */
+
+.ro-segmented {
+  display: inline-flex;
+  gap: 3px;
+  height: 36px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+.ro-segmented__option {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--transition),
+    color var(--transition);
+}
+.ro-segmented__option:hover {
+  color: var(--text-primary);
+}
+.ro-segmented__option[aria-checked='true'] {
+  background: var(--brass);
+  font-weight: 600;
+  color: var(--on-brass);
+}
+.ro-segmented[data-locked] {
+  border-style: dashed;
+  border-color: var(--disabled-border);
+  background: var(--disabled-field-bg);
+}
+.ro-segmented[data-locked] .ro-segmented__option {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+.ro-segmented[data-locked] .ro-segmented__option[aria-checked='true'] {
+  background: var(--color-selected);
+}
+
+/* ---------- Chip ---------- */
+
+.ro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.ro-chip--filter,
+.ro-chip--active {
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+.ro-chip--filter {
+  border-color: var(--color-border);
+  color: var(--text-secondary);
+}
+.ro-chip--active {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+
+.ro-chip--street,
+.ro-chip--showdown {
+  padding: 5px 8px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ro-chip--street {
+  border-color: var(--color-border-strong);
+  color: var(--text-secondary);
+}
+.ro-chip--showdown {
+  border-color: var(--sync-soft-border);
+  color: var(--sync-ink);
+}
+
+.ro-chip--tag {
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: var(--color-selected);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ro-chip__remove {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}

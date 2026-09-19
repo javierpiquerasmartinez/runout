@@ -1,0 +1,511 @@
+/* Layout of the design-system sample page; mirrors the 1440-wide boards of Design.html. */
+
+.ds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-12);
+}
+
+.ds-top,
+.ds-board__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.ds-top__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ds-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ds-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ds-title {
+  font-family: var(--font-serif);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.ds-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.ds-board__intro {
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.ds-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 700fr) minmax(0, 620fr);
+  gap: var(--space-6);
+}
+
+.ds-columns--icons {
+  grid-template-columns: minmax(0, 1fr) 480px;
+}
+
+@media (width < 1100px) {
+  .ds {
+    padding: var(--space-6) var(--space-4);
+  }
+  .ds-columns,
+  .ds-columns--icons {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ds-board__intro {
+    text-align: left;
+  }
+}
+
+.ds-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ds-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-panel);
+}
+
+.ds-grow {
+  flex-grow: 1;
+}
+
+.ds-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ds-overline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ds-caption {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.ds-note {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.ds-divider {
+  height: 1px;
+  border: 0;
+  background: var(--color-divider);
+}
+
+.ds-rule {
+  display: block;
+  width: 1px;
+  height: 46px;
+  margin: 0 var(--space-2);
+  background: var(--color-panel-border);
+}
+
+.ds-rule--tall {
+  height: 56px;
+  margin: 0;
+}
+
+/* Swatches */
+
+.ds-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (width < 700px) {
+  .ds-swatches {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ds-swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ds-swatch__chip {
+  display: block;
+  height: 48px;
+  border-radius: var(--radius-md);
+}
+
+.ds-swatch__chip[data-outlined] {
+  border: 1px solid var(--color-border);
+}
+
+.ds-swatch__name {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ds-swatch__hex {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ds-contrast {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ds-contrast div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ds-contrast dt {
+  flex-shrink: 0;
+  width: 130px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ds-contrast dd {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* Rhythm */
+
+.ds-rhythm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.ds-rhythm__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ds-rhythm__bar {
+  display: block;
+  height: 34px;
+  background: var(--brass);
+}
+
+.ds-rhythm__bar[data-tier='2'] {
+  background: var(--brass-pressed);
+}
+
+.ds-rhythm__bar[data-tier='3'] {
+  background: var(--brass-deep);
+}
+
+.ds-rhythm__radius {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-hover);
+}
+
+.ds-elevations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ds-elevation {
+  display: flex;
+  flex: 1 1 160px;
+  align-items: center;
+  justify-content: center;
+  height: 62px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-elevated);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.ds-elevation[data-level='flat'] {
+  border-color: var(--color-panel-border);
+  background: var(--color-control);
+}
+
+.ds-elevation[data-level='raised'] {
+  box-shadow: var(--shadow-raised);
+}
+
+.ds-elevation[data-level='modal'] {
+  box-shadow: var(--shadow-modal);
+}
+
+/* Type */
+
+.ds-family {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ds-family__label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ds-mono-samples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.ds-figures,
+.ds-system-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ds-figures div,
+.ds-system-rules div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ds-figures dt,
+.ds-system-rules dt {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.ds-figures dd {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ds-system-rules dd {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.ds-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.ds-rules li {
+  display: flex;
+  gap: 11px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ds-rules strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ds-dot {
+  display: block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+}
+
+/* Icons */
+
+.ds-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ds-spec {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ds-icon-group {
+  gap: 14px;
+  padding: 18px var(--space-5);
+}
+
+.ds-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.ds-icon-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 84px;
+  text-align: center;
+}
+
+.ds-icon-tile__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-control);
+}
+
+.ds-scaling {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ds-scaling__sizes {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+
+.ds-scaling__size {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Controls */
+
+.ds-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ds-matrix__row {
+  display: grid;
+  grid-template-columns: 110px repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ds-matrix__state {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+}
+
+.ds-matrix__variant {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ds-matrix__button {
+  width: 100%;
+  padding: 0 var(--space-1);
+}
+
+.ds-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 22px;
+}
+
+.ds-sizes__group {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.ds-sizes__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.ds-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+
+.ds-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ds-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.ds-segmented-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
