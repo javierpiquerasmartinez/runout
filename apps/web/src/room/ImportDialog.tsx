@@ -376,7 +376,7 @@ function rowStatus(item: ImportItem): RowStatus {
   return item.preview.discarded.length > 0 || item.preview.hands.length === 0 ? 'warning' : 'ok'
 }
 
-/** "PokerStars · 42 manos · 3 descartadas", or why it gave nothing. */
+/** "PokerStars · 42 manos · 1 ya en la cola · 3 descartadas", or why it gave nothing. */
 function fileMeta(item: ImportItem, { t }: Translator): string {
   if (item.state === 'reading') return t('import.file.reading')
   if (item.state === 'failed') return t(`reason.${item.reason}`)
@@ -384,12 +384,18 @@ function fileMeta(item: ImportItem, { t }: Translator): string {
   if (format === null) {
     return t('import.file.undetected', { formats: tried.map((name) => t(`import.format.${name}`)).join(', ') })
   }
+  // Duplicates are read fine and left out on purpose, so they are counted apart.
+  const duplicates = discarded.filter((entry) => entry.reason === 'duplicate').length
+  const left = discarded.length - duplicates
   const parts = [
     t(`import.format.${format}`),
     t(hands.length === 1 ? 'import.file.hands.one' : 'import.file.hands.other', { count: hands.length }),
   ]
-  if (discarded.length > 0) {
-    parts.push(t(discarded.length === 1 ? 'import.file.discarded.one' : 'import.file.discarded.other', { count: discarded.length }))
+  if (duplicates > 0) {
+    parts.push(t(duplicates === 1 ? 'import.file.duplicates.one' : 'import.file.duplicates.other', { count: duplicates }))
+  }
+  if (left > 0) {
+    parts.push(t(left === 1 ? 'import.file.discarded.one' : 'import.file.discarded.other', { count: left }))
   }
   return parts.join(' · ')
 }

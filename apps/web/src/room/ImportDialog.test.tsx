@@ -144,7 +144,7 @@ describe('ImportDialog', () => {
     const { session } = renderDialog()
     await choose('unmatched.txt', 'session.txt')
 
-    expect(await screen.findByText('Nobody in the room has iMapleAA among their screen names, so those hands are yours.')).toBeTruthy()
+    expect(await screen.findByText('Nobody in the room plays as iMapleAA, so those hands are yours.')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Add iMapleAA to my screen names' }))
 
     expect(requests.at(-1)!.url).toBe('/api/identities/me/screen-names')

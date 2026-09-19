@@ -51,6 +51,13 @@ export interface Attribution {
   heroMatched: boolean;
 }
 
+/** A Hand an import is about to put in the Queue. */
+export interface Queued extends Attribution {
+  hand: Hand;
+  /** Set when the Hand is already stored, from an earlier import (ADR 0002). */
+  storedId?: string;
+}
+
 export interface Pasted {
   room: Room;
   /** The new Queue Entries, in Queue order. Empty when no Hand was read. */
@@ -69,7 +76,7 @@ export class QueueService {
 
   /**
    * Imports the Hands in pasted Hand History text and appends them to the
-   * Room's Queue. Any Participant may import. Hands already imported are
+   * Room's Queue. Any Participant may import. Hands already in this Queue are
    * discarded as duplicates.
    */
   async paste(
@@ -80,58 +87,101 @@ export class QueueService {
     const room = await this.rooms.findOpen(code);
     await this.rooms.requireParticipant(room.id, importer.id);
     const result = importHandHistory(typeof text === 'string' ? text : '');
-    const { fresh, duplicates } = await this.firstImports(
+    const { duplicates } = await this.planImport(
+      room.id,
+      importer,
       result.hands,
       result.texts,
     );
     const entries = await this.db.transaction((tx) =>
-      this.append(tx, room, importer, fresh),
+      this.append(tx, room, importer, result.hands),
     );
     return { room, entries, discarded: [...result.discarded, ...duplicates] };
   }
 
   /**
-   * Splits Hands into those never imported before and duplicates: the same
-   * Poker Site, hand ID and Hero as a stored Hand, or as one earlier in the
-   * list. Duplicates come back as discarded entries with their text.
+   * What importing these Hands into the Room would do: which ones join the
+   * Queue and under which Author, and which are duplicates — already in this
+   * Room's Queue, or read twice from the same text. A Hand stored from an
+   * earlier Room is not imported again: the Queue Entry references it, with
+   * the Author it already has (ADR 0002).
    */
-  async firstImports(
+  async planImport(
+    roomId: string,
+    importer: Identity,
     read: Hand[],
     texts: string[],
-  ): Promise<{ fresh: Hand[]; duplicates: Discarded[] }> {
-    const stored =
-      read.length === 0
-        ? []
-        : await this.db
-            .select({
-              site: hands.site,
-              siteHandId: hands.siteHandId,
-              heroScreenName: hands.heroScreenName,
-            })
-            .from(hands)
-            .where(
-              inArray(
-                hands.siteHandId,
-                read.map((hand) => hand.siteHandId),
-              ),
-            );
-    const seen = new Set(
-      stored.map((row) =>
-        handKey(row.site, row.siteHandId, row.heroScreenName),
-      ),
-    );
-    const fresh: Hand[] = [];
+    db: Database | Transaction = this.db,
+  ): Promise<{ queued: Queued[]; duplicates: Discarded[] }> {
+    const stored = await this.storedHands(roomId, read, db);
+    const matched = await this.attribute(roomId, importer, read, db);
+    const queued: Queued[] = [];
     const duplicates: Discarded[] = [];
+    const taken = new Set<string>();
     read.forEach((hand, index) => {
       const key = handKey(hand.site, hand.siteHandId, hand.hero.screenName);
-      if (seen.has(key)) {
+      const known = stored.get(key);
+      if (known?.inQueue || taken.has(key)) {
         duplicates.push({ text: texts[index], reason: 'duplicate' });
         return;
       }
-      seen.add(key);
-      fresh.push(hand);
+      taken.add(key);
+      queued.push({
+        hand,
+        storedId: known?.id,
+        // A stored Hand keeps the Author it was given when it was imported.
+        author: known?.author ?? matched[index].author,
+        heroMatched: matched[index].heroMatched,
+      });
     });
-    return { fresh, duplicates };
+    return { queued, duplicates };
+  }
+
+  /**
+   * The Hands among `read` that are already stored: their id, their Author,
+   * and whether they are in this Room's Queue already.
+   */
+  private async storedHands(
+    roomId: string,
+    read: Hand[],
+    db: Database | Transaction,
+  ): Promise<Map<string, { id: string; author: Author; inQueue: boolean }>> {
+    if (read.length === 0) return new Map();
+    const rows = await db
+      .select({
+        id: hands.id,
+        site: hands.site,
+        siteHandId: hands.siteHandId,
+        heroScreenName: hands.heroScreenName,
+        authorId: hands.authorId,
+        authorName: identities.displayName,
+        queueEntryId: queueEntries.id,
+      })
+      .from(hands)
+      .innerJoin(identities, eq(identities.id, hands.authorId))
+      .leftJoin(
+        queueEntries,
+        and(eq(queueEntries.handId, hands.id), eq(queueEntries.roomId, roomId)),
+      )
+      .where(
+        inArray(
+          hands.siteHandId,
+          read.map((hand) => hand.siteHandId),
+        ),
+      );
+    return new Map(
+      rows.map((row) => [
+        handKey(row.site, row.siteHandId, row.heroScreenName),
+        {
+          id: row.id,
+          author: {
+            identityId: row.authorId,
+            displayName: row.authorName ?? '',
+          },
+          inQueue: row.queueEntryId !== null,
+        },
+      ]),
+    );
   }
 
   /**
@@ -195,9 +245,9 @@ export class QueueService {
   }
 
   /**
-   * Stores Hands, attributed to their Authors, and appends them to the end of
-   * the Room's Queue, inside the caller's transaction. A Hand stored since it
-   * was read is skipped. Returns the new Queue Entries, in Queue order.
+   * Stores the Hands this Room hasn't got yet, attributed to their Authors,
+   * and appends a Queue Entry for each Hand that isn't in the Queue, inside
+   * the caller's transaction. Returns the new Queue Entries, in Queue order.
    */
   async append(
     tx: Transaction,
@@ -217,39 +267,18 @@ export class QueueService {
       .select({ last: max(queueEntries.position) })
       .from(queueEntries)
       .where(eq(queueEntries.roomId, room.id));
-    const attributions = await this.attribute(room.id, importer, read, tx);
+    // Read again inside the transaction: Screen Names, and the Queue itself,
+    // may have moved on since the import was previewed.
+    const { queued } = await this.planImport(room.id, importer, read, [], tx);
+    if (queued.length === 0) return [];
 
-    // The uniqueness constraint turns away a Hand another import stored
-    // since this one was previewed.
-    const stored = await tx
-      .insert(hands)
-      .values(
-        read.map((hand, index) => ({
-          site: hand.site,
-          siteHandId: hand.siteHandId,
-          heroScreenName: hand.hero.screenName,
-          authorId: attributions[index].author.identityId,
-          importerId: importer.id,
-          sourceFormat: hand.sourceFormat,
-          playedAt: new Date(hand.playedAt),
-          smallBlind: hand.stake.smallBlind,
-          bigBlind: hand.stake.bigBlind,
-          currency: hand.stake.currency,
-          content: hand,
-          importedAt: now,
-        })),
-      )
-      .onConflictDoNothing({
-        target: [hands.site, hands.siteHandId, hands.heroScreenName],
-      })
-      .returning({ id: hands.id });
-    if (stored.length === 0) return [];
+    const handIds = await this.store(tx, importer, queued, now);
     const added = await tx
       .insert(queueEntries)
       .values(
-        stored.map(({ id }, index) => ({
+        handIds.map((handId, index) => ({
           roomId: room.id,
-          handId: id,
+          handId,
           position: (last ?? 0) + index + 1,
           addedAt: now,
         })),
@@ -260,6 +289,79 @@ export class QueueService {
     return (await this.entries(room.id, tx)).filter((entry) =>
       addedIds.has(entry.id),
     );
+  }
+
+  /** Stores the Hands that aren't stored yet, and returns every Hand's id, in order. */
+  private async store(
+    tx: Transaction,
+    importer: Identity,
+    queued: Queued[],
+    now: Date,
+  ): Promise<string[]> {
+    const toStore = queued.filter((each) => each.storedId === undefined);
+    const ids = new Map(
+      queued.flatMap((each) =>
+        each.storedId ? [[keyOf(each.hand), each.storedId] as const] : [],
+      ),
+    );
+    if (toStore.length > 0) {
+      // Another Room's import may have stored one of them a moment ago; the
+      // uniqueness constraint turns it away and it is read back below.
+      const stored = await tx
+        .insert(hands)
+        .values(
+          toStore.map(({ hand, author }) => ({
+            site: hand.site,
+            siteHandId: hand.siteHandId,
+            heroScreenName: hand.hero.screenName,
+            authorId: author.identityId,
+            importerId: importer.id,
+            sourceFormat: hand.sourceFormat,
+            playedAt: new Date(hand.playedAt),
+            smallBlind: hand.stake.smallBlind,
+            bigBlind: hand.stake.bigBlind,
+            currency: hand.stake.currency,
+            content: hand,
+            importedAt: now,
+          })),
+        )
+        .onConflictDoNothing({
+          target: [hands.site, hands.siteHandId, hands.heroScreenName],
+        })
+        .returning({
+          id: hands.id,
+          site: hands.site,
+          siteHandId: hands.siteHandId,
+          heroScreenName: hands.heroScreenName,
+        });
+      for (const row of stored) {
+        ids.set(handKey(row.site, row.siteHandId, row.heroScreenName), row.id);
+      }
+      const missing = toStore.filter((each) => !ids.has(keyOf(each.hand)));
+      if (missing.length > 0) {
+        const rows = await tx
+          .select({
+            id: hands.id,
+            site: hands.site,
+            siteHandId: hands.siteHandId,
+            heroScreenName: hands.heroScreenName,
+          })
+          .from(hands)
+          .where(
+            inArray(
+              hands.siteHandId,
+              missing.map(({ hand }) => hand.siteHandId),
+            ),
+          );
+        for (const row of rows) {
+          ids.set(
+            handKey(row.site, row.siteHandId, row.heroScreenName),
+            row.id,
+          );
+        }
+      }
+    }
+    return queued.map(({ hand }) => ids.get(keyOf(hand))!);
   }
 
   /**
@@ -348,4 +450,8 @@ export class QueueService {
 /** What makes a Hand the same Hand (ADR 0002). */
 function handKey(site: string, siteHandId: string, hero: string): string {
   return JSON.stringify([site, siteHandId, hero]);
+}
+
+function keyOf(hand: Hand): string {
+  return handKey(hand.site, hand.siteHandId, hand.hero.screenName);
 }

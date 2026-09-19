@@ -4,7 +4,7 @@ import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { importPreviews } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
-import type { Hand, SourceFormat, Stake } from '../hands/hand.js';
+import type { SourceFormat, Stake } from '../hands/hand.js';
 import {
   importHandHistory,
   SOURCE_FORMATS,
@@ -17,6 +17,7 @@ import { Rejected } from '../rejection/rejection.js';
 import {
   QueueService,
   type Attribution,
+  type Queued,
   type QueueEntry,
 } from './queue.service.js';
 import { RoomsService, type Room } from './rooms.service.js';
@@ -68,8 +69,8 @@ export class ImportsService {
   /**
    * Reads one file or paste, in the format picked by hand if there is one,
    * and keeps the Hands until they are confirmed. Nothing reaches the Queue.
-   * Hands already imported are left out as duplicates; each Hand kept says
-   * who its Author would be.
+   * Hands already in this Room's Queue are left out as duplicates; each Hand
+   * kept says who its Author would be.
    */
   async preview(
     importer: Identity,
@@ -81,11 +82,12 @@ export class ImportsService {
     await this.rooms.requireParticipant(room.id, importer.id);
     const picked = pickedFormat(format);
     const result = importHandHistory(textOf(source), { format: picked });
-    const { fresh, duplicates } = await this.queue.firstImports(
+    const { queued, duplicates } = await this.queue.planImport(
+      room.id,
+      importer,
       result.hands,
       result.texts,
     );
-    const attributions = await this.queue.attribute(room.id, importer, fresh);
 
     const now = this.clock.now();
     await this.db
@@ -96,7 +98,7 @@ export class ImportsService {
       .values({
         roomId: room.id,
         importerId: importer.id,
-        hands: fresh,
+        hands: queued.map(({ hand }) => hand),
         createdAt: now,
       })
       .returning({ id: importPreviews.id });
@@ -104,7 +106,7 @@ export class ImportsService {
       id: stored.id,
       format: result.format,
       tried: result.tried,
-      hands: fresh.map((hand, index) => handPreview(hand, attributions[index])),
+      hands: queued.map(handPreview),
       discarded: [...result.discarded, ...duplicates],
     };
   }
@@ -187,9 +189,10 @@ function validIds(previewIds: unknown): string[] {
   return [...new Set(previewIds as string[])];
 }
 
-function handPreview(hand: Hand, attribution: Attribution): HandPreview {
+function handPreview({ hand, author, heroMatched }: Queued): HandPreview {
   return {
-    ...attribution,
+    author,
+    heroMatched,
     hero: hand.hero.screenName,
     playedAt: hand.playedAt,
     stake: hand.stake,

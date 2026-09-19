@@ -314,7 +314,37 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       });
     });
 
-    it('lets the database refuse a duplicate that two previews both held', async () => {
+    it('puts a Hand imported in another Room in this Queue too, with the Author it already had', async () => {
+      const master = await issueIdentity();
+      const guest = await issueIdentity();
+      const first = await createRoom(master.token);
+      await join(master.token, first, 'Javier');
+      await join(guest.token, first, 'Marta');
+      await setScreenNames(guest.token, [HERO]).expect(200);
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      await importText(master.token, first, text);
+      const { queue: firstQueue } = await join(master.token, first, 'Javier');
+
+      // A week later, in a Room the Author isn't even in.
+      const later = await createRoom(master.token);
+      await join(master.token, later, 'Javier');
+      const read = await importText(master.token, later, text);
+
+      expect(read.discarded).toEqual([]);
+      expect(read.hands[0].author).toEqual({
+        identityId: guest.id,
+        displayName: 'Marta',
+      });
+      const { queue } = await join(master.token, later, 'Javier');
+      // The same Hand (ADR 0002), referenced by a Queue Entry of its own.
+      expect(queue.map((entry) => entry.handId)).toEqual([
+        firstQueue[0].handId,
+      ]);
+      expect(queue[0].id).not.toBe(firstQueue[0].id);
+      expect(queue[0].author.identityId).toBe(guest.id);
+    });
+
+    it('skips a Hand another Importer queued between the preview and the confirm', async () => {
       const master = await issueIdentity();
       const guest = await issueIdentity();
       const code = await createRoom(master.token);

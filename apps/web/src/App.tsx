@@ -19,9 +19,13 @@ function App() {
   return (
     <SessionProvider>
       {/* Keyed by code, so moving to another Room starts from a clean slate. */}
-      {code ? <RoomPage key={code} code={code} /> : path === settingsPath ? <SettingsPage /> : <WelcomePage />}
+      {code ? <RoomPage key={code} code={code} /> : <Screen path={path} />}
     </SessionProvider>
   )
+}
+
+function Screen({ path }: { path: string }) {
+  return path === settingsPath ? <SettingsPage /> : <WelcomePage />
 }
 
 function ConnectionStatus() {
