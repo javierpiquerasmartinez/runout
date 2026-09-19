@@ -6,3 +6,6 @@ export type Database = NodePgDatabase<typeof schema> & { $client: pg.Pool };
 
 export const DATABASE = Symbol('DATABASE');
 export const DATABASE_URL = Symbol('DATABASE_URL');
+
+/** What `Database.transaction` hands its callback. */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];

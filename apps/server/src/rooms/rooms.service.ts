@@ -120,6 +120,20 @@ export class RoomsService {
     };
   }
 
+  /** Refuses with `not-in-room` anyone who isn't a Participant of the Room. */
+  async requireParticipant(roomId: string, identityId: string): Promise<void> {
+    const [membership] = await this.db
+      .select({ kicked: roomMemberships.kicked })
+      .from(roomMemberships)
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, identityId),
+        ),
+      );
+    if (!membership || membership.kicked) throw new Rejected('not-in-room');
+  }
+
   private async unusedCode(): Promise<string> {
     for (;;) {
       const code = generateRoomCode();

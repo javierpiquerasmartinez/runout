@@ -1,0 +1,406 @@
+/* The "Modal de importación de manos" board. */
+
+.import-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: none;
+  height: min(668px, calc(100dvh - 32px));
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+.import-dialog:not([open]) {
+  display: none;
+}
+.import-dialog::backdrop {
+  background: rgb(6 9 9 / 72%);
+}
+
+.import-dialog__header {
+  height: 76px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 26px;
+  border-bottom: 1px solid var(--color-panel-border);
+}
+.import-dialog__heading {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.import-dialog__title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+.import-dialog__subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.import-dialog__tabs {
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 22px;
+  padding: 0 26px;
+  border-bottom: 1px solid var(--color-panel-border);
+}
+.import-dialog__tab {
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.import-dialog__tab:hover {
+  color: var(--text-secondary);
+}
+.import-dialog__tab[aria-selected='true'] {
+  font-weight: 600;
+  color: var(--brass-ink);
+  border-bottom-color: var(--brass);
+}
+
+.import-dialog__body {
+  flex-grow: 1;
+  min-height: 0;
+  display: flex;
+  gap: 24px;
+  padding: 24px 26px;
+}
+.import-dialog__main {
+  flex: 1 1 536px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+.import-dialog__side {
+  flex: 0 0 308px;
+  /* Long lines of discarded text scroll inside it instead of widening it. */
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.import-dialog__eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.import-drop {
+  height: 172px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1.5px dashed var(--color-border-hover);
+  border-radius: var(--radius-xl);
+  background: var(--color-pressed);
+  text-align: center;
+}
+.import-drop[data-dragging] {
+  border-color: var(--brass);
+  background: var(--brass-soft-bg);
+}
+.import-drop__icon {
+  margin-bottom: 8px;
+  color: var(--brass);
+}
+.import-drop__title {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.import-drop__hint {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.import-paste {
+  display: block;
+}
+.import-paste__field {
+  width: 100%;
+  height: 172px;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--color-border-hover);
+  border-radius: var(--radius-xl);
+  background: var(--color-pressed);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.import-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.import-formats__chip {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.import-files {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.import-files__list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.import-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-pressed);
+}
+.import-file[data-status='ok'] {
+  border-color: var(--sync-soft-border);
+}
+.import-file[data-status='warning'] {
+  border-color: var(--brass-soft-border);
+}
+.import-file[data-status='failed'] {
+  border-color: var(--alert-border);
+}
+.import-file__icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.import-file[data-status='ok'] .import-file__icon {
+  color: var(--sync);
+}
+.import-file[data-status='warning'] .import-file__icon {
+  color: var(--brass);
+}
+.import-file[data-status='failed'] .import-file__icon {
+  color: var(--alert);
+}
+.import-file__text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.import-file__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-file__meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.import-file[data-status='warning'] .import-file__meta {
+  color: var(--brass-ink);
+}
+.import-file[data-status='failed'] .import-file__meta {
+  color: var(--alert-ink);
+}
+.import-file__format {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-control);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.import-preview,
+.import-discarded {
+  flex-grow: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-pressed);
+}
+.import-preview__empty {
+  margin: auto 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-muted);
+}
+.import-preview__board {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.import-preview__no-board {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.import-preview__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+.import-preview__facts > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.import-preview__facts dt {
+  width: 74px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.import-preview__facts dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+}
+.import-preview__pot {
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+.import-preview__next {
+  margin-top: auto;
+}
+
+.import-discarded__list {
+  flex-grow: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.import-discarded__entry {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.import-discarded__reason {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+.import-discarded__text {
+  max-height: 160px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-canvas);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  white-space: pre;
+}
+
+.import-dialog__footer {
+  min-height: 78px;
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 26px;
+  border-top: 1px solid var(--color-panel-border);
+}
+.import-dialog__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.import-dialog__ready {
+  font-size: 13px;
+  font-weight: 600;
+}
+.import-dialog__left-out {
+  font-size: 12px;
+  color: var(--brass-ink);
+}
+.import-dialog__failure {
+  margin: 0;
+  font-size: 12px;
+  color: var(--alert-ink);
+}
+.import-dialog__spacer {
+  flex-grow: 1;
+}
+
+@media (max-width: 760px) {
+  .import-dialog {
+    height: calc(100dvh - 32px);
+  }
+  .import-dialog__header,
+  .import-dialog__tabs,
+  .import-dialog__footer {
+    padding-inline: 16px;
+  }
+  .import-dialog__body {
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .import-dialog__main {
+    flex: none;
+    overflow: visible;
+  }
+  .import-dialog__side {
+    flex: none;
+  }
+}

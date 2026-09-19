@@ -18,6 +18,10 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'hand-not-in-queue': HttpStatus.NOT_FOUND,
   'no-hand-loaded': HttpStatus.CONFLICT,
   'invalid-action-index': HttpStatus.BAD_REQUEST,
+  'file-too-large': HttpStatus.PAYLOAD_TOO_LARGE,
+  'unreadable-file': HttpStatus.BAD_REQUEST,
+  'invalid-format': HttpStatus.BAD_REQUEST,
+  'preview-not-found': HttpStatus.NOT_FOUND,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }`. */
