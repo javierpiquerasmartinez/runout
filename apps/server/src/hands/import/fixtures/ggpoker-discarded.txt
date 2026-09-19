@@ -1,0 +1,46 @@
+Poker Hand #TM3301982210: Tournament #181234567, Bounty Hunters Special $10.8 Hold'em No Limit - Level7(60/120(15)) - 2026/09/12 20:01:00
+Table '12' 8-max Seat #2 is the button
+Seat 1: Hero (6,420 in chips)
+Seat 2: 3c8d1e0f (8,115 in chips)
+Seat 3: b72a90e4 (5,030 in chips)
+Hero: posts the ante 15
+3c8d1e0f: posts the ante 15
+b72a90e4: posts the ante 15
+b72a90e4: posts small blind 60
+Hero: posts big blind 120
+*** HOLE CARDS ***
+Dealt to Hero [Ac Jh]
+Dealt to 3c8d1e0f 
+Dealt to b72a90e4 
+3c8d1e0f: folds
+b72a90e4: folds
+Uncalled bet (60) returned to Hero
+*** SHOWDOWN ***
+Hero collected 165 from pot
+*** SUMMARY ***
+Total pot 165 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: Hero (big blind) won (165)
+Seat 2: 3c8d1e0f (button) folded before Flop
+Seat 3: b72a90e4 (small blind) folded before Flop
+
+Poker Hand #RC2104580002: Omaha Pot Limit ($0.05/$0.1) - 2026/09/12 19:10:00
+Table 'RushAndCash10354388' 6-max Seat #3 is the button
+Seat 1: Hero ($10 in chips)
+Seat 2: f02b6c1a ($10.3 in chips)
+Seat 3: 61e7d8b5 ($9.9 in chips)
+Hero: posts small blind $0.05
+f02b6c1a: posts big blind $0.1
+*** HOLE CARDS ***
+Dealt to Hero [Ah Ks Qd 7c]
+Dealt to f02b6c1a 
+Dealt to 61e7d8b5 
+61e7d8b5: folds
+Hero: folds
+Uncalled bet ($0.05) returned to f02b6c1a
+*** SHOWDOWN ***
+f02b6c1a collected $0.1 from pot
+*** SUMMARY ***
+Total pot $0.1 | Rake $0 | Jackpot $0 | Bingo $0 | Fortune $0 | Tax $0
+Seat 1: Hero (small blind) folded before Flop
+Seat 2: f02b6c1a (big blind) won ($0.1)
+Seat 3: 61e7d8b5 (button) folded before Flop

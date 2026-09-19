@@ -1,0 +1,41 @@
+PokerStars Hand #262130000301:  Hold'em No Limit ($0.01/$0.02 USD) - 2026/09/10 21:30:00 CET [2026/09/10 15:30:00 ET]
+Table 'Achird' 10-max Seat #10 is the button
+Seat 1: Pine_SB ($2 in chips)
+Seat 2: Oak_BB ($2.14 in chips)
+Seat 3: Elm_UTG ($1.87 in chips)
+Seat 4: Ash4 ($2 in chips)
+Seat 5: Fir5 ($2.40 in chips)
+Seat 6: Yew6 ($2 in chips)
+Seat 7: Hero10max ($2 in chips)
+Seat 8: Rowan8 ($3.05 in chips)
+Seat 9: Spruce9 ($2 in chips)
+Seat 10: Larch10 ($1.62 in chips)
+Pine_SB: posts small blind $0.01
+Oak_BB: posts big blind $0.02
+*** HOLE CARDS ***
+Dealt to Hero10max [Tc Td]
+Elm_UTG: folds
+Ash4: folds
+Fir5: folds
+Yew6: folds
+Hero10max: raises $0.04 to $0.06
+Rowan8: folds
+Spruce9: folds
+Larch10: folds
+Pine_SB: folds
+Oak_BB: folds
+Uncalled bet ($0.04) returned to Hero10max
+Hero10max collected $0.05 from pot
+Hero10max: doesn't show hand
+*** SUMMARY ***
+Total pot $0.05 | Rake $0
+Seat 1: Pine_SB (small blind) folded before Flop
+Seat 2: Oak_BB (big blind) folded before Flop
+Seat 3: Elm_UTG folded before Flop (didn't bet)
+Seat 4: Ash4 folded before Flop (didn't bet)
+Seat 5: Fir5 folded before Flop (didn't bet)
+Seat 6: Yew6 folded before Flop (didn't bet)
+Seat 7: Hero10max collected ($0.05)
+Seat 8: Rowan8 folded before Flop (didn't bet)
+Seat 9: Spruce9 folded before Flop (didn't bet)
+Seat 10: Larch10 (button) folded before Flop (didn't bet)

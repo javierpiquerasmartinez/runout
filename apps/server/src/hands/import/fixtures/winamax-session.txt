@@ -1,0 +1,89 @@
+Winamax Poker - CashGame - HandId: #20954312-7731-1757700000 - Holdem no limit (0.05€/0.10€) - 2026/09/12 18:40:00 UTC
+Table: 'Wichita 03' 6-max (real money) Seat #2 is the button
+Seat 1: Alder239 (10€)
+Seat 2: Birch Woods (12.40€)
+Seat 3: iMapleAA (10.10€)
+Seat 5: Cedar31 (8.75€)
+*** ANTE/BLINDS ***
+iMapleAA posts small blind 0.05€
+Cedar31 posts big blind 0.10€
+Dealt to iMapleAA [Th 9h]
+*** PRE-FLOP *** 
+Alder239 folds
+Birch Woods raises 0.15€ to 0.25€
+iMapleAA calls 0.20€
+Cedar31 folds
+*** FLOP *** [9c 5d 2s]
+iMapleAA checks
+Birch Woods bets 0.30€
+iMapleAA calls 0.30€
+*** TURN *** [9c 5d 2s][Ts]
+iMapleAA checks
+Birch Woods checks
+*** RIVER *** [9c 5d 2s Ts][Qd]
+iMapleAA bets 0.60€
+Birch Woods calls 0.60€
+*** SHOW DOWN ***
+iMapleAA shows [Th 9h] (Two pairs : Tens and Nines)
+Birch Woods shows [Ac Qc] (One pair : Queens)
+iMapleAA collected 2.24€ from pot
+*** SUMMARY ***
+Total pot 2.40€ | Rake 0.16€
+Board: [9c 5d 2s Ts Qd]
+Seat 3: iMapleAA (small blind) showed [Th 9h] and won 2.24€ with Two pairs : Tens and Nines
+Seat 2: Birch Woods (button) showed [Ac Qc] and lost with One pair : Queens
+
+
+Winamax Poker - CashGame - HandId: #20954312-7732-1757700090 - Holdem no limit (0.05€/0.10€) - 2026/09/12 18:41:30 UTC
+Table: 'Wichita 03' 6-max (real money) Seat #3 is the button
+Seat 1: Alder239 (10€)
+Seat 2: Birch Woods (11.25€)
+Seat 3: iMapleAA (11.19€)
+Seat 5: Cedar31 (8.65€)
+*** ANTE/BLINDS ***
+Cedar31 posts small blind 0.05€
+Alder239 posts big blind 0.10€
+Dealt to iMapleAA [Ks Jd]
+*** PRE-FLOP *** 
+Birch Woods folds
+iMapleAA raises 0.20€ to 0.30€
+Cedar31 folds
+Alder239 folds
+iMapleAA collected 0.25€ from pot
+*** SUMMARY ***
+Total pot 0.25€ | No rake
+Seat 3: iMapleAA (button) won 0.25€
+
+
+Winamax Poker - CashGame - HandId: #20954312-7733-1757700200 - Holdem no limit (0.05€/0.10€) - 2026/09/12 18:43:20 UTC
+Table: 'Wichita 03' 6-max (real money) Seat #5 is the button
+Seat 1: Alder239 (9.90€)
+Seat 2: Birch Woods (11.25€)
+Seat 3: iMapleAA (11.34€)
+Seat 5: Cedar31 (8.60€)
+*** ANTE/BLINDS ***
+Alder239 posts small blind 0.05€
+Birch Woods posts big blind 0.10€
+Dealt to iMapleAA [Qh Qc]
+*** PRE-FLOP *** 
+iMapleAA raises 0.20€ to 0.30€
+Cedar31 raises 8.30€ to 8.60€ and is all-in
+Alder239 folds
+Birch Woods calls 8.50€
+iMapleAA raises 2.74€ to 11.34€ and is all-in
+Birch Woods calls 2.65€ and is all-in
+*** FLOP *** [8d 4c 2h]
+*** TURN *** [8d 4c 2h][9c]
+*** RIVER *** [8d 4c 2h 9c][3s]
+*** SHOW DOWN ***
+iMapleAA shows [Qh Qc] (One pair : Queens)
+Cedar31 shows [Ah Ad] (One pair : Aces)
+Birch Woods shows [Js Jd] (One pair : Jacks)
+iMapleAA collected 5.30€ from side pot 1
+Cedar31 collected 25.24€ from main pot
+*** SUMMARY ***
+Total pot 31.15€ | Rake 0.61€
+Board: [8d 4c 2h 9c 3s]
+Seat 3: iMapleAA showed [Qh Qc] and won 5.30€ with One pair : Queens
+Seat 5: Cedar31 (button) showed [Ah Ad] and won 25.24€ with One pair : Aces
+Seat 2: Birch Woods (big blind) showed [Js Jd] and lost with One pair : Jacks
