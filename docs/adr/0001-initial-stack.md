@@ -1,6 +1,6 @@
 # 0001 · Initial stack: monorepo with two isolated apps
 
-Date: 2026-09-18 · Status: accepted
+Date: 2026-09-18 · Status: accepted (authentication stance amended by ADR 0003)
 
 ## Context
 

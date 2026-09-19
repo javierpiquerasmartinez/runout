@@ -1,399 +1,438 @@
-# Runout — Documento funcional y épicas
+# Runout — Functional spec and epics
 
-2026-09-18 · @Someone
+2026-09-19 · @Someone
 
-## Resumen del producto
+Domain terms (Room, Master, Guest, Hand, Hero, Author, Queue, Playback, Action, Street…) are defined in [CONTEXT.md](CONTEXT.md) and used here with exactly that meaning. Decisions that shape the model are in [docs/adr/](docs/adr/).
 
-Runout es una sala web donde varios jugadores analizan la misma mano de póker a la vez, sincronizados en tiempo real. Un anfitrión reproduce el historial calle a calle y el resto ve exactamente el mismo estado en su pantalla.
+## Product summary
 
-El problema que resuelve es el de un grupo que ya se reúne cada semana y hoy comparte pantalla por Discord o Zoom. Ese formato convierte a una persona en operador y a las demás en espectadores: nadie más puede señalar, volver atrás ni aportar sus propias manos sin cortar la sesión. Además la imagen llega comprimida, y leer un stack en ciegas grandes sobre un vídeo reescalado cuesta más de lo que parece.
+Runout is a web Room where several players review the same poker Hand at once, synchronised in real time. The Master steps through the Hand Action by Action and everyone else sees exactly the same table on their own screen.
 
-El usuario objetivo es un grupo de estudio de tres a ocho jugadores de cash online que ya usan un tracker (PokerTracker 4, Hold'em Manager 3 o Hand2Note) y exportan historiales de texto. No es una herramienta de entrenamiento individual ni un solver: no calcula estrategia, organiza la conversación que el grupo ya tiene.
+It solves the problem of a group that already meets every week and today shares a screen over Discord or Zoom. That format turns one person into the operator and everyone else into spectators: nobody else can point, go back or bring their own Hands without breaking the session. The picture also arrives compressed, and reading a stack in big blinds off a rescaled video is harder than it looks.
 
-La diferencia con compartir pantalla es que aquí el historial es dato, no píxeles: cada participante lo ve renderizado en su propia pantalla, con su baraja y sus unidades, y la cola de manos la construye el grupo entero en lugar de una sola persona.
+The target user is a study group of three to eight online cash players who already use a Tracker (PokerTracker 4, Hold'em Manager 3 or Hand2Note) and export text Hand Histories. It is not a solo training tool nor a solver: it computes no strategy, it organises the conversation the group already has.
 
-## Tipos de usuario y roles
+The difference from screen sharing is that the Hand History is data, not pixels: each Participant sees it rendered on their own screen, with their own deck and Display Unit, and the Queue is built by the whole group instead of one person.
 
-Hay dos roles y la diferencia entre ellos es una sola cosa: quién controla la reproducción. En todo lo demás — aportar manos, tomar notas, configurar su propia vista — Master e invitado son iguales.
+The study group itself lives outside Runout. There are no groups or teams inside the app: only Rooms, shared with the group through whatever chat it already uses.
 
-| Capacidad | Master | Invitado |
+## Participants, roles and identity
+
+There are two roles, and the difference between them is a single thing: who controls Playback. In everything else — bringing Hands, writing Notes, configuring their own view — Master and Guest are equal.
+
+| Capability | Master | Guest |
 | --- | --- | --- |
-| Crear la sala y ponerle nombre | Sí | No |
-| Compartir el código y el enlace | Sí | Sí |
-| Importar manos a la cola | Sí | Sí, si el Master lo permite |
-| Elegir qué mano se reproduce | Sí | No |
-| Avanzar, retroceder, pausar y saltar de calle | Sí | No |
-| Ver la mesa sincronizada en vivo | Sí | Sí |
-| Escribir notas sobre la mano | Sí | Sí |
-| Elegir su baraja, sus unidades y su tema | Sí | Sí |
-| Ceder el rol de Master a otro participante | Sí | No |
-| Expulsar a alguien y cerrar la sala | Sí | No |
+| Create the Room and name it | Yes (as its creator) | — |
+| Share the Room Code and link | Yes | Yes |
+| Import Hands into the Queue | Yes | Yes |
+| Choose which Hand is loaded | Yes | No |
+| Step Actions and jump Streets | Yes | No |
+| Toggle Hide Opponent Names | Yes | No |
+| See the synchronised table live | Yes | Yes |
+| Write Notes on a Hand | Yes | Yes |
+| Edit or delete Notes | Yes | No |
+| Reorder and remove Queue Entries | Yes | No |
+| Reassign a Hand's Author | Yes | No |
+| Choose their own deck, Display Unit and language | Yes | Yes |
+| Hand the Master role to another Participant | Yes | No |
+| Kick a Participant and close the Room | Yes | No |
 
-El rol de Master nace con la sala: lo tiene quien la crea y no se pide, se cede. El Master puede pasarlo a cualquier participante en cualquier momento, y el traspaso es inmediato y visible para todos, sin interrumpir la mano en curso.
+The Master role is born with the Room: whoever creates it holds it. It is never requested, only handed over. The Master can hand it to any Participant at any time; the handover is immediate, visible to everyone, and does not touch Playback. A Master cannot simply leave: leaving means handing the role over or closing the Room.
 
-Si el Master pierde la conexión más de dos minutos, el rol pasa automáticamente al participante más antiguo de la sala para que la sesión no se quede bloqueada. Cuando el Master original vuelve, entra como invitado y puede pedir el rol de vuelta.
+If the Master loses connection for more than two minutes, the role passes automatically to the Participant who has been present the longest, so the session never gets stuck. When the former Master comes back they join as a Guest; if they want the role back they ask for it out loud.
 
-No hay rol de espectador ni de administrador global en esta versión. Tampoco hay cuentas de equipo: cada persona es una cuenta individual y las salas son efímeras.
+Nobody needs an account. Every Participant has an identity bound to their browser from the first visit, which owns their Hands, Marks, Screen Names and preferences. An optional account only carries that identity to other devices (ADR 0003).
 
-## Flujo de usuario de punta a punta
+## End-to-end flow
 
-El recorrido completo son seis etapas, de crear la sala a discutir un spot concreto. El punto de no retorno está en la cuarta: hasta que la cola tiene manos, la sala está vacía y no hay nada que analizar.
+The full journey has six stages, from creating the Room to discussing a specific spot. The point of no return is the fourth: until the Queue has Hands, the Room is empty and there is nothing to review.
 
 ```mermaid
 flowchart LR
-    A[Master<br/>crea la sala] --> B[Master<br/>comparte código]
-    B --> C[Invitados<br/>entran]
-    C --> D[Todos<br/>importan manos]
+    A[Master<br/>creates the Room] --> B[Master<br/>shares the code]
+    B --> C[Guests<br/>join]
+    C --> D[Everyone<br/>imports Hands]
     A --> D
-    D --> E[Cola común<br/>construida]
-    E --> F[Master<br/>reproduce]
-    F --> G[Grupo<br/>analiza el spot]
+    D --> E[Shared Queue<br/>built]
+    E --> F[Master<br/>steps through]
+    F --> G[Group<br/>discusses the spot]
     G --> F
 ```
 
-El bucle final entre reproducir y analizar es lo que ocupa la mayor parte de la sesión: se pausa, se discute, se retrocede y se vuelve a avanzar decenas de veces por mano.
+The loop between stepping and discussing is where most of the session goes: stop, discuss, go back, step forward again, dozens of times per Hand. Playback only moves when the Master moves it; there is no automatic play, because the conversation sets the pace.
 
-1. **El Master crea la sala.** Le pone nombre a la sesión y fija un stake de referencia. La sala existe desde ese momento, aunque esté vacía.
-2. **Comparte el acceso.** El sistema genera un código corto de ocho caracteres y un enlace copiable. El Master lo pega en el chat del grupo.
-3. **Los invitados entran.** Con el enlace entran directamente; con el código lo teclean y confirman su alias. No hace falta que se registren antes de ver la sala.
-4. **Todos aportan manos.** Cada uno sube el archivo exportado de su tracker o pega el texto del historial. Cada mano queda firmada con su autor.
-5. **El Master reproduce.** Elige una mano de la cola y controla la línea de tiempo: acción a acción, saltando de calle o dejándola correr.
-6. **El grupo analiza.** Todos ven el mismo estado al mismo tiempo, se pausa en el punto de decisión, se discute por voz y la conclusión queda como nota en la mano.
+1. **The Master creates the Room.** They give the session a name. The Room exists from that moment, even while empty.
+2. **They share access.** The system generates an eight-character Room Code and a copyable link. The Master pastes it into the group's chat.
+3. **Guests join.** With the link they go straight in; with the code they type it. Either way they only confirm their Display Name. No registration.
+4. **Everyone brings Hands.** Each person uploads their Tracker export or pastes Hand History text. Each Hand gets its Author.
+5. **The Master drives Playback.** They load a Hand from the Queue and step through it Action by Action or jump between Streets.
+6. **The group discusses.** Everyone sees the same state at the same moment; they stop at the decision point, talk over voice, and the conclusion is left as a Note on the Hand.
 
-La voz sigue yendo por Discord o por donde el grupo ya hable. Runout no lleva audio en esta versión, y es deliberado: el grupo ya tiene resuelta esa parte.
+Voice still goes through Discord or wherever the group already talks. Runout carries no audio in this version, on purpose: the group has that solved.
 
-## Mapa de épicas
+## Epic map
 
-Siete épicas cubren el producto. Cinco son imprescindibles para que una sesión funcione de principio a fin; las otras dos pueden entrar a medias y crecer después.
+Seven epics cover the product. Five are essential for a session to work end to end; the other two can land partially and grow later.
 
-| Épica | Objetivo | Prioridad |
+| Epic | Goal | Priority |
 | --- | --- | --- |
-| E1 · Salas | Crear una sala, compartirla y entrar con código o enlace | MVP |
-| E2 · Importación de manos | Convertir historiales de tracker en manos reproducibles y firmadas | MVP |
-| E3 · Cola compartida | Una sola lista de manos con sus metadatos, construida entre todos | MVP |
-| E4 · Reproductor | Recorrer la mano calle a calle sobre una mesa legible | MVP |
-| E5 · Sincronización | Que todos vean el mismo estado en el mismo instante | MVP |
-| E6 · Biblioteca y notas | Conservar, buscar y anotar manos entre sesiones | Parcial en MVP |
-| E7 · Preferencias y perfil | Leer la mesa a su gusto e identificarse en los historiales | Parcial en MVP |
+| E1 · Rooms | Create a Room, share it, join it with a code or a link, and run its lifecycle | MVP |
+| E2 · Hand import | Turn Hand Histories into playable Hands with their Hero and Author | MVP |
+| E3 · Shared Queue | One list of Hands with their metadata, built by everyone | MVP |
+| E4 · Player | Step through a Hand on a readable table | MVP |
+| E5 · Synchronisation | Everyone sees the same Playback at the same instant | MVP |
+| E6 · Library and Notes | Keep, find and annotate Hands across Rooms | Partial in MVP |
+| E7 · Preferences and profile | Read the table your own way and be recognised in Hand Histories | Partial in MVP |
 
-El orden de construcción no es el de la tabla. E2 va primero porque sin manos parseadas no hay nada que enseñar, y E4 se puede construir en local mucho antes de que exista E5.
+Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
 
-## E1 · Salas
+## E1 · Rooms
 
-Una sala es el contenedor de una sesión de estudio: tiene un anfitrión, unos participantes, una cola de manos y un estado de reproducción. Es efímera por defecto y se archiva sola a los treinta días sin actividad.
+A Room holds exactly one study session: its Participants, a Queue and the Playback. It closes when its Master closes it, or on its own after 30 minutes with nobody connected. A closed Room never reopens.
 
-**H1.1 — Crear una sala.** Como jugador que organiza la sesión, quiero crear una sala con nombre y stake de referencia, para tener un sitio al que convocar al grupo.
+**H1.1 — Create a Room.** As the player organising the session, I want to create a Room with a name, so I have somewhere to call the group to.
 
-- Al crearla quedo como Master de forma automática.
-- El nombre admite hasta 60 caracteres y el stake es opcional.
-- La sala existe y es accesible aunque no tenga ninguna mano todavía.
+- On creation I become the Master automatically.
+- The name allows up to 60 characters.
+- The Room exists and is reachable even with no Hands yet.
 
-**H1.2 — Obtener código y enlace.** Como Master, quiero un código corto y un enlace copiable, para pegarlos en el chat del grupo sin explicar nada más.
+**H1.2 — Get the Room Code and link.** As Master, I want a short code and a copyable link, so I can paste them into the group chat without explaining anything else.
 
-- El código tiene ocho caracteres alfanuméricos y excluye los que se confunden al leerlos en voz alta.
-- Un botón copia el enlace completo al portapapeles y confirma que lo ha hecho.
-- El código sigue siendo válido mientras la sala esté abierta.
+- The Room Code has eight alphanumeric characters and excludes those easily confused when read aloud.
+- A button copies the full link to the clipboard and confirms it did.
+- The code stays valid while the Room is open, and stops working once it closes.
 
-**H1.3 — Entrar con código.** Como invitado, quiero teclear el código y entrar, para no depender de que me reenvíen el enlace.
+**H1.3 — Join with the Room Code.** As a Guest, I want to type the code and get in, so I don't depend on someone forwarding me the link.
 
-- El campo acepta el código con o sin guion y sin distinguir mayúsculas.
-- Un código inexistente muestra un error junto al campo, sin recargar la página.
-- Al entrar veo el estado actual de la sala, incluida la mano que se esté reproduciendo.
+- The field accepts the code with or without a dash and ignores case.
+- An unknown or closed code shows an error next to the field, without reloading the page.
+- On joining I see the Room's current state, including the loaded Hand and its current Action.
 
-**H1.4 — Entrar por enlace directo.** Como invitado, quiero abrir el enlace y estar dentro, para no dar ningún paso intermedio.
+**H1.4 — Join by direct link.** As a Guest, I want to open the link and be in, with no intermediate step.
 
-- El enlace lleva a la sala y pide solo confirmar el alias visible.
-- Si ya he entrado antes en esa sala, entro directamente con el alias anterior.
+- The link leads to the Room and only asks me to confirm my Display Name.
+- The Display Name is prefilled with the one I used last, in any Room.
 
-**H1.5 — Ver quién está en la sala.** Como participante, quiero ver la lista de presentes y quién es el Master, para saber si falta alguien antes de empezar.
+**H1.5 — See who is in the Room.** As a Participant, I want to see who is present and who is Master, so I know whether someone is missing before we start.
 
-- La lista muestra alias, rol y cuántas manos ha aportado cada uno.
-- Las entradas y salidas se reflejan en menos de dos segundos.
+- The list shows Display Name, role and how many Hands in the Queue each person is Author of.
+- Joins and leaves show up in under two seconds.
 
-**H1.6 — Ceder el rol de Master.** Como Master, quiero pasarle el control a otro participante, para que conduzca él la siguiente mano.
+**H1.6 — Hand over the Master role.** As Master, I want to pass control to another Participant, so they drive the next Hand.
 
-- El traspaso es inmediato y se anuncia a toda la sala.
-- La mano en curso no se reinicia ni pierde su posición.
-- Quien cede pasa a ser invitado y sus controles se bloquean al instante.
+- The handover is immediate and announced to the whole Room.
+- Playback is not reset and keeps its current Action.
+- The former Master becomes a Guest and their controls lock instantly.
 
-## E2 · Importación de manos
+**H1.7 — Leave or lose the Master.** As a Participant, I want the Room to keep working when the Master leaves or drops, so the session never gets stuck.
 
-Esta épica convierte texto de tracker en manos que el reproductor entiende. Es la que más riesgo esconde: los formatos varían entre salas y versiones, y una mano mal parseada rompe la confianza en toda la herramienta.
+- A Master who tries to leave must choose between handing the role over and closing the Room.
+- If the Master is disconnected for more than two minutes, the role passes to the Participant present the longest, and the Room is told.
+- A former Master who comes back joins as a Guest.
 
-**H2.1 — Subir archivos.** Como participante, quiero arrastrar los archivos exportados de mi tracker, para no copiar y pegar mano por mano.
+**H1.8 — Kick a Participant.** As Master, I want to remove someone from the Room.
 
-- Acepto .txt y .zip, hasta 20 MB por archivo y varios archivos a la vez.
-- Cada archivo muestra su estado: formato detectado, manos leídas y manos descartadas.
-- Puedo quitar un archivo de la lista antes de confirmar la importación.
+- The kicked Participant leaves immediately and cannot rejoin this Room.
+- Their Queue Entries stay in the Queue.
+- Kicking asks for confirmation.
 
-**H2.2 — Pegar texto plano.** Como participante, quiero pegar el historial de una mano suelta, para compartir algo que acabo de jugar sin exportar nada.
+**H1.9 — Close the Room.** As Master, I want to end the session for everyone.
 
-- El análisis ocurre al pegar, sin pulsar ningún botón.
-- Si el texto contiene varias manos, se importan todas.
+- Closing asks for confirmation, since a closed Room cannot be reopened.
+- Every Participant sees that the Room has closed, not a blank or broken screen.
+- The Hands that were in the Queue remain in the Libraries of everyone who was in the Room.
 
-**H2.3 — Detectar el formato.** Como participante, quiero que el sistema reconozca solo de qué tracker viene el archivo, para no tener que saberlo yo.
+## E2 · Hand import
 
-- Se reconocen PokerTracker 4, Hold'em Manager 3, Hand2Note y el texto de sala en crudo.
-- El formato detectado se muestra junto al nombre del archivo.
-- Si no se reconoce, se dice cuál se ha intentado y se ofrece elegirlo a mano.
+This epic turns Tracker text into Hands the player understands. It hides the most risk: formats vary across Poker Sites and versions, and one badly parsed Hand breaks trust in the whole tool.
 
-**H2.4 — Ver qué no se ha podido leer.** Como participante, quiero ver qué manos se han descartado y por qué, para saber si me falta algo importante.
+**H2.1 — Upload files.** As a Participant, I want to drag in my Tracker exports, so I don't copy and paste Hand by Hand.
 
-- El resumen dice cuántas manos entran y cuántas se omiten.
-- Puedo abrir el detalle y ver el texto original de cada mano descartada.
-- Una mano descartada nunca bloquea la importación del resto.
+- Accepts .txt and .zip, up to 20 MB per file and several files at once.
+- Each file shows its status: detected format, Hands read and Hands discarded.
+- I can remove a file from the list before confirming the import.
 
-**H2.5 — Asignar el autor.** Como participante, quiero que las manos que subo queden firmadas con mi nombre, para que el grupo sepa de quién es cada spot.
+**H2.2 — Paste plain text.** As a Participant, I want to paste the Hand History of a single Hand, so I can share something I just played without exporting anything.
 
-- El autor se asigna por defecto a quien importa.
-- El Master puede reasignar el autor de una mano concreta después de importarla.
-- El autor viaja con la mano a la biblioteca.
+- Parsing happens on paste, with no button to press.
+- If the text holds several Hands, all of them are imported.
 
-**H2.6 — Identificar al héroe.** Como participante, quiero que se detecte cuál de los asientos soy yo, para verme abajo en la mesa como en mi tracker.
+**H2.3 — Detect the format.** As a Participant, I want the system to recognise which Tracker and Poker Site the file comes from, so I don't have to know.
 
-- La detección usa los alias guardados en mi perfil.
-- Si ninguno coincide, se me pide elegir el asiento una sola vez por archivo.
-- El héroe se dibuja siempre en la posición inferior central, sea cual sea su posición en la mesa.
+- Recognises PokerTracker 4, Hold'em Manager 3, Hand2Note and raw Poker Site text.
+- The detected format is shown next to the file name.
+- If it is not recognised, it says which formats were tried and offers to pick one by hand.
 
-## E3 · Cola de manos compartida
+**H2.4 — See what could not be read.** As a Participant, I want to see which Hands were discarded and why, so I know whether I am missing something important.
 
-La cola es la lista de manos de la sesión, común a todos y ordenable. Es lo que convierte la sala en una sesión de estudio y no en una sucesión de manos sueltas.
+- The summary says how many Hands come in and how many are skipped.
+- I can open the detail and see the original text of each discarded Hand, with its reason (unrecognised format, more than nine seats, duplicate…).
+- A discarded Hand never blocks the import of the rest.
 
-**H3.1 — Ver la cola.** Como participante, quiero ver todas las manos de la sesión en un panel lateral, para saber qué queda por repasar.
+**H2.5 — Handle duplicates.** As a Participant, I want importing the same Hand twice not to clutter the Queue.
 
-- Cada fila muestra autor, fecha, posiciones enfrentadas, stake, bote final y calle en la que murió la acción.
-- La mano en reproducción aparece destacada sin ambigüedad.
-- El panel se puede colapsar para dejar la mesa a pantalla completa.
+- A Hand with the same Poker Site, hand ID and Hero as an existing Hand is a duplicate: it is skipped and reported (ADR 0002).
+- The same hand ID from a different Hero is a separate Hand, with its own hole cards. The Queue shows that the two are the same real-world hand, but never merges them.
 
-**H3.2 — Ver la cola crecer en vivo.** Como participante, quiero ver aparecer las manos que suben los demás, para no preguntar si ya han subido las suyas.
+**H2.6 — Assign the Hero and the Author.** As a Participant, I want each Hand attributed to whoever played it, so the group knows whose spot it is.
 
-- Una mano importada por cualquiera aparece en la cola de todos en menos de dos segundos.
-- La llegada no mueve el foco ni interrumpe la reproducción en curso.
+- The Hero is taken from the Hand History itself.
+- The Author is the Participant of the Room whose Screen Names include the Hero's name.
+- If nobody matches, the Importer becomes the Author and is offered to add that Screen Name to their own.
+- The Master can reassign the Author of any Hand after import.
+- The Author travels with the Hand to the Library. The Importer is kept for audit only.
 
-**H3.3 — Buscar y filtrar.** Como Master, quiero filtrar la cola por autor, posición o calle final, para encontrar rápido el tipo de spot que quiero tratar.
+## E3 · Shared Queue
 
-- Los filtros se combinan y se limpian de una vez.
-- El resultado dice cuántas manos quedan tras filtrar.
-- El filtro es personal: no cambia lo que ven los demás.
+The Queue is the Room's ordered list of Hands, shared by everyone. It is what turns the Room into a study session rather than a string of loose Hands.
 
-**H3.4 — Elegir la mano que se reproduce.** Como Master, quiero seleccionar una mano de la cola, para llevar a toda la sala a ese spot.
+**H3.1 — See the Queue.** As a Participant, I want to see every Hand of the session in a side panel, so I know what is left to review.
 
-- Al seleccionarla, la mesa de todos carga esa mano por el principio.
-- El invitado ve las filas como información, no como algo pulsable.
+- Each row shows Author, date, the Positions involved, Stake, final pot, Final Street and whether it went to Showdown.
+- The loaded Hand is highlighted unambiguously.
+- The panel can collapse to leave the table full screen.
 
-**H3.5 — Reordenar la cola.** Como Master, quiero mover manos arriba y abajo, para preparar el orden de la sesión antes de empezar.
+**H3.2 — See the Queue grow live.** As a Participant, I want to see the Hands others import appear, so I don't ask whether they have uploaded theirs yet.
 
-- El orden es el mismo para todos y se conserva al recargar.
-- Reordenar no cambia la mano que se está reproduciendo.
+- A Hand imported by anyone appears in everyone's Queue in under two seconds.
+- Its arrival does not move focus or touch Playback.
 
-**H3.6 — Quitar una mano de la sesión.** Como Master, quiero sacar una mano de la cola, para descartar duplicados o manos irrelevantes.
+**H3.3 — Search and filter.** As a Participant, I want to filter the Queue by Author, Position, Final Street or Showdown, so I quickly find the kind of spot I want.
 
-- Quitarla de la sala no la borra de la biblioteca de su autor.
-- La acción se puede deshacer durante los diez segundos siguientes.
+- Filters combine and clear in one go.
+- The result says how many Hands remain after filtering.
+- The filter is personal: it does not change what others see.
 
-## E4 · Reproductor de manos
+**H3.4 — Load a Hand.** As Master, I want to pick a Hand from the Queue, so I take the whole Room to that spot.
 
-El reproductor es la mesa y sus controles. Su trabajo no es parecerse a una sala de póker, sino dejar leer de un vistazo el tamaño del bote, los stacks en ciegas grandes y a quién le toca actuar.
+- On loading, everyone's table shows the Hand at its Initial State, with Hide Opponent Names off.
+- Guests see the rows as information, not as something clickable.
 
-**H4.1 — Ver la mesa.** Como participante, quiero ver la mano en una mesa cenital, para reconocer la situación sin leer texto.
+**H3.5 — Reorder the Queue.** As Master, I want to move Hands up and down, so I can prepare the order of the session before starting.
 
-- Se dibujan los asientos ocupados con alias, posición y stack en ciegas grandes y en fichas.
-- Las cartas comunitarias aparecen según avanza la calle; las que faltan se ven como huecos.
-- Las cartas del héroe se muestran siempre; las de los rivales solo si llegan al showdown.
-- Los jugadores retirados se atenúan en lugar de desaparecer.
+- The order is the same for everyone and survives a reload.
+- Reordering does not change the loaded Hand.
 
-**H4.2 — Avanzar y retroceder acción a acción.** Como Master, quiero moverme una acción adelante o atrás, para pararme justo en el punto de decisión.
+**H3.6 — Remove a Hand from the Queue.** As Master, I want to take a Hand out of the Queue, to drop duplicates or irrelevant Hands.
 
-- Cada paso actualiza bote, stacks y apuestas en la mesa.
-- El contador dice en qué acción estamos y cuántas tiene la mano.
-- En la primera acción el botón de retroceder queda deshabilitado, no oculto.
+- Removing the Queue Entry never deletes the Hand.
+- Removing the loaded Hand's entry does not interrupt Playback; it stays loaded until the Master loads another.
+- The removal can be undone for ten seconds, restoring the entry to its position.
 
-**H4.3 — Saltar de calle.** Como Master, quiero ir directo al flop, al turn, al river o al showdown, para no pasar acción por acción cuando ya sabemos lo que pasó.
+## E4 · Player
 
-- La barra de progreso divide la mano en cinco calles de anchura igual.
-- Pulsar una calle lleva a su primera acción.
-- Las calles que la mano no alcanzó se marcan como no disponibles.
+The player is the table and its controls. Its job is not to look like a poker client, but to make the pot size, the Stacks in big blinds and whose turn it is readable at a glance.
 
-**H4.4 — Reproducir en automático.** Como Master, quiero darle a play y que la mano avance sola, para enseñar el desarrollo sin ir pulsando.
+**H4.1 — See the table.** As a Participant, I want to see the Hand on a top-down table, so I recognise the situation without reading text.
 
-- La velocidad se elige entre 0,5×, 1×, 1,5× y 2×.
-- Al llegar al final se detiene en el showdown, no vuelve a empezar.
-- Pausar deja la mano exactamente donde estaba.
+- Tables of two to nine seats are supported.
+- Occupied seats show Screen Name, Position and Stack in my Display Unit.
+- The Hero is always drawn at the bottom centre, whatever their Position.
+- Community cards appear as Streets are reached; missing ones show as empty slots.
+- The Hero's cards are always shown; opponents' only if they reach Showdown.
+- Folded players are dimmed instead of disappearing.
 
-**H4.5 — Leer las apuestas y los botes.** Como participante, quiero ver cuánto se apuesta y qué parte del bote representa, para juzgar el sizing sin calcular.
+**H4.2 — Step Action by Action.** As Master, I want to move one Action forward or back, so I can stop right at the decision point.
 
-- Cada apuesta muestra su importe en ciegas grandes y su porcentaje del bote.
-- El bote central distingue el acumulado de lo que hay en juego en la calle.
-- Los botes secundarios se muestran por separado, con quién compite en cada uno.
+- Playback starts at the Initial State: blinds and antes posted, no Action taken yet.
+- Each step updates the pot, Stacks and bets on the table.
+- The counter shows which Action we are on and how many the Hand has. Blinds and antes are not Actions.
+- At the Initial State the back button is disabled, not hidden.
 
-**H4.6 — Ver el showdown.** Como participante, quiero ver las manos que se enseñaron y quién ganó cada bote, para cerrar la mano sin dudas.
+**H4.3 — Jump between Streets.** As Master, I want to go straight to the flop, turn, river or Showdown, so I don't step Action by Action through what we already know.
 
-- Las cartas mostradas se voltean y se etiqueta la jugada de cada uno.
-- La mano ganadora se marca y se indica cuánto se lleva de cada bote.
+- The progress bar shows the four Streets in equal widths, followed by a Showdown marker.
+- Clicking a Street goes to its first Action.
+- Streets the Hand never reached, and Showdown if there was none, are marked as unavailable.
 
-**H4.7 — Manejar el reproductor con el teclado.** Como Master, quiero usar atajos, para conducir la sesión sin soltar la mano del teclado.
+**H4.4 — Read bets and pots.** As a Participant, I want to see how much is bet and what share of the pot it is, so I judge sizing without doing maths.
 
-- Espacio reproduce y pausa; las flechas mueven acción a acción; mayúsculas y flecha saltan de calle.
-- Los atajos no responden cuando el foco está en un campo de texto.
-- Los atajos están inactivos para los invitados.
+- Each bet shows its size in my Display Unit and its percentage of the pot.
+- The central pot separates what has accumulated from what is in play on this Street.
+- Side pots are shown separately, with who contests each one.
 
-## E5 · Sincronización en tiempo real
+**H4.5 — See the Showdown.** As a Participant, I want to see the hands that were shown and who won each pot, so the Hand ends without doubts.
 
-Esta épica es la promesa del producto: lo que el Master hace, los demás lo ven al instante. También es la que decide la confianza, porque un invitado que no sabe si va al día deja de mirar la pantalla y pregunta en voz alta.
+- Shown cards flip over and each player's made hand is labelled.
+- The winning hand is marked, with how much it takes from each pot.
 
-**H5.1 — Recibir el estado en vivo.** Como invitado, quiero que mi mesa refleje lo que hace el Master, para seguir la explicación sin ir por detrás.
+**H4.6 — Hide opponent names.** As Master, I want to hide the Screen Names of players outside the Room, so we can review a Hand without exposing anyone.
 
-- Un cambio del Master llega a los invitados en menos de 300 ms en condiciones normales.
-- Se propagan la mano seleccionada, la acción actual, la calle y el estado de pausa.
-- Nada de lo que yo haga en mi pantalla altera lo que ven los demás.
+- Hide Opponent Names is part of Playback: toggling it changes every Participant's table at once.
+- It is off whenever a Hand is loaded.
+- When on, every seat whose Screen Name does not belong to a Participant of the Room is shown by its Position instead.
 
-**H5.2 — Ver los controles bloqueados.** Como invitado, quiero ver los controles del reproductor aunque no pueda usarlos, para entender qué está haciendo el Master.
+**H4.7 — Drive the player from the keyboard.** As Master, I want shortcuts, so I can lead the session without leaving the keyboard.
 
-- Los botones mantienen tamaño y posición, y cambian relleno, borde y color de icono.
-- Cada botón bloqueado explica por qué lo está al recibir el foco o el puntero.
-- Nunca se ocultan.
+- Arrows step Action by Action; Shift plus arrow jumps between Streets.
+- Shortcuts do nothing while focus is in a text field.
+- Shortcuts are inactive for Guests.
 
-**H5.3 — Saber si voy al día.** Como invitado, quiero un indicador claro de sincronía, para saber si lo que veo es lo que ve el resto.
+## E5 · Real-time synchronisation
 
-- Hay tres estados: sincronizado, recuperando y sin conexión.
-- En recuperando, la mesa se atenúa para que no me fíe de lo que muestra.
-- El indicador muestra la latencia actual en milisegundos.
+This epic is the product's promise: what the Master does, everyone sees instantly. It is also what decides trust, because a Guest who doesn't know whether they are up to date stops watching the screen and asks out loud.
 
-**H5.4 — Recuperarme de una caída.** Como invitado, quiero volver al estado correcto al recuperar la conexión, para no tener que recargar ni preguntar.
+**H5.1 — Receive Playback live.** As a Guest, I want my table to reflect what the Master does, so I follow the explanation without lagging behind.
 
-- Al reconectar se pide el estado completo de la sala, no los cambios perdidos.
-- La vuelta es directa al estado actual, sin reproducir lo ocurrido mientras tanto.
-- Si la reconexión falla tres veces, se ofrece recargar con un botón.
+- A change by the Master reaches Guests in under 300 ms under normal conditions.
+- The whole Playback propagates: loaded Hand, current Action and Hide Opponent Names.
+- Guests cannot move Playback on their own screen, and nothing a Guest does alters what others see.
 
-**H5.5 — Entrar a mitad de sesión.** Como invitado que llega tarde, quiero caer en el punto exacto donde está el grupo, para incorporarme sin que nadie me ponga al día.
+**H5.2 — See locked controls.** As a Guest, I want to see the player controls even though I can't use them, so I understand what the Master is doing.
 
-- Al entrar recibo la mano en curso y su acción actual.
-- Si no hay ninguna mano en reproducción, veo la cola y un estado de espera.
+- Buttons keep their size and position, and change fill, border and icon colour.
+- Each locked button explains why it is locked on focus or hover.
+- They are never hidden.
 
-**H5.6 — Ver quién sigue conectado.** Como Master, quiero ver el estado de conexión de cada participante, para esperar a alguien antes de seguir.
+**H5.3 — Know whether I'm up to date.** As a Guest, I want a clear sync indicator, so I know whether what I see is what everyone else sees.
 
-- Cada participante muestra un indicador de conectado, inestable o ausente.
-- Una desconexión de más de treinta segundos se marca visiblemente en la lista.
+- There are three states: synced, recovering and offline.
+- While recovering, the table dims so I don't trust what it shows.
+- The indicator shows current latency in milliseconds.
 
-## E6 · Biblioteca y notas
+**H5.4 — Recover from a drop.** As a Guest, I want to get back to the right state when my connection returns, without reloading or asking.
 
-Lo que hace que la herramienta sobreviva a la sesión. Las notas entran en el MVP porque sin ellas la conclusión del grupo se pierde; la biblioteca completa puede esperar a que haya manos acumuladas que merezcan buscarse.
+- On reconnecting, the full Room state is requested, not the missed changes.
+- It jumps straight to the current state, without replaying what happened meanwhile.
+- If reconnection fails three times, a button offers to reload.
 
-**H6.1 — Anotar una mano.** Como participante, quiero escribir la conclusión del grupo sobre la mano, para no repetir la discusión dentro de tres semanas.
+**H5.5 — Join mid-session.** As a Guest arriving late, I want to land exactly where the group is, so I catch up without anyone briefing me.
 
-- La nota queda asociada a la mano, con autor y fecha.
-- Varias personas pueden anotar la misma mano.
-- Las notas se ven en la sala y viajan con la mano a la biblioteca.
+- On joining I receive the loaded Hand and its current Action.
+- If no Hand is loaded, I see the Queue and a waiting state.
 
-**H6.2 — Marcar una mano.** Como participante, quiero marcar una mano, para volver a ella sin buscarla.
+**H5.6 — See who is still connected.** As Master, I want to see each Participant's connection status, so I can wait for someone before going on.
 
-- La marca es personal y no la ven los demás.
-- Las marcadas se filtran en un clic desde la biblioteca.
+- Each Participant shows connected, unstable or away.
+- A disconnection longer than thirty seconds is clearly marked in the list.
 
-**H6.3 — Ver mis manos guardadas.** Como participante, quiero una biblioteca con todo lo que he aportado y todo lo que se ha compartido conmigo, para preparar la próxima sesión.
+## E6 · Library and Notes
 
-- La lista muestra mano, autor, stake, bote final, calle final, fecha y etiquetas.
-- Se ordena por cualquiera de esas columnas y por defecto por bote final descendente.
-- Hay vista de lista y vista de tarjetas.
+What makes the tool outlive the session. Notes are in the MVP because without them the group's conclusion is lost; the full Library can wait until there are enough Hands worth searching.
 
-**H6.4 — Filtrar la biblioteca.** Como participante, quiero filtrar por autor, stake, posición, calle final o bote mínimo, para encontrar un tipo de spot concreto.
+**H6.1 — Write a Note.** As a Participant, I want to write the group's conclusion on a Hand, so we don't repeat the discussion three weeks later.
 
-- Los filtros se combinan y se limpian de una vez.
-- La cabecera dice cuántas manos cumplen el filtro del total.
+- Notes are written inside a Room, on any Hand in its Queue.
+- The Note is attached to the Hand, with its writer and date.
+- Several people can write Notes on the same Hand.
+- Notes are visible wherever the Hand is seen: in any Room and in the Library.
 
-**H6.5 — Etiquetar manos.** Como participante, quiero poner etiquetas a las manos, para agrupar por tema en lugar de por fecha.
+**H6.2 — Edit or delete a Note.** As Master, I want to correct or remove a Note, so the record the group keeps is accurate.
 
-- Puedo crear etiquetas nuevas desde la propia mano.
-- Una mano admite varias etiquetas.
-- Las etiquetas son del grupo, no personales.
+- Only the Master of a Room can edit or delete Notes, on Hands in that Room's Queue.
+- Outside a Room, Notes are read-only. To fix one, bring the Hand into a Room.
+- Deleting a Note can be undone for ten seconds.
 
-**H6.6 — Llevar manos de la biblioteca a una sala.** Como Master, quiero seleccionar varias manos guardadas y añadirlas a la sesión, para preparar el temario antes de que llegue nadie.
+**H6.3 — Mark a Hand.** As a Participant, I want to Mark a Hand, so I can come back to it without searching.
 
-- Puedo seleccionar varias a la vez y añadirlas en una sola acción.
-- Las manos conservan su autor original, no pasan a ser mías.
+- A Mark is personal and nobody else sees it.
+- Marked Hands can be filtered in one click from the Library.
 
-## E7 · Preferencias y perfil
+**H6.4 — See my Library.** As a Participant, I want a Library of the Hands I can reach outside a Room, to prepare the next session.
 
-Casi todo aquí es lectura personal: cómo quiere cada uno ver la mesa. La excepción son los alias de sala, que no son cosméticos — sin ellos la importación no sabe quién es el héroe y la mesa se dibuja mal.
+- My Library holds the Hands I am Author of, plus every Hand that was in the Queue of a Room I was in.
+- The list shows Hand, Author, Stake, final pot, Final Street, Showdown, date and Tags.
+- It sorts by any of those columns, by default by final pot descending.
+- There are a list view and a card view.
 
-**H7.1 — Declarar mis alias de sala.** Como participante, quiero guardar los nombres con los que juego, para que se me reconozca automáticamente en cada historial.
+**H6.5 — Filter the Library.** As a Participant, I want to filter by Author, Stake, Position, Final Street, Showdown or minimum pot, to find a specific kind of spot.
 
-- Admite varios alias separados por comas.
-- Se usan al importar para detectar el asiento del héroe.
-- Cambiarlos no reprocesa las manos ya importadas.
+- Filters combine and clear in one go.
+- The header says how many Hands match out of the total.
 
-**H7.2 — Elegir el estilo de baraja.** Como participante, quiero elegir entre la baraja clásica y la de palo lleno, para leer las cartas como me resulta natural.
+**H6.6 — Tag Hands.** As a Participant, I want to put Tags on Hands, to group them by topic instead of by date.
 
-- La elección es personal y no cambia lo que ven los demás en la sala.
-- El cambio se aplica al instante, sin recargar.
-- Se recuerda entre sesiones y dispositivos.
+- I can create new Tags from the Hand itself.
+- A Hand can have several Tags.
+- Tags belong to the Hand: everyone who can see the Hand sees them.
 
-**H7.3 — Elegir la unidad de stacks y botes.** Como participante, quiero ver las cifras en ciegas grandes, en fichas o en ambas, para pensar en la unidad en la que razono.
+**H6.7 — Delete a Hand.** As Author, I want to withdraw a Hand I shared.
 
-- La unidad elegida manda en la mesa, en la cola y en la biblioteca a la vez.
-- Con ambas activas, la principal es la ciega grande y la secundaria va atenuada.
+- Only the Author can delete a Hand.
+- It disappears for everyone, from every Library and Queue, together with its Notes and Tags.
+- Deletion asks for confirmation, since it cannot be undone.
 
-**H7.4 — Ajustar la lectura de la mesa.** Como participante, quiero decidir si veo el porcentaje del bote y si uso baraja de cuatro colores, para quitar de la pantalla lo que no miro.
+**H6.8 — Bring Library Hands into a Room.** As Master, I want to select several saved Hands and add them to the Queue, so I can prepare the agenda before anyone arrives.
 
-- Cada opción se aplica al momento y se previsualiza en el propio ajuste.
-- La baraja de palo lleno lleva los cuatro colores siempre.
+- I can select several at once and add them in a single action.
+- The Hands keep their original Author; they do not become mine.
 
-**H7.5 — Fijar la velocidad por defecto.** Como Master, quiero que la reproducción automática arranque siempre a mi velocidad, para no ajustarla en cada mano.
+## E7 · Preferences and profile
 
-- Solo se aplica cuando soy yo quien controla la sala.
-- Puedo cambiarla en la propia mano sin alterar el valor por defecto.
+Almost everything here is personal reading: how each person wants to see the table. The exception is Screen Names, which are not cosmetic: without them import cannot tell who the Author of a Hand is.
 
-**H7.6 — Ocultar los nicks de los rivales.** Como participante, quiero sustituir los nombres de los rivales por su posición, para compartir una mano sin exponer a nadie.
+All preferences belong to the Participant's identity: they persist across Rooms, and across devices once there is an account.
 
-- Es un ajuste del autor de la mano y viaja con ella a la sala.
-- Los alias del propio grupo no se ocultan.
+**H7.1 — Declare my Screen Names.** As a Participant, I want to store the names I play under, so I am recognised automatically as Author in every Hand History.
 
-## Alcance del MVP y fuera de alcance
+- Accepts several Screen Names separated by commas.
+- They are used at import to match the Hero to a Participant.
+- Changing them does not reprocess Hands already imported.
 
-El MVP es una sesión completa del martes por la noche, de principio a fin, sin nada más. La prueba de que está listo es poder cancelar la llamada de pantalla compartida y no echarla de menos.
+**H7.2 — Change my Display Name.** As a Participant, I want to choose how others see me in Runout.
 
-Entra en la primera versión: crear sala y entrar por código o enlace, importar de los tres trackers principales, cola compartida con sus metadatos, reproductor completo calle a calle, sincronización con indicador de estado, notas por mano y los ajustes de lectura de la mesa.
+- One Display Name per person, reused across Rooms.
+- It can be changed at any time, and the change shows in the current Room immediately.
 
-Queda fuera a propósito, con su motivo:
+**H7.3 — Choose the deck style.** As a Participant, I want to choose between the classic deck and the full-suit deck, to read the cards the way that comes naturally.
 
-| Fuera del MVP | Por qué |
+- The choice is personal and does not change what others see.
+- The change applies instantly, without reloading.
+
+**H7.4 — Choose the Display Unit.** As a Participant, I want to see quantities in big blinds, as Amounts, or both, to think in the unit I reason in.
+
+- The chosen Display Unit applies to the table, the Queue and the Library at once.
+- With both on, big blinds are primary and the Amount is secondary and dimmed.
+
+**H7.5 — Tune table reading.** As a Participant, I want to decide whether I see the pot percentage and whether I use a four-colour deck, to remove from the screen what I don't look at.
+
+- Each option applies immediately and is previewed within the setting itself.
+- The full-suit deck is always four-colour.
+
+**H7.6 — Choose the language.** As a Participant, I want the interface in my language.
+
+- Spanish and English are available; Spanish is the default.
+- Poker terms are the ones the group uses out loud in that language.
+
+**H7.7 — Create an account.** As a Participant, I want an account, to use my Library, Screen Names and preferences on another device.
+
+- Creating an account keeps everything my anonymous identity already owns.
+- An account is never required to create or join a Room.
+
+## MVP scope and out of scope
+
+The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.
+
+In the first version: create a Room and join by code or link, the Room lifecycle and the Master role, import from the three main Trackers, the shared Queue with its metadata, the full player stepping Action by Action and Street by Street, synchronisation with its indicator, Notes, the table-reading preferences and the interface in Spanish and English. Participants are anonymous browser identities; the full Library and accounts (H6.4–H6.8, H7.7) come after.
+
+Deliberately out, with the reason:
+
+| Out of the MVP | Why |
 | --- | --- |
-| Audio y vídeo en la sala | El grupo ya tiene Discord y resolverlo bien es un producto entero |
-| Dibujar o señalar sobre la mesa | Aporta menos que la voz y multiplica el estado a sincronizar |
-| Cálculo de equity o rangos | Convierte la herramienta en un solver, que no es lo que falta |
-| Chat de texto en la sala | La conversación va por voz; las notas cubren lo que hay que conservar |
-| Importación automática desde el tracker | Exige instalar algo en el escritorio de cada uno |
-| Torneos y mesas de más de nueve asientos | El grupo juega cash 6-max; ampliarlo sin necesidad complica la mesa |
-| Estadísticas agregadas del grupo | No hay datos suficientes hasta que se acumulen sesiones |
-| Cuentas de equipo y facturación | No hay modelo de negocio que validar todavía |
+| Audio and video in the Room | The group already has Discord, and doing it well is a whole product |
+| Drawing or pointing on the table | Adds less than voice and multiplies the state to synchronise |
+| Automatic playback | The conversation sets the pace; the Master steps every Action |
+| Guests navigating on their own | Everyone must see the same Playback; that is the product |
+| Requesting the Master role in the app | The group asks out loud and the Master hands it over |
+| Equity or range calculation | Turns the tool into a solver, which is not what is missing |
+| Text chat in the Room | Conversation goes over voice; Notes cover what must be kept |
+| Automatic import from the Tracker | Requires installing something on each desktop |
+| Tournaments and tables of more than nine seats | The group plays cash; widening it without need complicates the table |
+| Aggregate group statistics | Not enough data until sessions accumulate |
+| Study groups or teams inside the app, and billing | The group lives outside Runout, and there is no business model to validate yet |
 
-Los dos supuestos sobre los que se apoya todo esto conviene comprobarlos pronto: que los historiales de los tres trackers se parsean con fiabilidad suficiente, y que la latencia de sincronización se mantiene por debajo de lo que el ojo nota mientras alguien habla.
+Two assumptions carry all of this and should be tested early: that Hand Histories from the three Trackers parse reliably enough, and that sync latency stays below what the eye notices while someone is talking.
 
-## Criterios transversales y glosario
+## Cross-cutting criteria
 
-Estos criterios se aplican a toda historia del documento y no se repiten en cada una. Una historia no está terminada si los incumple.
+These criteria apply to every story in this document and are not repeated in each one. A story is not done if it breaks them.
 
-- Toda cifra de dinero se muestra en la unidad que el usuario haya elegido, nunca en una mezcla sin etiquetar.
-- Ningún control se oculta por falta de permiso: se muestra bloqueado y explica por qué.
-- Toda acción destructiva se puede deshacer, o pide confirmación si no se puede.
-- El texto mantiene contraste 4,5:1 sobre su fondo, y los objetivos táctiles miden 44 px como mínimo.
-- Todo control es alcanzable y operable con teclado, y los botones de solo icono llevan etiqueta accesible.
-- Un error de red nunca deja la pantalla en blanco: se dice qué ha fallado y qué se puede hacer.
-- La interfaz está en español, con los términos de póker que el grupo usa en voz alta.
+- Every quantity is shown in the Participant's chosen Display Unit, never in an unlabelled mix.
+- No control is hidden for lack of permission: it is shown locked and explains why.
+- Every destructive action can be undone, or asks for confirmation if it can't.
+- Text keeps 4.5:1 contrast against its background, and touch targets are at least 44 px.
+- Every control is reachable and operable by keyboard, and icon-only buttons carry an accessible label.
+- A network error never leaves a blank screen: it says what failed and what can be done.
+- The interface is localised, Spanish by default and English, with the poker terms the group uses out loud.
 
-Sobre las historias: cada una es independiente y se puede construir sin esperar a las demás de su épica, está escrita como conversación y no como especificación cerrada, entrega valor visible por sí sola, es lo bastante pequeña para caber en una iteración y sus criterios de aceptación son comprobables sin ambigüedad. Las que no cumplan alguna de esas condiciones al planificar conviene partirlas antes de estimarlas.
-
-| Término | Qué significa aquí |
-| --- | --- |
-| Mano | Una partida completa, del reparto al showdown o al último fold |
-| Calle | Cada fase de apuestas: preflop, flop, turn, river y showdown |
-| Board o runout | Las cartas comunitarias tal como han ido saliendo |
-| Ciega grande (BB) | Unidad de medida de stacks y botes, independiente del stake |
-| Stack | Fichas que tiene un jugador delante al empezar la mano |
-| Bote principal | El bote que disputan todos los jugadores activos |
-| Bote lateral | El bote extra que disputan solo quienes tenían fichas de sobra tras un all-in |
-| SPR | Relación entre stack efectivo y bote, usada para juzgar el compromiso |
-| Héroe | El jugador desde cuyo punto de vista se grabó la mano |
-| Posiciones | UTG, HJ, CO, BTN, SB y BB en una mesa de seis |
-| Historial | El texto que exporta el tracker con todo lo ocurrido en la mano |
-| Tracker | Programa que registra las manos jugadas: PokerTracker 4, Hold'em Manager 3, Hand2Note |
+About the stories: each one is independent and can be built without waiting for the rest of its epic, is written as a conversation rather than a closed specification, delivers visible value on its own, is small enough to fit in one iteration, and has acceptance criteria that can be checked without ambiguity. Any that fails one of these at planning time should be split before being estimated.
