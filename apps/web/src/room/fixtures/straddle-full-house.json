@@ -1,0 +1,1138 @@
+{
+  "id": "straddle-full-house",
+  "stake": {
+    "limit": "no-limit",
+    "smallBlind": 25,
+    "bigBlind": 50,
+    "currency": "USD"
+  },
+  "tableSize": 6,
+  "timeline": {
+    "seats": [
+      {
+        "seat": 1,
+        "screenName": "Birch1",
+        "position": "HJ",
+        "startingStack": 5000
+      },
+      {
+        "seat": 2,
+        "screenName": "Cedar2",
+        "position": "CO",
+        "startingStack": 5000
+      },
+      {
+        "seat": 3,
+        "screenName": "Hero6",
+        "position": "BTN",
+        "startingStack": 5000
+      },
+      {
+        "seat": 4,
+        "screenName": "Larch4",
+        "position": "SB",
+        "startingStack": 5000
+      },
+      {
+        "seat": 5,
+        "screenName": "Maple5",
+        "position": "BB",
+        "startingStack": 5000
+      },
+      {
+        "seat": 6,
+        "screenName": "Olive6",
+        "position": "UTG",
+        "startingStack": 5000
+      }
+    ],
+    "buttonSeat": 3,
+    "hero": {
+      "screenName": "Hero6",
+      "cards": [
+        "9s",
+        "9h"
+      ]
+    },
+    "states": [
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 175,
+        "pots": [],
+        "toAct": "Birch1",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 5000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 5000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "action": null,
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 175,
+        "pots": [],
+        "toAct": "Cedar2",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 5000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 5000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Birch1",
+          "type": "fold",
+          "allIn": false
+        },
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 275,
+        "pots": [],
+        "toAct": "Hero6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 5000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Cedar2",
+          "type": "call",
+          "amount": 100,
+          "allIn": false
+        },
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 675,
+        "pots": [],
+        "toAct": "Larch4",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4600,
+            "bet": 400,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Hero6",
+          "type": "raise",
+          "amount": 300,
+          "to": 400,
+          "allIn": false
+        },
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 675,
+        "pots": [],
+        "toAct": "Maple5",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4600,
+            "bet": 400,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Larch4",
+          "type": "fold",
+          "allIn": false
+        },
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 675,
+        "pots": [],
+        "toAct": "Olive6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4600,
+            "bet": 400,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Maple5",
+          "type": "fold",
+          "allIn": false
+        },
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "preflop",
+        "board": [],
+        "pot": 975,
+        "pots": [],
+        "toAct": "Cedar2",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 100,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4600,
+            "bet": 400,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 50,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4600,
+            "bet": 400,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Olive6",
+          "type": "call",
+          "amount": 300,
+          "allIn": false
+        },
+        "effectiveStack": 5000,
+        "spr": null,
+        "result": null
+      },
+      {
+        "street": "flop",
+        "board": [
+          "9d",
+          "5c",
+          "2h"
+        ],
+        "pot": 975,
+        "pots": [
+          {
+            "amount": 975,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": "Olive6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4600,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4600,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          }
+        ],
+        "action": {
+          "street": "preflop",
+          "screenName": "Cedar2",
+          "type": "fold",
+          "allIn": false
+        },
+        "effectiveStack": 4600,
+        "spr": 4.717948717948718,
+        "result": null
+      },
+      {
+        "street": "flop",
+        "board": [
+          "9d",
+          "5c",
+          "2h"
+        ],
+        "pot": 975,
+        "pots": [
+          {
+            "amount": 975,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": "Hero6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4600,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4600,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          }
+        ],
+        "action": {
+          "street": "flop",
+          "screenName": "Olive6",
+          "type": "check",
+          "allIn": false
+        },
+        "effectiveStack": 4600,
+        "spr": 4.717948717948718,
+        "result": null
+      },
+      {
+        "street": "flop",
+        "board": [
+          "9d",
+          "5c",
+          "2h"
+        ],
+        "pot": 1425,
+        "pots": [
+          {
+            "amount": 975,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": "Olive6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4150,
+            "bet": 450,
+            "folded": false,
+            "allIn": false,
+            "committed": 850
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 4600,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 400
+          }
+        ],
+        "action": {
+          "street": "flop",
+          "screenName": "Hero6",
+          "type": "bet",
+          "amount": 450,
+          "allIn": false
+        },
+        "effectiveStack": 4600,
+        "spr": 4.717948717948718,
+        "result": null
+      },
+      {
+        "street": "flop",
+        "board": [
+          "9d",
+          "5c",
+          "2h"
+        ],
+        "pot": 2925,
+        "pots": [
+          {
+            "amount": 975,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": "Hero6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 4150,
+            "bet": 450,
+            "folded": false,
+            "allIn": false,
+            "committed": 850
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 3100,
+            "bet": 1500,
+            "folded": false,
+            "allIn": false,
+            "committed": 1900
+          }
+        ],
+        "action": {
+          "street": "flop",
+          "screenName": "Olive6",
+          "type": "raise",
+          "amount": 1050,
+          "to": 1500,
+          "allIn": false
+        },
+        "effectiveStack": 4600,
+        "spr": 4.717948717948718,
+        "result": null
+      },
+      {
+        "street": "turn",
+        "board": [
+          "9d",
+          "5c",
+          "2h",
+          "Jc"
+        ],
+        "pot": 3975,
+        "pots": [
+          {
+            "amount": 3975,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": "Olive6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 3100,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1900
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 3100,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1900
+          }
+        ],
+        "action": {
+          "street": "flop",
+          "screenName": "Hero6",
+          "type": "call",
+          "amount": 1050,
+          "allIn": false
+        },
+        "effectiveStack": 3100,
+        "spr": 0.779874213836478,
+        "result": null
+      },
+      {
+        "street": "turn",
+        "board": [
+          "9d",
+          "5c",
+          "2h",
+          "Jc"
+        ],
+        "pot": 7075,
+        "pots": [
+          {
+            "amount": 3975,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": "Hero6",
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 3100,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1900
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 0,
+            "bet": 3100,
+            "folded": false,
+            "allIn": true,
+            "committed": 5000
+          }
+        ],
+        "action": {
+          "street": "turn",
+          "screenName": "Olive6",
+          "type": "bet",
+          "amount": 3100,
+          "allIn": true
+        },
+        "effectiveStack": 3100,
+        "spr": 0.779874213836478,
+        "result": null
+      },
+      {
+        "street": "river",
+        "board": [
+          "9d",
+          "5c",
+          "2h",
+          "Jc",
+          "5h"
+        ],
+        "pot": 10175,
+        "pots": [
+          {
+            "amount": 10175,
+            "contestants": [
+              "Hero6",
+              "Olive6"
+            ]
+          }
+        ],
+        "toAct": null,
+        "players": [
+          {
+            "screenName": "Birch1",
+            "stack": 5000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Cedar2",
+            "stack": 4900,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero6",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 5000
+          },
+          {
+            "screenName": "Larch4",
+            "stack": 4975,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "Maple5",
+            "stack": 4950,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 50
+          },
+          {
+            "screenName": "Olive6",
+            "stack": 9875,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 5000
+          }
+        ],
+        "action": {
+          "street": "turn",
+          "screenName": "Hero6",
+          "type": "call",
+          "amount": 3100,
+          "allIn": true
+        },
+        "effectiveStack": 0,
+        "spr": 0,
+        "result": {
+          "revealed": [
+            {
+              "screenName": "Hero6",
+              "cards": [
+                "9s",
+                "9h"
+              ],
+              "madeHand": {
+                "category": "full-house",
+                "ranks": [
+                  "9",
+                  "5"
+                ],
+                "cards": [
+                  "9s",
+                  "9h",
+                  "9d",
+                  "5c",
+                  "5h"
+                ]
+              }
+            },
+            {
+              "screenName": "Olive6",
+              "cards": [
+                "Jh",
+                "Js"
+              ],
+              "madeHand": {
+                "category": "full-house",
+                "ranks": [
+                  "J",
+                  "5"
+                ],
+                "cards": [
+                  "Jh",
+                  "Js",
+                  "Jc",
+                  "5c",
+                  "5h"
+                ]
+              }
+            }
+          ],
+          "pots": [
+            {
+              "amount": 10175,
+              "contestants": [
+                "Hero6",
+                "Olive6"
+              ],
+              "winners": [
+                {
+                  "screenName": "Olive6",
+                  "amount": 9875
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "showdown": true
+  }
+}

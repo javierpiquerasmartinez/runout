@@ -11,12 +11,16 @@ const state = (street: Street): TableState => ({
   street,
   board: street === 'flop' ? ['2c', '10h', '4c'] : [],
   pot: 15,
+  pots: [],
   toAct: null,
   action: null,
   players: [
-    { screenName: 'Alder239', stack: 1000, bet: 0, folded: false },
-    { screenName: 'iMapleAA', stack: 1000, bet: 0, folded: false },
+    { screenName: 'Alder239', stack: 1000, bet: 0, folded: false, allIn: false, committed: 0 },
+    { screenName: 'iMapleAA', stack: 1000, bet: 0, folded: false, allIn: false, committed: 0 },
   ],
+  effectiveStack: 1000,
+  spr: null,
+  result: null,
 })
 
 /** Heads-up, won by a fold on the flop: Actions 1–3, the flop dealt at Action 2. */

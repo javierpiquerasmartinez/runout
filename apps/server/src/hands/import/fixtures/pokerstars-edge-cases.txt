@@ -1,0 +1,167 @@
+PokerStars Hand #262130000101:  Hold'em No Limit ($0.25/$0.50 USD) - 2026/09/10 21:00:00 CET [2026/09/10 15:00:00 ET]
+Table 'Alcyone' 2-max Seat #1 is the button
+Seat 1: HeroHU ($50 in chips)
+Seat 2: VillainHU ($62.30 in chips)
+HeroHU: posts small blind $0.25
+VillainHU: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to HeroHU [Ah Kd]
+HeroHU: raises $1 to $1.50
+VillainHU: folds
+Uncalled bet ($1) returned to HeroHU
+HeroHU collected $1 from pot
+HeroHU: doesn't show hand
+*** SUMMARY ***
+Total pot $1 | Rake $0
+Seat 1: HeroHU (button) (small blind) collected ($1)
+Seat 2: VillainHU (big blind) folded before Flop
+
+
+PokerStars Hand #262130000102:  Hold'em No Limit ($0.25/$0.50 USD) - 2026/09/10 21:05:00 CET [2026/09/10 15:05:00 ET]
+Table 'Pleione' 9-max Seat #9 is the button
+Seat 1: Pine_SB ($30 in chips)
+Seat 2: Oak_BB ($25 in chips)
+Seat 3: Elm_UTG ($10 in chips)
+Seat 4: Ash4 ($50 in chips)
+Seat 5: Fir5 ($50 in chips)
+Seat 6: Yew6 ($50 in chips)
+Seat 7: Hero9max ($80 in chips)
+Seat 8: Rowan8 ($50 in chips)
+Seat 9: Spruce9 ($60 in chips)
+Pine_SB: posts the ante $0.05
+Oak_BB: posts the ante $0.05
+Elm_UTG: posts the ante $0.05
+Ash4: posts the ante $0.05
+Fir5: posts the ante $0.05
+Yew6: posts the ante $0.05
+Hero9max: posts the ante $0.05
+Rowan8: posts the ante $0.05
+Spruce9: posts the ante $0.05
+Pine_SB: posts small blind $0.25
+Oak_BB: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to Hero9max [Ah Ad]
+Elm_UTG: raises $9.45 to $9.95 and is all-in
+Ash4: folds
+Fir5: folds
+Yew6: folds
+Hero9max: calls $9.95
+Rowan8: folds
+Spruce9: calls $9.95
+Pine_SB: folds
+Oak_BB: raises $15 to $24.95 and is all-in
+Hero9max: raises $55 to $79.95 and is all-in
+Spruce9: calls $50 and is all-in
+Uncalled bet ($20) returned to Hero9max
+*** FLOP *** [Kh 9c 4d]
+*** TURN *** [Kh 9c 4d] [2s]
+*** RIVER *** [Kh 9c 4d 2s] [7h]
+*** SHOW DOWN ***
+Oak_BB: shows [Qs Qc] (a pair of Queens)
+Elm_UTG: shows [Ks Kd] (three of a kind, Kings)
+Hero9max: shows [Ah Ad] (a pair of Aces)
+Spruce9: shows [Ac Qd] (high card Ace)
+Hero9max collected $69 from side pot-2
+Hero9max collected $44 from side pot-1
+Elm_UTG collected $39.50 from main pot
+*** SUMMARY ***
+Total pot $155.50 Main pot $39.50. Side pot-1 $44. Side pot-2 $69. | Rake $3
+Board [Kh 9c 4d 2s 7h]
+Seat 1: Pine_SB (small blind) folded before Flop
+Seat 2: Oak_BB (big blind) showed [Qs Qc] and lost with a pair of Queens
+Seat 3: Elm_UTG showed [Ks Kd] and won ($39.50) with three of a kind, Kings
+Seat 4: Ash4 folded before Flop (didn't bet)
+Seat 5: Fir5 folded before Flop (didn't bet)
+Seat 6: Yew6 folded before Flop (didn't bet)
+Seat 7: Hero9max showed [Ah Ad] and won ($113) with a pair of Aces
+Seat 8: Rowan8 folded before Flop (didn't bet)
+Seat 9: Spruce9 (button) showed [Ac Qd] and lost with high card Ace
+
+
+PokerStars Hand #262130000103:  Hold'em No Limit ($0.25/$0.50 USD) - 2026/09/10 21:10:00 CET [2026/09/10 15:10:00 ET]
+Table 'Merope' 6-max Seat #3 is the button
+Seat 1: Birch1 ($50 in chips)
+Seat 2: Cedar2 ($50 in chips)
+Seat 3: Hero6 ($50 in chips)
+Seat 4: Larch4 ($50 in chips)
+Seat 5: Maple5 ($50 in chips)
+Seat 6: Olive6 ($50 in chips)
+Larch4: posts small blind $0.25
+Maple5: posts big blind $0.50
+Olive6: posts straddle $1
+*** HOLE CARDS ***
+Dealt to Hero6 [9s 9h]
+Birch1: folds
+Cedar2: calls $1
+Hero6: raises $3 to $4
+Larch4: folds
+Maple5: folds
+Olive6: calls $3
+Cedar2: folds
+*** FLOP *** [9d 5c 2h]
+Olive6: checks
+Hero6: bets $4.50
+Olive6: raises $10.50 to $15
+Hero6: calls $10.50
+*** TURN *** [9d 5c 2h] [Jc]
+Olive6: bets $31 and is all-in
+Hero6: calls $31 and is all-in
+*** RIVER *** [9d 5c 2h Jc] [5h]
+*** SHOW DOWN ***
+Olive6: shows [Jh Js] (a full house, Jacks full of Fives)
+Hero6: shows [9s 9h] (a full house, Nines full of Fives)
+Olive6 collected $98.75 from pot
+*** SUMMARY ***
+Total pot $101.75 | Rake $3
+Board [9d 5c 2h Jc 5h]
+Seat 1: Birch1 folded before Flop (didn't bet)
+Seat 2: Cedar2 folded before Flop
+Seat 3: Hero6 (button) showed [9s 9h] and lost with a full house, Nines full of Fives
+Seat 4: Larch4 (small blind) folded before Flop
+Seat 5: Maple5 (big blind) folded before Flop
+Seat 6: Olive6 showed [Jh Js] and won ($98.75) with a full house, Jacks full of Fives
+
+
+PokerStars Hand #262130000104:  Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/12 22:10:00 CET [2026/09/12 16:10:00 ET]
+Table 'Taygeta' 6-max Seat #2 is the button
+Seat 1: Aspen1 (€10 in chips)
+Seat 2: Hero4 (€10 in chips)
+Seat 3: Poplar3 (€10 in chips)
+Seat 4: Willow4 (€10 in chips)
+Poplar3: posts small blind €0.05
+Willow4: posts big blind €0.10
+*** HOLE CARDS ***
+Dealt to Hero4 [Ad Jc]
+Aspen1: calls €0.10
+Hero4: raises €0.30 to €0.40
+Poplar3: folds
+Willow4: calls €0.30
+Aspen1: calls €0.30
+*** FLOP *** [As 8h 3c]
+Willow4: checks
+Aspen1: checks
+Hero4: bets €0.60
+Willow4: calls €0.60
+Aspen1: calls €0.60
+*** TURN *** [As 8h 3c] [Kd]
+Willow4: checks
+Aspen1: checks
+Hero4: checks
+*** RIVER *** [As 8h 3c Kd] [Qs]
+Willow4: checks
+Aspen1: bets €1
+Hero4: calls €1
+Willow4: calls €1
+*** SHOW DOWN ***
+Aspen1: shows [Ah Jd] (a pair of Aces)
+Hero4: shows [Ad Jc] (a pair of Aces)
+Willow4: mucks hand
+Hero4 collected €2.98 from pot
+Aspen1 collected €2.97 from pot
+*** SUMMARY ***
+Total pot €6.05 | Rake €0.10
+Board [As 8h 3c Kd Qs]
+Seat 1: Aspen1 showed [Ah Jd] and won (€2.97) with a pair of Aces
+Seat 2: Hero4 (button) showed [Ad Jc] and won (€2.98) with a pair of Aces
+Seat 3: Poplar3 (small blind) folded before Flop
+Seat 4: Willow4 (big blind) mucked

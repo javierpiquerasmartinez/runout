@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createTranslator } from '../i18n/translator'
 import type { HandWithTimeline, TableState } from './hand'
+import nineMaxSidePots from './fixtures/nine-max-side-pots.json'
+import splitPot from './fixtures/split-pot.json'
+import straddleFullHouse from './fixtures/straddle-full-house.json'
 import { tableView } from './tableView'
 
 const es = createTranslator('es')
@@ -8,7 +11,11 @@ const en = createTranslator('en')
 
 const players = (
   ...rows: [string, number, number, boolean][]
-): TableState['players'] => rows.map(([screenName, stack, bet, folded]) => ({ screenName, stack, bet, folded }))
+): TableState['players'] =>
+  rows.map(([screenName, stack, bet, folded]) => ({ screenName, stack, bet, folded, allIn: false, committed: 0 }))
+
+/** What the tests on this Hand don't look at. */
+const rest = { pots: [], effectiveStack: 1136, spr: null, result: null }
 
 /** The first Actions of a real €0.05/€0.10 Hand, from the Hero's seat 5 at a 6-max table. */
 const hand: HandWithTimeline = {
@@ -31,6 +38,7 @@ const hand: HandWithTimeline = {
         pot: 15,
         toAct: 'Cedar31lse',
         action: null,
+        ...rest,
         players: players(
           ['Alder239', 1131, 5, false],
           ['BIRCHWOODS', 1194, 10, false],
@@ -44,6 +52,7 @@ const hand: HandWithTimeline = {
         pot: 15,
         toAct: 'iMapleAA',
         action: { street: 'preflop', screenName: 'Cedar31lse', type: 'fold', allIn: false },
+        ...rest,
         players: players(
           ['Alder239', 1131, 5, false],
           ['BIRCHWOODS', 1194, 10, false],
@@ -57,6 +66,7 @@ const hand: HandWithTimeline = {
         pot: 45,
         toAct: 'Alder239',
         action: { street: 'preflop', screenName: 'iMapleAA', type: 'raise', amount: 20, to: 30, allIn: false },
+        ...rest,
         players: players(
           ['Alder239', 1131, 5, false],
           ['BIRCHWOODS', 1194, 10, false],
@@ -70,6 +80,7 @@ const hand: HandWithTimeline = {
         pot: 65,
         toAct: 'BIRCHWOODS',
         action: { street: 'preflop', screenName: 'BIRCHWOODS', type: 'call', amount: 20, allIn: false },
+        ...rest,
         players: players(
           ['Alder239', 1131, 0, true],
           ['BIRCHWOODS', 1174, 0, false],
@@ -110,7 +121,7 @@ describe('tableView', () => {
   it('starts at the Initial State with the blinds in front of the players who posted them', () => {
     const view = tableView(hand, 0, es)
 
-    expect(view.seats.map((seat) => seat.bet)).toEqual([null, '0,5 BB', '1 BB', null])
+    expect(view.seats.map((seat) => seat.chip?.label ?? null)).toEqual([null, '0,5 BB', '1 BB', null])
     expect(view.pot).toBe('1,5 BB')
     expect(view.lastAction).toBe('Ciegas puestas')
   })
@@ -157,5 +168,197 @@ describe('tableView', () => {
     expect(tableView(hand, 0, es)).toMatchObject({ canGoBack: false, canGoForward: true })
     expect(tableView(hand, 2, es)).toMatchObject({ canGoBack: true, canGoForward: true })
     expect(tableView(hand, 3, es)).toMatchObject({ canGoBack: true, canGoForward: false })
+  })
+})
+
+/*
+ * Real Timelines, as the server computes them for Hands in its fixture
+ * corpus ($0.25/$0.50 and €0.05/€0.10).
+ */
+const straddled = straddleFullHouse as HandWithTimeline
+const nineMax = nineMaxSidePots as HandWithTimeline
+const split = splitPot as HandWithTimeline
+
+describe('tableView: pots and bets', () => {
+  it('separates the pot gathered from earlier Streets from what is in play on this one', () => {
+    // Flop: Olive6 checks, Hero6 bets $4.50 into $9.75.
+    const view = tableView(straddled, 9, es)
+
+    expect(view.pot).toBe('28,5 BB')
+    expect(view.potDetail).toBe('19,5 BB + 9 BB en juego')
+    expect(view.sidePots).toBeNull()
+    expect(tableView(straddled, 9, en).potDetail).toBe('19.5 BB + 9 BB in play')
+  })
+
+  it('shows each bet with its share of the pot it went into, and a check as a check', () => {
+    const chips = (index: number) =>
+      Object.fromEntries(tableView(straddled, index, es).seats.map((seat) => [seat.screenName, seat.chip]))
+
+    expect(chips(9)).toMatchObject({
+      Hero6: { kind: 'bet', label: '9 BB', potShare: '46% bote' },
+      Olive6: { kind: 'check', label: 'check', potShare: null },
+    })
+    // Olive6 raises to $15 into $14.25; Hero6's bet keeps the share it was made with.
+    expect(chips(10)).toMatchObject({
+      Hero6: { kind: 'bet', label: '9 BB', potShare: '46% bote' },
+      Olive6: { kind: 'bet', label: '30 BB', potShare: '105% bote' },
+    })
+  })
+
+  it('shows blinds and a straddle without a share of the pot', () => {
+    const view = tableView(straddled, 0, es)
+
+    expect(view.seats.filter((seat) => seat.chip).map((seat) => [seat.screenName, seat.chip])).toEqual([
+      ['Larch4', { kind: 'bet', label: '0,5 BB', potShare: null }],
+      ['Maple5', { kind: 'bet', label: '1 BB', potShare: null }],
+      ['Olive6', { kind: 'bet', label: '2 BB', potShare: null }],
+    ])
+  })
+
+  it('draws an all-in bet in red, always with its amount, and says the player is all in', () => {
+    // Turn: Olive6 bets her last $31.
+    const olive = tableView(straddled, 12, es).seats.find((seat) => seat.screenName === 'Olive6')!
+
+    expect(olive.chip).toEqual({ kind: 'all-in', label: 'all-in 62 BB', potShare: null })
+    expect(olive.stack).toBe('0 BB')
+    expect(olive.allIn).toBe('all-in 100 BB')
+  })
+
+  it('shows side pots apart, each with who contests it', () => {
+    const view = tableView(nineMax, nineMax.timeline.states.length - 1, es)
+
+    expect(view.pot).toBe('311 BB')
+    expect(view.potDetail).toBeNull()
+    expect(view.sidePots).toEqual([
+      { label: 'BOTE PRINCIPAL', amount: '81 BB', contestants: '4 jugadores' },
+      { label: 'BOTE LATERAL 1', amount: '90 BB', contestants: '3 jugadores' },
+      { label: 'BOTE LATERAL 2', amount: '140 BB', contestants: 'Hero9max vs Spruce9' },
+    ])
+  })
+
+  it('gathers antes into the pot before the first Action, with the blinds in play', () => {
+    expect(tableView(nineMax, 0, es).potDetail).toBe('0,9 BB + 1,5 BB en juego')
+    expect(tableView(nineMax, 0, en).pot).toBe('2.4 BB')
+  })
+})
+
+describe('tableView: the log of the current Street', () => {
+  it('lists this Street’s Actions, highlighting the latest, then who is to act, with SPR and the effective stack', () => {
+    expect(tableView(straddled, 9, es).log).toEqual({
+      label: 'Flop',
+      entries: [
+        { text: 'Olive6 pasa', tone: 'past' },
+        { text: 'Hero6 apuesta 9 BB', tone: 'latest' },
+        { text: 'Olive6 · pendiente', tone: 'pending' },
+      ],
+      aside: 'SPR 4,7 · efectivo 92 BB',
+    })
+  })
+
+  it('starts a new Street with nobody having acted yet', () => {
+    // Cedar2 folds, closing preflop.
+    expect(tableView(straddled, 7, en).log).toEqual({
+      label: 'Flop',
+      entries: [{ text: 'Olive6 · to act', tone: 'pending' }],
+      aside: 'SPR 4.7 · effective 92 BB',
+    })
+  })
+
+  it('gives only the effective stack preflop', () => {
+    expect(tableView(nineMax, 0, es).log).toEqual({
+      label: 'Preflop',
+      entries: [{ text: 'Elm_UTG · pendiente', tone: 'pending' }],
+      aside: 'efectivo 120 BB',
+    })
+  })
+
+  it('ends at Showdown with the cards shown, who won and the pots', () => {
+    const last = nineMax.timeline.states.length - 1
+
+    expect(tableView(nineMax, last, es).log).toEqual({
+      label: 'Showdown',
+      entries: [
+        { text: 'Oak_BB muestra Q♠Q♣', tone: 'past' },
+        { text: 'Elm_UTG muestra K♠K♦', tone: 'past' },
+        { text: 'Spruce9 muestra A♣Q♦', tone: 'past' },
+        { text: 'Elm_UTG gana 79 BB', tone: 'winner' },
+        { text: 'Hero9max gana 226 BB', tone: 'winner' },
+      ],
+      aside: 'Bote 81 BB + 90 BB + 140 BB laterales',
+    })
+    expect(tableView(straddled, 13, en).log.aside).toBe('Pot 203.5 BB')
+  })
+})
+
+describe('tableView: Showdown', () => {
+  const last = (hand: HandWithTimeline) => hand.timeline.states.length - 1
+  const seat = (hand: HandWithTimeline, name: string, i18n = es) =>
+    tableView(hand, last(hand), i18n).seats.find((s) => s.screenName === name)!
+
+  it('keeps opponents’ cards face down until Showdown', () => {
+    expect(tableView(straddled, 12, es).seats.map((s) => [s.screenName, s.cards])).toContainEqual(['Olive6', null])
+  })
+
+  it('turns the shown cards face up, labelled with each made hand in the UI language', () => {
+    expect(seat(straddled, 'Olive6')).toMatchObject({
+      cards: ['Jh', 'Js'],
+      revealed: true,
+      winner: true,
+      outcome: 'Full de jotas y cincos · gana 197,5 BB',
+      won: '+97,5 BB',
+      stack: '197,5 BB',
+    })
+    expect(seat(straddled, 'Hero6')).toMatchObject({
+      cards: ['9s', '9h'],
+      winner: false,
+      outcome: 'Full de nueves y cincos',
+      won: null,
+      allIn: 'all-in 100 BB',
+    })
+    expect(seat(straddled, 'Olive6', en).outcome).toBe('Full house, jacks over fives · wins 197.5 BB')
+  })
+
+  it('outlines the cards that make each winning hand, on the board as well', () => {
+    expect(tableView(straddled, last(straddled), es).winningCards).toEqual(['Jh', 'Js', 'Jc', '5c', '5h'])
+    // Elm_UTG wins the main pot and Hero9max both side pots.
+    expect(tableView(nineMax, last(nineMax), es).winningCards).toEqual(['Ks', 'Kd', 'Kh', 'Ah', 'Ad'])
+  })
+
+  it('states how much each winner takes from each pot', () => {
+    expect(tableView(nineMax, last(nineMax), es).payout).toEqual([
+      { label: 'Principal', amount: '81 BB', winners: ['Elm_UTG gana 79 BB'] },
+      { label: 'Lateral 1', amount: '90 BB', winners: ['Hero9max gana 88 BB'] },
+      { label: 'Lateral 2', amount: '140 BB', winners: ['Hero9max gana 138 BB'] },
+    ])
+    expect(tableView(split, last(split), en).payout).toEqual([
+      { label: 'Pot', amount: '60.5 BB', winners: ['Hero4 wins 29.8 BB', 'Aspen1 wins 29.7 BB'] },
+    ])
+    expect(tableView(nineMax, 3, es).payout).toBeNull()
+  })
+
+  it('keeps a mucked hand face down', () => {
+    expect(seat(split, 'Willow4')).toMatchObject({ cards: null, outcome: null, winner: false })
+  })
+
+  it('names every kind of made hand', () => {
+    const label = (category: string, ranks: string[], cards: string[] = []) => {
+      const hand = structuredClone(straddled)
+      hand.timeline.states.at(-1)!.result!.revealed[1].madeHand = { category, ranks, cards } as never
+      return [seat(hand, 'Olive6', es).outcome, seat(hand, 'Olive6', en).outcome]
+    }
+
+    expect(label('high-card', ['A'])[0]).toBe('Carta alta: as · gana 197,5 BB')
+    expect(label('pair', ['10'])).toEqual(['Pareja de dieces · gana 197,5 BB', 'Pair of tens · wins 197.5 BB'])
+    expect(label('two-pair', ['K', '7'])[0]).toBe('Dobles parejas de reyes y sietes · gana 197,5 BB')
+    expect(label('three-of-a-kind', ['2'])[1]).toBe('Three of a kind, twos · wins 197.5 BB')
+    expect(label('straight', ['10'])).toEqual(['Escalera de seis a diez · gana 197,5 BB', 'Straight, six to ten · wins 197.5 BB'])
+    expect(label('straight', ['5'])[0]).toBe('Escalera de as a cinco · gana 197,5 BB')
+    expect(label('flush', ['A'], ['As', 'Qs', '9s', '7s', '2s'])).toEqual([
+      'Color de picas · gana 197,5 BB',
+      'Flush, ace high · wins 197.5 BB',
+    ])
+    expect(label('four-of-a-kind', ['Q'])[0]).toBe('Póker de damas · gana 197,5 BB')
+    expect(label('straight-flush', ['9'])[1]).toBe('Straight flush, five to nine · wins 197.5 BB')
+    expect(label('straight-flush', ['A'])).toEqual(['Escalera real · gana 197,5 BB', 'Royal flush · wins 197.5 BB'])
   })
 })

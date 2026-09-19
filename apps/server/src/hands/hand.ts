@@ -31,7 +31,11 @@ export interface Hand {
   showdown: boolean;
   /** Hole cards shown at Showdown. */
   shown: { screenName: string; cards: string[] }[];
-  collected: { screenName: string; amount: number }[];
+  /**
+   * What each winner took, and from which pot: 0 is the main pot, then side
+   * pots from 1. Hands imported before pots were recorded have no `pot`.
+   */
+  collected: { screenName: string; amount: number; pot?: number }[];
   rake: number;
 }
 
@@ -58,7 +62,8 @@ export interface Seat {
 
 export interface Post {
   screenName: string;
-  kind: 'small-blind' | 'big-blind' | 'small-and-big-blinds' | 'ante';
+  kind:
+    'small-blind' | 'big-blind' | 'small-and-big-blinds' | 'straddle' | 'ante';
   amount: number;
 }
 

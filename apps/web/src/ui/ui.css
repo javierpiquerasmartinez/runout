@@ -636,6 +636,28 @@
   height: var(--card-suit);
 }
 
+/* A winning hand's cards are outlined; cards shown at Showdown flip face up. */
+.ro-card[data-winning] {
+  outline: 2px solid var(--sync);
+  outline-offset: 2px;
+}
+.ro-card[data-flip] {
+  animation: ro-card-flip 260ms ease-out;
+}
+@keyframes ro-card-flip {
+  from {
+    transform: rotateY(90deg);
+  }
+  to {
+    transform: rotateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ro-card[data-flip] {
+    animation: none;
+  }
+}
+
 .ro-card--back {
   align-items: center;
   justify-content: center;

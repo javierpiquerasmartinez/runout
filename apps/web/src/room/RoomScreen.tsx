@@ -13,11 +13,12 @@ import { followLink } from '../routing'
 import { playedAtLabel, positionsLabel, potLabel, stakeLabel, streetLabel } from './queueEntryView'
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
-import type { Participant, Playback, QueueEntry, RoomView } from './roomClient'
+import type { Participant, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
 import { useShortcuts } from './shortcuts'
-import { tableView } from './tableView'
-import { useHand } from './useHand'
+import { StreetLog } from './StreetLog'
+import { tableView, type PayoutView, type TableView } from './tableView'
+import { useHand, type HandLoad } from './useHand'
 import type { RoomCommands } from './useRoom'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
@@ -33,6 +34,10 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const me = view.participants.find((p) => p.identityId === view.you)
   const isMaster = me?.role === 'master'
   const pasteOutcome = usePasteToImport(view.room.code)
+  const { token } = useSession()
+  const load = useHand(view.playback?.handId ?? null, token)
+  const table =
+    view.playback && load.state === 'loaded' ? tableView(load.hand, view.playback.actionIndex, i18n) : null
   // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
   const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
@@ -77,7 +82,14 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
 
         <main className="room-stage">
           {view.playback ? (
-            <LoadedHand view={view} playback={view.playback} isMaster={isMaster} onGoTo={commands.goToAction} />
+            <LoadedHand
+              view={view}
+              handId={view.playback.handId}
+              load={load}
+              table={table}
+              isMaster={isMaster}
+              onGoTo={commands.goToAction}
+            />
           ) : (
             <div className="room-stage__felt">
               <div className="room-stage__table">
@@ -93,6 +105,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               {t('room.details.title')}
             </h2>
           </div>
+          {table?.payout && <Payout payout={table.payout} />}
           <section className="room-side__section" aria-labelledby="room-participants-title">
             <h3 id="room-participants-title" className="room-side__title">
               {t('room.participants.title')}
@@ -187,22 +200,24 @@ function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
  */
 function LoadedHand({
   view,
-  playback,
+  handId,
+  load,
+  table,
   isMaster,
   onGoTo,
 }: {
   view: InRoom
-  playback: Playback
+  handId: string
+  load: HandLoad
+  /** The table at the current Action, once the Hand is loaded. */
+  table: TableView | null
   isMaster: boolean
   onGoTo: (actionIndex: number) => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
-  const { token } = useSession()
-  const load = useHand(playback.handId, token)
-  const index = view.queue.findIndex((entry) => entry.handId === playback.handId)
+  const index = view.queue.findIndex((entry) => entry.handId === handId)
   const entry = view.queue[index]
-  const table = load.state === 'loaded' ? tableView(load.hand, playback.actionIndex, i18n) : null
   const goTo = (actionIndex: number | null) => (actionIndex === null ? undefined : () => onGoTo(actionIndex))
   useShortcuts(isMaster && table !== null, {
     'previous-action': goTo(table?.canGoBack ? table.actionIndex - 1 : null),
@@ -232,6 +247,7 @@ function LoadedHand({
           <div className="room-stage__play">
             <PokerTable view={table} />
           </div>
+          <StreetLog log={table.log} />
           <PlaybackBar view={table} isMaster={isMaster} connected={view.connected} onGoTo={onGoTo} />
         </>
       ) : (
@@ -251,6 +267,33 @@ function LoadedHand({
         </div>
       )}
     </>
+  )
+}
+
+/** Board "Sala — vista del invitado": what each pot was worth and who took it. */
+function Payout({ payout }: { payout: PayoutView[] }) {
+  const { t } = useI18n()
+  return (
+    <section className="room-side__section" aria-labelledby="room-payout-title">
+      <h3 id="room-payout-title" className="room-side__title">
+        {t('room.payout.title')}
+      </h3>
+      <ul className="room-payout">
+        {payout.map((pot, index) => (
+          <li key={index} className="room-payout__pot" data-main={index === 0 || undefined}>
+            <span className="room-payout__who">
+              <span className="room-payout__label">{pot.label}</span>
+              {pot.winners.map((winner) => (
+                <span key={winner} className="room-payout__winner">
+                  {winner}
+                </span>
+              ))}
+            </span>
+            <span className="room-payout__amount ro-mono">{pot.amount}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

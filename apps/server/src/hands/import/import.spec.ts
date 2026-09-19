@@ -118,7 +118,9 @@ describe('Hand History import: PokerStars format, as PokerTracker 4 exports it',
       { screenName: 'BIRCHWOODS', cards: ['As', '7d'] },
       { screenName: 'iMapleAA', cards: ['Js', '8s'] },
     ]);
-    expect(hand.collected).toEqual([{ screenName: 'iMapleAA', amount: 99 }]);
+    expect(hand.collected).toEqual([
+      { screenName: 'iMapleAA', amount: 99, pot: 0 },
+    ]);
     expect(hand.returned).toEqual([]);
     expect(hand.rake).toBe(6);
   });
@@ -155,7 +157,9 @@ describe('Hand History import: several Hands at once', () => {
     const [hand] = importHandHistory(fixture('pokerstars-session.txt')).hands;
 
     expect(hand.returned).toEqual([{ screenName: 'BIRCHWOODS', amount: 15 }]);
-    expect(hand.collected).toEqual([{ screenName: 'BIRCHWOODS', amount: 25 }]);
+    expect(hand.collected).toEqual([
+      { screenName: 'BIRCHWOODS', amount: 25, pot: 0 },
+    ]);
     expect(hand.showdown).toBe(false);
     expect(hand.board).toEqual([]);
     expect(hand.rake).toBe(0);

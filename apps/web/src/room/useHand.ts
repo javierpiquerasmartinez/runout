@@ -7,12 +7,13 @@ export type HandLoad =
   | { state: 'loaded'; hand: HandWithTimeline }
   | { state: 'failed'; reason: FailureReason; retry: () => void }
 
-/** The Hand behind `handId`, fetched once and kept for the rest of the page. */
-export function useHand(handId: string, token: string): HandLoad {
+/** The Hand behind `handId` (none while nothing is loaded), fetched once and kept for the rest of the page. */
+export function useHand(handId: string | null, token: string): HandLoad {
   const [attempt, setAttempt] = useState(0)
   const [load, setLoad] = useState<{ handId: string; result: HandLoad } | null>(null)
 
   useEffect(() => {
+    if (handId === null) return
     let cancelled = false
     fetchHand(handId, token)
       .then((hand) => !cancelled && setLoad({ handId, result: { state: 'loaded', hand } }))

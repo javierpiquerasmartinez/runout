@@ -49,14 +49,48 @@ describe('Replay: a Hand’s Timeline', () => {
       street: 'preflop',
       board: [],
       pot: 15,
+      // The blinds are bets in play, not yet gathered into a pot.
+      pots: [],
       toAct: 'Cedar31lse',
       action: null,
       players: [
-        { screenName: 'Alder239', stack: 1131, bet: 5, folded: false },
-        { screenName: 'BIRCHWOODS', stack: 1194, bet: 10, folded: false },
-        { screenName: 'Cedar31lse', stack: 1110, bet: 0, folded: false },
-        { screenName: 'iMapleAA', stack: 1000, bet: 0, folded: false },
+        {
+          screenName: 'Alder239',
+          stack: 1131,
+          bet: 5,
+          folded: false,
+          allIn: false,
+          committed: 5,
+        },
+        {
+          screenName: 'BIRCHWOODS',
+          stack: 1194,
+          bet: 10,
+          folded: false,
+          allIn: false,
+          committed: 10,
+        },
+        {
+          screenName: 'Cedar31lse',
+          stack: 1110,
+          bet: 0,
+          folded: false,
+          allIn: false,
+          committed: 0,
+        },
+        {
+          screenName: 'iMapleAA',
+          stack: 1000,
+          bet: 0,
+          folded: false,
+          allIn: false,
+          committed: 0,
+        },
       ],
+      // Preflop, the second-deepest Stack the players sat down with.
+      effectiveStack: 1136,
+      spr: null,
+      result: null,
     });
   });
 
@@ -107,6 +141,39 @@ describe('Replay: a Hand’s Timeline', () => {
       pot: 105,
       toAct: null,
     });
+  });
+
+  it('ends at Showdown with the shown cards, each made hand and who won the pot', () => {
+    const last = timeline(showdown).states.at(-1)!;
+
+    expect(last.result).toEqual({
+      revealed: [
+        {
+          screenName: 'BIRCHWOODS',
+          cards: ['As', '7d'],
+          madeHand: { category: 'high-card', ranks: ['A'], cards: ['As'] },
+        },
+        {
+          screenName: 'iMapleAA',
+          cards: ['Js', '8s'],
+          madeHand: { category: 'pair', ranks: ['8'], cards: ['8s', '8c'] },
+        },
+      ],
+      pots: [
+        {
+          amount: 105,
+          contestants: ['BIRCHWOODS', 'iMapleAA'],
+          winners: [{ screenName: 'iMapleAA', amount: 99 }],
+        },
+      ],
+    });
+    // The winner's Stack takes what they collected, net of rake.
+    expect(players(last)[3]).toEqual(['iMapleAA', 1049, 0, false]);
+    expect(
+      timeline(showdown)
+        .states.slice(0, -1)
+        .map((s) => s.result),
+    ).toEqual(Array(10).fill(null));
   });
 
   it('says whether the Hand reached Showdown', () => {
@@ -173,7 +240,7 @@ describe('Replay: a Hand’s Timeline', () => {
     expect(players(states[2])[3]).toEqual(['iMapleAA', 969, 30, false]);
   });
 
-  it('leaves out players who sat out, and keeps the board of a Hand won by a fold', () => {
+  it('leaves out players who sat out, and hands back the uncalled bet of a Hand won by a fold', () => {
     const [first, second] = hands('pokerstars-session.txt');
 
     expect(timeline(first).seats.map((seat) => seat.screenName)).not.toContain(
@@ -185,9 +252,332 @@ describe('Replay: a Hand’s Timeline', () => {
       board: ['Qs', 'Qd', '10s'],
       toAct: null,
     });
-    // The flop bet stays in front of juniperpallo; nobody called it.
-    expect(last.players.find((p) => p.screenName === 'juniperpallo')?.bet).toBe(
-      17,
+    // Nobody called the €0.17 flop bet: it goes back, and the €0.55 pot
+    // (€0.52 after rake) is juniperpallo's.
+    expect(last.pot).toBe(55);
+    expect(last.result).toEqual({
+      revealed: [],
+      pots: [
+        {
+          amount: 55,
+          contestants: ['juniperpallo'],
+          winners: [{ screenName: 'juniperpallo', amount: 52 }],
+        },
+      ],
+    });
+    expect(
+      last.players.find((p) => p.screenName === 'juniperpallo'),
+    ).toMatchObject({ stack: 922 - 25 + 52, bet: 0, committed: 25 });
+  });
+});
+
+describe('Replay: pots, side pots and results across edge cases', () => {
+  const [headsUp, nineMax, straddled, split] = hands(
+    'pokerstars-edge-cases.txt',
+  );
+
+  it('plays heads-up with the button on the small blind, and ends preflop when the big blind folds', () => {
+    const { seats, states } = timeline(headsUp);
+
+    expect(seats.map((seat) => [seat.screenName, seat.position])).toEqual([
+      ['HeroHU', 'BTN'],
+      ['VillainHU', 'BB'],
+    ]);
+    const last = states.at(-1)!;
+    expect(last).toMatchObject({ street: 'preflop', board: [], pot: 100 });
+    expect(last.result).toEqual({
+      revealed: [],
+      pots: [
+        {
+          amount: 100,
+          contestants: ['HeroHU'],
+          winners: [{ screenName: 'HeroHU', amount: 100 }],
+        },
+      ],
+    });
+    // The raise over the big blind comes back, then the pot is won.
+    expect(players(last)).toEqual([
+      ['HeroHU', 5050, 0, false],
+      ['VillainHU', 6180, 0, true],
+    ]);
+  });
+
+  it('names all nine Positions and gathers the antes into the pot before the first Action', () => {
+    const { seats, states } = timeline(nineMax);
+
+    expect(seats.map((seat) => seat.position)).toEqual([
+      'SB',
+      'BB',
+      'UTG',
+      'UTG+1',
+      'MP',
+      'LJ',
+      'HJ',
+      'CO',
+      'BTN',
+    ]);
+    expect(states[0].pot).toBe(45 + 25 + 50);
+    expect(states[0].pots).toEqual([
+      { amount: 45, contestants: seats.map((seat) => seat.screenName) },
+    ]);
+  });
+
+  it('keeps all-in bets in play until the Street closes', () => {
+    const { states } = timeline(nineMax);
+
+    // Oak_BB has just moved all in: nobody's bets are gathered yet.
+    const oakAllIn = states[9];
+    expect(oakAllIn.action).toMatchObject({
+      screenName: 'Oak_BB',
+      allIn: true,
+    });
+    expect(oakAllIn.pots).toEqual([
+      { amount: 45, contestants: expect.any(Array) },
+    ]);
+    expect(
+      oakAllIn.players
+        .filter((p) => p.allIn)
+        .map((p) => [p.screenName, p.stack, p.bet]),
+    ).toEqual([
+      ['Oak_BB', 0, 2495],
+      ['Elm_UTG', 0, 995],
+    ]);
+  });
+
+  it('splits a multi-way all-in into a main pot and two side pots, each with who contests it and who won it', () => {
+    const last = timeline(nineMax).states.at(-1)!;
+
+    expect(last).toMatchObject({
+      street: 'river',
+      board: ['Kh', '9c', '4d', '2s', '7h'],
+      pot: 15550,
+      toAct: null,
+    });
+    expect(last.result!.pots).toEqual([
+      {
+        amount: 4050,
+        contestants: ['Oak_BB', 'Elm_UTG', 'Hero9max', 'Spruce9'],
+        winners: [{ screenName: 'Elm_UTG', amount: 3950 }],
+      },
+      {
+        amount: 4500,
+        contestants: ['Oak_BB', 'Hero9max', 'Spruce9'],
+        winners: [{ screenName: 'Hero9max', amount: 4400 }],
+      },
+      {
+        amount: 7000,
+        contestants: ['Hero9max', 'Spruce9'],
+        winners: [{ screenName: 'Hero9max', amount: 6900 }],
+      },
+    ]);
+    expect(last.pots).toEqual(
+      last.result!.pots.map(({ amount, contestants }) => ({
+        amount,
+        contestants,
+      })),
     );
+  });
+
+  it('hands back the part of an all-in nobody could call, so that player is no longer all in', () => {
+    const last = timeline(nineMax).states.at(-1)!;
+    const hero = last.players.find((p) => p.screenName === 'Hero9max')!;
+
+    // $20 back, then $69 + $44 won.
+    expect(hero).toMatchObject({
+      stack: 2000 + 6900 + 4400,
+      allIn: false,
+      committed: 6000,
+    });
+    expect(
+      last.players.filter((p) => p.allIn).map((p) => p.screenName),
+    ).toEqual(['Oak_BB', 'Elm_UTG', 'Spruce9']);
+  });
+
+  it('labels every hand shown at Showdown with its own evaluator', () => {
+    const { revealed } = timeline(nineMax).states.at(-1)!.result!;
+
+    expect(
+      revealed.map((r) => [
+        r.screenName,
+        r.madeHand.category,
+        r.madeHand.ranks,
+      ]),
+    ).toEqual([
+      ['Oak_BB', 'pair', ['Q']],
+      ['Elm_UTG', 'three-of-a-kind', ['K']],
+      ['Hero9max', 'pair', ['A']],
+      ['Spruce9', 'high-card', ['A']],
+    ]);
+    expect(revealed[1].madeHand.cards).toEqual(['Ks', 'Kd', 'Kh']);
+  });
+
+  it('treats a straddle as a live bet in front of the straddler', () => {
+    const { states } = timeline(straddled);
+
+    expect(states[0].pot).toBe(175);
+    expect(states[0].toAct).toBe('Birch1');
+    expect(
+      states[0].players
+        .map((p) => [p.screenName, p.bet])
+        .filter(([, bet]) => bet),
+    ).toEqual([
+      ['Larch4', 25],
+      ['Maple5', 50],
+      ['Olive6', 100],
+    ]);
+  });
+
+  it('separates the pot gathered from earlier Streets from the bets in play on this one', () => {
+    const { states } = timeline(straddled);
+
+    // The flop: Olive6 checks, Hero6 bets $4.50.
+    const heroBets = states[9];
+    expect(heroBets.action).toMatchObject({ screenName: 'Hero6', type: 'bet' });
+    expect(heroBets.pots).toEqual([
+      { amount: 975, contestants: ['Hero6', 'Olive6'] },
+    ]);
+    expect(heroBets.pot).toBe(975 + 450);
+  });
+
+  it('reads the effective stack and SPR as each Street begins', () => {
+    const { states } = timeline(straddled);
+
+    const flop = states.findIndex((s) => s.street === 'flop');
+    const turn = states.findIndex((s) => s.street === 'turn');
+    // Flop: $46 behind each into a $9.75 pot.
+    expect(states[flop]).toMatchObject({ effectiveStack: 4600 });
+    expect(states[flop].spr).toBeCloseTo(4600 / 975);
+    // It holds for the whole Street, whatever is bet on it.
+    expect(states[turn - 1]).toMatchObject({ effectiveStack: 4600 });
+    expect(states[turn - 1].spr).toBeCloseTo(4600 / 975);
+    // Turn: $31 behind into a $39.75 pot.
+    expect(states[turn]).toMatchObject({ effectiveStack: 3100 });
+    expect(states[turn].spr).toBeCloseTo(3100 / 3975);
+  });
+
+  it('labels a full house by its trips and its pair', () => {
+    const { revealed, pots } = timeline(straddled).states.at(-1)!.result!;
+
+    expect(revealed.map((r) => [r.screenName, r.madeHand])).toEqual([
+      [
+        'Hero6',
+        {
+          category: 'full-house',
+          ranks: ['9', '5'],
+          cards: ['9s', '9h', '9d', '5c', '5h'],
+        },
+      ],
+      [
+        'Olive6',
+        {
+          category: 'full-house',
+          ranks: ['J', '5'],
+          cards: ['Jh', 'Js', 'Jc', '5c', '5h'],
+        },
+      ],
+    ]);
+    expect(pots).toEqual([
+      {
+        amount: 10175,
+        contestants: ['Hero6', 'Olive6'],
+        winners: [{ screenName: 'Olive6', amount: 9875 }],
+      },
+    ]);
+  });
+
+  it('shares a split pot, and keeps a mucked hand face down', () => {
+    const { revealed, pots } = timeline(split).states.at(-1)!.result!;
+
+    expect(revealed.map((r) => [r.screenName, r.cards, r.madeHand])).toEqual([
+      [
+        'Aspen1',
+        ['Ah', 'Jd'],
+        { category: 'pair', ranks: ['A'], cards: ['Ah', 'As'] },
+      ],
+      [
+        'Hero4',
+        ['Ad', 'Jc'],
+        { category: 'pair', ranks: ['A'], cards: ['Ad', 'As'] },
+      ],
+    ]);
+    expect(pots).toEqual([
+      {
+        amount: 605,
+        contestants: ['Aspen1', 'Hero4', 'Willow4'],
+        winners: [
+          { screenName: 'Hero4', amount: 298 },
+          { screenName: 'Aspen1', amount: 297 },
+        ],
+      },
+    ]);
+  });
+});
+
+describe('Replay: made hands at Showdown', () => {
+  const [showdown] = hands('pokerstars-showdown.txt');
+
+  /** The Showdown Hand dealt again: BIRCHWOODS's cards and the board. */
+  function madeHand(cards: string[], board: string[]) {
+    const hand = {
+      ...showdown,
+      board,
+      shown: [{ screenName: 'BIRCHWOODS', cards }],
+    };
+    return timeline(hand).states.at(-1)!.result!.revealed[0].madeHand;
+  }
+
+  it.each([
+    [
+      ['As', '7d'],
+      ['Ah', '7c', '2d', '9s', 'Kc'],
+      'two-pair',
+      ['A', '7'],
+      ['As', 'Ah', '7d', '7c'],
+    ],
+    [
+      ['6s', '7d'],
+      ['8h', '9c', '10d', '2s', 'Kc'],
+      'straight',
+      ['10'],
+      ['10d', '9c', '8h', '7d', '6s'],
+    ],
+    [
+      ['As', '2d'],
+      ['3h', '4c', '5d', 'Js', 'Kc'],
+      'straight',
+      ['5'],
+      ['5d', '4c', '3h', '2d', 'As'],
+    ],
+    [
+      ['As', '7s'],
+      ['2s', '9s', 'Qs', 'Jh', 'Kc'],
+      'flush',
+      ['A'],
+      ['As', 'Qs', '9s', '7s', '2s'],
+    ],
+    [
+      ['7s', '7d'],
+      ['7h', '7c', '2d', 'As', 'Kc'],
+      'four-of-a-kind',
+      ['7'],
+      ['7s', '7d', '7h', '7c'],
+    ],
+    [
+      ['9h', '10h'],
+      ['Jh', 'Qh', 'Kh', 'Ah', '2c'],
+      'straight-flush',
+      ['A'],
+      ['Ah', 'Kh', 'Qh', 'Jh', '10h'],
+    ],
+  ])('%j on %j makes a %s', (cards, board, category, ranks, made) => {
+    expect(madeHand(cards, board)).toEqual({ category, ranks, cards: made });
+  });
+
+  it('plays the board when it beats the hole cards', () => {
+    expect(madeHand(['2c', '3d'], ['As', 'Ks', 'Qs', 'Js', '10s'])).toEqual({
+      category: 'straight-flush',
+      ranks: ['A'],
+      cards: ['As', 'Ks', 'Qs', 'Js', '10s'],
+    });
   });
 });

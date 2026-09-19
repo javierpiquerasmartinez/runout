@@ -13,8 +13,11 @@ const CENTRE = { x: 0.5, y: 0.49 }
 const BET_REACH = 0.62
 
 const PLATE = { width: 148, height: 57 }
-/** A bet's pill, sized for the longest label ("999,9 BB") so its place never shifts mid-Hand. */
-export const BET = { width: 96, height: 28 }
+/**
+ * A bet's pill, sized for the longest label ("999,9 BB 100% bote", or
+ * "all-in 999,9 BB") so its place never shifts mid-Hand.
+ */
+export const BET = { width: 156, height: 28 }
 /** The least room left between a bet and anything else. */
 const CLEARANCE = 4
 const STEP = 4
@@ -67,8 +70,9 @@ export function overlaps(a: Box, b: Box): boolean {
 
 /** What a bet must not cover: the board and pot, and every seat's plate, cards, status and dealer button. */
 export function obstacles(slots: number, seats: SeatPlace[]): Box[] {
-  // The board's five community cards, and the pot below them with room for a long value.
-  const found = [box(261, 214, 298, 76), box(330, 304, 160, 48)]
+  // The board's five community cards, and the pot below them with room for a
+  // long value, or for a main pot and two side pots side by side.
+  const found = [box(261, 214, 298, 76), box(214, 304, 392, 58)]
   for (const seat of seats) {
     const { x, y } = seatCentre(seat.slot, slots)
     const plate = centred({ x, y }, PLATE.width, PLATE.height)
