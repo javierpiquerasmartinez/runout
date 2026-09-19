@@ -27,7 +27,7 @@ pnpm dev
 - Web at http://localhost:5173
 - API at http://localhost:3000/api (in development, Vite proxies `/api` and `/ws`)
 
-The initial screen calls `GET /api/health` and pings the server over WebSocket at `/ws`, showing the latency. The health response also says whether the server can reach the database (`"database": "reachable"` or `"unreachable"`).
+The initial screen calls `GET /api/health` and pings the server over WebSocket at `/ws`, showing the latency. The health response also says whether the server can reach the database: `200` with `"database": "reachable"`, or `503` with `"status": "unavailable"` and `"database": "unreachable"`, so uptime checks and load balancers see the server as down.
 
 ## Database
 

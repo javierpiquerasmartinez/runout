@@ -55,7 +55,7 @@ describe('Runout server (e2e)', () => {
 });
 
 describe('Runout server without a database (e2e)', () => {
-  it('stays up and reports the database as unreachable', async () => {
+  it('stays up and answers health with 503, reporting the database as unreachable', async () => {
     // Nothing listens on port 1, so every connection attempt is refused.
     const running = await startApp({
       databaseUrl: 'postgres://runout:runout@127.0.0.1:1/runout',
@@ -63,9 +63,12 @@ describe('Runout server without a database (e2e)', () => {
     try {
       const res = await request(running.httpServer)
         .get('/api/health')
-        .expect(200);
+        .expect(503);
 
-      expect(res.body).toMatchObject({ status: 'ok', database: 'unreachable' });
+      expect(res.body).toMatchObject({
+        status: 'unavailable',
+        database: 'unreachable',
+      });
     } finally {
       await running.close();
     }
