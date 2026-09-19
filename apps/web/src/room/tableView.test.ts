@@ -78,6 +78,7 @@ const hand: HandWithTimeline = {
         ),
       },
     ],
+    showdown: false,
   },
 }
 

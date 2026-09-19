@@ -24,6 +24,8 @@
   --color-border: #253230;
   --color-border-strong: #2c3937;
   --color-border-hover: #3a4a47;
+  /* The Street progress bar once the Hand is over. */
+  --color-track-finished: #6b7873;
   --color-felt: #12241f;
   --color-felt-border: #23423a;
 
@@ -156,6 +158,7 @@
   --color-border: #d3cec0;
   --color-border-strong: #c4beae;
   --color-border-hover: #a9a292;
+  --color-track-finished: #a9a292;
   --color-felt: #dce8e2;
   --color-felt-border: #b4ccc1;
 

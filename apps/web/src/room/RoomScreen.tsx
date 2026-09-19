@@ -15,6 +15,7 @@ import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
 import type { Participant, Playback, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
+import { useShortcuts } from './shortcuts'
 import { tableView } from './tableView'
 import { useHand } from './useHand'
 import type { RoomCommands } from './useRoom'
@@ -23,7 +24,8 @@ type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
 /**
  * The Room, as in the "Sala" boards: header, Queue panel, table and side panel.
- * Hands pasted anywhere in the Room (outside a field) go into the Queue.
+ * Hands pasted anywhere in the Room (outside a field) go into the Queue. The
+ * Master moves through the Queue with J and K.
  */
 export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCommands }) {
   const i18n = useI18n()
@@ -31,6 +33,14 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const me = view.participants.find((p) => p.identityId === view.you)
   const isMaster = me?.role === 'master'
   const pasteOutcome = usePasteToImport(view.room.code)
+  // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
+  const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
+  const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
+  const next = view.queue[loadedIndex + 1]
+  useShortcuts(isMaster, {
+    'previous-hand': previous && (() => commands.loadHand(previous.handId)),
+    'next-hand': next && (() => commands.loadHand(next.handId)),
+  })
 
   return (
     <div className="room">
@@ -172,7 +182,8 @@ function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
 
 /**
  * The loaded Hand: which one it is, the table at the current Action and the
- * transport bar. The Hand's content is fetched once by id.
+ * transport bar. The Hand's content is fetched once by id. The Master steps
+ * Actions with the arrow keys and jumps Streets with Shift + arrow.
  */
 function LoadedHand({
   view,
@@ -192,6 +203,13 @@ function LoadedHand({
   const index = view.queue.findIndex((entry) => entry.handId === playback.handId)
   const entry = view.queue[index]
   const table = load.state === 'loaded' ? tableView(load.hand, playback.actionIndex, i18n) : null
+  const goTo = (actionIndex: number | null) => (actionIndex === null ? undefined : () => onGoTo(actionIndex))
+  useShortcuts(isMaster && table !== null, {
+    'previous-action': goTo(table?.canGoBack ? table.actionIndex - 1 : null),
+    'next-action': goTo(table?.canGoForward ? table.actionIndex + 1 : null),
+    'previous-street': goTo(table?.streets.previousStreet ?? null),
+    'next-street': goTo(table?.streets.nextStreet ?? null),
+  })
 
   return (
     <>

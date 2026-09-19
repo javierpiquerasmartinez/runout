@@ -109,6 +109,13 @@ describe('Replay: a Hand’s Timeline', () => {
     });
   });
 
+  it('says whether the Hand reached Showdown', () => {
+    const [, wonByAFold] = hands('pokerstars-session.txt');
+
+    expect(timeline(showdown).showdown).toBe(true);
+    expect(timeline(wonByAFold).showdown).toBe(false);
+  });
+
   it('names Positions from the blinds when the button seat is empty', () => {
     // A dead button: seat 4 had the button and left. iMapleAA (seat 5) posts
     // the small blind and Alder239 (seat 1) the big blind.

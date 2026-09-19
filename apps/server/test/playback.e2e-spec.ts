@@ -211,6 +211,7 @@ describe('Playback (e2e)', () => {
       timeline: {
         buttonSeat: 5,
         hero: { screenName: 'iMapleAA', cards: ['Js', '8s'] },
+        showdown: true,
       },
     });
     expect(res.body.timeline.states).toHaveLength(11);

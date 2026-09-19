@@ -1,30 +1,18 @@
 import type { CSSProperties } from 'react'
 import { useI18n } from '../i18n'
 import { Card, CardBack, CardSlot } from '../ui/Card'
+import { asPercent, cachedBetCentres, seatCentre } from './tableLayout'
 import type { SeatView, TableView } from './tableView'
 
 /*
- * The top-down table of the "Sala" boards, drawn at 820 × 606 and scaled to
- * fit: the felt, the board and pot in the middle, and the seats around it.
+ * The top-down table of the "Sala" boards, laid out at 820 × 606: the felt,
+ * the board and pot in the middle, and the seats around it, each bet placed
+ * clear of everything else. It doesn't scale as one drawing yet (issue 19).
  */
-
-/** Where the seats' plates sit, as a share of the table's width and height. */
-const RIM = { x: 40, y: 30 }
-const CENTRE = { x: 50, y: 49 }
-/** How far out from the centre a seat's bet is drawn, as a share of the way to the seat. */
-const BET_REACH = 0.62
-
-/** Slot 0 is the bottom centre; slots go clockwise, as players act. */
-function around(slot: number, slots: number, reach = 1): { left: string; top: string } {
-  const angle = Math.PI / 2 + (slot / slots) * 2 * Math.PI
-  return {
-    left: `${CENTRE.x + RIM.x * reach * Math.cos(angle)}%`,
-    top: `${CENTRE.y + RIM.y * reach * Math.sin(angle)}%`,
-  }
-}
 
 export function PokerTable({ view }: { view: TableView }) {
   const { t } = useI18n()
+  const bets = cachedBetCentres(view.slots, view.seats)
   return (
     <div className="poker-table">
       <div className="poker-table__felt" />
@@ -46,7 +34,7 @@ export function PokerTable({ view }: { view: TableView }) {
       </div>
 
       {view.seats.map((seat) => (
-        <Seat key={seat.screenName} seat={seat} style={around(seat.slot, view.slots)} />
+        <Seat key={seat.screenName} seat={seat} style={asPercent(seatCentre(seat.slot, view.slots))} />
       ))}
       {view.seats
         .filter((seat) => seat.bet)
@@ -54,7 +42,7 @@ export function PokerTable({ view }: { view: TableView }) {
           <span
             key={seat.screenName}
             className="poker-table__bet ro-mono"
-            style={around(seat.slot, view.slots, BET_REACH)}
+            style={asPercent(bets.get(seat.slot)!)}
           >
             <span className="poker-table__bet-chip" />
             {seat.bet}
