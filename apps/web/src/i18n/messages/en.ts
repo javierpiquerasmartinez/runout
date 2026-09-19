@@ -84,6 +84,7 @@ export const en: Messages = {
   'design.rules.red': 'Red does not mean "losing".',
   'design.rules.redBody': "It means all-in, error or delete. A hand's result is told by the figures and the winning hand's outline.",
 
+  'design.icons.eyebrow': 'Sprites 02',
   'design.icons.title': 'Iconography',
   'design.icons.viewBox': 'viewBox 24×24',
   'design.icons.stroke': 'stroke 1.75',
@@ -133,7 +134,7 @@ export const en: Messages = {
   'icon.sort': 'sort',
   'icon.mark': 'mark',
   'icon.stats': 'stats',
-  'icon.pot': 'pot / chips',
+  'icon.pot': 'pot',
   'icon.delete': 'delete',
   'icon.success': 'success',
   'icon.warning': 'warning',
@@ -142,6 +143,7 @@ export const en: Messages = {
   'icon.add': 'add',
   'icon.help': 'help',
 
+  'design.controls.eyebrow': 'Sprites 03',
   'design.controls.title': 'Buttons, fields and controls',
   'design.controls.intro': 'One action accent, brass. Teal is kept for the state of the Room and never competes as a primary button.',
   'design.controls.hierarchy': 'Hierarchy and states',
@@ -166,7 +168,7 @@ export const en: Messages = {
   'design.controls.field.focus': 'Focused',
   'design.controls.field.error': 'With error',
   'design.controls.field.disabled': 'Disabled',
-  'design.controls.field.placeholder': 'Session name',
+  'design.controls.field.placeholder': 'Room name',
   'design.controls.field.sampleName': 'Tuesday NL50',
   'design.controls.field.errorMessage': 'No Room has that code.',
   'design.controls.field.lockedValue': 'Master only',
@@ -193,6 +195,7 @@ export const en: Messages = {
   'design.controls.rule.disabled': 'Disabled',
   'design.controls.rule.disabledValue': 'dashed border + muted text',
   'design.controls.rule.transition': 'Transition',
+  'design.controls.rule.transitionValue': '{ms} ms ease-out',
   'design.controls.rulesNote': 'Disabled is never hidden nor only faded: the border turns dashed so it reads differently from something merely dimmed, and the reason goes in the aria-label, not only in a tooltip.',
 
   'design.buttons.createRoom': 'Create room',

@@ -12,6 +12,9 @@ import './DesignSystemPage.css'
 
 type Theme = 'dark' | 'light'
 
+/** A person's choice of how quantities are shown (CONTEXT.md: Display Unit). */
+type DisplayUnit = 'bb' | 'amount' | 'both'
+
 /**
  * The three design-system boards of Design.html rebuilt from the real tokens,
  * components, icon sprite and message catalogue. Laid out for 1440×900.
@@ -316,7 +319,7 @@ function IconGroup({ group }: { group: keyof typeof iconGroups }) {
 function IconBoard() {
   const { t, formatNumber } = useI18n()
   return (
-    <Board id="icons" eyebrow="Sprites 02" title={t('design.icons.title')}>
+    <Board id="icons" eyebrow={t('design.icons.eyebrow')} title={t('design.icons.title')}>
       <div className="ds-specs">
         {(['design.icons.viewBox', 'design.icons.stroke', 'design.icons.roundCaps', 'design.icons.grid'] as const).map((key) => (
           <span key={key} className="ds-spec ro-mono">{t(key)}</span>
@@ -363,8 +366,8 @@ const states = ['normal', 'hover', 'pressed', 'focus', 'disabled'] as const
 function ControlsBoard() {
   const { t, formatNumber } = useI18n()
   const [hideNames, setHideNames] = useState(true)
-  const [autoAdvance, setAutoAdvance] = useState(false)
-  const [unit, setUnit] = useState<'bb' | 'amount' | 'both'>('bb')
+  const [markHand, setMarkHand] = useState(false)
+  const [unit, setUnit] = useState<DisplayUnit>('bb')
   const [stakeFilter, setStakeFilter] = useState(true)
   const lockedReason = t('design.controls.lockedReason')
   const unitOptions = [
@@ -377,11 +380,11 @@ function ControlsBoard() {
     { label: 'design.controls.rule.radii', value: [4, 7, 8, 10, 12, 999].map((n) => formatNumber(n)).join(' · ') },
     { label: 'design.controls.rule.focus', value: t('design.controls.rule.focusValue') },
     { label: 'design.controls.rule.disabled', value: t('design.controls.rule.disabledValue') },
-    { label: 'design.controls.rule.transition', value: `${formatNumber(120)} ms ease-out` },
+    { label: 'design.controls.rule.transition', value: t('design.controls.rule.transitionValue', { ms: formatNumber(120) }) },
   ]
 
   return (
-    <Board id="controls" eyebrow="Sprites 03" title={t('design.controls.title')} intro={t('design.controls.intro')}>
+    <Board id="controls" eyebrow={t('design.controls.eyebrow')} title={t('design.controls.title')} intro={t('design.controls.intro')}>
       <div className="ds-columns">
         <div className="ds-stack">
           <Panel title={t('design.controls.hierarchy')}>
@@ -420,34 +423,34 @@ function ControlsBoard() {
               <div className="ds-sizes__group">
                 <div className="ds-sizes__item">
                   <Button size="compact">{t('design.controls.size.compact')}</Button>
-                  <span className="ds-caption ro-mono">32 · r7</span>
+                  <span className="ds-caption ro-mono">{formatNumber(32)} · r{formatNumber(7)}</span>
                 </div>
                 <div className="ds-sizes__item">
                   <Button>{t('design.controls.size.standard')}</Button>
-                  <span className="ds-caption ro-mono">40 · r8</span>
+                  <span className="ds-caption ro-mono">{formatNumber(40)} · r{formatNumber(8)}</span>
                 </div>
                 <div className="ds-sizes__item">
                   <Button variant="primary" size="prominent">{t('design.controls.size.prominent')}</Button>
-                  <span className="ds-caption ro-mono">48 · r9</span>
+                  <span className="ds-caption ro-mono">{formatNumber(48)} · r{formatNumber(9)}</span>
                 </div>
               </div>
               <span className="ds-rule ds-rule--tall" />
               <div className="ds-sizes__group">
                 <div className="ds-sizes__item">
                   <IconButton icon="copy" size="compact" label={t('design.buttons.copyLink')} />
-                  <span className="ds-caption ro-mono">34</span>
+                  <span className="ds-caption ro-mono">{formatNumber(34)}</span>
                 </div>
                 <div className="ds-sizes__item">
                   <IconButton icon="filter" label={t('design.buttons.filter')} />
-                  <span className="ds-caption ro-mono">44</span>
+                  <span className="ds-caption ro-mono">{formatNumber(44)}</span>
                 </div>
                 <div className="ds-sizes__item">
                   <IconButton icon="play" size="prominent" label={t('design.buttons.play')} />
-                  <span className="ds-caption ro-mono">56</span>
+                  <span className="ds-caption ro-mono">{formatNumber(56)}</span>
                 </div>
                 <div className="ds-sizes__item">
                   <IconButton icon="next" label={t('design.buttons.nextAction')} disabledReason={lockedReason} />
-                  <span className="ds-caption ro-mono">44</span>
+                  <span className="ds-caption ro-mono">{formatNumber(44)}</span>
                 </div>
               </div>
             </div>
@@ -497,7 +500,7 @@ function ControlsBoard() {
             <hr className="ds-divider" />
             <div className="ds-toggles">
               <Toggle label={t('design.controls.toggle.on')} checked={hideNames} onChange={setHideNames} showLabel />
-              <Toggle label={t('design.controls.toggle.off')} checked={autoAdvance} onChange={setAutoAdvance} showLabel />
+              <Toggle label={t('design.controls.toggle.off')} checked={markHand} onChange={setMarkHand} showLabel />
               <Toggle
                 label={t('design.controls.toggle.locked')}
                 checked={false}

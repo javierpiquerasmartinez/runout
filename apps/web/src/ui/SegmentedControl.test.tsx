@@ -4,15 +4,15 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { SegmentedControl } from './SegmentedControl'
 
-type Unit = 'bb' | 'amount' | 'both'
+type DisplayUnit = 'bb' | 'amount' | 'both'
 const options = [
   { value: 'bb', label: 'Ciegas' },
-  { value: 'amount', label: 'Fichas' },
+  { value: 'amount', label: 'Cantidades' },
   { value: 'both', label: 'Ambas' },
 ] as const
 
 function Controlled({ disabledReason }: { disabledReason?: string }) {
-  const [unit, setUnit] = useState<Unit>('bb')
+  const [unit, setUnit] = useState<DisplayUnit>('bb')
   return (
     <SegmentedControl
       label="Unidad"

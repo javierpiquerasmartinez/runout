@@ -39,3 +39,10 @@ describe('locale formatting', () => {
     expect(createTranslator('en').formatCurrency(0.25, 'EUR')).toBe('€0.25')
   })
 })
+
+describe('time formatting', () => {
+  it('formats a time of day the Spanish way', () => {
+    const at = new Date('2026-09-19T21:05:07Z')
+    expect(createTranslator('es').formatTime(at, { timeZone: 'UTC' })).toBe('21:05:07')
+  })
+})

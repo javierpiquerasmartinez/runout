@@ -10,7 +10,7 @@ function App() {
 }
 
 function ConnectionStatus() {
-  const { t, locale } = useI18n()
+  const { t, formatTime } = useI18n()
   const health = useHealth()
   const ping = usePing()
 
@@ -24,7 +24,7 @@ function ConnectionStatus() {
           <dt>{t('status.api')}</dt>
           <dd className="ro-mono" data-state={health.state}>
             {health.state === 'checking' && t('status.checking')}
-            {health.state === 'ok' && t('status.ok', { time: new Date(health.serverTime).toLocaleTimeString(locale) })}
+            {health.state === 'ok' && t('status.ok', { time: formatTime(new Date(health.serverTime)) })}
             {health.state === 'error' && t('status.noResponse', { message: health.message })}
           </dd>
         </div>
