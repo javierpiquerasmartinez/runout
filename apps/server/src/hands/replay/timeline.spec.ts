@@ -109,6 +109,31 @@ describe('Replay: a Hand’s Timeline', () => {
     });
   });
 
+  it('names Positions from the blinds when the button seat is empty', () => {
+    // A dead button: seat 4 had the button and left. iMapleAA (seat 5) posts
+    // the small blind and Alder239 (seat 1) the big blind.
+    const deadButton = {
+      ...showdown,
+      buttonSeat: 4,
+      posts: [
+        { screenName: 'iMapleAA', kind: 'small-blind' as const, amount: 5 },
+        { screenName: 'Alder239', kind: 'big-blind' as const, amount: 10 },
+      ],
+    };
+
+    expect(
+      timeline(deadButton).seats.map((seat) => [
+        seat.screenName,
+        seat.position,
+      ]),
+    ).toEqual([
+      ['Alder239', 'BB'],
+      ['BIRCHWOODS', 'CO'],
+      ['Cedar31lse', 'BTN'],
+      ['iMapleAA', 'SB'],
+    ]);
+  });
+
   it('puts antes and a dead small blind straight into the pot, not in front of the player', () => {
     // The showdown Hand again, now with €0.01 antes and Cedar31lse posting
     // small and big blinds (€0.15, of which €0.05 is dead) to come in.

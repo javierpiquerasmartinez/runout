@@ -20,13 +20,13 @@ export function PlaybackBar({
   onGoTo: (actionIndex: number) => void
 }) {
   const { t } = useI18n()
-  const masterOnly = isMaster ? undefined : t('room.player.masterOnly')
+  const masterOnly = isMaster ? undefined : t('room.playback.masterOnly')
 
   return (
-    <section className="playback-bar" aria-label={t('room.player.label')}>
+    <section className="playback-bar" aria-label={t('room.playback.label')}>
       <div className="playback-bar__where" aria-live="polite">
         <span className="playback-bar__counter ro-mono" data-guest={!isMaster || undefined}>
-          {t('room.player.counter', { current: view.actionIndex, total: view.actionCount })}
+          {t('room.playback.counter', { current: view.actionIndex, total: view.actionCount })}
         </span>
         <span className="playback-bar__action">{view.lastAction}</span>
       </div>
@@ -35,14 +35,14 @@ export function PlaybackBar({
         {!isMaster && <span className="playback-bar__locked-note">{masterOnly}</span>}
         <IconButton
           icon="previous"
-          label={t('room.player.previous')}
-          disabledReason={masterOnly ?? (view.canGoBack ? undefined : t('room.player.atStart'))}
+          label={t('room.playback.previous')}
+          disabledReason={masterOnly ?? (view.canGoBack ? undefined : t('room.playback.atStart'))}
           onClick={() => onGoTo(view.actionIndex - 1)}
         />
         <IconButton
           icon="next"
-          label={t('room.player.next')}
-          disabledReason={masterOnly ?? (view.canGoForward ? undefined : t('room.player.atEnd'))}
+          label={t('room.playback.next')}
+          disabledReason={masterOnly ?? (view.canGoForward ? undefined : t('room.playback.atEnd'))}
           onClick={() => onGoTo(view.actionIndex + 1)}
         />
       </div>
@@ -51,12 +51,12 @@ export function PlaybackBar({
         {isMaster ? (
           <span className="playback-bar__pill" data-tone="brass">
             <Icon name="master" size={13} />
-            {t('room.player.youControl')}
+            {t('room.playback.youControl')}
           </span>
         ) : (
           <span className="playback-bar__pill" data-tone={connected ? 'sync' : 'muted'}>
             <span className="playback-bar__dot" />
-            {t(connected ? 'room.player.synced' : 'room.player.offline')}
+            {t(connected ? 'room.playback.synced' : 'room.playback.offline')}
           </span>
         )}
       </div>

@@ -78,8 +78,8 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
     canGoBack: index > 0,
     canGoForward: index < actionCount,
     lastAction: state.action
-      ? `${i18n.t(`room.player.street.${state.action.street}`)} · ${actionLabel(state.action, bigBlinds, i18n)}`
-      : i18n.t('room.player.blindsPosted'),
+      ? `${i18n.t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, bigBlinds, i18n)}`
+      : i18n.t('room.playback.blindsPosted'),
   }
 }
 
@@ -92,11 +92,11 @@ function actionLabel(action: Action, bigBlinds: (amount: number) => string, { t 
   switch (action.type) {
     case 'fold':
     case 'check':
-      return t(`room.player.action.${action.type}`, { name })
+      return t(`room.playback.action.${action.type}`, { name })
     case 'call':
     case 'bet':
-      return t(`room.player.action.${action.type}`, { name, amount: bigBlinds(action.amount) })
+      return t(`room.playback.action.${action.type}`, { name, amount: bigBlinds(action.amount) })
     case 'raise':
-      return t('room.player.action.raise', { name, amount: bigBlinds(action.to) })
+      return t('room.playback.action.raise', { name, amount: bigBlinds(action.to) })
   }
 }
