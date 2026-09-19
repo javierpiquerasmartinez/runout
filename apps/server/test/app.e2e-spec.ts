@@ -1,36 +1,40 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import { WsAdapter } from '@nestjs/platform-ws';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { WebSocket, type RawData } from 'ws';
-import { AddressInfo } from 'node:net';
-import { AppModule } from './../src/app.module.js';
+import { startApp, type RunningApp } from './support/app.js';
 
 describe('Runout server (e2e)', () => {
-  let app: INestApplication<App>;
+  let running: RunningApp;
 
   beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useWebSocketAdapter(new WsAdapter(app));
-    await app.listen(0);
+    running = await startApp();
   });
 
-  it('GET /api/health', () => {
-    return request(app.getHttpServer())
+  afterEach(async () => {
+    await running.close();
+  });
+
+  it('GET /api/health reports the server and database as up', () => {
+    return request(running.httpServer)
       .get('/api/health')
       .expect(200)
-      .expect((res) => expect(res.body.status).toBe('ok'));
+      .expect((res) =>
+        expect(res.body).toMatchObject({ status: 'ok', database: 'reachable' }),
+      );
+  });
+
+  it('GET /api/health reports the server time from the injected clock', async () => {
+    running.clock.advance(60_000);
+    const expected = running.clock.now().toISOString();
+
+    const res = await request(running.httpServer)
+      .get('/api/health')
+      .expect(200);
+
+    expect(res.body.serverTime).toBe(expected);
   });
 
   it('answers ping with pong over /ws', async () => {
-    const { port } = app.getHttpServer().address() as AddressInfo;
-    const socket = new WebSocket(`ws://localhost:${port}/ws`);
+    const socket = new WebSocket(running.wsUrl);
 
     const reply = await new Promise<{
       event: string;
@@ -48,8 +52,22 @@ describe('Runout server (e2e)', () => {
 
     expect(reply).toMatchObject({ event: 'pong', data: { sentAt: 42 } });
   });
+});
 
-  afterEach(async () => {
-    await app.close();
+describe('Runout server without a database (e2e)', () => {
+  it('stays up and reports the database as unreachable', async () => {
+    // Nothing listens on port 1, so every connection attempt is refused.
+    const running = await startApp({
+      databaseUrl: 'postgres://runout:runout@127.0.0.1:1/runout',
+    });
+    try {
+      const res = await request(running.httpServer)
+        .get('/api/health')
+        .expect(200);
+
+      expect(res.body).toMatchObject({ status: 'ok', database: 'unreachable' });
+    } finally {
+      await running.close();
+    }
   });
 });
