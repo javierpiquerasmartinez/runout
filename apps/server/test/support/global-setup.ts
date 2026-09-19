@@ -30,21 +30,33 @@ export default async function setup(project: TestProject) {
     onLog: () => {},
   });
 
-  await postgres.initialise();
-  await postgres.start();
-  await postgres.createDatabase('runout');
-  const databaseUrl = `postgres://runout:runout@127.0.0.1:${port}/runout`;
-
-  const db = drizzle(databaseUrl);
-  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-  await db.$client.end();
-
-  project.provide('databaseUrl', databaseUrl);
-
-  return async () => {
+  const teardown = async () => {
     await postgres.stop();
     await rm(dataDir, { recursive: true, force: true });
   };
+
+  try {
+    await postgres.initialise();
+    await postgres.start();
+    await postgres.createDatabase('runout');
+  } catch (error) {
+    await rm(dataDir, { recursive: true, force: true });
+    throw error;
+  }
+  const databaseUrl = `postgres://runout:runout@127.0.0.1:${port}/runout`;
+
+  try {
+    const db = drizzle(databaseUrl);
+    await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    await db.$client.end();
+  } catch (error) {
+    await teardown();
+    throw error;
+  }
+
+  project.provide('databaseUrl', databaseUrl);
+
+  return teardown;
 }
 
 function freePort(): Promise<number> {

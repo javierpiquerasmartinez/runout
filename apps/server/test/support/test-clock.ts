@@ -3,7 +3,7 @@ import type { Clock } from '../../src/clock/clock.js';
 interface Scheduled {
   dueAt: number;
   order: number;
-  callback: () => void;
+  callback: () => unknown;
 }
 
 /** A Clock that only moves when a test calls `advance`. */
@@ -20,7 +20,7 @@ export class TestClock implements Clock {
     return new Date(this.current);
   }
 
-  schedule(delayMs: number, callback: () => void): () => void {
+  schedule(delayMs: number, callback: () => unknown): () => void {
     const entry = {
       dueAt: this.current + delayMs,
       order: this.scheduledCount++,
@@ -32,13 +32,16 @@ export class TestClock implements Clock {
     };
   }
 
-  /** Moves time forward, running every callback that falls due on the way. */
-  advance(ms: number): void {
+  /**
+   * Moves time forward, running every callback that falls due on the way and
+   * waiting for each one (and whatever it awaits) before running the next.
+   */
+  async advance(ms: number): Promise<void> {
     const target = this.current + ms;
     for (let next = this.nextDue(target); next; next = this.nextDue(target)) {
       this.pending = this.pending.filter((other) => other !== next);
       this.current = next.dueAt;
-      next.callback();
+      await next.callback();
     }
     this.current = target;
   }

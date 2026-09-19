@@ -23,7 +23,7 @@ describe('Runout server (e2e)', () => {
   });
 
   it('GET /api/health reports the server time from the injected clock', async () => {
-    running.clock.advance(60_000);
+    await running.clock.advance(60_000);
     const expected = running.clock.now().toISOString();
 
     const res = await request(running.httpServer)

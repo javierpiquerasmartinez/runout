@@ -5,7 +5,7 @@
 export interface Clock {
   now(): Date;
   /** Runs `callback` once after `delayMs`. Returns a function that cancels it. */
-  schedule(delayMs: number, callback: () => void): () => void;
+  schedule(delayMs: number, callback: () => unknown): () => void;
 }
 
 export const CLOCK = Symbol('CLOCK');
@@ -15,8 +15,8 @@ export class SystemClock implements Clock {
     return new Date();
   }
 
-  schedule(delayMs: number, callback: () => void): () => void {
-    const timer = setTimeout(callback, delayMs);
+  schedule(delayMs: number, callback: () => unknown): () => void {
+    const timer = setTimeout(() => void callback(), delayMs);
     return () => clearTimeout(timer);
   }
 }
