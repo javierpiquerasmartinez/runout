@@ -31,7 +31,7 @@ export function PlaybackBar({
       <div className="playback-bar__row">
         <div className="playback-bar__where" aria-live="polite">
           <span className="playback-bar__counter ro-mono" data-guest={!isMaster || undefined}>
-            {t('room.playback.counter', { current: view.actionIndex, total: view.actionCount })}
+            {t('room.playback.counter', { current: view.actionNumber, total: view.actionCount })}
           </span>
           <span className="playback-bar__action">{view.lastAction}</span>
         </div>

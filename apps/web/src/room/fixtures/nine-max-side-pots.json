@@ -1,0 +1,1883 @@
+{
+  "id": "nine-max-side-pots",
+  "stake": {
+    "limit": "no-limit",
+    "smallBlind": 25,
+    "bigBlind": 50,
+    "currency": "USD"
+  },
+  "tableSize": 9,
+  "timeline": {
+    "seats": [
+      {
+        "seat": 1,
+        "screenName": "Pine_SB",
+        "position": "SB",
+        "startingStack": 3000
+      },
+      {
+        "seat": 2,
+        "screenName": "Oak_BB",
+        "position": "BB",
+        "startingStack": 2500
+      },
+      {
+        "seat": 3,
+        "screenName": "Elm_UTG",
+        "position": "UTG",
+        "startingStack": 1000
+      },
+      {
+        "seat": 4,
+        "screenName": "Ash4",
+        "position": "UTG+1",
+        "startingStack": 5000
+      },
+      {
+        "seat": 5,
+        "screenName": "Fir5",
+        "position": "MP",
+        "startingStack": 5000
+      },
+      {
+        "seat": 6,
+        "screenName": "Yew6",
+        "position": "LJ",
+        "startingStack": 5000
+      },
+      {
+        "seat": 7,
+        "screenName": "Hero9max",
+        "position": "HJ",
+        "startingStack": 8000
+      },
+      {
+        "seat": 8,
+        "screenName": "Rowan8",
+        "position": "CO",
+        "startingStack": 5000
+      },
+      {
+        "seat": 9,
+        "screenName": "Spruce9",
+        "position": "BTN",
+        "startingStack": 6000
+      }
+    ],
+    "buttonSeat": 9,
+    "hero": {
+      "screenName": "Hero9max",
+      "cards": [
+        "Ah",
+        "Ad"
+      ]
+    },
+    "states": [
+      {
+        "street": "preflop",
+        "toAct": "Elm_UTG",
+        "action": null,
+        "result": null,
+        "board": [],
+        "pot": 120,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Ash4",
+              "Fir5",
+              "Yew6",
+              "Hero9max",
+              "Rowan8",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Ash4",
+        "action": {
+          "street": "preflop",
+          "screenName": "Elm_UTG",
+          "type": "raise",
+          "amount": 945,
+          "to": 995,
+          "allIn": true
+        },
+        "result": null,
+        "board": [],
+        "pot": 1115,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Ash4",
+              "Fir5",
+              "Yew6",
+              "Hero9max",
+              "Rowan8",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Fir5",
+        "action": {
+          "street": "preflop",
+          "screenName": "Ash4",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 1115,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Fir5",
+              "Yew6",
+              "Hero9max",
+              "Rowan8",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Yew6",
+        "action": {
+          "street": "preflop",
+          "screenName": "Fir5",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 1115,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Yew6",
+              "Hero9max",
+              "Rowan8",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Hero9max",
+        "action": {
+          "street": "preflop",
+          "screenName": "Yew6",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 1115,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Rowan8",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Rowan8",
+        "action": {
+          "street": "preflop",
+          "screenName": "Hero9max",
+          "type": "call",
+          "amount": 995,
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 2110,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Rowan8",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Spruce9",
+        "action": {
+          "street": "preflop",
+          "screenName": "Rowan8",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 2110,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5995,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Pine_SB",
+        "action": {
+          "street": "preflop",
+          "screenName": "Spruce9",
+          "type": "call",
+          "amount": 995,
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 3105,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Pine_SB",
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Oak_BB",
+        "action": {
+          "street": "preflop",
+          "screenName": "Pine_SB",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "board": [],
+        "pot": 3105,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 2445,
+            "bet": 50,
+            "folded": false,
+            "allIn": false,
+            "committed": 55
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Hero9max",
+        "action": {
+          "street": "preflop",
+          "screenName": "Oak_BB",
+          "type": "raise",
+          "amount": 1500,
+          "to": 2495,
+          "allIn": true
+        },
+        "result": null,
+        "board": [],
+        "pot": 5550,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 2495,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 7000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Spruce9",
+        "action": {
+          "street": "preflop",
+          "screenName": "Hero9max",
+          "type": "raise",
+          "amount": 5500,
+          "to": 7995,
+          "allIn": true
+        },
+        "result": null,
+        "board": [],
+        "pot": 12550,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 2495,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 0,
+            "bet": 7995,
+            "folded": false,
+            "allIn": true,
+            "committed": 8000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 5000,
+            "bet": 995,
+            "folded": false,
+            "allIn": false,
+            "committed": 1000
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": null,
+        "action": {
+          "street": "preflop",
+          "screenName": "Spruce9",
+          "type": "call",
+          "amount": 5000,
+          "allIn": true
+        },
+        "result": null,
+        "board": [],
+        "pot": 17550,
+        "pots": [
+          {
+            "amount": 45,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 25,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 2495,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 995,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 0,
+            "bet": 7995,
+            "folded": false,
+            "allIn": true,
+            "committed": 8000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 0,
+            "bet": 5995,
+            "folded": false,
+            "allIn": true,
+            "committed": 6000
+          }
+        ],
+        "effectiveStack": 5995,
+        "spr": null
+      },
+      {
+        "street": "flop",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "board": [
+          "Kh",
+          "9c",
+          "4d"
+        ],
+        "pot": 15550,
+        "pots": [
+          {
+            "amount": 4050,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 4500,
+            "contestants": [
+              "Oak_BB",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 7000,
+            "contestants": [
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 2000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 6000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 6000
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      },
+      {
+        "street": "turn",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "board": [
+          "Kh",
+          "9c",
+          "4d",
+          "2s"
+        ],
+        "pot": 15550,
+        "pots": [
+          {
+            "amount": 4050,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 4500,
+            "contestants": [
+              "Oak_BB",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 7000,
+            "contestants": [
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 2000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 6000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 6000
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "board": [
+          "Kh",
+          "9c",
+          "4d",
+          "2s",
+          "7h"
+        ],
+        "pot": 15550,
+        "pots": [
+          {
+            "amount": 4050,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 4500,
+            "contestants": [
+              "Oak_BB",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 7000,
+            "contestants": [
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 2000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 6000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 6000
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
+        "result": {
+          "revealed": [
+            {
+              "screenName": "Oak_BB",
+              "cards": [
+                "Qs",
+                "Qc"
+              ],
+              "madeHand": {
+                "category": "pair",
+                "ranks": [
+                  "Q"
+                ],
+                "cards": [
+                  "Qs",
+                  "Qc"
+                ]
+              }
+            },
+            {
+              "screenName": "Elm_UTG",
+              "cards": [
+                "Ks",
+                "Kd"
+              ],
+              "madeHand": {
+                "category": "three-of-a-kind",
+                "ranks": [
+                  "K"
+                ],
+                "cards": [
+                  "Ks",
+                  "Kd",
+                  "Kh"
+                ]
+              }
+            },
+            {
+              "screenName": "Hero9max",
+              "cards": [
+                "Ah",
+                "Ad"
+              ],
+              "madeHand": {
+                "category": "pair",
+                "ranks": [
+                  "A"
+                ],
+                "cards": [
+                  "Ah",
+                  "Ad"
+                ]
+              }
+            },
+            {
+              "screenName": "Spruce9",
+              "cards": [
+                "Ac",
+                "Qd"
+              ],
+              "madeHand": {
+                "category": "high-card",
+                "ranks": [
+                  "A"
+                ],
+                "cards": [
+                  "Ac"
+                ]
+              }
+            }
+          ],
+          "pots": [
+            {
+              "amount": 4050,
+              "contestants": [
+                "Oak_BB",
+                "Elm_UTG",
+                "Hero9max",
+                "Spruce9"
+              ],
+              "winners": [
+                {
+                  "screenName": "Elm_UTG",
+                  "amount": 3950
+                }
+              ]
+            },
+            {
+              "amount": 4500,
+              "contestants": [
+                "Oak_BB",
+                "Hero9max",
+                "Spruce9"
+              ],
+              "winners": [
+                {
+                  "screenName": "Hero9max",
+                  "amount": 4400
+                }
+              ]
+            },
+            {
+              "amount": 7000,
+              "contestants": [
+                "Hero9max",
+                "Spruce9"
+              ],
+              "winners": [
+                {
+                  "screenName": "Hero9max",
+                  "amount": 6900
+                }
+              ]
+            }
+          ],
+          "rake": 300
+        },
+        "board": [
+          "Kh",
+          "9c",
+          "4d",
+          "2s",
+          "7h"
+        ],
+        "pot": 15550,
+        "pots": [
+          {
+            "amount": 4050,
+            "contestants": [
+              "Oak_BB",
+              "Elm_UTG",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 4500,
+            "contestants": [
+              "Oak_BB",
+              "Hero9max",
+              "Spruce9"
+            ]
+          },
+          {
+            "amount": 7000,
+            "contestants": [
+              "Hero9max",
+              "Spruce9"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Pine_SB",
+            "stack": 2970,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 30
+          },
+          {
+            "screenName": "Oak_BB",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 2500
+          },
+          {
+            "screenName": "Elm_UTG",
+            "stack": 3950,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1000
+          },
+          {
+            "screenName": "Ash4",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Fir5",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Yew6",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Hero9max",
+            "stack": 13300,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 6000
+          },
+          {
+            "screenName": "Rowan8",
+            "stack": 4995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Spruce9",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 6000
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      }
+    ],
+    "showdown": true
+  }
+}

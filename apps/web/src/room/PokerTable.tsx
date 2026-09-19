@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useI18n } from '../i18n'
 import { Card, CardBack, CardSlot } from '../ui/Card'
+import { Icon } from '../ui/Icon'
 import { asPercent, cachedBetCentres, seatCentre } from './tableLayout'
 import type { SeatView, TableView } from './tableView'
 
@@ -13,6 +14,7 @@ import type { SeatView, TableView } from './tableView'
 export function PokerTable({ view }: { view: TableView }) {
   const { t } = useI18n()
   const bets = cachedBetCentres(view.slots, view.seats)
+  const winning = new Set(view.winningCards)
   return (
     <div className="poker-table">
       <div className="poker-table__felt" />
@@ -21,50 +23,82 @@ export function PokerTable({ view }: { view: TableView }) {
         <div className="poker-table__board" role="group" aria-label={t('room.table.board')}>
           {view.board.map((card, index) =>
             card ? (
-              <Card key={index} card={card} size="community" />
+              <Card key={index} card={card} size="community" winning={winning.has(card)} />
             ) : (
               <CardSlot key={index} size="community" label={t('room.card.empty')} />
             ),
           )}
         </div>
-        <div className="poker-table__pot">
-          <span className="poker-table__pot-label ro-mono">{t('room.table.pot')}</span>
-          <span className="poker-table__pot-value ro-mono">{view.pot}</span>
-        </div>
+        {view.sidePots ? (
+          <div className="poker-table__pots">
+            {view.sidePots.map((pot, index) => (
+              <div key={index} className="poker-table__side-pot" data-main={index === 0 || undefined}>
+                <span className="poker-table__side-pot-label ro-mono">{pot.label}</span>
+                <span className="poker-table__side-pot-value ro-mono">{pot.amount}</span>
+                <span className="poker-table__side-pot-who ro-mono">{pot.contestants}</span>
+              </div>
+            ))}
+            {view.potDetail && <span className="poker-table__pot-detail ro-mono">{view.potDetail}</span>}
+          </div>
+        ) : (
+          <div className="poker-table__pot">
+            <span className="poker-table__pot-label ro-mono">{t('room.table.pot')}</span>
+            <span className="poker-table__pot-value ro-mono">{view.pot}</span>
+            {view.potDetail && <span className="poker-table__pot-detail ro-mono">{view.potDetail}</span>}
+          </div>
+        )}
       </div>
 
       {view.seats.map((seat) => (
-        <Seat key={seat.screenName} seat={seat} style={asPercent(seatCentre(seat.slot, view.slots))} />
+        <Seat key={seat.screenName} seat={seat} winning={winning} style={asPercent(seatCentre(seat.slot, view.slots))} />
       ))}
-      {view.seats
-        .filter((seat) => seat.bet)
-        .map((seat) => (
-          <span
-            key={seat.screenName}
-            className="poker-table__bet ro-mono"
-            style={asPercent(bets.get(seat.slot)!)}
-          >
-            <span className="poker-table__bet-chip" />
-            {seat.bet}
-          </span>
-        ))}
+      {view.seats.map(
+        (seat) =>
+          seat.chip && (
+            <span
+              key={seat.screenName}
+              className="poker-table__bet ro-mono"
+              data-kind={seat.chip.kind}
+              data-hero={seat.hero || undefined}
+              style={asPercent(bets.get(seat.slot)!)}
+            >
+              <span className="poker-table__bet-chip" />
+              <span className="poker-table__bet-amount">{seat.chip.label}</span>
+              {seat.chip.potShare && <span className="poker-table__bet-share">{seat.chip.potShare}</span>}
+            </span>
+          ),
+      )}
     </div>
   )
 }
 
-function Seat({ seat, style }: { seat: SeatView; style: CSSProperties }) {
+function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; style: CSSProperties }) {
   const { t } = useI18n()
-  const status = seat.toAct ? t('room.table.toAct') : seat.folded ? t('room.table.folded') : null
+  // Whose turn it is, or that they folded, before what they last did.
+  const status = seat.toAct ? t('room.table.toAct') : seat.folded ? t('room.table.folded') : seat.move
   const cards = seat.cards ? (
     <span className="seat__cards">
       {seat.cards.map((card) => (
-        <Card key={card} card={card} size={seat.hero ? 'hero' : 'opponent'} />
+        <Card
+          key={card}
+          card={card}
+          size={seat.hero ? 'hero' : 'opponent'}
+          winning={seat.winner && winning.has(card)}
+          flip={seat.revealed}
+        />
       ))}
     </span>
   ) : (
     <span className="seat__cards" role="img" aria-label={t('room.table.hiddenCards')}>
       <CardBack size="opponent" />
       <CardBack size="opponent" />
+    </span>
+  )
+  // How the Hand ended for them, where their status would be.
+  const outcome = seat.outcome && (
+    <span className="seat__outcome" data-winner={seat.winner || undefined}>
+      {seat.winner && <Icon name="success" size={12} />}
+      {seat.outcome}
     </span>
   )
 
@@ -76,6 +110,9 @@ function Seat({ seat, style }: { seat: SeatView; style: CSSProperties }) {
       data-hero={seat.hero || undefined}
       data-to-act={seat.toAct || undefined}
       data-folded={seat.folded || undefined}
+      data-all-in={seat.allInLabel ? true : undefined}
+      data-winner={seat.winner || undefined}
+      data-revealed={seat.revealed || undefined}
       style={style}
     >
       {/* The Hero's cards sit below the plate, everyone else's above it. */}
@@ -87,15 +124,25 @@ function Seat({ seat, style }: { seat: SeatView; style: CSSProperties }) {
           {seat.hero && <span className="seat__hero">{t('room.table.hero')}</span>}
           <span className="seat__position ro-mono">{seat.position}</span>
         </div>
-        <span className="seat__stack ro-mono">{seat.stack}</span>
+        <div className="seat__line seat__line--stack">
+          <span className="seat__stack ro-mono">{seat.stack}</span>
+          {seat.netResult && <span className="seat__note seat__note--won ro-mono">{seat.netResult}</span>}
+          {seat.allInLabel && <span className="seat__note seat__note--all-in ro-mono">{seat.allInLabel}</span>}
+        </div>
         {seat.dealer && (
           <span className="seat__dealer ro-mono" role="img" aria-label={t('room.table.dealer')}>
             D
           </span>
         )}
       </div>
-      {seat.hero && cards}
-      {!seat.hero && status && <span className="seat__status ro-mono">{status}</span>}
+      {seat.hero ? (
+        <span className="seat__below">
+          {cards}
+          {outcome}
+        </span>
+      ) : (
+        (outcome ?? (status && <span className="seat__status ro-mono">{status}</span>))
+      )}
     </div>
   )
 }

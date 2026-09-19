@@ -114,6 +114,7 @@ const POST_KINDS: Record<string, Post['kind']> = {
   'small blind': 'small-blind',
   'big blind': 'big-blind',
   'small & big blinds': 'small-and-big-blinds',
+  straddle: 'straddle',
   'the ante': 'ante',
 };
 
@@ -177,9 +178,16 @@ function readPlay(lines: string[], seats: Seat[]): Play {
     if (!name) continue;
     const said = line.slice(name.length);
 
-    const collected = said.match(/^ collected (\S+) from (?:main |side )?pot/);
+    const collected = said.match(
+      /^ collected (\S+) from (?:(main |side )?pot(?:-(\d+))?)/,
+    );
     if (collected) {
-      play.collected.push({ screenName: name, amount: amount(collected[1]) });
+      const [, won, kind, side] = collected;
+      play.collected.push({
+        screenName: name,
+        amount: amount(won),
+        pot: kind === 'side ' ? Number(side ?? 1) : 0,
+      });
       continue;
     }
     if (!said.startsWith(': ')) continue;
@@ -187,7 +195,7 @@ function readPlay(lines: string[], seats: Seat[]): Play {
 
     const post = move.match(
       new RegExp(
-        `^posts (small blind|big blind|small & big blinds|the ante) ${AMOUNT}${ALL_IN}$`,
+        `^posts (small blind|big blind|small & big blinds|straddle|the ante) ${AMOUNT}${ALL_IN}$`,
       ),
     );
     if (post) {

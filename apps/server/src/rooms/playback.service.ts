@@ -5,6 +5,7 @@ import { DATABASE, type Database } from '../database/database.js';
 import { hands, playbacks, queueEntries, rooms } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
+import { timeline } from '../hands/replay/timeline.js';
 import { Rejected } from '../rejection/rejection.js';
 
 /**
@@ -64,7 +65,8 @@ export class PlaybackService {
   }
 
   /**
-   * Takes Playback to an absolute Action index, so stepping either way and
+   * Takes Playback to an absolute step of the Hand's Timeline (the Initial
+   * State, an Action, a Street dealt or the end), so stepping either way and
    * jumping are the same idempotent command.
    */
   async goTo(
@@ -83,7 +85,7 @@ export class PlaybackService {
       typeof actionIndex !== 'number' ||
       !Number.isInteger(actionIndex) ||
       actionIndex < 0 ||
-      actionIndex > loaded.content.actions.length
+      actionIndex >= timeline(loaded.content).states.length
     ) {
       throw new Rejected('invalid-action-index');
     }

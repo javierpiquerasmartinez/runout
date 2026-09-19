@@ -7,8 +7,8 @@ import type { QueueEntry } from './roomClient'
  */
 
 /** The Positions involved, against each other: "BTN vs CO". */
-export function positionsLabel(entry: QueueEntry): string {
-  return entry.summary.positions.join(' vs ')
+export function positionsLabel(entry: QueueEntry, { t }: Translator): string {
+  return entry.summary.positions.join(t('room.versus'))
 }
 
 /** The Final Street badge; a Hand that went to Showdown says so instead. */

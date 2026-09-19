@@ -489,6 +489,61 @@
   color: var(--brass-ink);
 }
 
+.poker-table__pot-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Board "Sala — vista del invitado": the main pot in brass, each side pot beside it. */
+.poker-table__pots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 8px;
+}
+.poker-table__pots .poker-table__pot-detail {
+  flex-basis: 100%;
+  text-align: center;
+}
+.poker-table__side-pot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-chip);
+}
+.poker-table__side-pot[data-main] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+}
+.poker-table__side-pot-label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+.poker-table__side-pot[data-main] .poker-table__side-pot-label {
+  color: var(--text-secondary);
+}
+.poker-table__side-pot-value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-secondary);
+}
+.poker-table__side-pot[data-main] .poker-table__side-pot-value {
+  color: var(--brass-ink);
+}
+.poker-table__side-pot-who {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .poker-table__bet {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -505,10 +560,33 @@
   color: var(--text-secondary);
 }
 .poker-table__bet-chip {
+  flex-shrink: 0;
   width: 15px;
   height: 15px;
   border-radius: 50%;
   background: var(--color-border-hover);
+}
+.poker-table__bet-share {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+/* Board "Cartas": the Hero's bet in brass, an all-in in red, always with its amount. */
+.poker-table__bet[data-hero] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+}
+.poker-table__bet[data-hero] .poker-table__bet-chip {
+  background: var(--brass);
+}
+.poker-table__bet[data-kind='all-in'] {
+  border-color: var(--alert-border);
+  background: var(--alert-hover-bg);
+  color: var(--alert-ink);
+}
+.poker-table__bet[data-kind='all-in'] .poker-table__bet-chip {
+  background: var(--alert);
 }
 
 /* A seat is anchored by its plate; cards and status hang above or below it. */
@@ -533,9 +611,19 @@
   bottom: calc(100% + 5px);
   gap: 3px;
 }
-.seat[data-hero] .seat__cards {
+.seat__below {
+  position: absolute;
   top: calc(100% + 5px);
-  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.seat__below .seat__cards {
+  position: static;
+  transform: none;
   gap: 4px;
 }
 .seat__status {
@@ -550,6 +638,36 @@
 }
 .seat[data-to-act] .seat__status {
   color: var(--brass-ink);
+}
+
+/* How the Hand ended: the made hand, muted, or a teal pill for the winner. */
+.seat__outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.seat:not([data-hero]) > .seat__outcome {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.seat__outcome[data-winner] {
+  padding: 4px 11px;
+  border: 1px solid var(--sync-soft-border);
+  border-radius: var(--radius-pill);
+  background: var(--sync-hover-bg);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sync-ink);
+}
+.seat[data-revealed]:not([data-winner]) .seat__cards .ro-card {
+  opacity: 0.75;
 }
 
 .seat__plate {
@@ -571,6 +689,11 @@
 .seat[data-to-act] .seat__plate {
   border-color: var(--brass);
   box-shadow: 0 0 0 3px var(--brass-glow);
+}
+.seat[data-winner] .seat__plate {
+  border-color: var(--sync);
+  background: var(--sync-hover-bg);
+  box-shadow: 0 0 0 3px var(--sync-glow);
 }
 
 .seat__line {
@@ -623,6 +746,22 @@
 }
 .seat[data-folded] .seat__stack {
   color: var(--text-muted);
+}
+.seat[data-all-in] .seat__stack {
+  color: var(--alert-ink);
+}
+.seat__line--stack {
+  align-items: baseline;
+}
+.seat__note {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.seat__note--won {
+  color: var(--sync-ink);
+}
+.seat__note--all-in {
+  color: var(--alert-ink);
 }
 
 .seat__dealer {
@@ -973,4 +1112,130 @@
     border-left: 0;
     border-top: 1px solid var(--color-panel-border);
   }
+}
+
+/* The log strip between the table and the transport bar, 36 px as in the "Sala" boards. */
+.street-log {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  border-top: 1px solid var(--color-divider);
+  background: var(--color-pressed);
+  overflow: hidden;
+}
+.street-log__street {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.street-log__divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 14px;
+  background: var(--color-rule-strong);
+}
+.street-log__entries {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+.street-log__entry {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--color-control);
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+/* Older Actions and shown cards give way first; the latest, who is to act and who won never do. */
+.street-log__entry:not([data-tone='past']) {
+  flex-shrink: 0;
+}
+.street-log__entry[data-tone='latest'] {
+  background: var(--brass);
+  font-weight: 600;
+  color: var(--on-brass);
+}
+.street-log__entry[data-tone='winner'] {
+  background: var(--sync);
+  font-weight: 600;
+  color: var(--on-brass);
+}
+.street-log__entry[data-tone='pending'] {
+  padding: 2px 8px;
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  color: var(--text-disabled-label);
+}
+.street-log__aside {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* Board "Sala — vista del invitado": the pot distribution in the side panel. */
+.room-payout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.room-payout__pot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-chip);
+}
+.room-payout__pot[data-main] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+}
+.room-payout__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.room-payout__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.room-payout__winner {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.room-payout__amount {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.room-payout__pot[data-main] .room-payout__amount {
+  color: var(--brass-ink);
+}
+
+.room-payout__rake {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
 }

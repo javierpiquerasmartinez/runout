@@ -151,13 +151,14 @@ describe('Playback (e2e)', () => {
 
     masterSocket.send('playback.load', { handId });
     await masterSocket.next('playback.changed');
-    // The showdown Hand has 10 Actions: 0 (Initial State) to 10 are valid.
-    masterSocket.send('playback.goTo', { actionIndex: 10 });
+    // The showdown Hand has 15 steps: the Initial State, 10 Actions, the
+    // flop, turn and river dealt, and the end. 0 to 14 are valid.
+    masterSocket.send('playback.goTo', { actionIndex: 14 });
     expect(await masterSocket.next('playback.changed')).toEqual({
       handId,
-      actionIndex: 10,
+      actionIndex: 14,
     });
-    for (const actionIndex of [11, -1, 1.5, 'x']) {
+    for (const actionIndex of [15, -1, 1.5, 'x']) {
       masterSocket.send('playback.goTo', { actionIndex });
       expect(await masterSocket.next('rejected')).toEqual({
         command: 'playback.goTo',
@@ -214,7 +215,7 @@ describe('Playback (e2e)', () => {
         showdown: true,
       },
     });
-    expect(res.body.timeline.states).toHaveLength(11);
+    expect(res.body.timeline.states).toHaveLength(15);
     expect(res.headers['cache-control']).toMatch(/private/);
 
     const refused = await request(running.httpServer)

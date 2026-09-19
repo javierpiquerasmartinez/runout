@@ -16,14 +16,74 @@ export type Action = { street: Street; screenName: string; allIn: boolean } & (
   | { type: 'raise'; amount: number; to: number }
 )
 
+export type HandCategory =
+  | 'high-card'
+  | 'pair'
+  | 'two-pair'
+  | 'three-of-a-kind'
+  | 'straight'
+  | 'flush'
+  | 'full-house'
+  | 'four-of-a-kind'
+  | 'straight-flush'
+
+export type Rank = 'A' | 'K' | 'Q' | 'J' | '10' | '9' | '8' | '7' | '6' | '5' | '4' | '3' | '2'
+
+/** A made hand from the server's evaluator; the web only localises it. */
+export interface MadeHand {
+  category: HandCategory
+  /** The ranks that name the hand, most significant first. */
+  ranks: Rank[]
+  /** The cards that make it, kickers left out. */
+  cards: string[]
+}
+
+export interface Pot {
+  amount: number
+  /** Who can win it, in seat order. */
+  contestants: string[]
+}
+
+export interface PlayerState {
+  screenName: string
+  stack: number
+  /** What the player has put in on this Street. */
+  bet: number
+  folded: boolean
+  allIn: boolean
+  /** Everything put in the pot so far, net of bets returned. */
+  committed: number
+}
+
 export interface TableState {
   street: Street
   board: string[]
-  /** Amounts are integers in hundredths of the Hand's currency. */
+  /** Everything in the middle, bets on this Street included. Amounts are integers in hundredths of the Hand's currency. */
   pot: number
+  /** What has been gathered from earlier Streets: the main pot, then each side pot. */
+  pots: Pot[]
   toAct: string | null
-  players: { screenName: string; stack: number; bet: number; folded: boolean }[]
+  players: PlayerState[]
   action: Action | null
+  /** Read as this Street began; null with fewer than two players left. */
+  effectiveStack: number | null
+  /** Read as this Street began; null preflop. */
+  spr: number | null
+  /** How the Hand ended, on its last state only. */
+  result: HandResult | null
+}
+
+export interface HandResult {
+  /** The hands shown at Showdown; a mucked hand, the Hero's included, isn't one. */
+  revealed: { screenName: string; cards: string[]; madeHand: MadeHand }[]
+  pots: PaidPot[]
+  /** What the room kept. */
+  rake: number
+}
+
+/** A pot with what each winner took from it, after rake. */
+export interface PaidPot extends Pot {
+  winners: { screenName: string; amount: number }[]
 }
 
 export interface HandWithTimeline {

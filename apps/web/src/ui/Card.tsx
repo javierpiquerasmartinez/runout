@@ -21,7 +21,21 @@ function parse(card: string): { rank: string; suit: Suit } {
   return { rank: card.slice(0, -1), suit: card.slice(-1) as Suit }
 }
 
-export function Card({ card, size }: { card: string; size: CardSize }) {
+/**
+ * A card face up. `winning` outlines it as part of a winning hand; `flip`
+ * turns it over as it appears, for cards shown at Showdown.
+ */
+export function Card({
+  card,
+  size,
+  winning,
+  flip,
+}: {
+  card: string
+  size: CardSize
+  winning?: boolean
+  flip?: boolean
+}) {
   const { t } = useI18n()
   const { rank, suit } = parse(card)
   return (
@@ -29,6 +43,8 @@ export function Card({ card, size }: { card: string; size: CardSize }) {
       className={`ro-card ro-card--${size}`}
       data-suit={suit}
       data-ten={rank === '10' || undefined}
+      data-winning={winning || undefined}
+      data-flip={flip || undefined}
       role="img"
       aria-label={t('room.card.label', { rank, suit: t(`room.card.suit.${suit}`) })}
     >
