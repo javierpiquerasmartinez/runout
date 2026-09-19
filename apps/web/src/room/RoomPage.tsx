@@ -27,7 +27,7 @@ export function RoomPage({ code }: { code: string }) {
   const { token } = useSession()
   const [displayName, setDisplayName] = useState<string | null>(() => readJoinIntent()?.displayName ?? null)
   const [lookup, setLookup] = useState<Lookup>({ state: 'loading' })
-  const view = useRoom(code, token, displayName)
+  const [view, commands] = useRoom(code, token, displayName)
 
   // Also run when arriving from "Create": a refused name falls back to the name form.
   useEffect(() => {
@@ -42,7 +42,7 @@ export function RoomPage({ code }: { code: string }) {
     }
   }, [code, token])
 
-  if (view.phase === 'in-room') return <RoomScreen view={view} />
+  if (view.phase === 'in-room') return <RoomScreen view={view} commands={commands} />
   if (view.phase === 'rejected' && view.reason === 'invalid-display-name' && lookup.state === 'found') {
     return <ConfirmName room={lookup.room} rejected onConfirm={setDisplayName} />
   }

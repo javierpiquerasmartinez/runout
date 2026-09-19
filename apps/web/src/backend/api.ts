@@ -5,6 +5,11 @@ export type RejectionReason =
   | 'invalid-room-name'
   | 'room-not-found'
   | 'not-in-room'
+  | 'not-master'
+  | 'hand-not-found'
+  | 'hand-not-in-queue'
+  | 'no-hand-loaded'
+  | 'invalid-action-index'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

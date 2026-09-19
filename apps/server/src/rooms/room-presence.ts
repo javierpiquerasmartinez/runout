@@ -75,6 +75,13 @@ export class RoomPresence<Connection> {
     return this.roomOf.has(connection);
   }
 
+  /** The Room the connection is in, and whose connection it is. */
+  placeOf(
+    connection: Connection,
+  ): { roomId: string; identityId: string } | null {
+    return this.roomOf.get(connection) ?? null;
+  }
+
   /** Present Participants, in the order they first joined. */
   participants(roomId: string): Participant[] {
     const room = this.rooms.get(roomId);

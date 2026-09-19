@@ -13,6 +13,7 @@ interface Snapshot {
   you: string;
   participants: Participant[];
   queue: unknown[];
+  playback: unknown;
 }
 
 describe('Joining a Room over the WebSocket (e2e)', () => {
@@ -62,6 +63,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
         { identityId: master.id, displayName: 'Javier', role: 'master' },
       ],
       queue: [],
+      playback: null,
     });
   });
 

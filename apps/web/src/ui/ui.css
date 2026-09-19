@@ -552,3 +552,108 @@
   color: var(--brass);
   flex-shrink: 0;
 }
+
+/* ---------- Cards: board "Cartas", classic ivory deck, four colours ---------- */
+
+.ro-card {
+  --card-w: 54px;
+  --card-h: 76px;
+  --card-radius: 6px;
+  --card-pad: 5px;
+  --card-rank: 27px;
+  --card-ten: 21px;
+  --card-suit: 21px;
+  --card-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--card-w);
+  height: var(--card-h);
+  padding: var(--card-pad);
+  border-radius: var(--card-radius);
+  background: var(--card-face);
+  box-shadow: var(--card-shadow);
+  color: var(--card-ink-black);
+}
+.ro-card--hero {
+  --card-w: 40px;
+  --card-h: 56px;
+  --card-radius: 5px;
+  --card-pad: 3px;
+  --card-rank: 20px;
+  --card-ten: 16px;
+  --card-suit: 15px;
+  --card-shadow: 0 3px 10px rgb(0 0 0 / 55%);
+}
+.ro-card--opponent {
+  --card-w: 30px;
+  --card-h: 42px;
+  --card-radius: 4px;
+  --card-pad: 2px;
+  --card-rank: 16px;
+  --card-ten: 12.5px;
+  --card-suit: 12px;
+  --card-shadow: 0 2px 8px rgb(0 0 0 / 50%);
+}
+.ro-card--list {
+  --card-w: 24px;
+  --card-h: 34px;
+  --card-radius: 3px;
+  --card-pad: 2px;
+  --card-rank: 13px;
+  --card-ten: 10px;
+  --card-suit: 10px;
+  --card-shadow: none;
+}
+
+.ro-card[data-suit='h'] {
+  color: var(--card-ink-red);
+}
+.ro-card[data-suit='d'] {
+  color: var(--card-ink-blue);
+}
+.ro-card[data-suit='c'] {
+  color: var(--card-ink-green);
+}
+
+.ro-card__rank {
+  font-family: var(--font-mono);
+  font-size: var(--card-rank);
+  font-weight: 600;
+  line-height: 1;
+}
+.ro-card[data-ten] .ro-card__rank {
+  font-size: var(--card-ten);
+  letter-spacing: -0.05em;
+}
+
+.ro-card__suit {
+  align-self: flex-end;
+  width: var(--card-suit);
+  height: var(--card-suit);
+}
+
+.ro-card--back {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--card-back-border);
+  background: var(--card-back-bg);
+  box-shadow: none;
+  color: var(--card-back-mark);
+}
+.ro-card__mark {
+  width: 45%;
+  height: 45%;
+  opacity: 0.5;
+}
+
+.ro-card--empty {
+  padding: 0;
+  border: 1px dashed var(--card-slot-border);
+  background: var(--card-slot-bg);
+  box-shadow: none;
+}

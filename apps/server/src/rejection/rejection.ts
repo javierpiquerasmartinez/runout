@@ -7,7 +7,12 @@ export type RejectionReason =
   | 'invalid-display-name'
   | 'invalid-room-name'
   | 'room-not-found'
-  | 'not-in-room';
+  | 'not-in-room'
+  | 'not-master'
+  | 'hand-not-found'
+  | 'hand-not-in-queue'
+  | 'no-hand-loaded'
+  | 'invalid-action-index';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

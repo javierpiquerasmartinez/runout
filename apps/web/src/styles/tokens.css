@@ -52,6 +52,7 @@
   --sync-pressed-bg: #0a1513;
   --sync-soft-border: #1f6b58;
   --sync-glow: rgb(63 192 160 / 16%);
+  --brass-glow: rgb(224 160 80 / 14%);
 
   /* Alert: all-in, error, delete */
   --alert: #e0645c;
@@ -82,6 +83,13 @@
   --card-ink-black: #14201e;
   --card-ink-red: #c1362f;
   --card-ink-blue: #1c6fb8;
+  --card-ink-green: #1f7a45;
+  --card-back-bg: #17282f;
+  --card-back-border: #2a3e47;
+  --card-back-mark: #5e7c8a;
+  --seat-bg: #0f1917;
+  --seat-bg-live: #16211e;
+  --dealer-button: #f4f1ea;
   --card-slot-bg: #0e1918;
   --card-slot-border: #2a413b;
 
@@ -172,6 +180,7 @@
   --sync-pressed-bg: #d3eae2;
   --sync-soft-border: #8cc9b6;
   --sync-glow: rgb(27 132 104 / 18%);
+  --brass-glow: rgb(224 160 80 / 18%);
 
   --alert: #c0392f;
   --alert-ink: #c0392f;
@@ -199,6 +208,13 @@
   --card-ink-black: #14201e;
   --card-ink-red: #c1362f;
   --card-ink-blue: #1c6fb8;
+  --card-ink-green: #1f7a45;
+  --card-back-bg: #17282f;
+  --card-back-border: #2a3e47;
+  --card-back-mark: #5e7c8a;
+  --seat-bg: #ffffff;
+  --seat-bg-live: #ffffff;
+  --dealer-button: #f4f1ea;
   --card-slot-bg: transparent;
   --card-slot-border: #b4ccc1;
 

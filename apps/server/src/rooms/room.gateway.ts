@@ -15,6 +15,7 @@ import {
   type Identity,
 } from '../identity/identity.service.js';
 import { Rejected, type RejectionReason } from '../rejection/rejection.js';
+import { PlaybackService, type Playback } from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
 import { RoomPresence, type Participant } from './room-presence.js';
 import { RoomsService, type RoomSummary } from './rooms.service.js';
@@ -30,6 +31,16 @@ export interface RoomSnapshot {
   you: string;
   participants: Participant[];
   queue: QueueEntry[];
+  /** Null while no Hand is loaded. */
+  playback: Playback | null;
+}
+
+export interface LoadHandCommand {
+  handId: string;
+}
+
+export interface GoToActionCommand {
+  actionIndex: number;
 }
 
 export interface RejectedEvent {
@@ -46,11 +57,14 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RoomGateway.name);
   private readonly identityOf = new WeakMap<WebSocket, Promise<Identity>>();
   private readonly presence = new RoomPresence<WebSocket>();
+  /** The last Playback change of each Room, so changes apply and broadcast in order. */
+  private readonly playbackChanges = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly identities: IdentityService,
     private readonly rooms: RoomsService,
     private readonly queue: QueueService,
+    private readonly playback: PlaybackService,
   ) {}
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -79,7 +93,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         String(command?.code ?? ''),
         command?.displayName,
       );
-      const queue = await this.queue.entries(room.id);
+      const [queue, playback] = await Promise.all([
+        this.queue.entries(room.id),
+        this.playback.current(room.id),
+      ]);
       if (socket.readyState !== WebSocket.OPEN) return undefined;
 
       this.leave(socket);
@@ -101,6 +118,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           you: identity.id,
           participants: this.presence.participants(room.id),
           queue,
+          playback,
         },
       };
     });
@@ -118,6 +136,50 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  /** The Master loads a Hand from the Queue; every table goes to its Initial State. */
+  @SubscribeMessage('playback.load')
+  load(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<LoadHandCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.changePlayback('playback.load', socket, (master, roomId) =>
+      this.playback.load(master, roomId, command?.handId),
+    );
+  }
+
+  /** The Master's "go to Action N", for stepping either way. */
+  @SubscribeMessage('playback.goTo')
+  goTo(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<GoToActionCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.changePlayback('playback.goTo', socket, (master, roomId) =>
+      this.playback.goTo(master, roomId, command?.actionIndex),
+    );
+  }
+
+  /**
+   * Applies a Playback change and sends the new Playback to the whole Room.
+   * Changes to one Room apply, and are sent, in the order they arrived.
+   */
+  private changePlayback(
+    command: string,
+    socket: WebSocket,
+    change: (master: Identity, roomId: string) => Promise<Playback>,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting(command, async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      await this.inOrder(roomId, async () => {
+        this.publish(
+          roomId,
+          'playback.changed',
+          await change(identity, roomId),
+        );
+      });
+      return undefined;
+    });
+  }
+
   private leave(socket: WebSocket): void {
     const left = this.presence.exit(socket);
     if (left) {
@@ -131,6 +193,30 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const identity = this.identityOf.get(socket);
     if (!identity) throw new Rejected('unauthenticated');
     return identity;
+  }
+
+  /** Runs `change` after every earlier Playback change of the Room has settled. */
+  private inOrder(roomId: string, change: () => Promise<void>): Promise<void> {
+    const previous = this.playbackChanges.get(roomId) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(change);
+    this.playbackChanges.set(roomId, next);
+    void next
+      .finally(() => {
+        if (this.playbackChanges.get(roomId) === next) {
+          this.playbackChanges.delete(roomId);
+        }
+      })
+      .catch(() => {});
+    return next;
+  }
+
+  private async inRoom(
+    socket: WebSocket,
+  ): Promise<{ identity: Identity; roomId: string }> {
+    const identity = await this.authenticated(socket);
+    const place = this.presence.placeOf(socket);
+    if (!place) throw new Rejected('not-in-room');
+    return { identity, roomId: place.roomId };
   }
 
   /** Sends an event to every connection in the Room. */

@@ -26,16 +26,27 @@ export function positions(hand: Hand): Map<string, Position> {
   const dealt = hand.seats.filter((seat) => !seat.sittingOut);
   const names = BY_PLAYERS_DEALT[dealt.length];
   if (!names) return new Map();
-  // Clockwise from the button: BTN, SB, BB, then the earliest Position.
-  const fromButton = [
-    ...dealt.filter((seat) => seat.seat >= hand.buttonSeat),
-    ...dealt.filter((seat) => seat.seat < hand.buttonSeat),
+  const clockwiseFrom = (first: number) => [
+    ...dealt.filter((seat) => seat.seat >= first),
+    ...dealt.filter((seat) => seat.seat < first),
   ];
-  const button = names.indexOf('BTN');
-  const inActingOrder = [
-    ...fromButton.slice(names.length - button),
-    ...fromButton.slice(0, names.length - button),
-  ];
+
+  let inActingOrder;
+  const bigBlind = hand.posts.find((post) => post.kind === 'big-blind');
+  const bigBlindSeat = dealt.find((s) => s.screenName === bigBlind?.screenName);
+  if (dealt.some((seat) => seat.seat === hand.buttonSeat) || !bigBlindSeat) {
+    // Clockwise from the button: BTN, SB, BB, then the earliest Position.
+    const fromButton = clockwiseFrom(hand.buttonSeat);
+    const button = names.indexOf('BTN');
+    inActingOrder = [
+      ...fromButton.slice(names.length - button),
+      ...fromButton.slice(0, names.length - button),
+    ];
+  } else {
+    // A dead button (its seat empty or sitting out): the big blind acts last
+    // preflop, so the Positions run clockwise from the seat after it.
+    inActingOrder = clockwiseFrom(bigBlindSeat.seat + 1);
+  }
   return new Map(
     inActingOrder.map((seat, index) => [seat.screenName, names[index]]),
   );
