@@ -27,7 +27,9 @@ pnpm dev
 - Web at http://localhost:5173
 - API at http://localhost:3000/api (in development, Vite proxies `/api` and `/ws`)
 
-The initial screen calls `GET /api/health` and pings the server over WebSocket at `/ws`, showing the latency. The health response also says whether the server can reach the database: `200` with `"database": "reachable"`, or `503` with `"status": "unavailable"` and `"database": "unreachable"`, so uptime checks and load balancers see the server as down.
+The welcome screen at `/` creates a Room or joins one by Room Code; a Room lives at `/room/<code>`. The first visit issues an anonymous identity (ADR 0003): its token is kept in `localStorage` and sent as `Authorization: Bearer <token>` over HTTP and as `/ws?token=<token>` on the WebSocket. Refused commands carry a typed reason: `{ "reason": … }` over HTTP, a `rejected` event with `{ command, reason }` over the WebSocket.
+
+A connection check lives at `/status`: it calls `GET /api/health` and pings the server over WebSocket at `/ws`, showing the latency. The health response also says whether the server can reach the database: `200` with `"database": "reachable"`, or `503` with `"status": "unavailable"` and `"database": "unreachable"`, so uptime checks and load balancers see the server as down.
 
 ## Database
 

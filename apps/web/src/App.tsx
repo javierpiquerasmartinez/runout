@@ -1,12 +1,26 @@
 import { useHealth, usePing } from './backend/useBackendStatus'
 import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
+import { SessionProvider } from './identity/SessionProvider'
+import { RoomPage } from './room/RoomPage'
+import { roomCodeFromPath } from './room/roomCode'
+import { usePath } from './routing'
+import { WelcomePage } from './welcome/WelcomePage'
 
 export const designSystemPath = '/design-system'
+export const statusPath = '/status'
 
 function App() {
-  if (window.location.pathname === designSystemPath) return <DesignSystemPage />
-  return <ConnectionStatus />
+  const path = usePath()
+  if (path === designSystemPath) return <DesignSystemPage />
+  if (path === statusPath) return <ConnectionStatus />
+  const code = roomCodeFromPath(path)
+  return (
+    <SessionProvider>
+      {/* Keyed by code, so moving to another Room starts from a clean slate. */}
+      {code ? <RoomPage key={code} code={code} /> : <WelcomePage />}
+    </SessionProvider>
+  )
 }
 
 function ConnectionStatus() {
