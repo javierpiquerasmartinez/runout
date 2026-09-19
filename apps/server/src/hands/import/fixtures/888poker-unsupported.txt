@@ -1,0 +1,18 @@
+#Game No : 1034567890
+***** 888poker Hand History for Game 1034567890 *****
+$0.05/$0.10 Blinds No Limit Holdem - *** 12 09 2026 19:30:00
+Table Toronto 6 Max (Real Money)
+Seat 3 is the button
+Total number of players : 3
+Seat 1: Alder239 ( $10 )
+Seat 3: iMapleAA ( $10 )
+Seat 5: Cedar31 ( $10 )
+Cedar31 posts small blind [$0.05]
+Alder239 posts big blind [$0.10]
+** Dealing down cards **
+Dealt to iMapleAA [ Ks, Jd ]
+iMapleAA raises [$0.30]
+Cedar31 folds
+Alder239 folds
+** Summary **
+iMapleAA collected [ $0.25 ]

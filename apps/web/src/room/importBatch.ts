@@ -8,10 +8,10 @@ import type { QueueEntry } from './roomClient'
  */
 
 /** The formats the server reads. Mirrors the server's (ADR 0001: no shared code). */
-export type SourceFormat = 'pokerstars'
-export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars']
+export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax'
+export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax']
 
-export type DiscardReason = 'unrecognised-format' | 'not-cash-holdem' | 'no-hero' | 'malformed'
+export type DiscardReason = 'unrecognised-format' | 'not-cash-holdem' | 'too-many-seats' | 'no-hero' | 'malformed'
 
 /** What the dialog shows of each Hand the server read. */
 export type HandPreview = Pick<QueueEntry, 'playedAt' | 'stake' | 'summary'> & { board: string[] }

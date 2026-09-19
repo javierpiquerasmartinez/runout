@@ -127,7 +127,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     expect(sessionPreview.body).toEqual({
       id: expect.any(String),
       format: 'pokerstars',
-      tried: ['pokerstars'],
+      tried: ['pokerstars', 'ggpoker', 'winamax'],
       hands: [
         expect.objectContaining({ board: [] }),
         expect.objectContaining({ board: expect.any(Array) }),
@@ -274,7 +274,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
 
     expect(detected.body).toMatchObject({
       format: null,
-      tried: ['pokerstars'],
+      tried: ['pokerstars', 'ggpoker', 'winamax'],
       hands: [],
       discarded: [{ reason: 'unrecognised-format' }],
     });

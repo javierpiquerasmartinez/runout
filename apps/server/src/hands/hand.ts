@@ -36,13 +36,17 @@ export interface Hand {
    * pots from 1. Hands imported before pots were recorded have no `pot`.
    */
   collected: { screenName: string; amount: number; pot?: number }[];
+  /** Everything the house took: rake, plus any jackpot or other fee. */
   rake: number;
 }
 
-export type PokerSite = 'pokerstars';
+export type PokerSite = 'pokerstars' | 'ggpoker' | 'winamax';
 
-/** The layout the Hand History was written in. */
-export type SourceFormat = 'pokerstars';
+/**
+ * The layout the Hand History was written in. The Trackers export each Hand
+ * in its Poker Site's own layout, so there is one per Poker Site.
+ */
+export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax';
 
 export interface Stake {
   limit: 'no-limit' | 'pot-limit' | 'fixed-limit';
