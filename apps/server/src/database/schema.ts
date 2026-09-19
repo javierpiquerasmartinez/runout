@@ -9,6 +9,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { Hand } from '../hands/hand.js';
@@ -21,6 +22,23 @@ export const identities = pgTable('identities', {
   displayName: text('display_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
+
+/**
+ * The names a person plays under on Poker Sites. A Hand's Hero is matched
+ * against them, ignoring case, to find its Author.
+ */
+export const screenNames = pgTable(
+  'screen_names',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    screenName: text('screen_name').notNull(),
+    /** Where it was listed among the person's Screen Names, from 0. */
+    position: integer('position').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.identityId, table.screenName] })],
+);
 
 export const rooms = pgTable('rooms', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -53,27 +71,38 @@ export const roomMemberships = pgTable(
 );
 
 /** One Hand from one Hero's seat (ADR 0002), stored as the import module read it. */
-export const hands = pgTable('hands', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  site: text('site').notNull(),
-  siteHandId: text('site_hand_id').notNull(),
-  heroScreenName: text('hero_screen_name').notNull(),
-  authorId: uuid('author_id')
-    .notNull()
-    .references(() => identities.id),
-  /** Who brought the Hand in. Audit only; carries no meaning for attribution. */
-  importerId: uuid('importer_id')
-    .notNull()
-    .references(() => identities.id),
-  sourceFormat: text('source_format').notNull(),
-  playedAt: timestamp('played_at', { withTimezone: true }).notNull(),
-  /** The Stake, as Amounts in hundredths of `currency`. */
-  smallBlind: integer('small_blind').notNull(),
-  bigBlind: integer('big_blind').notNull(),
-  currency: text('currency').notNull(),
-  content: jsonb('content').$type<Hand>().notNull(),
-  importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
-});
+export const hands = pgTable(
+  'hands',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    site: text('site').notNull(),
+    siteHandId: text('site_hand_id').notNull(),
+    heroScreenName: text('hero_screen_name').notNull(),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => identities.id),
+    /** Who brought the Hand in. Audit only; carries no meaning for attribution. */
+    importerId: uuid('importer_id')
+      .notNull()
+      .references(() => identities.id),
+    sourceFormat: text('source_format').notNull(),
+    playedAt: timestamp('played_at', { withTimezone: true }).notNull(),
+    /** The Stake, as Amounts in hundredths of `currency`. */
+    smallBlind: integer('small_blind').notNull(),
+    bigBlind: integer('big_blind').notNull(),
+    currency: text('currency').notNull(),
+    content: jsonb('content').$type<Hand>().notNull(),
+    importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    // The same Hand from the same Hero is only ever imported once (ADR 0002).
+    uniqueIndex('hands_site_hand_hero_idx').on(
+      table.site,
+      table.siteHandId,
+      table.heroScreenName,
+    ),
+  ],
+);
 
 /** A Hand placed in a Room's Queue. Removing it never deletes the Hand (ADR 0002). */
 export const queueEntries = pgTable(

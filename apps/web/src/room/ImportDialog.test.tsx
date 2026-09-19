@@ -6,7 +6,10 @@ import { SessionContext } from '../identity/context'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPreview } from './importBatch'
 
-const hand = (board: string[]) => ({
+const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
+  hero,
+  author: heroMatched ? { identityId: 'id-marta', displayName: 'Marta' } : { identityId: 'me', displayName: 'Javier' },
+  heroMatched,
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit' as const, smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   board,
@@ -28,6 +31,13 @@ const previews: Record<string, ImportPreview> = {
     hands: [hand([])],
     discarded: [],
   },
+  'unmatched.txt': {
+    id: 'p-unmatched',
+    format: 'pokerstars',
+    tried: ['pokerstars'],
+    hands: [hand([], 'iMapleAA', false)],
+    discarded: [],
+  },
   'forum.txt': { id: 'p-forum', format: null, tried: ['pokerstars'], hands: [], discarded: [] },
 }
 
@@ -39,6 +49,10 @@ beforeEach(() => {
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {
       requests.push({ url, body: init.body as FormData | string })
+      if (url.endsWith('/screen-names')) {
+        const { screenNames } = JSON.parse(init.body as string)
+        return Response.json({ id: 'me', displayName: 'Javier', screenNames })
+      }
       if (url.endsWith('/imports/previews')) {
         const file = (init.body as FormData).get('file') as File
         return Response.json(previews[file.name], { status: 201 })
@@ -55,16 +69,20 @@ afterEach(() => {
 function renderDialog() {
   const onClose = vi.fn()
   const onImported = vi.fn()
+  const session = {
+    token: 'token',
+    identity: { id: 'me', displayName: 'Javier', screenNames: ['Javier_PS'] },
+    rememberDisplayName: () => {},
+    rememberScreenNames: vi.fn(),
+  }
   render(
     <I18nProvider initialLocale="en">
-      <SessionContext.Provider
-        value={{ token: 'token', identity: { id: 'me', displayName: 'Javier' }, rememberDisplayName: () => {} } as never}
-      >
+      <SessionContext.Provider value={session}>
         <ImportDialog room={{ code: 'ABCD2345', name: 'Martes NL10' }} onClose={onClose} onImported={onImported} />
       </SessionContext.Provider>
     </I18nProvider>,
   )
-  return { onClose, onImported }
+  return { onClose, onImported, session }
 }
 
 async function choose(...names: string[]) {
@@ -110,6 +128,30 @@ describe('ImportDialog', () => {
 
     expect(screen.getByRole('region', { name: 'Preview · hand 2 of 2' })).toBeTruthy()
     expect(screen.getByText('No flop')).toBeTruthy()
+  })
+
+  it('names each Hand’s Hero and Author', async () => {
+    renderDialog()
+
+    await choose('session.txt')
+
+    const preview = await screen.findByRole('region', { name: 'Preview · hand 1 of 2' })
+    expect(within(preview).getByText('Marta88')).toBeTruthy()
+    expect(within(preview).getByText('Marta')).toBeTruthy()
+  })
+
+  it('offers to add a Hero nobody is recognised as to the Importer’s Screen Names', async () => {
+    const { session } = renderDialog()
+    await choose('unmatched.txt', 'session.txt')
+
+    expect(await screen.findByText('Nobody in the room plays as iMapleAA, so those hands are yours.')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Add iMapleAA to my screen names' }))
+
+    expect(requests.at(-1)!.url).toBe('/api/identities/me/screen-names')
+    expect(JSON.parse(requests.at(-1)!.body as string)).toEqual({ screenNames: ['Javier_PS', 'iMapleAA'] })
+    expect(await screen.findByText('iMapleAA added to your screen names')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Add iMapleAA to my screen names' })).toBeNull()
+    expect(session.rememberScreenNames).toHaveBeenCalledWith(['Javier_PS', 'iMapleAA'])
   })
 
   it('opens a discarded Hand’s original text and reason', async () => {

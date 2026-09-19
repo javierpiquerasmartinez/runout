@@ -5,6 +5,7 @@
 export type RejectionReason =
   | 'unauthenticated'
   | 'invalid-display-name'
+  | 'invalid-screen-names'
   | 'invalid-room-name'
   | 'room-not-found'
   | 'not-in-room'
@@ -16,7 +17,8 @@ export type RejectionReason =
   | 'file-too-large'
   | 'unreadable-file'
   | 'invalid-format'
-  | 'preview-not-found';
+  | 'preview-not-found'
+  | 'author-not-in-room';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

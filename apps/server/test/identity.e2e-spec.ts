@@ -22,6 +22,7 @@ describe('Anonymous identity (e2e)', () => {
     expect(res.body.identity).toEqual({
       id: expect.any(String),
       displayName: null,
+      screenNames: [],
     });
   });
 

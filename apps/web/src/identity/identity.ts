@@ -3,6 +3,8 @@ import { api, ApiError } from '../backend/api'
 export interface Identity {
   id: string
   displayName: string | null
+  /** The names this person plays under on Poker Sites; Hands' Heroes are matched against them. */
+  screenNames: string[]
 }
 
 export interface Session {

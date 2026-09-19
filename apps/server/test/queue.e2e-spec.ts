@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 import request from 'supertest';
+import { fixture, freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
 
@@ -8,6 +8,8 @@ interface QueueEntry {
   handId: string;
   position: number;
   author: { identityId: string; displayName: string };
+  site: string;
+  siteHandId: string;
   playedAt: string;
   stake: {
     limit: string;
@@ -21,13 +23,6 @@ interface QueueEntry {
     finalStreet: string;
     showdown: boolean;
   };
-}
-
-function fixture(name: string): string {
-  return readFileSync(
-    new URL(`../src/hands/import/fixtures/${name}`, import.meta.url),
-    'utf8',
-  );
 }
 
 describe('Pasting Hands into the Queue (e2e)', () => {
@@ -87,7 +82,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const res = await paste(
       guest.token,
       code,
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     ).expect(201);
 
     expect(res.body).toEqual({ imported: 1, discarded: [] });
@@ -96,8 +91,10 @@ describe('Pasting Hands into the Queue (e2e)', () => {
         id: expect.any(String),
         handId: expect.any(String),
         position: 1,
-        // For now the Importer is the Author.
+        // Nobody declared the Hero's Screen Name, so the Importer is the Author.
         author: { identityId: guest.id, displayName: 'Marta' },
+        site: 'pokerstars',
+        siteHandId: expect.any(String),
         playedAt: '2026-09-18T12:34:30.000Z',
         stake: {
           limit: 'no-limit',
@@ -127,15 +124,19 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const code = await createRoom(master.token);
     const { socket } = await join(master.token, code, 'Javier');
 
-    await paste(master.token, code, fixture('pokerstars-session.txt')).expect(
-      201,
-    );
+    await paste(
+      master.token,
+      code,
+      freshHandHistory('pokerstars-session.txt'),
+    ).expect(201);
     const first = await socket.next<{ entries: QueueEntry[] }>(
       'queue.entriesAdded',
     );
-    await paste(master.token, code, fixture('pokerstars-showdown.txt')).expect(
-      201,
-    );
+    await paste(
+      master.token,
+      code,
+      freshHandHistory('pokerstars-showdown.txt'),
+    ).expect(201);
     const second = await socket.next<{ entries: QueueEntry[] }>(
       'queue.entriesAdded',
     );
@@ -149,7 +150,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const guest = await issueIdentity();
     const code = await createRoom(master.token);
     const { socket } = await join(master.token, code, 'Javier');
-    await paste(master.token, code, fixture('pokerstars-session.txt'));
+    await paste(master.token, code, freshHandHistory('pokerstars-session.txt'));
     const { entries } = await socket.next<{ entries: QueueEntry[] }>(
       'queue.entriesAdded',
     );
@@ -175,7 +176,11 @@ describe('Pasting Hands into the Queue (e2e)', () => {
       imported: 0,
       discarded: [{ text: forum.trim(), reason: 'unrecognised-format' }],
     });
-    await paste(master.token, code, fixture('pokerstars-showdown.txt'));
+    await paste(
+      master.token,
+      code,
+      freshHandHistory('pokerstars-showdown.txt'),
+    );
     const { entries } = await socket.next<{ entries: QueueEntry[] }>(
       'queue.entriesAdded',
     );
@@ -187,9 +192,9 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const master = await issueIdentity();
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
-    const session = Array(100)
-      .fill(fixture('pokerstars-session.txt'))
-      .join('\n\n');
+    const session = Array.from({ length: 100 }, () =>
+      freshHandHistory('pokerstars-session.txt'),
+    ).join('\n\n');
 
     const res = await paste(master.token, code, session).expect(201);
 
@@ -204,7 +209,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const res = await paste(
       stranger.token,
       code,
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     ).expect(403);
 
     expect(res.body).toEqual({ reason: 'not-in-room' });
@@ -217,7 +222,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const res = await paste(
       undefined,
       code,
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     ).expect(401);
 
     expect(res.body).toEqual({ reason: 'unauthenticated' });

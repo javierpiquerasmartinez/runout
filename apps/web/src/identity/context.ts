@@ -4,6 +4,8 @@ import type { Session } from './identity'
 export type SessionContextValue = Session & {
   /** Keeps the Display Name just used, so later forms are prefilled with it. */
   rememberDisplayName: (displayName: string) => void
+  /** Keeps the Screen Names just saved on the server. */
+  rememberScreenNames: (screenNames: string[]) => void
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null)

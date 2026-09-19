@@ -18,12 +18,20 @@ export interface RoomSummary {
   name: string
 }
 
+export interface Author {
+  identityId: string
+  displayName: string
+}
+
 /** A Queue row as every Participant sees it. Mirrors the server's shape. */
 export interface QueueEntry {
   id: string
   handId: string
   position: number
-  author: { identityId: string; displayName: string }
+  author: Author
+  /** With `siteHandId`, which real-world hand this is: two entries sharing both are it from two seats. */
+  site: 'pokerstars' | 'ggpoker' | 'winamax'
+  siteHandId: string
   playedAt: string
   stake: {
     limit: 'no-limit' | 'pot-limit' | 'fixed-limit'
@@ -63,6 +71,7 @@ export type RoomEvent =
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
   | { type: 'entriesAdded'; entries: QueueEntry[] }
+  | { type: 'authorChanged'; handId: string; author: Author }
   | { type: 'playbackChanged'; playback: Playback }
   | { type: 'rejected'; command: string; reason: RejectionReason }
   | { type: 'disconnected' }
@@ -104,6 +113,12 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'entriesAdded':
       if (view.phase !== 'in-room') return view
       return { ...view, queue: [...view.queue, ...event.entries] }
+    case 'authorChanged':
+      if (view.phase !== 'in-room') return view
+      return {
+        ...view,
+        queue: view.queue.map((entry) => (entry.handId === event.handId ? { ...entry, author: event.author } : entry)),
+      }
     case 'playbackChanged':
       if (view.phase !== 'in-room') return view
       return { ...view, playback: event.playback }
@@ -133,6 +148,8 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'participantLeft', identityId: String(data.identityId) }
     case 'queue.entriesAdded':
       return { type: 'entriesAdded', entries: data.entries as QueueEntry[] }
+    case 'queue.authorChanged':
+      return { type: 'authorChanged', handId: String(data.handId), author: data.author as Author }
     case 'playback.changed':
       return { type: 'playbackChanged', playback: { handId: String(data.handId), actionIndex: Number(data.actionIndex) } }
     case 'rejected':

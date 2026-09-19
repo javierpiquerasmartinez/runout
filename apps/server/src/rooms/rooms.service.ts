@@ -134,6 +134,16 @@ export class RoomsService {
     if (!membership || membership.kicked) throw new Rejected('not-in-room');
   }
 
+  /** Refuses with `not-master` anyone but the open Room's Master. */
+  async requireMaster(roomId: string, identityId: string): Promise<void> {
+    const [room] = await this.db
+      .select({ masterId: rooms.masterId })
+      .from(rooms)
+      .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open')));
+    if (!room) throw new Rejected('room-not-found');
+    if (room.masterId !== identityId) throw new Rejected('not-master');
+  }
+
   private async unusedCode(): Promise<string> {
     for (;;) {
       const code = generateRoomCode();

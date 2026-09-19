@@ -11,6 +11,7 @@ export function createTranslator(locale: Locale) {
   const messages = catalogues[locale]
   const intlLocale = intlLocales[locale]
   const numberFormat = new Intl.NumberFormat(intlLocale)
+  const listFormat = new Intl.ListFormat(intlLocale, { type: 'conjunction' })
 
   return {
     locale,
@@ -26,5 +27,7 @@ export function createTranslator(locale: Locale) {
       date.toLocaleDateString(intlLocale, options),
     formatTime: (date: Date, options?: Intl.DateTimeFormatOptions) =>
       date.toLocaleTimeString(intlLocale, options),
+    /** "Marta y Alberto": names joined the way the language does it. */
+    formatList: (items: string[]) => listFormat.format(items),
   }
 }

@@ -43,6 +43,12 @@ export interface GoToActionCommand {
   actionIndex: number;
 }
 
+export interface ReassignAuthorCommand {
+  handId: string;
+  /** The identity id of the new Author. */
+  authorId: string;
+}
+
 export interface RejectedEvent {
   command: string;
   reason: RejectionReason;
@@ -156,6 +162,28 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.changePlayback('playback.goTo', socket, (master, roomId) =>
       this.playback.goTo(master, roomId, command?.actionIndex),
     );
+  }
+
+  /** The Master gives a Hand in the Queue another Author, for everyone. */
+  @SubscribeMessage('queue.reassignAuthor')
+  reassignAuthor(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<ReassignAuthorCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('queue.reassignAuthor', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      this.publish(
+        roomId,
+        'queue.authorChanged',
+        await this.queue.reassignAuthor(
+          identity,
+          roomId,
+          command?.handId,
+          command?.authorId,
+        ),
+      );
+      return undefined;
+    });
   }
 
   /**

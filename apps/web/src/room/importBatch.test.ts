@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  batchHands,
   batchTotals,
   emptyBatch,
   MAX_FILE_BYTES,
@@ -7,10 +8,16 @@ import {
   type HandPreview,
   type ImportBatch,
   type ImportPreview,
+  unmatchedHeroes,
 } from './importBatch'
 
-function hand(playedAt: string): HandPreview {
+const me = { identityId: 'id-marta', displayName: 'Marta' }
+
+function hand(playedAt: string, hero = 'iMapleAA', heroMatched = false): HandPreview {
   return {
+    hero,
+    author: me,
+    heroMatched,
     playedAt,
     stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
     board: [],
@@ -92,5 +99,33 @@ describe('An import batch', () => {
     batch = reduceBatch(batch, { type: 'failed', key: 'b', reason: 'unreadable-file' })
 
     expect(batchTotals(batch)).toEqual({ ready: 0, discarded: 3, reading: false, previewIds: [] })
+  })
+})
+
+describe('The Screen Names an import could add', () => {
+  function withHands(...hands: HandPreview[]): ImportBatch {
+    const batch = added({ key: 'a', name: 'a.txt' })
+    return reduceBatch(batch, { type: 'read', key: 'a', preview: { ...preview('p1', 0), hands } })
+  }
+
+  it('offers each Hero nobody in the Room is recognised as, once', () => {
+    const batch = withHands(
+      hand('2026-09-18T12:00:00.000Z', 'Javier_PS'),
+      hand('2026-09-18T12:01:00.000Z', 'Marta88', true),
+      hand('2026-09-18T12:02:00.000Z', 'Javier_PS'),
+      hand('2026-09-18T12:03:00.000Z', 'JaviPQ'),
+    )
+
+    expect(unmatchedHeroes(batch)).toEqual(['Javier_PS', 'JaviPQ'])
+  })
+
+  it('stops offering a Screen Name once the Importer adds it, and marks its Hands matched', () => {
+    const batch = reduceBatch(
+      withHands(hand('2026-09-18T12:00:00.000Z', 'Javier_PS'), hand('2026-09-18T12:01:00.000Z', 'JaviPQ')),
+      { type: 'screenNameAdded', screenName: 'javier_ps' },
+    )
+
+    expect(unmatchedHeroes(batch)).toEqual(['JaviPQ'])
+    expect(batchHands(batch).map((each) => each.heroMatched)).toEqual([true, false])
   })
 })

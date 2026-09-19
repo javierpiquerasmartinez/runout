@@ -3,6 +3,7 @@ import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
 import { SessionProvider } from './identity/SessionProvider'
 import { RoomPage } from './room/RoomPage'
+import { SettingsPage, settingsPath } from './settings/SettingsPage'
 import { roomCodeFromPath } from './room/roomCode'
 import { usePath } from './routing'
 import { WelcomePage } from './welcome/WelcomePage'
@@ -18,9 +19,13 @@ function App() {
   return (
     <SessionProvider>
       {/* Keyed by code, so moving to another Room starts from a clean slate. */}
-      {code ? <RoomPage key={code} code={code} /> : <WelcomePage />}
+      {code ? <RoomPage key={code} code={code} /> : <Screen path={path} />}
     </SessionProvider>
   )
+}
+
+function Screen({ path }: { path: string }) {
+  return path === settingsPath ? <SettingsPage /> : <WelcomePage />
 }
 
 function ConnectionStatus() {

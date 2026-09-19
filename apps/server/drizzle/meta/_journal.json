@@ -36,6 +36,13 @@
       "when": 1789841429550,
       "tag": "0004_import_previews",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789848937721,
+      "tag": "0005_authors_and_duplicates",
+      "breakpoints": true
     }
   ]
 }

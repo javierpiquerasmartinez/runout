@@ -11,10 +11,22 @@ import type { QueueEntry } from './roomClient'
 export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax'
 export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax']
 
-export type DiscardReason = 'unrecognised-format' | 'not-cash-holdem' | 'too-many-seats' | 'no-hero' | 'malformed'
+export type DiscardReason =
+  | 'unrecognised-format'
+  | 'not-cash-holdem'
+  | 'too-many-seats'
+  | 'no-hero'
+  | 'malformed'
+  | 'duplicate'
 
 /** What the dialog shows of each Hand the server read. */
-export type HandPreview = Pick<QueueEntry, 'playedAt' | 'stake' | 'summary'> & { board: string[] }
+export type HandPreview = Pick<QueueEntry, 'author' | 'playedAt' | 'stake' | 'summary'> & {
+  /** The Hero's Screen Name, from the Hand History. */
+  hero: string
+  /** False when nobody in the Room has the Hero among their Screen Names, so the Importer is the Author. */
+  heroMatched: boolean
+  board: string[]
+}
 
 /** The server's reading of one file or paste. */
 export interface ImportPreview {
@@ -52,6 +64,8 @@ export type BatchEvent =
   | { type: 'failed'; key: string; reason: FailureReason }
   | { type: 'rereading'; key: string; format: SourceFormat }
   | { type: 'removed'; key: string }
+  /** The Importer added a Hero to their Screen Names, so its Hands are now matched to them. */
+  | { type: 'screenNameAdded'; screenName: string }
 
 export function reduceBatch(batch: ImportBatch, event: BatchEvent): ImportBatch {
   const update = (key: string, next: (item: ImportItem) => ImportItem) => ({
@@ -76,6 +90,24 @@ export function reduceBatch(batch: ImportBatch, event: BatchEvent): ImportBatch 
       return update(event.key, ({ key, name }) => ({ key, name, state: 'reading', format: event.format }))
     case 'removed':
       return { items: batch.items.filter((item) => item.key !== event.key) }
+    case 'screenNameAdded': {
+      const added = event.screenName.toLowerCase()
+      return {
+        items: batch.items.map((item) =>
+          item.state === 'read'
+            ? {
+                ...item,
+                preview: {
+                  ...item.preview,
+                  hands: item.preview.hands.map((hand) =>
+                    hand.hero.toLowerCase() === added ? { ...hand, heroMatched: true } : hand,
+                  ),
+                },
+              }
+            : item,
+        ),
+      }
+    }
   }
 }
 
@@ -103,4 +135,16 @@ export function batchTotals(batch: ImportBatch): BatchTotals {
 /** Every Hand ready to add, in the order they will join the Queue. */
 export function batchHands(batch: ImportBatch): HandPreview[] {
   return batch.items.flatMap((item) => (item.state === 'read' ? item.preview.hands : []))
+}
+
+/**
+ * The Heroes nobody in the Room is recognised as, once each: the Importer is
+ * those Hands' Author, and is offered to add each one to their Screen Names.
+ */
+export function unmatchedHeroes(batch: ImportBatch): string[] {
+  const heroes = new Map<string, string>()
+  for (const hand of batchHands(batch)) {
+    if (!hand.heroMatched && !heroes.has(hand.hero.toLowerCase())) heroes.set(hand.hero.toLowerCase(), hand.hero)
+  }
+  return [...heroes.values()]
 }

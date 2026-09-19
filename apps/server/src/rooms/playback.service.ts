@@ -2,11 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import { hands, playbacks, queueEntries, rooms } from '../database/schema.js';
+import { hands, playbacks, queueEntries } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { timeline } from '../hands/replay/timeline.js';
 import { Rejected } from '../rejection/rejection.js';
+import { RoomsService } from './rooms.service.js';
 
 /**
  * The Room's shared replay state as every Participant receives it. The Hand
@@ -24,6 +25,7 @@ export class PlaybackService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly rooms: RoomsService,
   ) {}
 
   /** The Room's Playback, or null while no Hand has been loaded. */
@@ -41,7 +43,7 @@ export class PlaybackService {
     roomId: string,
     handId: unknown,
   ): Promise<Playback> {
-    await this.requireMaster(roomId, master.id);
+    await this.rooms.requireMaster(roomId, master.id);
     if (!isUuid(handId)) throw new Rejected('hand-not-in-queue');
     const [queued] = await this.db
       .select({ id: queueEntries.id })
@@ -74,7 +76,7 @@ export class PlaybackService {
     roomId: string,
     actionIndex: unknown,
   ): Promise<Playback> {
-    await this.requireMaster(roomId, master.id);
+    await this.rooms.requireMaster(roomId, master.id);
     const [loaded] = await this.db
       .select({ handId: playbacks.handId, content: hands.content })
       .from(playbacks)
@@ -95,14 +97,5 @@ export class PlaybackService {
       .set({ actionIndex, updatedAt: this.clock.now() })
       .where(eq(playbacks.roomId, roomId));
     return { handId: loaded.handId, actionIndex };
-  }
-
-  private async requireMaster(roomId: string, identityId: string) {
-    const [room] = await this.db
-      .select({ masterId: rooms.masterId })
-      .from(rooms)
-      .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open')));
-    if (!room) throw new Rejected('room-not-found');
-    if (room.masterId !== identityId) throw new Rejected('not-master');
   }
 }
