@@ -66,6 +66,34 @@
   --disabled-field-bg: #0c1110;
   --disabled-border: #253230;
 
+  /* Room and Welcome surfaces, from the "Sala" and "Bienvenida" boards */
+  --color-card: #121917;
+  --color-chip: #14201e;
+  --color-chip-muted: #18211f;
+  --color-rule: #1e2725;
+  --color-rule-strong: #232e2c;
+  --color-preview-border: #202b29;
+  --felt-surround: radial-gradient(ellipse 62% 74% at 50% 48%, #163029 0%, #0d1817 62%, #0a100f 100%);
+  --felt-table: radial-gradient(ellipse 70% 80% at 50% 42%, #17332c 0%, #12241f 68%, #0e1a17 100%);
+  --shadow-felt: inset 0 0 40px rgb(0 0 0 / 45%);
+  --shadow-preview: 0 24px 60px rgb(0 0 0 / 50%);
+  --card-face: #f4f1ea;
+  --card-ink-black: #14201e;
+  --card-ink-red: #c1362f;
+  --card-ink-blue: #1c6fb8;
+  --card-slot-bg: #0e1918;
+  --card-slot-border: #2a413b;
+
+  /* Participant avatars, from the "Sala" boards */
+  --avatar-1-bg: #3a2a18;
+  --avatar-1-ink: #e0a050;
+  --avatar-2-bg: #15302a;
+  --avatar-2-ink: #3fc0a0;
+  --avatar-3-bg: #15283a;
+  --avatar-3-ink: #57a5e8;
+  --avatar-4-bg: #33191a;
+  --avatar-4-ink: #e0645c;
+
   /* Elevation */
   --shadow-raised: 0 8px 22px rgb(0 0 0 / 50%);
   --shadow-modal: 0 32px 80px rgb(0 0 0 / 60%);
@@ -154,6 +182,32 @@
   --disabled-bg: #efece4;
   --disabled-field-bg: #efece4;
   --disabled-border: #c9c3b4;
+
+  --color-card: #ffffff;
+  --color-chip: #eeebe2;
+  --color-chip-muted: #eeebe2;
+  --color-rule: #e8e4d9;
+  --color-rule-strong: #d3cec0;
+  --color-preview-border: #d3cec0;
+  --felt-surround: radial-gradient(ellipse 62% 74% at 50% 48%, #cfe2d9 0%, #e4eee9 62%, #eef3f0 100%);
+  --felt-table: #dce8e2;
+  --shadow-felt: none;
+  --shadow-preview: 0 32px 80px rgb(40 34 20 / 22%);
+  --card-face: #f4f1ea;
+  --card-ink-black: #14201e;
+  --card-ink-red: #c1362f;
+  --card-ink-blue: #1c6fb8;
+  --card-slot-bg: transparent;
+  --card-slot-border: #b4ccc1;
+
+  --avatar-1-bg: #f7e9d3;
+  --avatar-1-ink: #8c5a16;
+  --avatar-2-bg: #e1f1eb;
+  --avatar-2-ink: #1b8468;
+  --avatar-3-bg: #e1ecf7;
+  --avatar-3-ink: #1f5f99;
+  --avatar-4-bg: #fbe9e7;
+  --avatar-4-ink: #c0392f;
 
   --shadow-raised: 0 8px 22px rgb(40 34 20 / 12%);
   --shadow-modal: 0 32px 80px rgb(40 34 20 / 22%);

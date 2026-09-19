@@ -488,3 +488,67 @@
   color: inherit;
   cursor: pointer;
 }
+
+/* ---------- Avatar ---------- */
+
+.ro-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 600;
+  line-height: 1;
+}
+.ro-avatar--18 {
+  width: 18px;
+  height: 18px;
+  font-size: 8.5px;
+}
+.ro-avatar--20 {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+.ro-avatar--24 {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+.ro-avatar--26 {
+  width: 26px;
+  height: 26px;
+  font-size: 10.5px;
+}
+.ro-avatar[data-palette='1'] {
+  background: var(--avatar-1-bg);
+  color: var(--avatar-1-ink);
+}
+.ro-avatar[data-palette='2'] {
+  background: var(--avatar-2-bg);
+  color: var(--avatar-2-ink);
+}
+.ro-avatar[data-palette='3'] {
+  background: var(--avatar-3-bg);
+  color: var(--avatar-3-ink);
+}
+.ro-avatar[data-palette='4'] {
+  background: var(--avatar-4-bg);
+  color: var(--avatar-4-ink);
+}
+
+/* Overlapping avatars, each ringed in the surface they sit on. */
+.ro-avatar-stack {
+  display: flex;
+}
+.ro-avatar-stack > .ro-avatar {
+  border: 1.5px solid var(--avatar-ring, var(--color-panel));
+}
+.ro-avatar-stack > .ro-avatar + .ro-avatar {
+  margin-left: -8px;
+}
+
+.ro-brand-mark {
+  color: var(--brass);
+  flex-shrink: 0;
+}
