@@ -175,6 +175,12 @@
 .ro-btn--primary[data-locked]:active {
   background: var(--disabled-bg);
 }
+/* The board draws the locked ghost button borderless: only its text dims. */
+.ro-btn--ghost[data-locked],
+.ro-btn--ghost[data-locked]:hover,
+.ro-btn--ghost[data-locked]:active {
+  border-color: transparent;
+}
 
 /* ---------- Icon button ---------- */
 

@@ -46,8 +46,9 @@ The visual system (tokens, fonts, icon sprite and components from the design-sys
 
 ## Web conventions
 
+- **Design.html wins** where it and an issue disagree (e.g. the sync button's brass focus ring, the field focus glow, the teal Showdown chip).
 - **Tokens** live in `apps/web/src/styles/tokens.css`. Dark is the default; `data-theme="light"` on `<html>` switches to the light counterpart. Brass is the primary action, teal only sync and focus, red only all-in, error and delete.
-- **Components** live in `apps/web/src/ui/`. A control that can't be used right now is locked, never hidden: pass `disabledReason` and it keeps its focus stop, draws a dashed border and adds the reason to its accessible name.
+- **Components** live in `apps/web/src/ui/`. A control that can't be used right now is locked, never hidden: pass `disabledReason` and it keeps its focus stop, draws a dashed border (the ghost button, as on the board, only dims) and adds the reason to its accessible name.
 - **Icons** come from one sprite (`<IconSprite />`, mounted once) and are drawn with `<Icon name=… />`, coloured by `currentColor`.
 - **No hard-coded UI strings.** Every string goes in `apps/web/src/i18n/messages/es.ts` (Spanish, the default and source catalogue) and `en.ts`; the type system rejects a missing key. Use `useI18n()` for `t`, `formatNumber` and `formatCurrency`, and set figures and codes with the `ro-mono` class.
 
