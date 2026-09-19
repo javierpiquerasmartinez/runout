@@ -29,6 +29,13 @@
       "when": 1789819670968,
       "tag": "0003_playback",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789841429550,
+      "tag": "0004_import_previews",
+      "breakpoints": true
     }
   ]
 }

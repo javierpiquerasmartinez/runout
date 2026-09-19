@@ -14,7 +14,10 @@ export function isPokerStarsHand(block: string): boolean {
 
 export function parsePokerStarsHand(block: string): Hand {
   const lines = block.split(/\r?\n/).map((line) => line.trimEnd());
-  const [, siteHandId, rest] = lines[0].match(HEADER) ?? [];
+  const header = lines[0].match(HEADER);
+  // Reached when the format was picked by hand for text that isn't in it.
+  if (!header) throw new Discard('malformed');
+  const [, siteHandId, rest] = header;
   const { stake, playedAt } = readHeader(rest);
   const table = lines[1]?.match(
     /^Table '(.+)' (\d+)-max(?: \(.*?\))? Seat #(\d+) is the button$/,

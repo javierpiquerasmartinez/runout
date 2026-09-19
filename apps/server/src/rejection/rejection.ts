@@ -12,7 +12,11 @@ export type RejectionReason =
   | 'hand-not-found'
   | 'hand-not-in-queue'
   | 'no-hand-loaded'
-  | 'invalid-action-index';
+  | 'invalid-action-index'
+  | 'file-too-large'
+  | 'unreadable-file'
+  | 'invalid-format'
+  | 'preview-not-found';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

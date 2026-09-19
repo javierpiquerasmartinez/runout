@@ -108,3 +108,24 @@ export const playbacks = pgTable('playbacks', {
   actionIndex: integer('action_index').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
+
+/**
+ * Hands read from one uploaded file or paste, waiting for their Importer to
+ * confirm them into the Room's Queue. Deleted once confirmed; unconfirmed
+ * ones are forgotten after a while.
+ */
+export const importPreviews = pgTable(
+  'import_previews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id),
+    importerId: uuid('importer_id')
+      .notNull()
+      .references(() => identities.id),
+    hands: jsonb('hands').$type<Hand[]>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('import_previews_created_at_idx').on(table.createdAt)],
+);

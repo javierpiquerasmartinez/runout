@@ -10,6 +10,10 @@ export type RejectionReason =
   | 'hand-not-in-queue'
   | 'no-hand-loaded'
   | 'invalid-action-index'
+  | 'file-too-large'
+  | 'unreadable-file'
+  | 'invalid-format'
+  | 'preview-not-found'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'
@@ -32,11 +36,17 @@ export async function api<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // Form data (file uploads) goes as multipart, with the boundary the browser sets.
+  const isForm = body instanceof FormData
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
 
   let res: Response
   try {
-    res = await fetch(`/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    res = await fetch(`/api${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+    })
   } catch {
     throw new ApiError(0, 'network')
   }

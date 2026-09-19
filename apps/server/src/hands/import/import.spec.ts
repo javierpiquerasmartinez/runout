@@ -240,3 +240,36 @@ describe('Hand History import: what is discarded', () => {
     ]);
   });
 });
+
+describe('Hand History import: detecting the format', () => {
+  it('reports the format it detected', () => {
+    const result = importHandHistory(fixture('pokerstars-session.txt'));
+
+    expect(result.format).toBe('pokerstars');
+  });
+
+  it('reports no format, and every format it tried, when nothing is recognised', () => {
+    const result = importHandHistory(fixture('pokertracker-forum.txt'));
+
+    expect(result.format).toBeNull();
+    expect(result.tried).toEqual(['pokerstars']);
+  });
+
+  it('reads every piece of the text in a format picked by hand, discarding what it cannot read', () => {
+    const text = [
+      fixture('pokerstars-showdown.txt'),
+      fixture('pokertracker-forum.txt'),
+    ].join('\n\n');
+
+    const result = importHandHistory(text, { format: 'pokerstars' });
+
+    expect(result.format).toBe('pokerstars');
+    expect(result.tried).toEqual(['pokerstars']);
+    expect(result.hands).toHaveLength(1);
+    // Each piece is judged by the picked format's own parser.
+    expect(result.discarded.length).toBeGreaterThan(0);
+    expect(
+      result.discarded.every((entry) => entry.reason === 'malformed'),
+    ).toBe(true);
+  });
+});
