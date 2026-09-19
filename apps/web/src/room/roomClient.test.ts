@@ -1,9 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { initialRoomView, parseServerMessage, reduceRoom, type RoomEvent, type RoomView } from './roomClient'
+import {
+  initialRoomView,
+  parseServerMessage,
+  reduceRoom,
+  type QueueEntry,
+  type RoomEvent,
+  type RoomView,
+} from './roomClient'
 
 const javier = { identityId: 'id-javier', displayName: 'Javier', role: 'master' } as const
 const marta = { identityId: 'id-marta', displayName: 'Marta', role: 'guest' } as const
 const alberto = { identityId: 'id-alberto', displayName: 'Alberto', role: 'guest' } as const
+
+const firstHand: QueueEntry = {
+  id: 'entry-1',
+  handId: 'hand-1',
+  position: 1,
+  author: { identityId: 'id-javier', displayName: 'Javier' },
+  playedAt: '2026-09-18T12:34:30.000Z',
+  stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+  summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+}
+const secondHand: QueueEntry = { ...firstHand, id: 'entry-2', handId: 'hand-2', position: 2 }
 
 const snapshot: RoomEvent = {
   type: 'snapshot',
@@ -30,8 +48,29 @@ describe('reduceRoom', () => {
       room: { code: 'RNT4K9PX', name: 'Martes NL50' },
       you: 'id-marta',
       participants: [javier, marta],
+      queue: [],
       connected: true,
     })
+  })
+
+  it('lands with the Queue the snapshot carries', () => {
+    const view = apply({
+      type: 'snapshot',
+      snapshot: { ...snapshot.snapshot, queue: [firstHand] },
+    })
+    expect(view.phase === 'in-room' && view.queue).toEqual([firstHand])
+  })
+
+  it('appends imported Hands at the end of the Queue', () => {
+    const view = apply(
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, queue: [firstHand] } },
+      { type: 'entriesAdded', entries: [secondHand] },
+    )
+    expect(view.phase === 'in-room' && view.queue).toEqual([firstHand, secondHand])
+  })
+
+  it('ignores imported Hands that arrive before the snapshot', () => {
+    expect(apply({ type: 'entriesAdded', entries: [firstHand] })).toEqual({ phase: 'joining' })
   })
 
   it('adds a Participant who joins, at the end of the list', () => {
@@ -80,6 +119,9 @@ describe('parseServerMessage', () => {
     expect(
       parseServerMessage(JSON.stringify({ event: 'rejected', data: { command: 'room.join', reason: 'room-not-found' } })),
     ).toEqual({ type: 'rejected', command: 'room.join', reason: 'room-not-found' })
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'queue.entriesAdded', data: { entries: [firstHand] } })),
+    ).toEqual({ type: 'entriesAdded', entries: [firstHand] })
   })
 
   it('ignores anything that is not a Room event', () => {
