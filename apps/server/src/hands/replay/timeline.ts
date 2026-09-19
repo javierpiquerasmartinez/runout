@@ -12,6 +12,8 @@ export interface Timeline {
   hero: { screenName: string; cards: string[] };
   /** `states[0]` is the Initial State; `states[n]` is the table after Action n. */
   states: TableState[];
+  /** Whether the Hand reached Showdown after its last Action. */
+  showdown: boolean;
 }
 
 export interface TimelineSeat {
@@ -138,6 +140,7 @@ export function timeline(hand: Hand): Timeline {
     buttonSeat: hand.buttonSeat,
     hero: hand.hero,
     states,
+    showdown: hand.showdown,
   };
 }
 

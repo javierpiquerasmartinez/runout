@@ -1,5 +1,6 @@
 import type { Translator } from '../i18n/translator'
 import type { Action, HandWithTimeline, Position, Street } from './hand'
+import { streetProgress, type StreetProgress } from './streetProgress'
 
 /*
  * What the table draws at one point of Playback, derived from the Hand's
@@ -37,6 +38,8 @@ export interface TableView {
   actionCount: number
   canGoBack: boolean
   canGoForward: boolean
+  /** Where Playback is, Street by Street, and where the Street jumps go. */
+  streets: StreetProgress
   /** What led here: "Flop · Marta apuesta 6,5 BB", or that the blinds are posted. */
   lastAction: string
 }
@@ -77,6 +80,7 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
     actionCount,
     canGoBack: index > 0,
     canGoForward: index < actionCount,
+    streets: streetProgress(hand.timeline, index),
     lastAction: state.action
       ? `${i18n.t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, bigBlinds, i18n)}`
       : i18n.t('room.playback.blindsPosted'),

@@ -36,6 +36,8 @@ export interface HandWithTimeline {
     hero: { screenName: string; cards: string[] }
     /** `states[0]` is the Initial State; `states[n]` is the table after Action n. */
     states: TableState[]
+    /** Whether the Hand reached Showdown after its last Action. */
+    showdown: boolean
   }
 }
 

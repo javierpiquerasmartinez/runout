@@ -643,19 +643,117 @@
 }
 
 /*
- * The transport bar, without play/pause or speed. It keeps the board's 148 px,
- * with the controls at the bottom, so it never changes shape.
+ * The transport bar, without play/pause or speed. It keeps the board's 148 px:
+ * the Street progress bar on top, the controls at the bottom.
  */
 .playback-bar {
   flex-shrink: 0;
   box-sizing: border-box;
   min-height: 148px;
   display: flex;
-  align-items: flex-end;
-  gap: 14px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
   padding: 16px 20px;
   border-top: 1px solid var(--color-divider);
   background: var(--color-panel);
+}
+
+.playback-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/*
+ * Board B: equal segments, a 6 px track with radius 3, 6 px apart. Completed
+ * Streets are filled brass; the current one has a brass label and a 14 px
+ * handle; pending ones are a grey track with a muted label. Once the Hand is
+ * over the whole bar greys out, Showdown in sync green if there was one.
+ */
+.street-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.street-bar__segment {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+.street-bar__segment[data-state='completed'],
+.street-bar__segment[data-state='current'] {
+  color: var(--brass-ink);
+}
+.street-bar__segment[data-locked] {
+  cursor: not-allowed;
+}
+.street-bar__segment:not([data-locked]):hover {
+  color: var(--text-primary);
+}
+.street-bar__segment:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+  border-radius: 3px;
+}
+
+.street-bar__label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.street-bar__track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border-strong);
+}
+
+.street-bar__fill {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--brass);
+}
+
+.street-bar__handle {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border: 3px solid var(--color-panel);
+  border-radius: 50%;
+  background: var(--brass);
+}
+
+.street-bar[data-finished] .street-bar__segment {
+  color: var(--text-muted);
+}
+.street-bar[data-finished] .street-bar__segment:not([data-unreached]) .street-bar__track {
+  background: var(--color-track-finished);
+}
+.street-bar[data-finished] .street-bar__fill {
+  display: none;
+}
+.street-bar[data-finished] .street-bar__segment[data-stop='showdown']:not([data-unreached]) {
+  color: var(--sync-ink);
+}
+.street-bar[data-finished] .street-bar__segment[data-stop='showdown']:not([data-unreached]) .street-bar__track {
+  background: var(--sync);
 }
 
 .playback-bar__where,
