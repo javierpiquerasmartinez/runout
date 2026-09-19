@@ -330,6 +330,8 @@ export const es = {
   'room.payout.pot': 'Bote',
   'room.payout.main': 'Principal',
   'room.payout.side': 'Lateral',
+  'room.versus': ' vs ',
+  'room.payout.rake': 'Rake {amount}',
   'room.payout.sideNumbered': 'Lateral {n}',
   'room.hand.high-card': 'Carta alta: {rank}',
   'room.hand.pair': 'Pareja de {rank}',

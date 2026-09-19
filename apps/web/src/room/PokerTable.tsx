@@ -109,7 +109,7 @@ function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; 
       data-hero={seat.hero || undefined}
       data-to-act={seat.toAct || undefined}
       data-folded={seat.folded || undefined}
-      data-all-in={seat.allIn ? true : undefined}
+      data-all-in={seat.allInLabel ? true : undefined}
       data-winner={seat.winner || undefined}
       data-revealed={seat.revealed || undefined}
       style={style}
@@ -125,8 +125,8 @@ function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; 
         </div>
         <div className="seat__line seat__line--stack">
           <span className="seat__stack ro-mono">{seat.stack}</span>
-          {seat.won && <span className="seat__note seat__note--won ro-mono">{seat.won}</span>}
-          {seat.allIn && <span className="seat__note seat__note--all-in ro-mono">{seat.allIn}</span>}
+          {seat.netResult && <span className="seat__note seat__note--won ro-mono">{seat.netResult}</span>}
+          {seat.allInLabel && <span className="seat__note seat__note--all-in ro-mono">{seat.allInLabel}</span>}
         </div>
         {seat.dealer && (
           <span className="seat__dealer ro-mono" role="img" aria-label={t('room.table.dealer')}>

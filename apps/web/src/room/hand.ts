@@ -27,11 +27,13 @@ export type HandCategory =
   | 'four-of-a-kind'
   | 'straight-flush'
 
+export type Rank = 'A' | 'K' | 'Q' | 'J' | '10' | '9' | '8' | '7' | '6' | '5' | '4' | '3' | '2'
+
 /** A made hand from the server's evaluator; the web only localises it. */
 export interface MadeHand {
   category: HandCategory
-  /** The ranks that name the hand, most significant first ("10" for tens). */
-  ranks: string[]
+  /** The ranks that name the hand, most significant first. */
+  ranks: Rank[]
   /** The cards that make it, kickers left out. */
   cards: string[]
 }
@@ -72,9 +74,16 @@ export interface TableState {
 }
 
 export interface HandResult {
-  /** Cards face up at Showdown: whoever showed, and the Hero if they got there. */
+  /** The hands shown at Showdown; a mucked hand, the Hero's included, isn't one. */
   revealed: { screenName: string; cards: string[]; madeHand: MadeHand }[]
-  pots: (Pot & { winners: { screenName: string; amount: number }[] })[]
+  pots: PaidPot[]
+  /** What the room kept. */
+  rake: number
+}
+
+/** A pot with what each winner took from it, after rake. */
+export interface PaidPot extends Pot {
+  winners: { screenName: string; amount: number }[]
 }
 
 export interface HandWithTimeline {

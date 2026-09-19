@@ -1233,3 +1233,9 @@
 .room-payout__pot[data-main] .room-payout__amount {
   color: var(--brass-ink);
 }
+
+.room-payout__rake {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}

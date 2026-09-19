@@ -169,7 +169,7 @@
           }
         ],
         "action": null,
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -276,7 +276,7 @@
           "to": 995,
           "allIn": true
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -380,7 +380,7 @@
           "type": "fold",
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -483,7 +483,7 @@
           "type": "fold",
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -585,7 +585,7 @@
           "type": "fold",
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -688,7 +688,7 @@
           "amount": 995,
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -789,7 +789,7 @@
           "type": "fold",
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -891,7 +891,7 @@
           "amount": 995,
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -991,7 +991,7 @@
           "type": "fold",
           "allIn": false
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -1093,7 +1093,7 @@
           "to": 2495,
           "allIn": true
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -1195,7 +1195,7 @@
           "to": 7995,
           "allIn": true
         },
-        "effectiveStack": 6000,
+        "effectiveStack": 5995,
         "spr": null,
         "result": null
       },
@@ -1433,7 +1433,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "rake": 300
         }
       }
     ],

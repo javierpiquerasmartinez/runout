@@ -235,7 +235,7 @@ function LoadedHand({
               {t('room.stage.hand', { current: index + 1, total: view.queue.length })}
             </span>
             <span className="room-stage__divider" />
-            <span className="room-stage__title">{positionsLabel(entry)}</span>
+            <span className="room-stage__title">{positionsLabel(entry, i18n)}</span>
             <span className="room-stage__by">
               {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
             </span>
@@ -271,7 +271,7 @@ function LoadedHand({
 }
 
 /** Board "Sala — vista del invitado": what each pot was worth and who took it. */
-function Payout({ payout }: { payout: PayoutView[] }) {
+function Payout({ payout }: { payout: PayoutView }) {
   const { t } = useI18n()
   return (
     <section className="room-side__section" aria-labelledby="room-payout-title">
@@ -279,7 +279,7 @@ function Payout({ payout }: { payout: PayoutView[] }) {
         {t('room.payout.title')}
       </h3>
       <ul className="room-payout">
-        {payout.map((pot, index) => (
+        {payout.pots.map((pot, index) => (
           <li key={index} className="room-payout__pot" data-main={index === 0 || undefined}>
             <span className="room-payout__who">
               <span className="room-payout__label">{pot.label}</span>
@@ -293,6 +293,7 @@ function Payout({ payout }: { payout: PayoutView[] }) {
           </li>
         ))}
       </ul>
+      {payout.rake && <p className="room-payout__rake ro-mono">{payout.rake}</p>}
     </section>
   )
 }
@@ -318,7 +319,7 @@ function QueueRow({
         <span className="queue-entry__date ro-mono">{playedAtLabel(entry, i18n)}</span>
       </div>
       <div className="queue-entry__line">
-        <span className="queue-entry__positions">{positionsLabel(entry)}</span>
+        <span className="queue-entry__positions">{positionsLabel(entry, i18n)}</span>
         <span className="queue-entry__street ro-mono">{streetLabel(entry, i18n)}</span>
       </div>
       <div className="queue-entry__chips">

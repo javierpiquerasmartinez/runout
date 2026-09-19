@@ -18,8 +18,8 @@ const entry = (overrides: Partial<QueueEntry> = {}): QueueEntry => ({
 
 describe('positionsLabel', () => {
   it('joins the Positions involved against each other', () => {
-    expect(positionsLabel(entry())).toBe('BTN vs BB')
-    expect(positionsLabel(entry({ summary: { ...entry().summary, positions: ['SB', 'BB', 'CO'] } }))).toBe(
+    expect(positionsLabel(entry(), es)).toBe('BTN vs BB')
+    expect(positionsLabel(entry({ summary: { ...entry().summary, positions: ['SB', 'BB', 'CO'] } }), es)).toBe(
       'SB vs BB vs CO',
     )
   })

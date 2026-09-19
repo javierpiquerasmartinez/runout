@@ -205,6 +205,13 @@ describe('tableView: pots and bets', () => {
     })
   })
 
+  it('sizes bets and raises against the pot, not calls', () => {
+    // Oak_BB has just moved all in; Hero9max called Elm_UTG's all-in before that.
+    const hero = tableView(nineMax, 9, es).seats.find((seat) => seat.screenName === 'Hero9max')!
+
+    expect(hero.chip).toEqual({ kind: 'bet', label: '19,9 BB', potShare: null })
+  })
+
   it('shows blinds and a straddle without a share of the pot', () => {
     const view = tableView(straddled, 0, es)
 
@@ -221,7 +228,7 @@ describe('tableView: pots and bets', () => {
 
     expect(olive.chip).toEqual({ kind: 'all-in', label: 'all-in 62 BB', potShare: null })
     expect(olive.stack).toBe('0 BB')
-    expect(olive.allIn).toBe('all-in 100 BB')
+    expect(olive.allInLabel).toBe('all-in 100 BB')
   })
 
   it('shows side pots apart, each with who contests it', () => {
@@ -268,7 +275,8 @@ describe('tableView: the log of the current Street', () => {
     expect(tableView(nineMax, 0, es).log).toEqual({
       label: 'Preflop',
       entries: [{ text: 'Elm_UTG · pendiente', tone: 'pending' }],
-      aside: 'efectivo 120 BB',
+      // Spruce9's $60 less the ante.
+      aside: 'efectivo 119,9 BB',
     })
   })
 
@@ -305,15 +313,15 @@ describe('tableView: Showdown', () => {
       revealed: true,
       winner: true,
       outcome: 'Full de jotas y cincos · gana 197,5 BB',
-      won: '+97,5 BB',
+      netResult: '+97,5 BB',
       stack: '197,5 BB',
     })
     expect(seat(straddled, 'Hero6')).toMatchObject({
       cards: ['9s', '9h'],
       winner: false,
       outcome: 'Full de nueves y cincos',
-      won: null,
-      allIn: 'all-in 100 BB',
+      netResult: null,
+      allInLabel: 'all-in 100 BB',
     })
     expect(seat(straddled, 'Olive6', en).outcome).toBe('Full house, jacks over fives · wins 197.5 BB')
   })
@@ -324,15 +332,19 @@ describe('tableView: Showdown', () => {
     expect(tableView(nineMax, last(nineMax), es).winningCards).toEqual(['Ks', 'Kd', 'Kh', 'Ah', 'Ad'])
   })
 
-  it('states how much each winner takes from each pot', () => {
-    expect(tableView(nineMax, last(nineMax), es).payout).toEqual([
-      { label: 'Principal', amount: '81 BB', winners: ['Elm_UTG gana 79 BB'] },
-      { label: 'Lateral 1', amount: '90 BB', winners: ['Hero9max gana 88 BB'] },
-      { label: 'Lateral 2', amount: '140 BB', winners: ['Hero9max gana 138 BB'] },
-    ])
-    expect(tableView(split, last(split), en).payout).toEqual([
-      { label: 'Pot', amount: '60.5 BB', winners: ['Hero4 wins 29.8 BB', 'Aspen1 wins 29.7 BB'] },
-    ])
+  it('states how much each winner takes from each pot, after rake, and what the rake kept', () => {
+    expect(tableView(nineMax, last(nineMax), es).payout).toEqual({
+      pots: [
+        { label: 'Principal', amount: '79 BB', winners: ['Elm_UTG gana 79 BB'] },
+        { label: 'Lateral 1', amount: '88 BB', winners: ['Hero9max gana 88 BB'] },
+        { label: 'Lateral 2', amount: '138 BB', winners: ['Hero9max gana 138 BB'] },
+      ],
+      rake: 'Rake 6 BB',
+    })
+    expect(tableView(split, last(split), en).payout).toEqual({
+      pots: [{ label: 'Pot', amount: '59.5 BB', winners: ['Hero4 wins 29.8 BB', 'Aspen1 wins 29.7 BB'] }],
+      rake: 'Rake 1 BB',
+    })
     expect(tableView(nineMax, 3, es).payout).toBeNull()
   })
 

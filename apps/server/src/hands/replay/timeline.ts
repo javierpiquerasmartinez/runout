@@ -72,12 +72,22 @@ export interface PlayerState {
 
 export interface HandResult {
   /**
-   * The cards face up at Showdown, in seat order: whoever showed, and the
-   * Hero if they got there. Nobody's, if the Hand was won without one.
+   * The hands shown at Showdown, in seat order. Nobody's if the Hand was won
+   * without one; a hand mucked there, the Hero's included, isn't one.
    */
   revealed: { screenName: string; cards: string[]; madeHand: MadeHand }[];
-  /** Each pot, as in `pots`, with who took how much of it. */
-  pots: (Pot & { winners: { screenName: string; amount: number }[] })[];
+  /**
+   * Each pot, as in `pots`, with what each winner took from it after rake.
+   * When the Hand History's pots don't match these, a single pot holds
+   * everything and every winner, rather than a guess at who won which.
+   */
+  pots: PaidPot[];
+  /** What the room kept. */
+  rake: number;
+}
+
+export interface PaidPot extends Pot {
+  winners: { screenName: string; amount: number }[];
 }
 
 const BOARD_SIZE: Record<Street, number> = {
@@ -129,9 +139,12 @@ export function timeline(hand: Hand): Timeline {
     pay(post.screenName, post.amount, live);
   }
 
-  // Effective stack and SPR are read as each Street begins; preflop, from
-  // the Stacks the players sat down with.
-  let effectiveStack = secondDeepest(seats.map((seat) => seat.startingStack));
+  // Effective stack and SPR are read as each Street begins. Preflop there's
+  // no SPR, and the effective stack follows the players still in, counting
+  // what they have in front of them.
+  const preflopEffectiveStack = () =>
+    secondDeepest(players.filter((p) => !p.folded).map((p) => p.stack + p.bet));
+  let effectiveStack = preflopEffectiveStack();
   let spr: number | null = null;
 
   const states: TableState[] = [
@@ -173,20 +186,17 @@ export function timeline(hand: Hand): Timeline {
       // The Hand is over: uncalled bets go back, every bet is gathered in
       // and the pots are paid out.
       for (const returned of hand.returned) {
-        update(returned.screenName, (p) => ({
-          ...p,
-          stack: p.stack + returned.amount,
-          bet: p.bet - returned.amount,
-          committed: p.committed - returned.amount,
-          allIn: false,
-        }));
+        // Paying back is paying in reverse; it leaves the player with chips.
+        pay(returned.screenName, -returned.amount, -returned.amount);
       }
       players = players.map((p) => ({ ...p, bet: 0 }));
       result = resultOf(hand, players, board);
     } else if (street !== action.street) {
       players = players.map((p) => ({ ...p, bet: 0 }));
     }
-    if (street !== action.street) {
+    if (street === 'preflop') {
+      effectiveStack = preflopEffectiveStack();
+    } else if (street !== action.street) {
       const live = players.filter((p) => !p.folded);
       effectiveStack = secondDeepest(live.map((p) => p.stack));
       const pot = potOf(players);
@@ -269,32 +279,43 @@ function resultOf(
   players: PlayerState[],
   board: string[],
 ): HandResult {
-  const pots = potsOf(players).map((pot) => ({
-    ...pot,
-    winners: [] as { screenName: string; amount: number }[],
-  }));
+  const worked = potsOf(players);
+  // The Hand History numbers side pots from 1, the main pot being 0.
+  const matches = hand.collected.every(
+    ({ pot }) =>
+      (pot === undefined && worked.length === 1) ||
+      (pot !== undefined && pot < worked.length),
+  );
+  const pots: PaidPot[] = matches
+    ? worked.map((pot) => ({ ...pot, winners: [] }))
+    : [
+        {
+          amount: worked.reduce((sum, pot) => sum + pot.amount, 0),
+          contestants: worked[0]?.contestants ?? [],
+          winners: [],
+        },
+      ];
   for (const { screenName, amount, pot } of hand.collected) {
-    // The Hand History numbers side pots from 1, the main pot being 0.
-    const target = pots[Math.min(pot ?? 0, pots.length - 1)];
-    target?.winners.push({ screenName, amount });
+    const { winners } = pots[matches ? (pot ?? 0) : 0];
+    const winner = winners.find((w) => w.screenName === screenName);
+    if (winner) winner.amount += amount;
+    else winners.push({ screenName, amount });
   }
 
   const revealed: HandResult['revealed'] = [];
   if (hand.showdown) {
     for (const player of players) {
       if (player.folded) continue;
-      const cards =
-        hand.shown.find((s) => s.screenName === player.screenName)?.cards ??
-        (player.screenName === hand.hero.screenName ? hand.hero.cards : null);
-      if (!cards) continue;
+      const shown = hand.shown.find((s) => s.screenName === player.screenName);
+      if (!shown) continue;
       revealed.push({
         screenName: player.screenName,
-        cards,
-        madeHand: bestHand([...cards, ...board]),
+        cards: shown.cards,
+        madeHand: bestHand([...shown.cards, ...board]),
       });
     }
   }
-  return { revealed, pots };
+  return { revealed, pots, rake: hand.rake };
 }
 
 /** The second-biggest Stack, or null with fewer than two. */

@@ -87,7 +87,7 @@ describe('Replay: a Hand’s Timeline', () => {
           committed: 0,
         },
       ],
-      // Preflop, the second-deepest Stack the players sat down with.
+      // Preflop, the second-deepest Stack of the players still in, bets included.
       effectiveStack: 1136,
       spr: null,
       result: null,
@@ -166,6 +166,7 @@ describe('Replay: a Hand’s Timeline', () => {
           winners: [{ screenName: 'iMapleAA', amount: 99 }],
         },
       ],
+      rake: 6,
     });
     // The winner's Stack takes what they collected, net of rake.
     expect(players(last)[3]).toEqual(['iMapleAA', 1049, 0, false]);
@@ -174,6 +175,29 @@ describe('Replay: a Hand’s Timeline', () => {
         .states.slice(0, -1)
         .map((s) => s.result),
     ).toEqual(Array(10).fill(null));
+  });
+
+  it('reads the effective stack preflop among the players still in the Hand', () => {
+    const { states } = timeline(showdown);
+
+    // BIRCHWOODS (€12.04) and Alder239 (€11.36) are the deepest until
+    // Alder239 folds; then only iMapleAA's €10 can be won or lost.
+    expect(states[2].effectiveStack).toBe(1136);
+    expect(states[3].effectiveStack).toBe(1000);
+  });
+
+  it('labels only the hands shown: a Hero who mucks keeps their cards but gets no made hand', () => {
+    const heroMucks = {
+      ...showdown,
+      shown: [{ screenName: 'BIRCHWOODS', cards: ['As', '7d'] }],
+    };
+
+    const { revealed } = timeline(heroMucks).states.at(-1)!.result!;
+    expect(revealed.map((r) => r.screenName)).toEqual(['BIRCHWOODS']);
+  });
+
+  it('says what the rake took', () => {
+    expect(timeline(showdown).states.at(-1)!.result!.rake).toBe(6);
   });
 
   it('says whether the Hand reached Showdown', () => {
@@ -264,6 +288,7 @@ describe('Replay: a Hand’s Timeline', () => {
           winners: [{ screenName: 'juniperpallo', amount: 52 }],
         },
       ],
+      rake: 3,
     });
     expect(
       last.players.find((p) => p.screenName === 'juniperpallo'),
@@ -294,6 +319,7 @@ describe('Replay: pots, side pots and results across edge cases', () => {
           winners: [{ screenName: 'HeroHU', amount: 100 }],
         },
       ],
+      rake: 0,
     });
     // The raise over the big blind comes back, then the pot is won.
     expect(players(last)).toEqual([
@@ -317,6 +343,8 @@ describe('Replay: pots, side pots and results across edge cases', () => {
       'BTN',
     ]);
     expect(states[0].pot).toBe(45 + 25 + 50);
+    // Spruce9's $60, less the ante, is the second-deepest Stack.
+    expect(states[0].effectiveStack).toBe(5995);
     expect(states[0].pots).toEqual([
       { amount: 45, contestants: seats.map((seat) => seat.screenName) },
     ]);
@@ -481,6 +509,31 @@ describe('Replay: pots, side pots and results across edge cases', () => {
         amount: 10175,
         contestants: ['Hero6', 'Olive6'],
         winners: [{ screenName: 'Olive6', amount: 9875 }],
+      },
+    ]);
+  });
+
+  it('shows one pot with every winner when the Hand History’s pots don’t match the ones worked out', () => {
+    // A "side pot-3" this Hand never had, and a win recorded with no pot at
+    // all: rather than guess which pot each went to, they share one.
+    const mismatched = {
+      ...nineMax,
+      collected: [
+        { screenName: 'Hero9max', amount: 6900, pot: 3 },
+        { screenName: 'Hero9max', amount: 4400 },
+        { screenName: 'Elm_UTG', amount: 3950, pot: 0 },
+      ],
+    };
+
+    const { pots } = timeline(mismatched).states.at(-1)!.result!;
+    expect(pots).toEqual([
+      {
+        amount: 15550,
+        contestants: ['Oak_BB', 'Elm_UTG', 'Hero9max', 'Spruce9'],
+        winners: [
+          { screenName: 'Hero9max', amount: 11300 },
+          { screenName: 'Elm_UTG', amount: 3950 },
+        ],
       },
     ]);
   });

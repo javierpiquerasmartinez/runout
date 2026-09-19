@@ -331,6 +331,8 @@ export const en: Messages = {
   'room.payout.pot': 'Pot',
   'room.payout.main': 'Main',
   'room.payout.side': 'Side',
+  'room.versus': ' vs ',
+  'room.payout.rake': 'Rake {amount}',
   'room.payout.sideNumbered': 'Side {n}',
   'room.hand.high-card': 'High card, {rank}',
   'room.hand.pair': 'Pair of {rank}',
