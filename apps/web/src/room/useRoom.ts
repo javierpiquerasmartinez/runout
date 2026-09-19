@@ -7,6 +7,8 @@ export interface RoomCommands {
   loadHand(handId: string): void
   /** Takes Playback to an absolute Action index; 0 is the Initial State. */
   goToAction(actionIndex: number): void
+  /** Gives a Hand in the Queue another Author: a Participant's identity id. */
+  reassignAuthor(handId: string, authorId: string): void
 }
 
 /**
@@ -53,6 +55,7 @@ export function useRoom(code: string, token: string, displayName: string | null)
     () => ({
       loadHand: (handId) => send('playback.load', { handId }),
       goToAction: (actionIndex) => send('playback.goTo', { actionIndex }),
+      reassignAuthor: (handId, authorId) => send('queue.reassignAuthor', { handId, authorId }),
     }),
     [send],
   )

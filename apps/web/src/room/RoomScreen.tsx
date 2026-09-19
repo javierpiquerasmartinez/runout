@@ -10,8 +10,17 @@ import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { followLink } from '../routing'
+import { settingsPath } from '../settings/SettingsPage'
 import { ImportDialog } from './ImportDialog'
-import { playedAtLabel, positionsLabel, potLabel, stakeLabel, streetLabel } from './queueEntryView'
+import {
+  authoredCount,
+  playedAtLabel,
+  positionsLabel,
+  potLabel,
+  sameHandLabel,
+  stakeLabel,
+  streetLabel,
+} from './queueEntryView'
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
 import type { Participant, QueueEntry, RoomView } from './roomClient'
@@ -45,6 +54,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
     view.playback && load.state === 'loaded' ? tableView(load.hand, view.playback.actionIndex, i18n) : null
   // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
   const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
+  const loadedEntry = view.queue[loadedIndex]
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
   const next = view.queue[loadedIndex + 1]
   useShortcuts(isMaster, {
@@ -82,6 +92,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
                 <QueueRow
                   key={entry.id}
                   entry={entry}
+                  sameHand={sameHandLabel(entry, view.queue, i18n)}
                   i18n={i18n}
                   loaded={entry.handId === view.playback?.handId}
                   onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
@@ -116,6 +127,14 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               {t('room.details.title')}
             </h2>
           </div>
+          {loadedEntry && (
+            <CurrentHand
+              entry={loadedEntry}
+              participants={view.participants}
+              isMaster={isMaster}
+              onReassign={(authorId) => commands.reassignAuthor(loadedEntry.handId, authorId)}
+            />
+          )}
           {table?.payout && <Payout payout={table.payout} />}
           <section className="room-side__section" aria-labelledby="room-participants-title">
             <h3 id="room-participants-title" className="room-side__title">
@@ -123,7 +142,12 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
             </h3>
             <ul className="room-participants" aria-live="polite">
               {view.participants.map((participant) => (
-                <ParticipantRow key={participant.identityId} participant={participant} isYou={participant.identityId === view.you} />
+                <ParticipantRow
+                  key={participant.identityId}
+                  participant={participant}
+                  isYou={participant.identityId === view.you}
+                  authored={authoredCount(view.queue, participant.identityId)}
+                />
               ))}
             </ul>
           </section>
@@ -207,6 +231,9 @@ function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
         <Icon name={isMaster ? 'master' : 'profile'} size={14} />
         {t(isMaster ? 'room.master' : 'room.guest')}
       </span>
+      <a href={settingsPath} className="room-header__nav" aria-label={t('room.settings')} onClick={followLink}>
+        <Icon name="settings" size={17} />
+      </a>
     </header>
   )
 }
@@ -288,6 +315,77 @@ function LoadedHand({
   )
 }
 
+/**
+ * The details panel's "Mano actual" block, for now only its Author. The
+ * Master changes it from here; Guests see the control locked.
+ */
+function CurrentHand({
+  entry,
+  participants,
+  isMaster,
+  onReassign,
+}: {
+  entry: QueueEntry
+  participants: Participant[]
+  isMaster: boolean
+  onReassign: (authorId: string) => void
+}) {
+  const { t } = useI18n()
+  const [changing, setChanging] = useState(false)
+  // The Author may have left the Room; they stay a choice so the list shows who it is.
+  const choices = participants.some((p) => p.identityId === entry.author.identityId)
+    ? participants
+    : [{ ...entry.author, role: 'guest' as const }, ...participants]
+
+  return (
+    <section className="room-side__section" aria-labelledby="room-current-title">
+      <h3 id="room-current-title" className="room-side__title">
+        {t('room.current.title')}
+      </h3>
+      <dl className="room-facts">
+        <div className="room-facts__row">
+          <dt>{t('room.current.author')}</dt>
+          <dd className="room-facts__author">
+            {changing && isMaster ? (
+              <select
+                className="room-facts__select"
+                aria-label={t('room.current.reassign')}
+                value={entry.author.identityId}
+                autoFocus
+                onChange={(event) => {
+                  onReassign(event.target.value)
+                  setChanging(false)
+                }}
+                onBlur={() => setChanging(false)}
+              >
+                {choices.map((p) => (
+                  <option key={p.identityId} value={p.identityId}>
+                    {p.displayName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <span className="room-facts__value">{entry.author.displayName}</span>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  className="room-facts__change"
+                  aria-label={t('room.current.changeAuthor')}
+                  disabledReason={isMaster ? undefined : t('room.current.reassignLocked')}
+                  onClick={() => setChanging(true)}
+                >
+                  {t('room.current.change')}
+                </Button>
+              </>
+            )}
+          </dd>
+        </div>
+      </dl>
+    </section>
+  )
+}
+
 /** Board "Sala — vista del invitado": what each pot was worth and who took it. */
 function Payout({ payout }: { payout: PayoutView }) {
   const { t } = useI18n()
@@ -318,11 +416,14 @@ function Payout({ payout }: { payout: PayoutView }) {
 
 function QueueRow({
   entry,
+  sameHand,
   i18n,
   loaded,
   onLoad,
 }: {
   entry: QueueEntry
+  /** Names the other Heroes' Hands of the same real-world hand in the Queue, if any. */
+  sameHand: string | null
   i18n: Translator
   loaded: boolean
   /** Only the Master loads Hands; for Guests a row is information, not a control. */
@@ -343,6 +444,12 @@ function QueueRow({
       <div className="queue-entry__chips">
         <span className="queue-entry__chip ro-mono">{stakeLabel(entry)}</span>
         <span className="queue-entry__chip ro-mono">{potLabel(entry, i18n)}</span>
+        {sameHand && (
+          <span className="queue-entry__chip queue-entry__chip--same-hand">
+            <Icon name="link" size={11} />
+            {sameHand}
+          </span>
+        )}
       </div>
       {loaded && <span className="ro-visually-hidden">{i18n.t('room.queue.loaded')}</span>}
     </>
@@ -421,7 +528,16 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
   }, [code, token, enabled, report])
 }
 
-function ParticipantRow({ participant, isYou }: { participant: Participant; isYou: boolean }) {
+function ParticipantRow({
+  participant,
+  isYou,
+  authored,
+}: {
+  participant: Participant
+  isYou: boolean
+  /** How many Hands in the Queue they are Author of. */
+  authored: number
+}) {
   const { t } = useI18n()
   const role: MessageKey = participant.role === 'master' ? 'room.master' : 'room.guest'
   return (
@@ -432,7 +548,12 @@ function ParticipantRow({ participant, isYou }: { participant: Participant; isYo
           {participant.displayName}
           {isYou && <span className="room-participant__you">{t('room.you')}</span>}
         </span>
-        <span className="room-participant__role">{t(role)}</span>
+        <span className="room-participant__role">
+          {t(authored === 1 ? 'room.participants.hands.one' : 'room.participants.hands.other', {
+            role: t(role),
+            count: authored,
+          })}
+        </span>
       </span>
       <span className="room-participant__presence" title={t('room.participants.present')}>
         <span className="ro-visually-hidden">{t('room.participants.present')}</span>

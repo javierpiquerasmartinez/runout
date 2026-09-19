@@ -404,3 +404,47 @@
     flex: none;
   }
 }
+
+/* The board's "Jugador héroe detectado" block, offering to add the Hero to the Importer's Screen Names. */
+.import-claim {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.import-claim__box {
+  height: 46px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 12px;
+  background: var(--color-pressed);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+}
+.import-claim__name {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.import-claim__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.import-claim__status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.import-claim__status:empty {
+  display: none;
+}
+.import-claim__status:not(:empty) {
+  margin-bottom: 16px;
+}

@@ -18,6 +18,7 @@ import {
   type ImportItem,
   type ImportPreview,
   type SourceFormat,
+  unmatchedHeroes,
 } from './importBatch'
 import { playedAtLabel, positionsLabel, potLabel, streetLabel } from './queueEntryView'
 import './ImportDialog.css'
@@ -32,7 +33,9 @@ type Source = File | string
  * Tracker exports or pastes text, reviews what each file gave and what was
  * discarded, and confirms. The server reads each item into a preview; only
  * confirming puts Hands in the Queue. There is no Author picker (Authors come
- * from Screen Names) and no Library tab.
+ * from Screen Names) and no Library tab; the "detected Hero" block offers to
+ * add a Hero nobody is recognised as to the Importer's Screen Names instead
+ * of changing it.
  */
 export function ImportDialog({
   room,
@@ -263,6 +266,7 @@ export function ImportDialog({
         </div>
 
         <aside className="import-dialog__side">
+          <ClaimHeroes heroes={unmatchedHeroes(batch)} onClaimed={(screenName) => dispatch({ type: 'screenNameAdded', screenName })} />
           {showingDiscarded?.state === 'read' ? (
             <DiscardedPanel item={showingDiscarded} preview={showingDiscarded.preview} onBack={() => setDiscardedOf(null)} />
           ) : (
@@ -441,6 +445,14 @@ function HandPreviewPanel({
           <dt>{t('import.preview.date')}</dt>
           <dd className="ro-mono">{playedAtLabel(hand, i18n)}</dd>
         </div>
+        <div>
+          <dt>{t('import.preview.hero')}</dt>
+          <dd className="ro-mono">{hand.hero}</dd>
+        </div>
+        <div>
+          <dt>{t('import.preview.author')}</dt>
+          <dd>{hand.author.displayName}</dd>
+        </div>
       </dl>
       {hands.length > 1 && (
         <Button variant="secondary" size="compact" className="import-preview__next" onClick={onNext}>
@@ -448,6 +460,64 @@ function HandPreviewPanel({
         </Button>
       )}
     </section>
+  )
+}
+
+/**
+ * The board's "detected Hero" block, for each Hero nobody in the Room has
+ * among their Screen Names: those Hands are the Importer's, and one click
+ * adds the name to their Screen Names so they are recognised next time.
+ */
+function ClaimHeroes({ heroes, onClaimed }: { heroes: string[]; onClaimed: (screenName: string) => void }) {
+  const { t } = useI18n()
+  const { token, identity, rememberScreenNames } = useSession()
+  const [claiming, setClaiming] = useState<string | null>(null)
+  const [claimed, setClaimed] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+
+  function claim(screenName: string) {
+    setClaiming(screenName)
+    setFailure(null)
+    api<{ screenNames: string[] }>('/identities/me/screen-names', {
+      token,
+      method: 'PUT',
+      body: { screenNames: [...identity.screenNames, screenName] },
+    })
+      .then(({ screenNames }) => {
+        rememberScreenNames(screenNames)
+        onClaimed(screenName)
+        setClaimed(screenName)
+      })
+      .catch((error: unknown) => setFailure(reasonOf(error)))
+      .finally(() => setClaiming(null))
+  }
+
+  return (
+    <>
+      {heroes.map((hero) => (
+        <section key={hero} className="import-claim" aria-labelledby={`import-claim-${hero}`}>
+          <h3 id={`import-claim-${hero}`} className="import-dialog__eyebrow">
+            {t('import.claim.title')}
+          </h3>
+          <div className="import-claim__box">
+            <span className="import-claim__name ro-mono">{hero}</span>
+            <Button
+              variant="secondary"
+              size="compact"
+              aria-label={t('import.claim.addNamed', { name: hero })}
+              disabledReason={claiming === null ? undefined : t('import.claim.adding')}
+              onClick={() => claim(hero)}
+            >
+              {t('import.claim.add')}
+            </Button>
+          </div>
+          <p className="import-claim__hint">{t('import.claim.body', { name: hero })}</p>
+        </section>
+      ))}
+      <p className="import-claim__status" role="status">
+        {failure ? t(`reason.${failure}`) : claimed && t('import.claim.added', { name: claimed })}
+      </p>
+    </>
   )
 }
 

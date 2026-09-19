@@ -23,17 +23,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [attempt])
 
-  const rememberDisplayName = useCallback((displayName: string) => {
+  const remember = useCallback((changes: Partial<Session['identity']>) => {
     setLoading((current) =>
       current.state === 'ready'
-        ? { state: 'ready', session: { ...current.session, identity: { ...current.session.identity, displayName } } }
+        ? { state: 'ready', session: { ...current.session, identity: { ...current.session.identity, ...changes } } }
         : current,
     )
   }, [])
+  const rememberDisplayName = useCallback((displayName: string) => remember({ displayName }), [remember])
+  const rememberScreenNames = useCallback((screenNames: string[]) => remember({ screenNames }), [remember])
 
   const value = useMemo(
-    () => (loading.state === 'ready' ? { ...loading.session, rememberDisplayName } : null),
-    [loading, rememberDisplayName],
+    () => (loading.state === 'ready' ? { ...loading.session, rememberDisplayName, rememberScreenNames } : null),
+    [loading, rememberDisplayName, rememberScreenNames],
   )
 
   if (loading.state === 'loading') {

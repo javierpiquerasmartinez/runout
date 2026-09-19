@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createTranslator } from '../i18n/translator'
 import type { QueueEntry } from './roomClient'
-import { playedAtLabel, positionsLabel, potLabel, stakeLabel, streetLabel } from './queueEntryView'
+import {
+  authoredCount,
+  playedAtLabel,
+  positionsLabel,
+  potLabel,
+  sameHandLabel,
+  stakeLabel,
+  streetLabel,
+} from './queueEntryView'
 
 const es = createTranslator('es')
 
@@ -10,6 +18,8 @@ const entry = (overrides: Partial<QueueEntry> = {}): QueueEntry => ({
   handId: 'hand-1',
   position: 1,
   author: { identityId: 'id-javier', displayName: 'Javier' },
+  site: 'pokerstars',
+  siteHandId: '262120750636',
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
@@ -60,5 +70,46 @@ describe('playedAtLabel', () => {
   it('reads the date and time the Hand was played, in the UI language', () => {
     expect(playedAtLabel(entry(), es, 'UTC')).toBe('18 sept · 12:34')
     expect(playedAtLabel(entry(), createTranslator('en'), 'UTC')).toBe('Sep 18 · 12:34')
+  })
+})
+
+describe('sameHandLabel', () => {
+  const marta = { identityId: 'id-marta', displayName: 'Marta' }
+  const alberto = { identityId: 'id-alberto', displayName: 'Alberto' }
+
+  it('says whose other Hands in the Queue are the same real-world hand, from another seat', () => {
+    const mine = entry()
+    const queue = [
+      mine,
+      entry({ id: 'entry-2', handId: 'hand-2', author: marta }),
+      entry({ id: 'entry-3', handId: 'hand-3', siteHandId: '999' }),
+      entry({ id: 'entry-4', handId: 'hand-4', author: alberto }),
+    ]
+
+    expect(sameHandLabel(mine, queue, es)).toBe('Misma mano que Marta y Alberto')
+    expect(sameHandLabel(queue[1], queue, createTranslator('en'))).toBe('Same hand as Javier and Alberto')
+  })
+
+  it('says nothing for a hand only one Hero brought', () => {
+    const queue = [entry(), entry({ id: 'entry-2', handId: 'hand-2', siteHandId: '999' })]
+
+    expect(sameHandLabel(queue[0], queue, es)).toBeNull()
+  })
+
+  it('tells hands of different Poker Sites apart even with the same hand ID', () => {
+    const queue = [entry(), entry({ id: 'entry-2', handId: 'hand-2', site: 'winamax' })]
+
+    expect(sameHandLabel(queue[0], queue, es)).toBeNull()
+  })
+})
+
+describe('authoredCount', () => {
+  it('counts the Hands in the Queue a Participant is Author of', () => {
+    const marta = { identityId: 'id-marta', displayName: 'Marta' }
+    const queue = [entry(), entry({ id: 'entry-2', author: marta }), entry({ id: 'entry-3' })]
+
+    expect(authoredCount(queue, 'id-javier')).toBe(2)
+    expect(authoredCount(queue, 'id-marta')).toBe(1)
+    expect(authoredCount(queue, 'id-nobody')).toBe(0)
   })
 })

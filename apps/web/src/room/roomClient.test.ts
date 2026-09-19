@@ -17,6 +17,8 @@ const firstHand: QueueEntry = {
   handId: 'hand-1',
   position: 1,
   author: { identityId: 'id-javier', displayName: 'Javier' },
+  site: 'pokerstars',
+  siteHandId: '262120750636',
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
@@ -103,6 +105,19 @@ describe('reduceRoom', () => {
     expect(apply({ type: 'entriesAdded', entries: [firstHand] })).toEqual({ phase: 'joining' })
   })
 
+  it('gives a Hand in the Queue the Author the Master reassigned it to', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'authorChanged', handId: 'hand-2', author: { identityId: 'id-marta', displayName: 'Marta' } },
+    )
+
+    expect(view.phase === 'in-room' && view.queue.map((entry) => entry.author.identityId)).toEqual([
+      'id-javier',
+      'id-marta',
+    ])
+  })
+
   it('adds a Participant who joins, at the end of the list', () => {
     const view = apply(snapshot, { type: 'participantJoined', participant: alberto })
     expect(view.phase === 'in-room' && view.participants).toEqual([javier, marta, alberto])
@@ -155,6 +170,14 @@ describe('parseServerMessage', () => {
     expect(
       parseServerMessage(JSON.stringify({ event: 'playback.changed', data: { handId: 'hand-1', actionIndex: 2 } })),
     ).toEqual({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 } })
+    expect(
+      parseServerMessage(
+        JSON.stringify({
+          event: 'queue.authorChanged',
+          data: { handId: 'hand-1', author: { identityId: 'id-marta', displayName: 'Marta' } },
+        }),
+      ),
+    ).toEqual({ type: 'authorChanged', handId: 'hand-1', author: { identityId: 'id-marta', displayName: 'Marta' } })
   })
 
   it('ignores anything that is not a Room event', () => {

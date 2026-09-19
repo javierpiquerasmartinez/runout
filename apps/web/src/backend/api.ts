@@ -2,6 +2,7 @@
 export type RejectionReason =
   | 'unauthenticated'
   | 'invalid-display-name'
+  | 'invalid-screen-names'
   | 'invalid-room-name'
   | 'room-not-found'
   | 'not-in-room'
@@ -14,6 +15,7 @@ export type RejectionReason =
   | 'unreadable-file'
   | 'invalid-format'
   | 'preview-not-found'
+  | 'author-not-in-room'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'
@@ -32,7 +34,7 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST'; body?: unknown } = {},
+  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST' | 'PUT'; body?: unknown } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`

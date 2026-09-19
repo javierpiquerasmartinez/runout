@@ -42,3 +42,20 @@ export function playedAtLabel(entry: Described, { formatDate, formatTime }: Tran
   const time = formatTime(at, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
   return `${date} · ${time}`
 }
+
+/**
+ * "Misma mano que Marta": the same real-world hand is in the Queue from other
+ * Heroes' seats, named by those Hands' Authors. Null when it isn't.
+ */
+export function sameHandLabel(entry: QueueEntry, queue: QueueEntry[], { t, formatList }: Translator): string | null {
+  const others = queue.filter(
+    (other) => other.id !== entry.id && other.site === entry.site && other.siteHandId === entry.siteHandId,
+  )
+  if (others.length === 0) return null
+  return t('room.queue.sameHand', { names: formatList(others.map((other) => other.author.displayName)) })
+}
+
+/** How many Hands in the Queue a Participant is Author of. */
+export function authoredCount(queue: QueueEntry[], identityId: string): number {
+  return queue.filter((entry) => entry.author.identityId === identityId).length
+}

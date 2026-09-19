@@ -1265,3 +1265,84 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* ---------- Details: the loaded Hand's facts ---------- */
+
+.room-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+.room-facts__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+.room-facts__row dt {
+  width: 92px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.room-facts__row dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 12.5px;
+}
+.room-facts__author {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.room-facts__value {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-facts__change {
+  margin-left: auto;
+}
+.room-facts__select {
+  flex-grow: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-control);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+/* The same real-world hand is in the Queue from another Hero's seat. */
+.queue-entry__chip--same-hand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.room-header__nav {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+.room-header__nav:hover {
+  background: var(--color-hover);
+  color: var(--text-primary);
+}
