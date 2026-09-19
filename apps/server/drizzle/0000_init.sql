@@ -1,0 +1,1 @@
+-- Baseline: an empty database under Drizzle's migration history. Tables arrive in later migrations.
