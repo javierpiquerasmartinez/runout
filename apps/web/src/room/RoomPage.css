@@ -255,11 +255,51 @@
 
 /* A Queue row, from the "Sala" boards: Author and date, Positions and Final Street, Stake and pot. */
 .queue-entry {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queue-entry__body,
+.queue-entry__load {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  width: 100%;
   padding: 11px 14px;
-  border-bottom: 1px solid var(--color-divider);
+}
+
+/* The Master's rows load a Hand; a Guest's rows stay plain information. */
+.queue-entry__load {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+.queue-entry__load:hover {
+  background: var(--color-hover);
+}
+.queue-entry__load:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.queue-entry[data-loaded] {
+  background: var(--color-selected);
+}
+.queue-entry[data-loaded] .queue-entry__load:hover {
+  background: transparent;
+}
+.queue-entry__loaded-icon {
+  color: var(--brass);
+}
+.queue-entry[data-loaded] .queue-entry__author {
+  color: var(--brass-ink);
+}
+.queue-entry[data-loaded] .queue-entry__street {
+  border-color: var(--brass-soft-border);
+  color: var(--brass-ink);
 }
 
 .queue-entry__line {
@@ -318,6 +358,7 @@
 
 .room-stage__felt {
   flex-grow: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -338,6 +379,356 @@
   text-align: center;
   font-size: 13.5px;
   color: var(--text-secondary);
+}
+
+/* ---------- The loaded Hand: header, table, transport bar ---------- */
+
+.room-stage__header {
+  height: 54px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.room-stage__count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.room-stage__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--color-rule-strong);
+}
+
+.room-stage__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.room-stage__by {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-stage__failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.room-stage__play {
+  flex-grow: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Board "Sala": drawn at 820 × 606, the felt at 110, 148 and 600 × 300. */
+.poker-table {
+  position: relative;
+  width: min(100%, 820px);
+  aspect-ratio: 820 / 606;
+  container-type: inline-size;
+}
+
+.poker-table__felt {
+  position: absolute;
+  left: 13.41%;
+  top: 24.42%;
+  width: 73.17%;
+  height: 49.5%;
+  border: 1px solid var(--color-felt-border);
+  border-radius: var(--radius-pill);
+  background: var(--felt-table);
+  box-shadow: var(--shadow-felt);
+}
+
+.poker-table__middle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 35.3%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.poker-table__board {
+  display: flex;
+  gap: 7px;
+}
+
+.poker-table__pot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.poker-table__pot-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+}
+.poker-table__pot-value {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brass-ink);
+}
+
+.poker-table__bet {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-chip);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.poker-table__bet-chip {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--color-border-hover);
+}
+
+/* A seat is anchored by its plate; cards and status hang above or below it. */
+.seat {
+  position: absolute;
+  width: 148px;
+  transform: translate(-50%, -50%);
+}
+.seat[data-folded] {
+  opacity: 0.42;
+}
+
+.seat__cards,
+.seat__status {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  white-space: nowrap;
+}
+.seat__cards {
+  bottom: calc(100% + 5px);
+  gap: 3px;
+}
+.seat[data-hero] .seat__cards {
+  top: calc(100% + 5px);
+  bottom: auto;
+  gap: 4px;
+}
+.seat__status {
+  top: calc(100% + 5px);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.seat[data-hero] .seat__status {
+  top: auto;
+  bottom: calc(100% + 5px);
+}
+.seat[data-to-act] .seat__status {
+  color: var(--brass-ink);
+}
+
+.seat__plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--seat-bg-live);
+}
+.seat[data-folded] .seat__plate {
+  background: var(--seat-bg);
+}
+.seat[data-hero] .seat__plate {
+  border-color: var(--sync);
+}
+.seat[data-to-act] .seat__plate {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px var(--brass-glow);
+}
+
+.seat__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.seat__name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seat[data-folded] .seat__name {
+  color: var(--text-secondary);
+}
+
+.seat__hero {
+  font-size: 10px;
+  color: var(--sync-ink);
+}
+
+.seat__position {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.seat[data-hero] .seat__position {
+  border-color: var(--sync-soft-border);
+  color: var(--sync-ink);
+}
+.seat[data-to-act] .seat__position {
+  border-color: var(--brass-soft-border);
+  color: var(--brass-ink);
+}
+
+.seat__stack {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.seat[data-folded] .seat__stack {
+  color: var(--text-muted);
+}
+
+.seat__dealer {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 10px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--dealer-button);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--card-ink-black);
+}
+
+/*
+ * The transport bar, without play/pause or speed. It keeps the board's 148 px,
+ * with the controls at the bottom, so it never changes shape.
+ */
+.playback-bar {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-height: 148px;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-divider);
+  background: var(--color-panel);
+}
+
+.playback-bar__where,
+.playback-bar__who {
+  width: 210px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.playback-bar__who {
+  align-items: flex-end;
+}
+
+.playback-bar__counter {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.playback-bar__counter[data-guest] {
+  color: var(--text-secondary);
+}
+
+.playback-bar__action {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.playback-bar__controls {
+  position: relative;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.playback-bar__locked-note {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.playback-bar__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.playback-bar__pill[data-tone='brass'] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+}
+.playback-bar__pill[data-tone='sync'] {
+  border-color: var(--sync-soft-border);
+  background: var(--sync-hover-bg);
+  color: var(--sync-ink);
+}
+.playback-bar__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .room-side__section {

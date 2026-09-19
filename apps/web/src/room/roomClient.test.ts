@@ -30,6 +30,7 @@ const snapshot: RoomEvent = {
     you: 'id-marta',
     participants: [javier, marta],
     queue: [],
+    playback: null,
   },
 }
 
@@ -49,8 +50,37 @@ describe('reduceRoom', () => {
       you: 'id-marta',
       participants: [javier, marta],
       queue: [],
+      playback: null,
       connected: true,
     })
+  })
+
+  it('lands a late Participant on the loaded Hand at its current Action', () => {
+    const view = apply({
+      type: 'snapshot',
+      snapshot: { ...snapshot.snapshot, queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 4 } },
+    })
+    expect(view.phase === 'in-room' && view.playback).toEqual({ handId: 'hand-1', actionIndex: 4 })
+  })
+
+  it('follows the Playback the Master sets', () => {
+    const view = apply(
+      snapshot,
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3 } },
+    )
+    expect(view.phase === 'in-room' && view.playback).toEqual({ handId: 'hand-1', actionIndex: 3 })
+  })
+
+  it('ignores Playback that arrives before the snapshot', () => {
+    expect(apply({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } })).toEqual({
+      phase: 'joining',
+    })
+  })
+
+  it('keeps the Room as it is when a Playback command is refused', () => {
+    const before = apply(snapshot)
+    expect(reduceRoom(before, { type: 'rejected', command: 'playback.goTo', reason: 'not-master' })).toBe(before)
   })
 
   it('lands with the Queue the snapshot carries', () => {
@@ -122,6 +152,9 @@ describe('parseServerMessage', () => {
     expect(
       parseServerMessage(JSON.stringify({ event: 'queue.entriesAdded', data: { entries: [firstHand] } })),
     ).toEqual({ type: 'entriesAdded', entries: [firstHand] })
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'playback.changed', data: { handId: 'hand-1', actionIndex: 2 } })),
+    ).toEqual({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 } })
   })
 
   it('ignores anything that is not a Room event', () => {

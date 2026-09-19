@@ -39,12 +39,21 @@ export interface QueueEntry {
   }
 }
 
+/** The Room's shared replay state. The Hand itself is fetched by id. */
+export interface Playback {
+  handId: string
+  /** 0 is the Initial State; n is the table after Action n. */
+  actionIndex: number
+}
+
 export interface RoomSnapshot {
   room: RoomSummary
   /** The identity id of this browser's Participant. */
   you: string
   participants: Participant[]
   queue: QueueEntry[]
+  /** Null while no Hand is loaded. */
+  playback: Playback | null
 }
 
 export type { RejectionReason }
@@ -54,6 +63,7 @@ export type RoomEvent =
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
   | { type: 'entriesAdded'; entries: QueueEntry[] }
+  | { type: 'playbackChanged'; playback: Playback }
   | { type: 'rejected'; command: string; reason: RejectionReason }
   | { type: 'disconnected' }
 
@@ -67,6 +77,7 @@ export type RoomView =
       you: string
       participants: Participant[]
       queue: QueueEntry[]
+      playback: Playback | null
       /** False once the connection drops: the view is kept but is no longer live. */
       connected: boolean
     }
@@ -76,8 +87,8 @@ export const initialRoomView: RoomView = { phase: 'joining' }
 export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
-      const { room, you, participants, queue } = event.snapshot
-      return { phase: 'in-room', room, you, participants, queue, connected: true }
+      const { room, you, participants, queue, playback } = event.snapshot
+      return { phase: 'in-room', room, you, participants, queue, playback, connected: true }
     }
     case 'participantJoined':
       if (view.phase !== 'in-room') return view
@@ -93,6 +104,9 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'entriesAdded':
       if (view.phase !== 'in-room') return view
       return { ...view, queue: [...view.queue, ...event.entries] }
+    case 'playbackChanged':
+      if (view.phase !== 'in-room') return view
+      return { ...view, playback: event.playback }
     case 'rejected':
       return event.command === 'room.join' ? { phase: 'rejected', reason: event.reason } : view
     case 'disconnected':
@@ -119,6 +133,8 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'participantLeft', identityId: String(data.identityId) }
     case 'queue.entriesAdded':
       return { type: 'entriesAdded', entries: data.entries as QueueEntry[] }
+    case 'playback.changed':
+      return { type: 'playbackChanged', playback: { handId: String(data.handId), actionIndex: Number(data.actionIndex) } }
     case 'rejected':
       return { type: 'rejected', command: String(data.command), reason: data.reason as RejectionReason }
     default:

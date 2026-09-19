@@ -11,8 +11,13 @@ import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { followLink } from '../routing'
 import { playedAtLabel, positionsLabel, potLabel, stakeLabel, streetLabel } from './queueEntryView'
-import type { Participant, QueueEntry, RoomView } from './roomClient'
+import { PlaybackBar } from './PlaybackBar'
+import { PokerTable } from './PokerTable'
+import type { Participant, Playback, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
+import { tableView } from './tableView'
+import { useHand } from './useHand'
+import type { RoomCommands } from './useRoom'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
@@ -20,7 +25,7 @@ type InRoom = Extract<RoomView, { phase: 'in-room' }>
  * The Room, as in the "Sala" boards: header, Queue panel, table and side panel.
  * Hands pasted anywhere in the Room (outside a field) go into the Queue.
  */
-export function RoomScreen({ view }: { view: InRoom }) {
+export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCommands }) {
   const i18n = useI18n()
   const { t } = i18n
   const me = view.participants.find((p) => p.identityId === view.you)
@@ -48,18 +53,28 @@ export function RoomScreen({ view }: { view: InRoom }) {
           ) : (
             <ul className="room-queue__list">
               {view.queue.map((entry) => (
-                <QueueRow key={entry.id} entry={entry} i18n={i18n} />
+                <QueueRow
+                  key={entry.id}
+                  entry={entry}
+                  i18n={i18n}
+                  loaded={entry.handId === view.playback?.handId}
+                  onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
+                />
               ))}
             </ul>
           )}
         </aside>
 
         <main className="room-stage">
-          <div className="room-stage__felt">
-            <div className="room-stage__table">
-              <p>{t(isMaster ? 'room.table.waitingMaster' : 'room.table.waitingGuest')}</p>
+          {view.playback ? (
+            <LoadedHand view={view} playback={view.playback} isMaster={isMaster} onGoTo={commands.goToAction} />
+          ) : (
+            <div className="room-stage__felt">
+              <div className="room-stage__table">
+                <p>{t(isMaster ? 'room.table.waitingMaster' : 'room.table.waitingGuest')}</p>
+              </div>
             </div>
-          </div>
+          )}
         </main>
 
         <aside className="room-side" aria-labelledby="room-side-title">
@@ -155,10 +170,88 @@ function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
   )
 }
 
-function QueueRow({ entry, i18n }: { entry: QueueEntry; i18n: Translator }) {
+/**
+ * The loaded Hand: which one it is, the table at the current Action and the
+ * transport bar. The Hand's content is fetched once by id.
+ */
+function LoadedHand({
+  view,
+  playback,
+  isMaster,
+  onGoTo,
+}: {
+  view: InRoom
+  playback: Playback
+  isMaster: boolean
+  onGoTo: (actionIndex: number) => void
+}) {
+  const i18n = useI18n()
+  const { t } = i18n
+  const { token } = useSession()
+  const load = useHand(playback.handId, token)
+  const index = view.queue.findIndex((entry) => entry.handId === playback.handId)
+  const entry = view.queue[index]
+  const table = load.state === 'loaded' ? tableView(load.hand, playback.actionIndex, i18n) : null
+
   return (
-    <li className="queue-entry">
+    <>
+      <div className="room-stage__header">
+        {entry && (
+          <>
+            <span className="room-stage__count ro-mono">
+              {t('room.stage.hand', { current: index + 1, total: view.queue.length })}
+            </span>
+            <span className="room-stage__divider" />
+            <span className="room-stage__title">{positionsLabel(entry)}</span>
+            <span className="room-stage__by">
+              {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
+            </span>
+          </>
+        )}
+      </div>
+      {table ? (
+        <>
+          <div className="room-stage__play">
+            <PokerTable view={table} />
+          </div>
+          <PlaybackBar view={table} isMaster={isMaster} connected={view.connected} onGoTo={onGoTo} />
+        </>
+      ) : (
+        <div className="room-stage__felt">
+          <div className="room-stage__table" role={load.state === 'failed' ? 'alert' : undefined}>
+            {load.state !== 'failed' ? (
+              <p aria-busy="true">{t('room.table.loading')}</p>
+            ) : (
+              <div className="room-stage__failed">
+                <p>{t(`reason.${load.reason}`)}</p>
+                <Button variant="secondary" size="compact" onClick={load.retry}>
+                  {t('room.table.retry')}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function QueueRow({
+  entry,
+  i18n,
+  loaded,
+  onLoad,
+}: {
+  entry: QueueEntry
+  i18n: Translator
+  loaded: boolean
+  /** Only the Master loads Hands; for Guests a row is information, not a control. */
+  onLoad?: () => void
+}) {
+  const content = (
+    <>
       <div className="queue-entry__line">
+        {loaded && <Icon name="in-progress" size={13} className="queue-entry__loaded-icon" />}
         <Avatar name={entry.author.displayName} seed={entry.author.identityId} size={18} />
         <span className="queue-entry__author">{entry.author.displayName}</span>
         <span className="queue-entry__date ro-mono">{playedAtLabel(entry, i18n)}</span>
@@ -171,6 +264,18 @@ function QueueRow({ entry, i18n }: { entry: QueueEntry; i18n: Translator }) {
         <span className="queue-entry__chip ro-mono">{stakeLabel(entry)}</span>
         <span className="queue-entry__chip ro-mono">{potLabel(entry, i18n)}</span>
       </div>
+      {loaded && <span className="ro-visually-hidden">{i18n.t('room.queue.loaded')}</span>}
+    </>
+  )
+  return (
+    <li className="queue-entry" data-loaded={loaded || undefined} aria-current={loaded || undefined}>
+      {onLoad ? (
+        <button type="button" className="queue-entry__load" onClick={onLoad}>
+          {content}
+        </button>
+      ) : (
+        <div className="queue-entry__body">{content}</div>
+      )}
     </li>
   )
 }

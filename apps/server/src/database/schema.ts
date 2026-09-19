@@ -92,3 +92,19 @@ export const queueEntries = pgTable(
   },
   (table) => [index('queue_entries_room_id_idx').on(table.roomId)],
 );
+
+/**
+ * A Room's Playback: the loaded Hand and the Action it is on. One row per
+ * Room, written the first time its Master loads a Hand.
+ */
+export const playbacks = pgTable('playbacks', {
+  roomId: uuid('room_id')
+    .primaryKey()
+    .references(() => rooms.id),
+  handId: uuid('hand_id')
+    .notNull()
+    .references(() => hands.id),
+  /** 0 is the Initial State; n is the table after the Hand's Action n. */
+  actionIndex: integer('action_index').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
