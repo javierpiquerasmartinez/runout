@@ -231,6 +231,84 @@
   color: var(--text-muted);
 }
 
+.room-queue__status {
+  margin: 0;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.room-queue__status:empty {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.room-queue__list {
+  flex-grow: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A Queue row, from the "Sala" boards: Author and date, Positions and Final Street, Stake and pot. */
+.queue-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queue-entry__line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.queue-entry__author {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.queue-entry__date {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.queue-entry__positions {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.queue-entry__street {
+  padding: 2px 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.queue-entry__chips {
+  display: flex;
+  gap: 5px;
+}
+
+.queue-entry__chip {
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--color-chip-inset);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
 .room-stage {
   flex-grow: 1;
   min-width: 0;

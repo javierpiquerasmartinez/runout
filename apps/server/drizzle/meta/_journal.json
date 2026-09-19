@@ -15,6 +15,13 @@
       "when": 1789805368171,
       "tag": "0001_identities_and_rooms",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789808338792,
+      "tag": "0002_hands_and_queue",
+      "breakpoints": true
     }
   ]
 }

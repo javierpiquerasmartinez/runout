@@ -1,0 +1,22 @@
+PokerStars - €0.10 NL (6 max) - Holdem - 4 players
+Hand converted by PokerTracker 4: http://www.pokertracker.com
+
+Alder239 (SB): 113.6 BB (VPIP: 23.08, PFR: 18.34, 3Bet Preflop: 9.95, Hands: 524)
+BIRCHWOODS (BB): 120.4 BB (VPIP: 33.12, PFR: 18.22, 3Bet Preflop: 6.54, Hands: 1,149)
+Cedar31lse (CO): 111 BB (VPIP: 24.07, PFR: 15.89, 3Bet Preflop: 5.21, Hands: 6,354)
+iMapleAA (BTN): 100 BB
+
+Alder239 posts SB 0.5 BB, BIRCHWOODS posts BB 1 BB
+
+Pre Flop: (pot: 1.5 BB) iMapleAA has Js 8s
+fold, iMapleAA raises to 3 BB, fold, BIRCHWOODS calls 2 BB
+
+Flop : (6.5 BB, 2 players) 2c Th 4c
+BIRCHWOODS checks, iMapleAA checks
+
+Turn : (6.5 BB, 2 players) Qs
+BIRCHWOODS bets 2 BB, iMapleAA calls 2 BB
+
+River : (10.5 BB, 2 players) 8c
+BIRCHWOODS checks, iMapleAA checks
+

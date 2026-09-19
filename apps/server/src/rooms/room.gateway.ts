@@ -15,6 +15,7 @@ import {
   type Identity,
 } from '../identity/identity.service.js';
 import { Rejected, type RejectionReason } from '../rejection/rejection.js';
+import { QueueService, type QueueEntry } from './queue.service.js';
 import { RoomPresence, type Participant } from './room-presence.js';
 import { RoomsService, type RoomSummary } from './rooms.service.js';
 
@@ -28,8 +29,7 @@ export interface RoomSnapshot {
   /** The identity id of the Participant receiving the snapshot. */
   you: string;
   participants: Participant[];
-  /** Queue Entries arrive with Hand import; for now every Queue is empty. */
-  queue: never[];
+  queue: QueueEntry[];
 }
 
 export interface RejectedEvent {
@@ -50,6 +50,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly identities: IdentityService,
     private readonly rooms: RoomsService,
+    private readonly queue: QueueService,
   ) {}
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -78,6 +79,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         String(command?.code ?? ''),
         command?.displayName,
       );
+      const queue = await this.queue.entries(room.id);
       if (socket.readyState !== WebSocket.OPEN) return undefined;
 
       this.leave(socket);
@@ -98,7 +100,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           room: { code: room.code, name: room.name },
           you: identity.id,
           participants: this.presence.participants(room.id),
-          queue: [],
+          queue,
         },
       };
     });
@@ -131,9 +133,14 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return identity;
   }
 
+  /** Sends an event to every connection in the Room. */
+  publish(roomId: string, event: string, data: unknown): void {
+    this.broadcast(roomId, undefined, event, data);
+  }
+
   private broadcast(
     roomId: string,
-    exceptIdentityId: string,
+    exceptIdentityId: string | undefined,
     event: string,
     data: unknown,
   ): void {

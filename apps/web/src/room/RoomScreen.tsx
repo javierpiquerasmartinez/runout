@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
+import type { Translator } from '../i18n/translator'
+import { useSession } from '../identity/context'
 import { Avatar } from '../ui/Avatar'
 import { copyText } from '../ui/clipboard'
 import { BrandMark } from '../ui/BrandMark'
@@ -7,19 +10,22 @@ import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { followLink } from '../routing'
-import type { Participant, RoomView } from './roomClient'
+import { playedAtLabel, positionsLabel, potLabel, stakeLabel, streetLabel } from './queueEntryView'
+import type { Participant, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
 /**
  * The Room, as in the "Sala" boards: header, Queue panel, table and side panel.
- * The Queue and the table stay empty until Hands can be imported.
+ * Hands pasted anywhere in the Room (outside a field) go into the Queue.
  */
 export function RoomScreen({ view }: { view: InRoom }) {
-  const { t } = useI18n()
+  const i18n = useI18n()
+  const { t } = i18n
   const me = view.participants.find((p) => p.identityId === view.you)
   const isMaster = me?.role === 'master'
+  const pasteOutcome = usePasteToImport(view.room.code)
 
   return (
     <div className="room">
@@ -31,9 +37,21 @@ export function RoomScreen({ view }: { view: InRoom }) {
             <h2 id="room-queue-title" className="room-panel__title">
               {t('room.queue.title')}
             </h2>
-            <span className="room-queue__count ro-mono">0</span>
+            <span className="room-queue__count ro-mono">{view.queue.length}</span>
           </div>
-          <p className="room-queue__empty">{t('room.queue.empty')}</p>
+          {/* Always mounted, so screen readers announce the outcome when it appears. */}
+          <p className="room-queue__status" role="status">
+            {pasteOutcome}
+          </p>
+          {view.queue.length === 0 ? (
+            <p className="room-queue__empty">{t('room.queue.empty')}</p>
+          ) : (
+            <ul className="room-queue__list">
+              {view.queue.map((entry) => (
+                <QueueRow key={entry.id} entry={entry} i18n={i18n} />
+              ))}
+            </ul>
+          )}
         </aside>
 
         <main className="room-stage">
@@ -135,6 +153,78 @@ function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
       </span>
     </header>
   )
+}
+
+function QueueRow({ entry, i18n }: { entry: QueueEntry; i18n: Translator }) {
+  return (
+    <li className="queue-entry">
+      <div className="queue-entry__line">
+        <Avatar name={entry.author.displayName} seed={entry.author.identityId} size={18} />
+        <span className="queue-entry__author">{entry.author.displayName}</span>
+        <span className="queue-entry__date ro-mono">{playedAtLabel(entry, i18n)}</span>
+      </div>
+      <div className="queue-entry__line">
+        <span className="queue-entry__positions">{positionsLabel(entry)}</span>
+        <span className="queue-entry__street ro-mono">{streetLabel(entry, i18n)}</span>
+      </div>
+      <div className="queue-entry__chips">
+        <span className="queue-entry__chip ro-mono">{stakeLabel(entry)}</span>
+        <span className="queue-entry__chip ro-mono">{potLabel(entry, i18n)}</span>
+      </div>
+    </li>
+  )
+}
+
+type PasteOutcome =
+  | { state: 'done'; imported: number; discarded: number }
+  | { state: 'failed'; reason: FailureReason }
+
+const OUTCOME_FOR_MS = 6000
+
+/**
+ * Imports whatever Hand History text is pasted while in the Room — no button,
+ * as the issue asks. Pastes into a field (e.g. a Display Name) are left alone.
+ * Returns a short-lived, human-readable outcome for the status line.
+ */
+function usePasteToImport(code: string): string | null {
+  const { t } = useI18n()
+  const { token } = useSession()
+  const [outcome, setOutcome] = useState<PasteOutcome | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]')) return
+      const text = event.clipboardData?.getData('text/plain')
+      if (!text?.trim()) return
+      event.preventDefault()
+      api<{ imported: number; discarded: unknown[] }>(`/rooms/${encodeURIComponent(code)}/hands`, {
+        token,
+        method: 'POST',
+        body: { text },
+      })
+        .then(({ imported, discarded }) => setOutcome({ state: 'done', imported, discarded: discarded.length }))
+        .catch((error: unknown) => setOutcome({ state: 'failed', reason: reasonOf(error) }))
+        .finally(() => {
+          clearTimeout(timer.current)
+          timer.current = setTimeout(() => setOutcome(null), OUTCOME_FOR_MS)
+        })
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [code, token])
+
+  if (!outcome) return null
+  if (outcome.state === 'failed') return t(`reason.${outcome.reason}`)
+  const parts: string[] = []
+  if (outcome.imported > 0) {
+    parts.push(t(outcome.imported === 1 ? 'room.queue.imported.one' : 'room.queue.imported.other', { count: outcome.imported }))
+  }
+  if (outcome.discarded > 0) {
+    parts.push(t(outcome.discarded === 1 ? 'room.queue.discarded.one' : 'room.queue.discarded.other', { count: outcome.discarded }))
+  }
+  return parts.length > 0 ? parts.join(' · ') : t('room.queue.imported.none')
 }
 
 function ParticipantRow({ participant, isYou }: { participant: Participant; isYou: boolean }) {

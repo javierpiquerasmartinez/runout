@@ -70,6 +70,7 @@
   --color-card: #121917;
   --color-chip: #14201e;
   --color-chip-muted: #18211f;
+  --color-chip-inset: #0f1615;
   --color-rule: #1e2725;
   --color-rule-strong: #232e2c;
   --color-preview-border: #202b29;
@@ -186,6 +187,7 @@
   --color-card: #ffffff;
   --color-chip: #eeebe2;
   --color-chip-muted: #eeebe2;
+  --color-chip-inset: #f3f1ea;
   --color-rule: #e8e4d9;
   --color-rule-strong: #d3cec0;
   --color-preview-border: #d3cec0;

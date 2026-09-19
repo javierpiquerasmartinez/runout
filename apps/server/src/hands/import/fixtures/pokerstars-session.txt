@@ -1,0 +1,131 @@
+PokerStars Hand #262120715506:  Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/18 14:29:08 CET [2026/09/18 8:29:08 ET]
+Table 'Yildun II' 6-max Seat #2 is the button
+Seat 4: Dogwood55 (€9.95 in chips) is sitting out
+Seat 1: Alder239 (€11.84 in chips)
+Seat 2: BIRCHWOODS (€11.67 in chips)
+Seat 3: Cedar31lse (€10.31 in chips)
+Seat 5: iMapleAA (€10 in chips)
+Cedar31lse: posts small blind €0.05
+Dogwood55: is sitting out
+iMapleAA: posts big blind €0.10
+*** HOLE CARDS ***
+Dealt to iMapleAA [4c Jc]
+Alder239: folds
+BIRCHWOODS: raises €0.15 to €0.25
+Cedar31lse: folds
+iMapleAA: folds
+Uncalled bet (€0.15) returned to BIRCHWOODS
+BIRCHWOODS collected €0.25 from pot
+BIRCHWOODS: doesn't show hand
+*** SUMMARY ***
+Total pot €0.25 | Rake €0
+Seat 4: Dogwood55
+Seat 1: Alder239 folded before Flop (didn't bet)
+Seat 2: BIRCHWOODS (button) collected (€0.25)
+Seat 3: Cedar31lse (small blind) folded before Flop
+Seat 5: iMapleAA (big blind) folded before Flop
+
+
+PokerStars Hand #262120715010:  Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/18 14:29:04 CET [2026/09/18 8:29:04 ET]
+Table 'Neujmina II' 6-max Seat #4 is the button
+Seat 1: hazel1963 (€17.80 in chips)
+Seat 2: Cedar31lse (€10 in chips)
+Seat 3: iMapleAA (€11.37 in chips)
+Seat 4: juniperpallo (€9.22 in chips)
+Seat 6: Larch_18 (€10.77 in chips)
+Larch_18: posts small blind €0.05
+hazel1963: posts big blind €0.10
+*** HOLE CARDS ***
+Dealt to iMapleAA [4s Tc]
+Cedar31lse: folds
+iMapleAA: folds
+juniperpallo: raises €0.15 to €0.25
+Larch_18: folds
+hazel1963: calls €0.15
+*** FLOP *** [Qs Qd Ts]
+hazel1963: checks
+juniperpallo: bets €0.17
+hazel1963: folds
+Uncalled bet (€0.17) returned to juniperpallo
+juniperpallo collected €0.52 from pot
+juniperpallo: doesn't show hand
+*** SUMMARY ***
+Total pot €0.55 | Rake €0.03
+Board [Qs Qd Ts]
+Seat 1: hazel1963 (big blind) folded on the Flop
+Seat 2: Cedar31lse folded before Flop (didn't bet)
+Seat 3: iMapleAA folded before Flop (didn't bet)
+Seat 4: juniperpallo (button) collected (€0.52)
+Seat 6: Larch_18 (small blind) folded before Flop
+
+
+PokerStars Hand #262120711267:  Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/18 14:28:29 CET [2026/09/18 8:28:29 ET]
+Table 'Yildun II' 6-max Seat #1 is the button
+Seat 1: Alder239 (€11.84 in chips)
+Seat 2: BIRCHWOODS (€11.72 in chips)
+Seat 3: Cedar31lse (€10 in chips)
+Seat 4: Dogwood55 (€9.95 in chips)
+Seat 5: iMapleAA (€10 in chips)
+BIRCHWOODS: posts small blind €0.05
+Cedar31lse: posts big blind €0.10
+*** HOLE CARDS ***
+Dealt to iMapleAA [Qc Tc]
+Dogwood55: folds
+iMapleAA: raises €0.20 to €0.30
+Alder239: folds
+BIRCHWOODS: folds
+Cedar31lse: calls €0.20
+*** FLOP *** [3d 6h 9s]
+Cedar31lse: checks
+iMapleAA: checks
+*** TURN *** [3d 6h 9s] [8c]
+Cedar31lse: bets €0.46
+iMapleAA: folds
+Uncalled bet (€0.46) returned to Cedar31lse
+Cedar31lse collected €0.61 from pot
+*** SUMMARY ***
+Total pot €0.65 | Rake €0.04
+Board [3d 6h 9s 8c]
+Seat 1: Alder239 (button) folded before Flop (didn't bet)
+Seat 2: BIRCHWOODS (small blind) folded before Flop
+Seat 3: Cedar31lse (big blind) collected (€0.61)
+Seat 4: Dogwood55 folded before Flop (didn't bet)
+Seat 5: iMapleAA folded on the Turn
+
+
+PokerStars Hand #262120710959:  Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/18 14:28:26 CET [2026/09/18 8:28:26 ET]
+Table 'Neujmina II' 6-max Seat #3 is the button
+Seat 5: kapok280 (€10.38 in chips) is sitting out
+Seat 1: hazel1963 (€17.80 in chips)
+Seat 2: Cedar31lse (€10 in chips)
+Seat 3: iMapleAA (€11.06 in chips)
+Seat 4: juniperpallo (€9.27 in chips)
+Seat 6: Larch_18 (€11.07 in chips)
+juniperpallo: posts small blind €0.05
+kapok280: is sitting out
+Larch_18: posts big blind €0.10
+*** HOLE CARDS ***
+Dealt to iMapleAA [Ac Kh]
+hazel1963: folds
+Cedar31lse: folds
+iMapleAA: raises €0.20 to €0.30
+juniperpallo: folds
+kapok280 leaves the table
+Larch_18: calls €0.20
+*** FLOP *** [Ts 4s Tc]
+Larch_18: checks
+iMapleAA: bets €0.20
+Larch_18: folds
+Uncalled bet (€0.20) returned to iMapleAA
+iMapleAA collected €0.61 from pot
+*** SUMMARY ***
+Total pot €0.65 | Rake €0.04
+Board [Ts 4s Tc]
+Seat 5: kapok280
+Seat 1: hazel1963 folded before Flop (didn't bet)
+Seat 2: Cedar31lse folded before Flop (didn't bet)
+Seat 3: iMapleAA (button) collected (€0.61)
+Seat 4: juniperpallo (small blind) folded before Flop
+Seat 6: Larch_18 (big blind) folded on the Flop
+
+

@@ -1,0 +1,34 @@
+PokerStars Hand #262120750636:  Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/18 14:34:30 CET [2026/09/18 8:34:30 ET]
+Table 'Yildun II' 6-max Seat #5 is the button
+Seat 1: Alder239 (€11.36 in chips)
+Seat 2: BIRCHWOODS (€12.04 in chips)
+Seat 3: Cedar31lse (€11.10 in chips)
+Seat 5: iMapleAA (€10 in chips)
+Alder239: posts small blind €0.05
+BIRCHWOODS: posts big blind €0.10
+*** HOLE CARDS ***
+Dealt to iMapleAA [Js 8s]
+Cedar31lse: folds
+iMapleAA: raises €0.20 to €0.30
+Alder239: folds
+BIRCHWOODS: calls €0.20
+*** FLOP *** [2c Th 4c]
+BIRCHWOODS: checks
+iMapleAA: checks
+*** TURN *** [2c Th 4c] [Qs]
+BIRCHWOODS: bets €0.20
+iMapleAA: calls €0.20
+*** RIVER *** [2c Th 4c Qs] [8c]
+BIRCHWOODS: checks
+iMapleAA: checks
+*** SHOW DOWN ***
+BIRCHWOODS: shows [As 7d] (high card Ace)
+iMapleAA: shows [Js 8s] (a pair of Eights)
+iMapleAA collected €0.99 from pot
+*** SUMMARY ***
+Total pot €1.05 | Rake €0.06
+Board [2c Th 4c Qs 8c]
+Seat 1: Alder239 (small blind) folded before Flop
+Seat 2: BIRCHWOODS (big blind) showed [As 7d] and lost with high card Ace
+Seat 3: Cedar31lse folded before Flop (didn't bet)
+Seat 5: iMapleAA (button) showed [Js 8s] and won (€0.99) with a pair of Eights

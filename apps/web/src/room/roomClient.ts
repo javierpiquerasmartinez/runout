@@ -18,12 +18,33 @@ export interface RoomSummary {
   name: string
 }
 
+/** A Queue row as every Participant sees it. Mirrors the server's shape. */
+export interface QueueEntry {
+  id: string
+  handId: string
+  position: number
+  author: { identityId: string; displayName: string }
+  playedAt: string
+  stake: {
+    limit: 'no-limit' | 'pot-limit' | 'fixed-limit'
+    smallBlind: number
+    bigBlind: number
+    currency: string
+  }
+  summary: {
+    positions: string[]
+    finalPot: number
+    finalStreet: 'preflop' | 'flop' | 'turn' | 'river'
+    showdown: boolean
+  }
+}
+
 export interface RoomSnapshot {
   room: RoomSummary
   /** The identity id of this browser's Participant. */
   you: string
   participants: Participant[]
-  queue: unknown[]
+  queue: QueueEntry[]
 }
 
 export type { RejectionReason }
@@ -32,6 +53,7 @@ export type RoomEvent =
   | { type: 'snapshot'; snapshot: RoomSnapshot }
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
+  | { type: 'entriesAdded'; entries: QueueEntry[] }
   | { type: 'rejected'; command: string; reason: RejectionReason }
   | { type: 'disconnected' }
 
@@ -44,6 +66,7 @@ export type RoomView =
       room: RoomSummary
       you: string
       participants: Participant[]
+      queue: QueueEntry[]
       /** False once the connection drops: the view is kept but is no longer live. */
       connected: boolean
     }
@@ -53,8 +76,8 @@ export const initialRoomView: RoomView = { phase: 'joining' }
 export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
-      const { room, you, participants } = event.snapshot
-      return { phase: 'in-room', room, you, participants, connected: true }
+      const { room, you, participants, queue } = event.snapshot
+      return { phase: 'in-room', room, you, participants, queue, connected: true }
     }
     case 'participantJoined':
       if (view.phase !== 'in-room') return view
@@ -67,6 +90,9 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'participantLeft':
       if (view.phase !== 'in-room') return view
       return { ...view, participants: view.participants.filter((p) => p.identityId !== event.identityId) }
+    case 'entriesAdded':
+      if (view.phase !== 'in-room') return view
+      return { ...view, queue: [...view.queue, ...event.entries] }
     case 'rejected':
       return event.command === 'room.join' ? { phase: 'rejected', reason: event.reason } : view
     case 'disconnected':
@@ -91,6 +117,8 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'participantJoined', participant: data.participant as Participant }
     case 'room.participantLeft':
       return { type: 'participantLeft', identityId: String(data.identityId) }
+    case 'queue.entriesAdded':
+      return { type: 'entriesAdded', entries: data.entries as QueueEntry[] }
     case 'rejected':
       return { type: 'rejected', command: String(data.command), reason: data.reason as RejectionReason }
     default:
