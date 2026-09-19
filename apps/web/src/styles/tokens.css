@@ -1,0 +1,162 @@
+/*
+ * Design tokens from Design.html, board "Color, tipografía y ritmo".
+ *
+ * Accent roles are strict:
+ *   brass  — the one primary action on screen, and who controls the Room
+ *   sync   — Room liveness / being in sync, and the keyboard focus ring. Never a button fill.
+ *   alert  — all-in, error and delete only. Never "losing".
+ *
+ * Dark is the default theme; [data-theme='light'] on <html> switches to the light counterpart.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds and surfaces */
+  --color-canvas: #0b0f0e;
+  --color-panel: #0e1413;
+  --color-panel-border: #1a2321;
+  --color-control: #131a19;
+  --color-selected: #1a2320;
+  --color-hover: #161e1c;
+  --color-pressed: #0c1110;
+  --color-elevated: #101615;
+  --color-divider: #161e1c;
+  --color-border: #253230;
+  --color-border-strong: #2c3937;
+  --color-border-hover: #3a4a47;
+  --color-felt: #12241f;
+  --color-felt-border: #23423a;
+
+  /* Text */
+  --text-primary: #ecf1ef;
+  --text-secondary: #a7b4b0;
+  --text-muted: #75837f;
+  --text-disabled: #3a4a47;
+  --text-disabled-label: #4e5a57;
+
+  /* Brass: primary action */
+  --brass: #e0a050;
+  --brass-hover: #edb369;
+  --brass-pressed: #c98c3e;
+  --brass-deep: #8a5f26;
+  --brass-ink: #e0a050;
+  --on-brass: #0b0f0e;
+  --brass-soft-bg: #1c1409;
+  --brass-soft-border: #6b4a1e;
+
+  /* Sync: liveness and focus */
+  --sync: #3fc0a0;
+  --sync-ink: #3fc0a0;
+  --sync-hover-ink: #6bd9bc;
+  --sync-hover-bg: #0f1f1b;
+  --sync-pressed-bg: #0a1513;
+  --sync-soft-border: #1f6b58;
+  --sync-glow: rgb(63 192 160 / 16%);
+
+  /* Alert: all-in, error, delete */
+  --alert: #e0645c;
+  --alert-ink: #e0645c;
+  --alert-hover-ink: #ee8781;
+  --alert-border: #7a2f2b;
+  --alert-hover-bg: #1e0f0e;
+  --alert-pressed-bg: #140a09;
+
+  /* Disabled (locked) */
+  --disabled-bg: #0f1413;
+  --disabled-field-bg: #0c1110;
+  --disabled-border: #253230;
+
+  /* Elevation */
+  --shadow-raised: 0 8px 22px rgb(0 0 0 / 50%);
+  --shadow-modal: 0 32px 80px rgb(0 0 0 / 60%);
+  --shadow-pressed: inset 0 2px 5px rgb(0 0 0 / 50%);
+  --shadow-pressed-brass: inset 0 2px 5px rgb(0 0 0 / 35%);
+
+  /* Typography */
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  --control-compact: 32px;
+  --control-standard: 40px;
+  --control-touch: 44px;
+  --control-prominent: 48px;
+
+  --focus-ring: 2px solid var(--sync);
+  --focus-offset: 2px;
+  --transition: 120ms ease-out;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-canvas: #f3f1ea;
+  --color-panel: #faf9f5;
+  --color-panel-border: #e3dfd4;
+  --color-control: #eeebe2;
+  --color-selected: #e5e1d5;
+  --color-hover: #ece8de;
+  --color-pressed: #e2ddd0;
+  --color-elevated: #ffffff;
+  --color-divider: #e8e4d9;
+  --color-border: #d3cec0;
+  --color-border-strong: #c4beae;
+  --color-border-hover: #a9a292;
+  --color-felt: #dce8e2;
+  --color-felt-border: #b4ccc1;
+
+  --text-primary: #151b19;
+  --text-secondary: #46524e;
+  --text-muted: #5e6a66;
+  --text-disabled: #a39d8e;
+  --text-disabled-label: #8f897b;
+
+  --brass: #e0a050;
+  --brass-hover: #d4913f;
+  --brass-pressed: #c07f2f;
+  --brass-ink: #8c5a16;
+  --on-brass: #0b0f0e;
+  --brass-soft-bg: #f7e9d3;
+  --brass-soft-border: #d9b27a;
+
+  --sync: #1b8468;
+  --sync-ink: #1b8468;
+  --sync-hover-ink: #146b54;
+  --sync-hover-bg: #e1f1eb;
+  --sync-pressed-bg: #d3eae2;
+  --sync-soft-border: #8cc9b6;
+  --sync-glow: rgb(27 132 104 / 18%);
+
+  --alert: #c0392f;
+  --alert-ink: #c0392f;
+  --alert-hover-ink: #9e2a21;
+  --alert-border: #e3a29c;
+  --alert-hover-bg: #fbe9e7;
+  --alert-pressed-bg: #f5d9d6;
+
+  --disabled-bg: #efece4;
+  --disabled-field-bg: #efece4;
+  --disabled-border: #c9c3b4;
+
+  --shadow-raised: 0 8px 22px rgb(40 34 20 / 12%);
+  --shadow-modal: 0 32px 80px rgb(40 34 20 / 22%);
+  --shadow-pressed: inset 0 2px 5px rgb(40 34 20 / 14%);
+  --shadow-pressed-brass: inset 0 2px 5px rgb(0 0 0 / 22%);
+}
