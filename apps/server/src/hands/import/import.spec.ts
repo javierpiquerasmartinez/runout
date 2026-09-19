@@ -173,6 +173,16 @@ describe('Hand History import: several Hands at once', () => {
 
     expect(importHandHistory(text).hands).toHaveLength(5);
   });
+
+  it('keeps the text each Hand was read from, so it can still be shown if the Hand is left out later', () => {
+    const [first, second] = fixture('pokerstars-session.txt').split(/\n\n\n/);
+    const text = [first, 'not a hand history', second].join('\n\n');
+
+    const { hands, texts } = importHandHistory(text);
+
+    expect(texts).toHaveLength(hands.length);
+    expect(texts).toEqual([first.trim(), second.trim()]);
+  });
 });
 
 describe('Hand History import: what is discarded', () => {

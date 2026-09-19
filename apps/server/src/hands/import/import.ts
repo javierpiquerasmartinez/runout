@@ -37,6 +37,8 @@ export interface ImportResult {
   /** The formats the text was tried against, in order. */
   tried: SourceFormat[];
   hands: Hand[];
+  /** The text each Hand was read from, in the order of `hands`. */
+  texts: string[];
   discarded: Discarded[];
 }
 
@@ -54,6 +56,7 @@ export function importHandHistory(
     format: null,
     tried,
     hands: [],
+    texts: [],
     discarded: [],
   };
   const detected = new Map<SourceFormat, number>();
@@ -84,6 +87,7 @@ export function importHandHistory(
     detected.set(format, (detected.get(format) ?? 0) + 1);
     try {
       result.hands.push(FORMATS[format].parse(block));
+      result.texts.push(block);
     } catch (error) {
       if (!(error instanceof Discard)) throw error;
       result.discarded.push({ text: block, reason: error.reason });

@@ -10,6 +10,7 @@ import { Rejected, type RejectionReason } from './rejection.js';
 const statusFor: Record<RejectionReason, HttpStatus> = {
   unauthenticated: HttpStatus.UNAUTHORIZED,
   'invalid-display-name': HttpStatus.BAD_REQUEST,
+  'invalid-screen-names': HttpStatus.BAD_REQUEST,
   'invalid-room-name': HttpStatus.BAD_REQUEST,
   'room-not-found': HttpStatus.NOT_FOUND,
   'not-in-room': HttpStatus.FORBIDDEN,
@@ -22,6 +23,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'unreadable-file': HttpStatus.BAD_REQUEST,
   'invalid-format': HttpStatus.BAD_REQUEST,
   'preview-not-found': HttpStatus.NOT_FOUND,
+  'author-not-in-room': HttpStatus.BAD_REQUEST,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }`. */

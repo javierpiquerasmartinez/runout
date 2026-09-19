@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { strToU8, zipSync } from 'fflate';
 import request from 'supertest';
+import { fixture, freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
 
@@ -9,6 +9,9 @@ interface Preview {
   format: string | null;
   tried: string[];
   hands: {
+    hero: string;
+    author: { identityId: string; displayName: string };
+    heroMatched: boolean;
     playedAt: string;
     stake: { bigBlind: number; currency: string };
     board: string[];
@@ -26,13 +29,6 @@ interface QueueEntry {
   position: number;
   author: { identityId: string };
   playedAt: string;
-}
-
-function fixture(name: string): string {
-  return readFileSync(
-    new URL(`../src/hands/import/fixtures/${name}`, import.meta.url),
-    'utf8',
-  );
 }
 
 const MB = 1024 * 1024;
@@ -108,7 +104,9 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     const code = await createRoom(master.token);
     const masterSocket = await join(master.token, code, 'Javier');
     const guestSocket = await join(guest.token, code, 'Marta');
-    const [first, second] = fixture('pokerstars-session.txt').split(/\n\n\n/);
+    const [first, second] = freshHandHistory('pokerstars-session.txt').split(
+      /\n\n\n/,
+    );
     const withBadHand = [first, 'not a hand history', second].join('\n\n');
 
     const sessionPreview = await upload(
@@ -121,7 +119,9 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       guest.token,
       code,
       'showdown.zip',
-      zipSync({ 'hh.txt': strToU8(fixture('pokerstars-showdown.txt')) }),
+      zipSync({
+        'hh.txt': strToU8(freshHandHistory('pokerstars-showdown.txt')),
+      }),
     ).expect(201);
 
     expect(sessionPreview.body).toEqual({
@@ -138,6 +138,9 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     });
     expect((zipped.body as Preview).hands).toEqual([
       {
+        hero: 'iMapleAA',
+        author: { identityId: guest.id, displayName: 'Marta' },
+        heroMatched: false,
         playedAt: '2026-09-18T12:34:30.000Z',
         stake: {
           limit: 'no-limit',
@@ -185,13 +188,13 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       master.token,
       code,
       'kept.txt',
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     );
     await upload(
       master.token,
       code,
       'removed.txt',
-      fixture('pokerstars-session.txt'),
+      freshHandHistory('pokerstars-session.txt'),
     );
 
     await confirm(master.token, code, [kept.body.id]).expect(201);
@@ -210,7 +213,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       master.token,
       code,
       'hh.txt',
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     );
     await confirm(master.token, code, [preview.body.id]).expect(201);
 
@@ -231,7 +234,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       guest.token,
       code,
       'hh.txt',
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     );
 
     const res = await confirm(master.token, code, [preview.body.id]).expect(
@@ -249,7 +252,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       master.token,
       code,
       'hh.txt',
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     );
 
     await running.clock.advance(60 * 60 * 1000 + 1);
@@ -292,7 +295,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     const res = await request(running.httpServer)
       .post(`/api/rooms/${code}/imports/previews`)
       .set('Authorization', `Bearer ${master.token}`)
-      .send({ text: fixture('pokerstars-session.txt') })
+      .send({ text: freshHandHistory('pokerstars-session.txt') })
       .expect(201);
 
     expect((res.body as Preview).hands).toHaveLength(4);
@@ -337,7 +340,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       master.token,
       code,
       'hh.txt',
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
       'ipoker',
     ).expect(400);
 
@@ -353,7 +356,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       stranger.token,
       code,
       'hh.txt',
-      fixture('pokerstars-showdown.txt'),
+      freshHandHistory('pokerstars-showdown.txt'),
     ).expect(403);
 
     expect(res.body).toEqual({ reason: 'not-in-room' });

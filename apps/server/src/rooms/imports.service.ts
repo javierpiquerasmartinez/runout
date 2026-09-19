@@ -14,11 +14,17 @@ import { readUpload, UnreadableUpload } from '../hands/import/upload.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
-import { QueueService, type QueueEntry } from './queue.service.js';
+import {
+  QueueService,
+  type Attribution,
+  type QueueEntry,
+} from './queue.service.js';
 import { RoomsService, type Room } from './rooms.service.js';
 
 /** What the import dialog shows of each Hand it read. */
-export interface HandPreview {
+export interface HandPreview extends Attribution {
+  /** The Hero's Screen Name, as the Hand History states it. */
+  hero: string;
   playedAt: string;
   stake: Stake;
   board: string[];
@@ -34,6 +40,7 @@ export interface ImportPreview {
   /** The formats the text was tried against, to pick one by hand from. */
   tried: SourceFormat[];
   hands: HandPreview[];
+  /** What was left out, duplicates of Hands already imported included. */
   discarded: Discarded[];
 }
 
@@ -61,6 +68,8 @@ export class ImportsService {
   /**
    * Reads one file or paste, in the format picked by hand if there is one,
    * and keeps the Hands until they are confirmed. Nothing reaches the Queue.
+   * Hands already imported are left out as duplicates; each Hand kept says
+   * who its Author would be.
    */
   async preview(
     importer: Identity,
@@ -72,6 +81,11 @@ export class ImportsService {
     await this.rooms.requireParticipant(room.id, importer.id);
     const picked = pickedFormat(format);
     const result = importHandHistory(textOf(source), { format: picked });
+    const { fresh, duplicates } = await this.queue.firstImports(
+      result.hands,
+      result.texts,
+    );
+    const attributions = await this.queue.attribute(room.id, importer, fresh);
 
     const now = this.clock.now();
     await this.db
@@ -82,7 +96,7 @@ export class ImportsService {
       .values({
         roomId: room.id,
         importerId: importer.id,
-        hands: result.hands,
+        hands: fresh,
         createdAt: now,
       })
       .returning({ id: importPreviews.id });
@@ -90,14 +104,16 @@ export class ImportsService {
       id: stored.id,
       format: result.format,
       tried: result.tried,
-      hands: result.hands.map(handPreview),
-      discarded: result.discarded,
+      hands: fresh.map((hand, index) => handPreview(hand, attributions[index])),
+      discarded: [...result.discarded, ...duplicates],
     };
   }
 
   /**
    * Appends the Hands of the Importer's previews to the end of the Queue, in
-   * the order given, and forgets the previews. Refuses with
+   * the order given, and forgets the previews. Authors are matched again,
+   * against the Screen Names as they are now, and a Hand imported since it
+   * was previewed is skipped. Refuses with
    * `preview-not-found` if any of them is not theirs, not for this Room,
    * already confirmed or forgotten.
    */
@@ -171,8 +187,10 @@ function validIds(previewIds: unknown): string[] {
   return [...new Set(previewIds as string[])];
 }
 
-function handPreview(hand: Hand): HandPreview {
+function handPreview(hand: Hand, attribution: Attribution): HandPreview {
   return {
+    ...attribution,
+    hero: hand.hero.screenName,
     playedAt: hand.playedAt,
     stake: hand.stake,
     board: hand.board,

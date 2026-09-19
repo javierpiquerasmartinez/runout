@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import { identities } from '../database/schema.js';
+import { identities, screenNames } from '../database/schema.js';
 import { Rejected } from '../rejection/rejection.js';
 
 export interface Identity {
@@ -11,7 +11,14 @@ export interface Identity {
   displayName: string | null;
 }
 
+/** An identity as its owner sees it: with the Screen Names they declared. */
+export interface Profile extends Identity {
+  screenNames: string[];
+}
+
 export const DISPLAY_NAME_MAX_LENGTH = 40;
+export const SCREEN_NAME_MAX_LENGTH = 50;
+export const SCREEN_NAMES_MAX_COUNT = 20;
 
 /** Issues anonymous identities and recognises them by their bearer token (ADR 0003). */
 @Injectable()
@@ -21,13 +28,13 @@ export class IdentityService {
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
-  async issue(): Promise<{ token: string; identity: Identity }> {
+  async issue(): Promise<{ token: string; identity: Profile }> {
     const token = randomBytes(32).toString('base64url');
     const [row] = await this.db
       .insert(identities)
       .values({ tokenHash: hashToken(token), createdAt: this.clock.now() })
       .returning();
-    return { token, identity: toIdentity(row) };
+    return { token, identity: { ...toIdentity(row), screenNames: [] } };
   }
 
   /** The identity holding `token`, or `unauthenticated`. */
@@ -39,6 +46,37 @@ export class IdentityService {
       .where(eq(identities.tokenHash, hashToken(token)));
     if (!row) throw new Rejected('unauthenticated');
     return toIdentity(row);
+  }
+
+  async profile(identity: Identity): Promise<Profile> {
+    const rows = await this.db
+      .select({ screenName: screenNames.screenName })
+      .from(screenNames)
+      .where(eq(screenNames.identityId, identity.id))
+      .orderBy(asc(screenNames.position));
+    return { ...identity, screenNames: rows.map((row) => row.screenName) };
+  }
+
+  /**
+   * Replaces the identity's Screen Names. Hands already imported keep the
+   * Author they were given.
+   */
+  async setScreenNames(identity: Identity, raw: unknown): Promise<Profile> {
+    const names = validScreenNames(raw);
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(screenNames)
+        .where(eq(screenNames.identityId, identity.id));
+      if (names.length === 0) return;
+      await tx.insert(screenNames).values(
+        names.map((screenName, position) => ({
+          identityId: identity.id,
+          screenName,
+          position,
+        })),
+      );
+    });
+    return { ...identity, screenNames: names };
   }
 
   /** Stores the Display Name last used, so it is prefilled next time. */
@@ -58,6 +96,29 @@ export function validDisplayName(raw: unknown): string {
     throw new Rejected('invalid-display-name');
   }
   return name;
+}
+
+/**
+ * A list of names, each trimmed, with blanks and repeats (ignoring case)
+ * dropped, or `invalid-screen-names`.
+ */
+function validScreenNames(raw: unknown): string[] {
+  if (!Array.isArray(raw) || !raw.every((name) => typeof name === 'string')) {
+    throw new Rejected('invalid-screen-names');
+  }
+  const names = new Map<string, string>();
+  for (const name of (raw as string[]).map((each) => each.trim())) {
+    if (name.length > SCREEN_NAME_MAX_LENGTH) {
+      throw new Rejected('invalid-screen-names');
+    }
+    if (name.length > 0 && !names.has(name.toLowerCase())) {
+      names.set(name.toLowerCase(), name);
+    }
+  }
+  if (names.size > SCREEN_NAMES_MAX_COUNT) {
+    throw new Rejected('invalid-screen-names');
+  }
+  return [...names.values()];
 }
 
 function hashToken(token: string): string {

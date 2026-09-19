@@ -1,18 +1,11 @@
-import { readFileSync } from 'node:fs';
 import request from 'supertest';
+import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
 
 interface Playback {
   handId: string;
   actionIndex: number;
-}
-
-function fixture(name: string): string {
-  return readFileSync(
-    new URL(`../src/hands/import/fixtures/${name}`, import.meta.url),
-    'utf8',
-  );
 }
 
 describe('Playback (e2e)', () => {
@@ -64,7 +57,7 @@ describe('Playback (e2e)', () => {
     await request(running.httpServer)
       .post(`/api/rooms/${code}/hands`)
       .set('Authorization', `Bearer ${master.token}`)
-      .send({ text: fixture('pokerstars-showdown.txt') })
+      .send({ text: freshHandHistory('pokerstars-showdown.txt') })
       .expect(201);
     const { entries } = await masterSocket.next<{
       entries: { handId: string }[];

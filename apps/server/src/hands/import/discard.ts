@@ -4,7 +4,9 @@ export type DiscardReason =
   | 'not-cash-holdem'
   | 'too-many-seats'
   | 'no-hero'
-  | 'malformed';
+  | 'malformed'
+  /** Already imported: same Poker Site, hand ID and Hero (ADR 0002). */
+  | 'duplicate';
 
 /** Thrown by a format parser when a Hand can't be read. */
 export class Discard extends Error {
