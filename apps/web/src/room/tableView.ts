@@ -15,8 +15,10 @@ export interface SeatView {
   slot: number
   /** The Stack in big blinds: "113,1 BB". */
   stack: string
-  /** What sits in front of the player on this Street: a bet, an all-in or a check. */
+  /** The chips in front of the player on this Street: a bet or an all-in. A check puts none. */
   chip: ChipView | null
+  /** What they last did on this Street, next to them: "APUESTA", "PASA"… */
+  move: string | null
   /** "all-in 62 BB", everything they put in, while they have nothing left behind. */
   allInLabel: string | null
   folded: boolean
@@ -36,7 +38,7 @@ export interface SeatView {
 }
 
 export interface ChipView {
-  kind: 'bet' | 'all-in' | 'check'
+  kind: 'bet' | 'all-in'
   label: string
   /** A bet or raise as a share of the pot it went into: "33% bote". Not for calls, blinds or all-ins. */
   potShare: string | null
@@ -82,15 +84,17 @@ export interface TableView {
   /** The main pot and each side pot, once there are side pots. */
   sidePots: PotView[] | null
   street: Street
-  /** 0 at the Initial State. */
+  /** The step of the Timeline Playback is on, 0 at the Initial State: what to step from. */
   actionIndex: number
+  /** How many of the Hand's Actions have been played; Streets dealt and the end don't count. */
+  actionNumber: number
   /** The Hand's Actions; blinds and antes don't count. */
   actionCount: number
   canGoBack: boolean
   canGoForward: boolean
   /** Where Playback is, Street by Street, and where the Street jumps go. */
   streets: StreetProgress
-  /** What led here: "Flop · Marta apuesta 6,5 BB", or that the blinds are posted. */
+  /** What led here: "Flop · Marta apuesta 6,5 BB", a Street dealt, the end of the Hand, or that the blinds are posted. */
   lastAction: string
   /** The latest Actions on this Street, or how the Hand ended. */
   log: LogView
@@ -105,8 +109,8 @@ const LOG_LENGTH = 6
 export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Translator): TableView {
   const { t } = i18n
   const { seats, states, hero, buttonSeat } = hand.timeline
-  const actionCount = states.length - 1
-  const index = Math.min(Math.max(actionIndex, 0), actionCount)
+  const last = states.length - 1
+  const index = Math.min(Math.max(actionIndex, 0), last)
   const state = states[index]
   const bigBlinds = (amount: number, options?: Intl.NumberFormatOptions) =>
     bigBlindsLabel(amount, hand.stake.bigBlind, i18n, options)
@@ -142,6 +146,7 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
           slot: (seat.seat - heroSeat + slots) % slots,
           stack: bigBlinds(player?.stack ?? seat.startingStack),
           chip: player && !result ? chipOf(player, states, index, bigBlinds, i18n) : null,
+          move: result ? null : moveOf(seat.screenName, states, index, i18n),
           allInLabel:
             player?.allIn && won === undefined ? t('room.table.allIn', { amount: bigBlinds(player.committed) }) : null,
           folded: player?.folded ?? false,
@@ -178,13 +183,12 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
         : null,
     street: state.street,
     actionIndex: index,
-    actionCount,
+    actionNumber: states.slice(1, index + 1).filter((s) => s.action).length,
+    actionCount: states.filter((s) => s.action).length,
     canGoBack: index > 0,
-    canGoForward: index < actionCount,
+    canGoForward: index < last,
     streets: streetProgress(hand.timeline, index),
-    lastAction: state.action
-      ? `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, bigBlinds, i18n)}`
-      : t('room.playback.blindsPosted'),
+    lastAction: lastActionOf(hand, index, bigBlinds, i18n),
     log: logOf(hand, index, winnings, bigBlinds, i18n),
     winningCards: [
       ...new Set(
@@ -258,10 +262,27 @@ function bigBlindsLabel(
   })
 }
 
-/**
- * What sits in front of a player: their bet on this Street, sized against the
- * pot it went into, or a check if that was their last move on it.
- */
+/** What led to this step, for the line under the Action counter. */
+function lastActionOf(hand: HandWithTimeline, index: number, bigBlinds: BigBlinds, i18n: Translator): string {
+  const { t } = i18n
+  const state = hand.timeline.states[index]
+  const street = t(`room.playback.street.${state.street}`)
+  if (state.action) return `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, bigBlinds, i18n)}`
+  if (state.result) {
+    return `${hand.timeline.showdown ? t('room.playback.showdown') : street} · ${t('room.playback.handOver')}`
+  }
+  return index === 0 ? t('room.playback.blindsPosted') : `${street} · ${t('room.playback.dealt')}`
+}
+
+/** A player's latest move on this Street, as a word next to them; folds say so already. */
+function moveOf(screenName: string, states: TableState[], index: number, { t }: Translator): string | null {
+  const latest = streetActions(states, index).findLast((i) => states[i].action?.screenName === screenName)
+  const move = latest === undefined ? null : states[latest].action
+  if (!move || move.type === 'fold') return null
+  return move.allIn ? t('room.table.move.all-in') : t(`room.table.move.${move.type}`)
+}
+
+/** The chips in front of a player: their bet on this Street, sized against the pot it went into. */
 function chipOf(
   player: PlayerState,
   states: TableState[],
@@ -272,9 +293,7 @@ function chipOf(
   const latest = streetActions(states, index).findLast((i) => states[i].action?.screenName === player.screenName)
   const move = latest === undefined ? null : states[latest].action
 
-  if (player.bet === 0) {
-    return move?.type === 'check' ? { kind: 'check', label: t('room.table.check'), potShare: null } : null
-  }
+  if (player.bet === 0) return null
   const amount = bigBlinds(player.bet)
   if (player.allIn) return { kind: 'all-in', label: t('room.table.allIn', { amount }), potShare: null }
   if (latest === undefined || (move?.type !== 'bet' && move?.type !== 'raise')) {

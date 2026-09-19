@@ -74,7 +74,8 @@ export function PokerTable({ view }: { view: TableView }) {
 
 function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; style: CSSProperties }) {
   const { t } = useI18n()
-  const status = seat.toAct ? t('room.table.toAct') : seat.folded ? t('room.table.folded') : null
+  // Whose turn it is, or that they folded, before what they last did.
+  const status = seat.toAct ? t('room.table.toAct') : seat.folded ? t('room.table.folded') : seat.move
   const cards = seat.cards ? (
     <span className="seat__cards">
       {seat.cards.map((card) => (

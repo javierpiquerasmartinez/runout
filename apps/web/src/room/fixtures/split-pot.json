@@ -45,10 +45,12 @@
     "states": [
       {
         "street": "preflop",
+        "toAct": "Aspen1",
+        "action": null,
+        "result": null,
         "board": [],
         "pot": 15,
         "pots": [],
-        "toAct": "Aspen1",
         "players": [
           {
             "screenName": "Aspen1",
@@ -83,51 +85,12 @@
             "committed": 10
           }
         ],
-        "action": null,
         "effectiveStack": 1000,
-        "spr": null,
-        "result": null
+        "spr": null
       },
       {
         "street": "preflop",
-        "board": [],
-        "pot": 25,
-        "pots": [],
         "toAct": "Hero4",
-        "players": [
-          {
-            "screenName": "Aspen1",
-            "stack": 990,
-            "bet": 10,
-            "folded": false,
-            "allIn": false,
-            "committed": 10
-          },
-          {
-            "screenName": "Hero4",
-            "stack": 1000,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 0
-          },
-          {
-            "screenName": "Poplar3",
-            "stack": 995,
-            "bet": 5,
-            "folded": false,
-            "allIn": false,
-            "committed": 5
-          },
-          {
-            "screenName": "Willow4",
-            "stack": 990,
-            "bet": 10,
-            "folded": false,
-            "allIn": false,
-            "committed": 10
-          }
-        ],
         "action": {
           "street": "preflop",
           "screenName": "Aspen1",
@@ -135,16 +98,10 @@
           "amount": 10,
           "allIn": false
         },
-        "effectiveStack": 1000,
-        "spr": null,
-        "result": null
-      },
-      {
-        "street": "preflop",
+        "result": null,
         "board": [],
-        "pot": 65,
+        "pot": 25,
         "pots": [],
-        "toAct": "Poplar3",
         "players": [
           {
             "screenName": "Aspen1",
@@ -156,11 +113,11 @@
           },
           {
             "screenName": "Hero4",
-            "stack": 960,
-            "bet": 40,
+            "stack": 1000,
+            "bet": 0,
             "folded": false,
             "allIn": false,
-            "committed": 40
+            "committed": 0
           },
           {
             "screenName": "Poplar3",
@@ -179,6 +136,12 @@
             "committed": 10
           }
         ],
+        "effectiveStack": 1000,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Poplar3",
         "action": {
           "street": "preflop",
           "screenName": "Hero4",
@@ -187,16 +150,10 @@
           "to": 40,
           "allIn": false
         },
-        "effectiveStack": 1000,
-        "spr": null,
-        "result": null
-      },
-      {
-        "street": "preflop",
+        "result": null,
         "board": [],
         "pot": 65,
         "pots": [],
-        "toAct": "Willow4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -218,7 +175,7 @@
             "screenName": "Poplar3",
             "stack": 995,
             "bet": 5,
-            "folded": true,
+            "folded": false,
             "allIn": false,
             "committed": 5
           },
@@ -231,22 +188,73 @@
             "committed": 10
           }
         ],
+        "effectiveStack": 1000,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Willow4",
         "action": {
           "street": "preflop",
           "screenName": "Poplar3",
           "type": "fold",
           "allIn": false
         },
+        "result": null,
+        "board": [],
+        "pot": 65,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 990,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 960,
+            "bet": 40,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 5,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 990,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
         "effectiveStack": 1000,
-        "spr": null,
-        "result": null
+        "spr": null
       },
       {
         "street": "preflop",
+        "toAct": "Aspen1",
+        "action": {
+          "street": "preflop",
+          "screenName": "Willow4",
+          "type": "call",
+          "amount": 30,
+          "allIn": false
+        },
+        "result": null,
         "board": [],
         "pot": 95,
         "pots": [],
-        "toAct": "Aspen1",
         "players": [
           {
             "screenName": "Aspen1",
@@ -281,70 +289,12 @@
             "committed": 40
           }
         ],
-        "action": {
-          "street": "preflop",
-          "screenName": "Willow4",
-          "type": "call",
-          "amount": 30,
-          "allIn": false
-        },
         "effectiveStack": 1000,
-        "spr": null,
-        "result": null
+        "spr": null
       },
       {
-        "street": "flop",
-        "board": [
-          "As",
-          "8h",
-          "3c"
-        ],
-        "pot": 125,
-        "pots": [
-          {
-            "amount": 125,
-            "contestants": [
-              "Aspen1",
-              "Hero4",
-              "Willow4"
-            ]
-          }
-        ],
-        "toAct": "Willow4",
-        "players": [
-          {
-            "screenName": "Aspen1",
-            "stack": 960,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 40
-          },
-          {
-            "screenName": "Hero4",
-            "stack": 960,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 40
-          },
-          {
-            "screenName": "Poplar3",
-            "stack": 995,
-            "bet": 0,
-            "folded": true,
-            "allIn": false,
-            "committed": 5
-          },
-          {
-            "screenName": "Willow4",
-            "stack": 960,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 40
-          }
-        ],
+        "street": "preflop",
+        "toAct": null,
         "action": {
           "street": "preflop",
           "screenName": "Aspen1",
@@ -352,12 +302,52 @@
           "amount": 30,
           "allIn": false
         },
-        "effectiveStack": 960,
-        "spr": 7.68,
-        "result": null
+        "result": null,
+        "board": [],
+        "pot": 125,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 960,
+            "bet": 40,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 960,
+            "bet": 40,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 5,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 960,
+            "bet": 40,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          }
+        ],
+        "effectiveStack": 1000,
+        "spr": null
       },
       {
         "street": "flop",
+        "toAct": "Willow4",
+        "action": null,
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -374,7 +364,6 @@
             ]
           }
         ],
-        "toAct": "Aspen1",
         "players": [
           {
             "screenName": "Aspen1",
@@ -409,18 +398,19 @@
             "committed": 40
           }
         ],
+        "effectiveStack": 960,
+        "spr": 7.68
+      },
+      {
+        "street": "flop",
+        "toAct": "Aspen1",
         "action": {
           "street": "flop",
           "screenName": "Willow4",
           "type": "check",
           "allIn": false
         },
-        "effectiveStack": 960,
-        "spr": 7.68,
-        "result": null
-      },
-      {
-        "street": "flop",
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -437,7 +427,6 @@
             ]
           }
         ],
-        "toAct": "Hero4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -472,18 +461,83 @@
             "committed": 40
           }
         ],
+        "effectiveStack": 960,
+        "spr": 7.68
+      },
+      {
+        "street": "flop",
+        "toAct": "Hero4",
         "action": {
           "street": "flop",
           "screenName": "Aspen1",
           "type": "check",
           "allIn": false
         },
+        "result": null,
+        "board": [
+          "As",
+          "8h",
+          "3c"
+        ],
+        "pot": 125,
+        "pots": [
+          {
+            "amount": 125,
+            "contestants": [
+              "Aspen1",
+              "Hero4",
+              "Willow4"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 960,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 960,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 960,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 40
+          }
+        ],
         "effectiveStack": 960,
-        "spr": 7.68,
-        "result": null
+        "spr": 7.68
       },
       {
         "street": "flop",
+        "toAct": "Willow4",
+        "action": {
+          "street": "flop",
+          "screenName": "Hero4",
+          "type": "bet",
+          "amount": 60,
+          "allIn": false
+        },
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -500,7 +554,6 @@
             ]
           }
         ],
-        "toAct": "Willow4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -535,19 +588,20 @@
             "committed": 40
           }
         ],
-        "action": {
-          "street": "flop",
-          "screenName": "Hero4",
-          "type": "bet",
-          "amount": 60,
-          "allIn": false
-        },
         "effectiveStack": 960,
-        "spr": 7.68,
-        "result": null
+        "spr": 7.68
       },
       {
         "street": "flop",
+        "toAct": "Aspen1",
+        "action": {
+          "street": "flop",
+          "screenName": "Willow4",
+          "type": "call",
+          "amount": 60,
+          "allIn": false
+        },
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -564,7 +618,6 @@
             ]
           }
         ],
-        "toAct": "Aspen1",
         "players": [
           {
             "screenName": "Aspen1",
@@ -599,71 +652,12 @@
             "committed": 100
           }
         ],
-        "action": {
-          "street": "flop",
-          "screenName": "Willow4",
-          "type": "call",
-          "amount": 60,
-          "allIn": false
-        },
         "effectiveStack": 960,
-        "spr": 7.68,
-        "result": null
+        "spr": 7.68
       },
       {
-        "street": "turn",
-        "board": [
-          "As",
-          "8h",
-          "3c",
-          "Kd"
-        ],
-        "pot": 305,
-        "pots": [
-          {
-            "amount": 305,
-            "contestants": [
-              "Aspen1",
-              "Hero4",
-              "Willow4"
-            ]
-          }
-        ],
-        "toAct": "Willow4",
-        "players": [
-          {
-            "screenName": "Aspen1",
-            "stack": 900,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 100
-          },
-          {
-            "screenName": "Hero4",
-            "stack": 900,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 100
-          },
-          {
-            "screenName": "Poplar3",
-            "stack": 995,
-            "bet": 0,
-            "folded": true,
-            "allIn": false,
-            "committed": 5
-          },
-          {
-            "screenName": "Willow4",
-            "stack": 900,
-            "bet": 0,
-            "folded": false,
-            "allIn": false,
-            "committed": 100
-          }
-        ],
+        "street": "flop",
+        "toAct": null,
         "action": {
           "street": "flop",
           "screenName": "Aspen1",
@@ -671,12 +665,65 @@
           "amount": 60,
           "allIn": false
         },
-        "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
+        "result": null,
+        "board": [
+          "As",
+          "8h",
+          "3c"
+        ],
+        "pot": 305,
+        "pots": [
+          {
+            "amount": 125,
+            "contestants": [
+              "Aspen1",
+              "Hero4",
+              "Willow4"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 900,
+            "bet": 60,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 900,
+            "bet": 60,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 900,
+            "bet": 60,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "effectiveStack": 960,
+        "spr": 7.68
       },
       {
         "street": "turn",
+        "toAct": "Willow4",
+        "action": null,
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -694,7 +741,6 @@
             ]
           }
         ],
-        "toAct": "Aspen1",
         "players": [
           {
             "screenName": "Aspen1",
@@ -729,18 +775,19 @@
             "committed": 100
           }
         ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "turn",
+        "toAct": "Aspen1",
         "action": {
           "street": "turn",
           "screenName": "Willow4",
           "type": "check",
           "allIn": false
         },
-        "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
-      },
-      {
-        "street": "turn",
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -758,7 +805,6 @@
             ]
           }
         ],
-        "toAct": "Hero4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -793,24 +839,24 @@
             "committed": 100
           }
         ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "turn",
+        "toAct": "Hero4",
         "action": {
           "street": "turn",
           "screenName": "Aspen1",
           "type": "check",
           "allIn": false
         },
-        "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
-      },
-      {
-        "street": "river",
+        "result": null,
         "board": [
           "As",
           "8h",
           "3c",
-          "Kd",
-          "Qs"
+          "Kd"
         ],
         "pot": 305,
         "pots": [
@@ -823,7 +869,6 @@
             ]
           }
         ],
-        "toAct": "Willow4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -858,24 +903,24 @@
             "committed": 100
           }
         ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "turn",
+        "toAct": null,
         "action": {
           "street": "turn",
           "screenName": "Hero4",
           "type": "check",
           "allIn": false
         },
-        "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
-      },
-      {
-        "street": "river",
+        "result": null,
         "board": [
           "As",
           "8h",
           "3c",
-          "Kd",
-          "Qs"
+          "Kd"
         ],
         "pot": 305,
         "pots": [
@@ -888,7 +933,6 @@
             ]
           }
         ],
-        "toAct": "Aspen1",
         "players": [
           {
             "screenName": "Aspen1",
@@ -923,18 +967,145 @@
             "committed": 100
           }
         ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "river",
+        "toAct": "Willow4",
+        "action": null,
+        "result": null,
+        "board": [
+          "As",
+          "8h",
+          "3c",
+          "Kd",
+          "Qs"
+        ],
+        "pot": 305,
+        "pots": [
+          {
+            "amount": 305,
+            "contestants": [
+              "Aspen1",
+              "Hero4",
+              "Willow4"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 900,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 900,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 900,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "river",
+        "toAct": "Aspen1",
         "action": {
           "street": "river",
           "screenName": "Willow4",
           "type": "check",
           "allIn": false
         },
+        "result": null,
+        "board": [
+          "As",
+          "8h",
+          "3c",
+          "Kd",
+          "Qs"
+        ],
+        "pot": 305,
+        "pots": [
+          {
+            "amount": 305,
+            "contestants": [
+              "Aspen1",
+              "Hero4",
+              "Willow4"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 900,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 900,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 900,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 100
+          }
+        ],
         "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
+        "spr": 2.9508196721311477
       },
       {
         "street": "river",
+        "toAct": "Hero4",
+        "action": {
+          "street": "river",
+          "screenName": "Aspen1",
+          "type": "bet",
+          "amount": 100,
+          "allIn": false
+        },
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -953,7 +1124,6 @@
             ]
           }
         ],
-        "toAct": "Hero4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -988,19 +1158,20 @@
             "committed": 100
           }
         ],
-        "action": {
-          "street": "river",
-          "screenName": "Aspen1",
-          "type": "bet",
-          "amount": 100,
-          "allIn": false
-        },
         "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
+        "spr": 2.9508196721311477
       },
       {
         "street": "river",
+        "toAct": "Willow4",
+        "action": {
+          "street": "river",
+          "screenName": "Hero4",
+          "type": "call",
+          "amount": 100,
+          "allIn": false
+        },
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -1019,7 +1190,6 @@
             ]
           }
         ],
-        "toAct": "Willow4",
         "players": [
           {
             "screenName": "Aspen1",
@@ -1054,19 +1224,20 @@
             "committed": 100
           }
         ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "river",
+        "toAct": null,
         "action": {
           "street": "river",
-          "screenName": "Hero4",
+          "screenName": "Willow4",
           "type": "call",
           "amount": 100,
           "allIn": false
         },
-        "effectiveStack": 900,
-        "spr": 2.9508196721311477,
-        "result": null
-      },
-      {
-        "street": "river",
+        "result": null,
         "board": [
           "As",
           "8h",
@@ -1077,7 +1248,7 @@
         "pot": 605,
         "pots": [
           {
-            "amount": 605,
+            "amount": 305,
             "contestants": [
               "Aspen1",
               "Hero4",
@@ -1085,20 +1256,19 @@
             ]
           }
         ],
-        "toAct": null,
         "players": [
           {
             "screenName": "Aspen1",
-            "stack": 1097,
-            "bet": 0,
+            "stack": 800,
+            "bet": 100,
             "folded": false,
             "allIn": false,
             "committed": 200
           },
           {
             "screenName": "Hero4",
-            "stack": 1098,
-            "bet": 0,
+            "stack": 800,
+            "bet": 100,
             "folded": false,
             "allIn": false,
             "committed": 200
@@ -1114,21 +1284,19 @@
           {
             "screenName": "Willow4",
             "stack": 800,
-            "bet": 0,
+            "bet": 100,
             "folded": false,
             "allIn": false,
             "committed": 200
           }
         ],
-        "action": {
-          "street": "river",
-          "screenName": "Willow4",
-          "type": "call",
-          "amount": 100,
-          "allIn": false
-        },
         "effectiveStack": 900,
-        "spr": 2.9508196721311477,
+        "spr": 2.9508196721311477
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
         "result": {
           "revealed": [
             {
@@ -1187,7 +1355,61 @@
             }
           ],
           "rake": 10
-        }
+        },
+        "board": [
+          "As",
+          "8h",
+          "3c",
+          "Kd",
+          "Qs"
+        ],
+        "pot": 605,
+        "pots": [
+          {
+            "amount": 605,
+            "contestants": [
+              "Aspen1",
+              "Hero4",
+              "Willow4"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "Aspen1",
+            "stack": 1097,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 200
+          },
+          {
+            "screenName": "Hero4",
+            "stack": 1098,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 200
+          },
+          {
+            "screenName": "Poplar3",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "Willow4",
+            "stack": 800,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 200
+          }
+        ],
+        "effectiveStack": 900,
+        "spr": 2.9508196721311477
       }
     ],
     "showdown": true

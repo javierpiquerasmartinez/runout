@@ -3,15 +3,21 @@ import { bestHand, type MadeHand } from './evaluator.js';
 import { positions, type Position } from './positions.js';
 
 /**
- * A Hand as Playback steps through it: the Initial State, then one table
- * state per Action. The web only indexes into it by Action.
+ * A Hand as Playback steps through it, one table state per step: the Initial
+ * State, then each Action, each Street as it is dealt, and the end of the
+ * Hand. The web only indexes into it.
  */
 export interface Timeline {
   /** The players dealt in, in seat order. */
   seats: TimelineSeat[];
   buttonSeat: number;
   hero: { screenName: string; cards: string[] };
-  /** `states[0]` is the Initial State; `states[n]` is the table after Action n. */
+  /**
+   * `states[0]` is the Initial State. An Action that closes a Street is shown
+   * with the bets still in front of the players; the next state deals the
+   * next Street, bets gathered into the pot. The last state is the end of
+   * the Hand: its result, and Showdown if there was one.
+   */
   states: TableState[];
   /** Whether the Hand reached Showdown after its last Action. */
   showdown: boolean;
@@ -35,11 +41,11 @@ export interface TableState {
    * Street left out: the main pot first, then each side pot.
    */
   pots: Pot[];
-  /** Who acts next, or null once the Hand is over. */
+  /** Who acts next on this Street, or null when nobody does. */
   toAct: string | null;
   /** In seat order, like `seats`. */
   players: PlayerState[];
-  /** The Action that led here; null at the Initial State. */
+  /** The Action that led here; null at the Initial State, a deal and the end. */
   action: Action | null;
   /**
    * The smaller Stack of the two deepest players still in the Hand as this
@@ -89,6 +95,8 @@ export interface HandResult {
 export interface PaidPot extends Pot {
   winners: { screenName: string; amount: number }[];
 }
+
+const STREETS: Street[] = ['preflop', 'flop', 'turn', 'river'];
 
 const BOARD_SIZE: Record<Street, number> = {
   preflop: 0,
@@ -146,21 +154,48 @@ export function timeline(hand: Hand): Timeline {
     secondDeepest(players.filter((p) => !p.folded).map((p) => p.stack + p.bet));
   let effectiveStack = preflopEffectiveStack();
   let spr: number | null = null;
+  let board: string[] = [];
+  // Uncalled bets, handed back once nobody acts again.
+  let unreturned: Hand['returned'] = [];
 
-  const states: TableState[] = [
-    {
-      street: 'preflop',
-      board: [],
+  const states: TableState[] = [];
+  const push = (
+    state: Pick<TableState, 'street' | 'toAct' | 'action' | 'result'>,
+  ) =>
+    states.push({
+      ...state,
+      board,
       pot: potOf(players),
       pots: potsOf(players),
-      toAct: hand.actions[0]?.screenName ?? null,
       players,
-      action: null,
       effectiveStack,
       spr,
-      result: null,
-    },
-  ];
+    });
+  // Bets go into the middle, uncalled ones back to their owners first.
+  // Paying back is paying in reverse, and leaves the player with chips.
+  const gather = () => {
+    for (const { screenName, amount } of unreturned) {
+      pay(screenName, -amount, -amount);
+    }
+    unreturned = [];
+    players = players.map((p) => ({ ...p, bet: 0 }));
+  };
+  const deal = (street: Street, toAct: string | null) => {
+    gather();
+    board = hand.board.slice(0, BOARD_SIZE[street]);
+    effectiveStack = secondDeepest(
+      players.filter((p) => !p.folded).map((p) => p.stack),
+    );
+    spr = effectiveStack === null ? null : effectiveStack / potOf(players);
+    push({ street, toAct, action: null, result: null });
+  };
+
+  push({
+    street: 'preflop',
+    toAct: hand.actions[0]?.screenName ?? null,
+    action: null,
+    result: null,
+  });
   hand.actions.forEach((action, index) => {
     const paid =
       action.type === 'call' || action.type === 'bet'
@@ -173,54 +208,36 @@ export function timeline(hand: Hand): Timeline {
     if (action.type === 'fold') {
       update(action.screenName, (p) => ({ ...p, folded: true }));
     }
+    if (action.street === 'preflop') effectiveStack = preflopEffectiveStack();
 
     const next = hand.actions[index + 1];
-    // Once a Street closes, the next one is dealt; after the last Action,
-    // whatever the board still holds (an all-in runout) is dealt at once.
-    const board = next
-      ? hand.board.slice(0, BOARD_SIZE[next.street])
-      : hand.board;
-    const street = next ? next.street : streetOf(board.length);
-    let result: HandResult | null = null;
-    if (!next) {
-      // The Hand is over: uncalled bets go back, every bet is gathered in
-      // and the pots are paid out.
-      for (const returned of hand.returned) {
-        // Paying back is paying in reverse; it leaves the player with chips.
-        pay(returned.screenName, -returned.amount, -returned.amount);
-      }
-      players = players.map((p) => ({ ...p, bet: 0 }));
-      result = resultOf(hand, players, board);
-    } else if (street !== action.street) {
-      players = players.map((p) => ({ ...p, bet: 0 }));
-    }
-    if (street === 'preflop') {
-      effectiveStack = preflopEffectiveStack();
-    } else if (street !== action.street) {
-      const live = players.filter((p) => !p.folded);
-      effectiveStack = secondDeepest(live.map((p) => p.stack));
-      const pot = potOf(players);
-      spr = effectiveStack === null ? null : effectiveStack / pot;
-    }
-    if (result) {
-      // Winnings come in last, so they don't count as a Stack to play with.
-      for (const { screenName, amount } of hand.collected) {
-        update(screenName, (p) => ({ ...p, stack: p.stack + amount }));
-      }
-    }
-    states.push({
-      street,
-      board,
-      pot: potOf(players),
-      pots: potsOf(players),
-      toAct: next?.screenName ?? null,
-      players,
+    const closesStreet = next?.street !== action.street;
+    push({
+      street: action.street,
+      toAct: closesStreet ? null : next.screenName,
       action,
-      effectiveStack,
-      spr,
-      result,
+      result: null,
     });
+    if (next && closesStreet) deal(next.street, next.screenName);
   });
+
+  // Whatever the board still holds (an all-in runout) is dealt Street by
+  // Street, then the Hand ends: the pots are paid out.
+  unreturned = hand.returned;
+  const finalStreet = streetOf(hand.board.length);
+  const reached = STREETS.indexOf(hand.actions.at(-1)?.street ?? 'preflop');
+  for (const street of STREETS.slice(reached + 1)) {
+    if (STREETS.indexOf(street) > STREETS.indexOf(finalStreet)) break;
+    deal(street, null);
+  }
+  gather();
+  board = hand.board;
+  const result = resultOf(hand, players, board);
+  // Winnings come in last, so they don't count as a Stack to play with.
+  for (const { screenName, amount } of hand.collected) {
+    update(screenName, (p) => ({ ...p, stack: p.stack + amount }));
+  }
+  push({ street: finalStreet, toAct: null, action: null, result });
 
   return {
     seats,

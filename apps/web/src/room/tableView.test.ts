@@ -182,27 +182,65 @@ const split = splitPot as HandWithTimeline
 describe('tableView: pots and bets', () => {
   it('separates the pot gathered from earlier Streets from what is in play on this one', () => {
     // Flop: Olive6 checks, Hero6 bets $4.50 into $9.75.
-    const view = tableView(straddled, 9, es)
+    const view = tableView(straddled, 10, es)
 
     expect(view.pot).toBe('28,5 BB')
     expect(view.potDetail).toBe('19,5 BB + 9 BB en juego')
     expect(view.sidePots).toBeNull()
-    expect(tableView(straddled, 9, en).potDetail).toBe('19.5 BB + 9 BB in play')
+    expect(tableView(straddled, 10, en).potDetail).toBe('19.5 BB + 9 BB in play')
   })
 
-  it('shows each bet with its share of the pot it went into, and a check as a check', () => {
-    const chips = (index: number) =>
-      Object.fromEntries(tableView(straddled, index, es).seats.map((seat) => [seat.screenName, seat.chip]))
+  const chips = (index: number) =>
+    Object.fromEntries(tableView(straddled, index, es).seats.map((seat) => [seat.screenName, seat.chip]))
+  const moves = (index: number, i18n = es) =>
+    Object.fromEntries(tableView(straddled, index, i18n).seats.map((seat) => [seat.screenName, seat.move]))
 
-    expect(chips(9)).toMatchObject({
+  it('puts chips in front of a bet, with its share of the pot it went into, and none for a check', () => {
+    expect(chips(10)).toMatchObject({
       Hero6: { kind: 'bet', label: '9 BB', potShare: '46% bote' },
-      Olive6: { kind: 'check', label: 'check', potShare: null },
+      Olive6: null,
     })
     // Olive6 raises to $15 into $14.25; Hero6's bet keeps the share it was made with.
-    expect(chips(10)).toMatchObject({
+    expect(chips(11)).toMatchObject({
       Hero6: { kind: 'bet', label: '9 BB', potShare: '46% bote' },
       Olive6: { kind: 'bet', label: '30 BB', potShare: '105% bote' },
     })
+  })
+
+  it('names what each player did on this Street next to them, a check included', () => {
+    expect(moves(10)).toMatchObject({ Olive6: 'PASA', Hero6: 'APUESTA' })
+    expect(moves(11, en)).toMatchObject({ Olive6: 'RAISE', Hero6: 'BET' })
+    // Blinds are posted, not played; the straddle hasn't acted yet.
+    expect(moves(0)).toEqual({ Birch1: null, Cedar2: null, Hero6: null, Larch4: null, Maple5: null, Olive6: null })
+  })
+
+  it('shows the call that closes a Street with both bets still in front, then deals the next Street with the bets in the pot', () => {
+    // Hero6 calls the flop raise.
+    expect(chips(12)).toMatchObject({
+      Hero6: { kind: 'bet', label: '30 BB', potShare: null },
+      Olive6: { kind: 'bet', label: '30 BB', potShare: '105% bote' },
+    })
+    expect(moves(12)).toMatchObject({ Hero6: 'IGUALA', Olive6: 'SUBE' })
+    expect(tableView(straddled, 12, es).board).toEqual(['9d', '5c', '2h', null, null])
+
+    // The turn is dealt: nothing in front of anyone, nobody has moved yet.
+    const turn = tableView(straddled, 13, es)
+    expect(turn.board).toEqual(['9d', '5c', '2h', 'Jc', null])
+    expect(turn.seats.map((seat) => [seat.chip, seat.move])).toEqual(turn.seats.map(() => [null, null]))
+    expect(turn.pot).toBe('79,5 BB')
+    expect(turn.potDetail).toBeNull()
+  })
+
+  it('counts only Actions, not the Streets dealt or the end of the Hand', () => {
+    const count = (index: number) => {
+      const view = tableView(straddled, index, es)
+      return [view.actionNumber, view.actionCount, view.lastAction]
+    }
+
+    expect(count(7)).toEqual([7, 13, 'Preflop · Cedar2 se retira'])
+    expect(count(8)).toEqual([7, 13, 'Flop · se reparte'])
+    expect(count(17)).toEqual([13, 13, 'Showdown · fin de la mano'])
+    expect(tableView(straddled, 8, en).lastAction).toBe('Flop · dealt')
   })
 
   it('sizes bets and raises against the pot, not calls', () => {
@@ -224,7 +262,7 @@ describe('tableView: pots and bets', () => {
 
   it('draws an all-in bet in red, always with its amount, and says the player is all in', () => {
     // Turn: Olive6 bets her last $31.
-    const olive = tableView(straddled, 12, es).seats.find((seat) => seat.screenName === 'Olive6')!
+    const olive = tableView(straddled, 14, es).seats.find((seat) => seat.screenName === 'Olive6')!
 
     expect(olive.chip).toEqual({ kind: 'all-in', label: 'all-in 62 BB', potShare: null })
     expect(olive.stack).toBe('0 BB')
@@ -251,7 +289,7 @@ describe('tableView: pots and bets', () => {
 
 describe('tableView: the log of the current Street', () => {
   it('lists this Street’s Actions, highlighting the latest, then who is to act, with SPR and the effective stack', () => {
-    expect(tableView(straddled, 9, es).log).toEqual({
+    expect(tableView(straddled, 10, es).log).toEqual({
       label: 'Flop',
       entries: [
         { text: 'Olive6 pasa', tone: 'past' },
@@ -263,8 +301,8 @@ describe('tableView: the log of the current Street', () => {
   })
 
   it('starts a new Street with nobody having acted yet', () => {
-    // Cedar2 folds, closing preflop.
-    expect(tableView(straddled, 7, en).log).toEqual({
+    // The flop is dealt.
+    expect(tableView(straddled, 8, en).log).toEqual({
       label: 'Flop',
       entries: [{ text: 'Olive6 · to act', tone: 'pending' }],
       aside: 'SPR 4.7 · effective 92 BB',
@@ -294,7 +332,7 @@ describe('tableView: the log of the current Street', () => {
       ],
       aside: 'Bote 81 BB + 90 BB + 140 BB laterales',
     })
-    expect(tableView(straddled, 13, en).log.aside).toBe('Pot 203.5 BB')
+    expect(tableView(straddled, 17, en).log.aside).toBe('Pot 203.5 BB')
   })
 })
 
@@ -304,7 +342,7 @@ describe('tableView: Showdown', () => {
     tableView(hand, last(hand), i18n).seats.find((s) => s.screenName === name)!
 
   it('keeps opponents’ cards face down until Showdown', () => {
-    expect(tableView(straddled, 12, es).seats.map((s) => [s.screenName, s.cards])).toContainEqual(['Olive6', null])
+    expect(tableView(straddled, 16, es).seats.map((s) => [s.screenName, s.cards])).toContainEqual(['Olive6', null])
   })
 
   it('turns the shown cards face up, labelled with each made hand in the UI language', () => {

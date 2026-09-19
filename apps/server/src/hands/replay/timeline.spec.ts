@@ -41,10 +41,10 @@ describe('Replay: a Hand’s Timeline', () => {
     expect(hero).toEqual({ screenName: 'iMapleAA', cards: ['Js', '8s'] });
   });
 
-  it('starts at the Initial State, blinds posted, then has one state per Action', () => {
+  it('starts at the Initial State, blinds posted, then has a state per Action, per Street dealt and for the end', () => {
     const { states } = timeline(showdown);
 
-    expect(states).toHaveLength(1 + 10);
+    expect(states).toHaveLength(1 + 10 + 3 + 1);
     expect(states[0]).toEqual({
       street: 'preflop',
       board: [],
@@ -110,36 +110,80 @@ describe('Replay: a Hand’s Timeline', () => {
     expect(states[2].toAct).toBe('Alder239');
   });
 
-  it('deals the next Street once the last one closes, sweeping the bets into the pot', () => {
+  it('shows the Action that closes a Street with the bets still in front, then deals the next Street as a step of its own', () => {
     const { states } = timeline(showdown);
 
-    // BIRCHWOODS calls, closing preflop: the flop is out and BIRCHWOODS acts first.
+    // BIRCHWOODS calls, closing preflop: both bets of €0.30 are still in
+    // front of the players, and nobody else acts on this Street.
     expect(states[4]).toMatchObject({
+      street: 'preflop',
+      board: [],
+      pot: 65,
+      toAct: null,
+      action: { screenName: 'BIRCHWOODS', type: 'call' },
+    });
+    expect(players(states[4])[1]).toEqual(['BIRCHWOODS', 1174, 30, false]);
+    expect(players(states[4])[3]).toEqual(['iMapleAA', 970, 30, false]);
+
+    // Then the flop is dealt, the bets gathered, and BIRCHWOODS acts first.
+    expect(states[5]).toMatchObject({
       street: 'flop',
       board: ['2c', '10h', '4c'],
       pot: 65,
+      pots: [{ amount: 65, contestants: ['BIRCHWOODS', 'iMapleAA'] }],
       toAct: 'BIRCHWOODS',
+      action: null,
     });
-    expect(players(states[4])).toEqual([
+    expect(players(states[5])).toEqual([
       ['Alder239', 1131, 0, true],
       ['BIRCHWOODS', 1174, 0, false],
       ['Cedar31lse', 1110, 0, true],
       ['iMapleAA', 970, 0, false],
     ]);
+  });
 
-    // A turn bet is in play until it is called.
-    expect(states[7]).toMatchObject({ street: 'turn', pot: 85 });
-    expect(players(states[7])[1]).toEqual(['BIRCHWOODS', 1154, 20, false]);
+  it('shows a check behind, and each Street dealt, before the next Action', () => {
+    const { states } = timeline(showdown);
+
+    expect(
+      states.map((s) =>
+        s.action
+          ? `${s.action.screenName} ${s.action.type}`
+          : s.result
+            ? 'end'
+            : `deal ${s.street}`,
+      ),
+    ).toEqual([
+      'deal preflop',
+      'Cedar31lse fold',
+      'iMapleAA raise',
+      'Alder239 fold',
+      'BIRCHWOODS call',
+      'deal flop',
+      'BIRCHWOODS check',
+      'iMapleAA check',
+      'deal turn',
+      'BIRCHWOODS bet',
+      'iMapleAA call',
+      'deal river',
+      'BIRCHWOODS check',
+      'iMapleAA check',
+      'end',
+    ]);
+    // The turn call is shown with both bets in front, before the river.
+    expect(players(states[10])[1]).toEqual(['BIRCHWOODS', 1154, 20, false]);
+    expect(players(states[10])[3]).toEqual(['iMapleAA', 950, 20, false]);
   });
 
   it('ends with the whole board and nobody to act', () => {
     const { states } = timeline(showdown);
 
-    expect(states[10]).toMatchObject({
+    expect(states.at(-1)).toMatchObject({
       street: 'river',
       board: ['2c', '10h', '4c', 'Qs', '8c'],
       pot: 105,
       toAct: null,
+      action: null,
     });
   });
 
@@ -174,7 +218,7 @@ describe('Replay: a Hand’s Timeline', () => {
       timeline(showdown)
         .states.slice(0, -1)
         .map((s) => s.result),
-    ).toEqual(Array(10).fill(null));
+    ).toEqual(Array(14).fill(null));
   });
 
   it('reads the effective stack preflop among the players still in the Hand', () => {
@@ -372,6 +416,37 @@ describe('Replay: pots, side pots and results across edge cases', () => {
     ]);
   });
 
+  it('runs an all-in board out a Street at a time, handing back the uncalled bet first', () => {
+    const { states } = timeline(nineMax);
+    const lastCall = states.findIndex(
+      (s) => s.action?.screenName === 'Spruce9' && s.action.allIn,
+    );
+    const hero = (state: (typeof states)[number]) =>
+      state.players.find((p) => p.screenName === 'Hero9max')!;
+
+    // Spruce9's call is shown with Hero9max's whole all-in still in front.
+    expect(states[lastCall]).toMatchObject({ street: 'preflop', toAct: null });
+    expect(hero(states[lastCall])).toMatchObject({ bet: 7995, stack: 0 });
+
+    expect(
+      states
+        .slice(lastCall + 1)
+        .map((s) => [s.street, s.board.length, s.toAct]),
+    ).toEqual([
+      ['flop', 3, null],
+      ['turn', 4, null],
+      ['river', 5, null],
+      ['river', 5, null],
+    ]);
+    // $20 went back as the flop was dealt.
+    expect(hero(states[lastCall + 1])).toMatchObject({
+      bet: 0,
+      stack: 2000,
+      allIn: false,
+    });
+    expect(states[lastCall + 1].pots).toHaveLength(3);
+  });
+
   it('splits a multi-way all-in into a main pot and two side pots, each with who contests it and who won it', () => {
     const last = timeline(nineMax).states.at(-1)!;
 
@@ -459,7 +534,9 @@ describe('Replay: pots, side pots and results across edge cases', () => {
     const { states } = timeline(straddled);
 
     // The flop: Olive6 checks, Hero6 bets $4.50.
-    const heroBets = states[9];
+    const heroBets = states.find(
+      (s) => s.action?.screenName === 'Hero6' && s.action.type === 'bet',
+    )!;
     expect(heroBets.action).toMatchObject({ screenName: 'Hero6', type: 'bet' });
     expect(heroBets.pots).toEqual([
       { amount: 975, contestants: ['Hero6', 'Olive6'] },
