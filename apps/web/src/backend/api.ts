@@ -1,3 +1,5 @@
+import { backendUrl } from './backendUrl'
+
 /** Why the server refused a command. Mirrors the server's reasons (ADR 0001: no shared code). */
 export type RejectionReason =
   | 'unauthenticated'
@@ -48,7 +50,7 @@ export async function api<T>(
 
   let res: Response
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${backendUrl() ?? ''}/api${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
