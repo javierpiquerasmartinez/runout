@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, max, sql, type SQL } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
@@ -161,7 +161,11 @@ export class QueueService {
       .innerJoin(identities, eq(identities.id, hands.authorId))
       .leftJoin(
         queueEntries,
-        and(eq(queueEntries.handId, hands.id), eq(queueEntries.roomId, roomId)),
+        and(
+          eq(queueEntries.handId, hands.id),
+          eq(queueEntries.roomId, roomId),
+          isNull(queueEntries.removedAt),
+        ),
       )
       .where(
         inArray(
@@ -258,11 +262,7 @@ export class QueueService {
     if (read.length === 0) return [];
     const now = this.clock.now();
     // Serialises appends to one Room, so two imports never share a position.
-    await tx
-      .select({ id: rooms.id })
-      .from(rooms)
-      .where(eq(rooms.id, room.id))
-      .for('update');
+    await this.lockRoom(tx, room.id);
     const [{ last }] = await tx
       .select({ last: max(queueEntries.position) })
       .from(queueEntries)
@@ -380,7 +380,11 @@ export class QueueService {
       .select({ id: queueEntries.id })
       .from(queueEntries)
       .where(
-        and(eq(queueEntries.roomId, roomId), eq(queueEntries.handId, handId)),
+        and(
+          eq(queueEntries.roomId, roomId),
+          eq(queueEntries.handId, handId),
+          isNull(queueEntries.removedAt),
+        ),
       )
       .limit(1);
     if (!queued) throw new Rejected('hand-not-in-queue');
@@ -419,7 +423,24 @@ export class QueueService {
     roomId: string,
     db: Database | Transaction = this.db,
   ): Promise<QueueEntry[]> {
-    const rows = await db
+    const rows = await this.entryRows(
+      db,
+      and(eq(queueEntries.roomId, roomId), isNull(queueEntries.removedAt)),
+    ).orderBy(asc(queueEntries.position));
+    return rows.map(toQueueEntry);
+  }
+
+  /** One Queue Entry by id, regardless of whether it's removed. */
+  private async entryById(
+    db: Database | Transaction,
+    id: string,
+  ): Promise<QueueEntry | undefined> {
+    const [row] = await this.entryRows(db, eq(queueEntries.id, id));
+    return row && toQueueEntry(row);
+  }
+
+  private entryRows(db: Database | Transaction, where: SQL | undefined) {
+    return db
       .select({
         id: queueEntries.id,
         handId: hands.id,
@@ -431,20 +452,159 @@ export class QueueService {
       .from(queueEntries)
       .innerJoin(hands, eq(hands.id, queueEntries.handId))
       .innerJoin(identities, eq(identities.id, hands.authorId))
-      .where(eq(queueEntries.roomId, roomId))
-      .orderBy(asc(queueEntries.position));
-    return rows.map((row) => ({
-      id: row.id,
-      handId: row.handId,
-      position: row.position,
-      author: { identityId: row.authorId, displayName: row.authorName ?? '' },
-      site: row.content.site,
-      siteHandId: row.content.siteHandId,
-      playedAt: row.content.playedAt,
-      stake: row.content.stake,
-      summary: summarise(row.content),
-    }));
+      .where(where);
   }
+
+  /** Row-locks the Room, serialising position changes to its Queue. */
+  private lockRoom(tx: Transaction, roomId: string) {
+    return tx
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(eq(rooms.id, roomId))
+      .for('update');
+  }
+
+  /** Renumbers `orderedIds` to consecutive positions starting at 1, in order. */
+  private renumber(tx: Transaction, orderedIds: string[]): Promise<unknown> {
+    return Promise.all(
+      orderedIds.map((id, index) =>
+        tx
+          .update(queueEntries)
+          .set({ position: index + 1 })
+          .where(eq(queueEntries.id, id)),
+      ),
+    );
+  }
+
+  /**
+   * The Master puts the Queue's active Entries in a new order, the same for
+   * everyone. `order` must be exactly a permutation of their ids, with no
+   * repeats.
+   */
+  async reorder(
+    master: Identity,
+    roomId: string,
+    order: unknown,
+  ): Promise<string[]> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if (!Array.isArray(order) || !order.every(isUuid)) {
+      throw new Rejected('invalid-queue-order');
+    }
+    if (new Set(order).size !== order.length) {
+      throw new Rejected('invalid-queue-order');
+    }
+    await this.db.transaction(async (tx) => {
+      // Serialises reorders (and appends) of one Room.
+      await this.lockRoom(tx, roomId);
+      const active = await tx
+        .select({ id: queueEntries.id })
+        .from(queueEntries)
+        .where(
+          and(eq(queueEntries.roomId, roomId), isNull(queueEntries.removedAt)),
+        );
+      const activeIds = new Set(active.map((row) => row.id));
+      if (
+        order.length !== activeIds.size ||
+        !order.every((id) => activeIds.has(id))
+      ) {
+        throw new Rejected('invalid-queue-order');
+      }
+      await this.renumber(tx, order);
+    });
+    return order;
+  }
+
+  /**
+   * The Master removes a Queue Entry, soft: the Hand it references is never
+   * deleted, and undoing within 10 s restores it (see `undoRemoval`).
+   */
+  async remove(
+    master: Identity,
+    roomId: string,
+    id: unknown,
+  ): Promise<{ id: string }> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if (!isUuid(id)) throw new Rejected('entry-not-in-queue');
+    const [removed] = await this.db
+      .update(queueEntries)
+      .set({ removedAt: this.clock.now() })
+      .where(
+        and(
+          eq(queueEntries.id, id),
+          eq(queueEntries.roomId, roomId),
+          isNull(queueEntries.removedAt),
+        ),
+      )
+      .returning({ id: queueEntries.id });
+    if (!removed) throw new Rejected('entry-not-in-queue');
+    return { id: removed.id };
+  }
+
+  /**
+   * Undoes a removal within its 10 s window. The restored Entry is sorted
+   * back into the active Queue by the position it had, then the whole active
+   * Queue is renumbered from it: a `reorder` of the other Entries while this
+   * one was removed can't leave two Entries sharing a position.
+   */
+  async undoRemoval(
+    master: Identity,
+    roomId: string,
+    id: unknown,
+  ): Promise<QueueEntry> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if (!isUuid(id)) throw new Rejected('nothing-to-undo');
+    return this.db.transaction(async (tx) => {
+      await this.lockRoom(tx, roomId);
+      const [row] = await tx
+        .select({ removedAt: queueEntries.removedAt })
+        .from(queueEntries)
+        .where(and(eq(queueEntries.id, id), eq(queueEntries.roomId, roomId)));
+      if (!row || row.removedAt === null) {
+        throw new Rejected('nothing-to-undo');
+      }
+      if (this.clock.now().getTime() - row.removedAt.getTime() > UNDO_WINDOW_MS) {
+        throw new Rejected('undo-expired');
+      }
+      await tx
+        .update(queueEntries)
+        .set({ removedAt: null })
+        .where(eq(queueEntries.id, id));
+      const active = await tx
+        .select({ id: queueEntries.id })
+        .from(queueEntries)
+        .where(
+          and(eq(queueEntries.roomId, roomId), isNull(queueEntries.removedAt)),
+        )
+        .orderBy(asc(queueEntries.position), asc(queueEntries.addedAt));
+      await this.renumber(tx, active.map((each) => each.id));
+      return (await this.entryById(tx, id))!;
+    });
+  }
+}
+
+const UNDO_WINDOW_MS = 10_000;
+
+interface QueueEntryRow {
+  id: string;
+  handId: string;
+  position: number;
+  authorId: string;
+  authorName: string | null;
+  content: Hand;
+}
+
+function toQueueEntry(row: QueueEntryRow): QueueEntry {
+  return {
+    id: row.id,
+    handId: row.handId,
+    position: row.position,
+    author: { identityId: row.authorId, displayName: row.authorName ?? '' },
+    site: row.content.site,
+    siteHandId: row.content.siteHandId,
+    playedAt: row.content.playedAt,
+    stake: row.content.stake,
+    summary: summarise(row.content),
+  };
 }
 
 /** What makes a Hand the same Hand (ADR 0002). */

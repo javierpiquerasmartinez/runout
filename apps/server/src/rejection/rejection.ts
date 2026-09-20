@@ -18,7 +18,11 @@ export type RejectionReason =
   | 'unreadable-file'
   | 'invalid-format'
   | 'preview-not-found'
-  | 'author-not-in-room';
+  | 'author-not-in-room'
+  | 'invalid-queue-order'
+  | 'entry-not-in-queue'
+  | 'nothing-to-undo'
+  | 'undo-expired';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

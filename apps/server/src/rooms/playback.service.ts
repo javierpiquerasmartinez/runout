@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { hands, playbacks, queueEntries } from '../database/schema.js';
@@ -49,7 +49,11 @@ export class PlaybackService {
       .select({ id: queueEntries.id })
       .from(queueEntries)
       .where(
-        and(eq(queueEntries.roomId, roomId), eq(queueEntries.handId, handId)),
+        and(
+          eq(queueEntries.roomId, roomId),
+          eq(queueEntries.handId, handId),
+          isNull(queueEntries.removedAt),
+        ),
       )
       .limit(1);
     if (!queued) throw new Rejected('hand-not-in-queue');

@@ -43,6 +43,13 @@
       "when": 1789848937721,
       "tag": "0005_authors_and_duplicates",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789890868887,
+      "tag": "0006_hard_talon",
+      "breakpoints": true
     }
   ]
 }

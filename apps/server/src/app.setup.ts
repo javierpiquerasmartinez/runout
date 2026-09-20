@@ -10,4 +10,13 @@ export function configureApp(app: INestApplication): void {
   (app as NestExpressApplication).useBodyParser('json', { limit: '5mb' });
   app.useWebSocketAdapter(new WsAdapter(app));
   app.useGlobalFilters(new RejectionFilter());
+  // The REST API is cross-origin in production (frontend on Vercel, backend on Render), so
+  // the browser needs this to allow it. The WebSocket gateway doesn't go through Express and
+  // isn't origin-restricted by the browser either way. Unset in local dev, where Vite's proxy
+  // makes everything same-origin.
+  const allowedOrigins = (process.env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: allowedOrigins.length > 0 ? allowedOrigins : true });
 }

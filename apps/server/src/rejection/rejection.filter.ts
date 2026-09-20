@@ -24,6 +24,10 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'invalid-format': HttpStatus.BAD_REQUEST,
   'preview-not-found': HttpStatus.NOT_FOUND,
   'author-not-in-room': HttpStatus.BAD_REQUEST,
+  'invalid-queue-order': HttpStatus.BAD_REQUEST,
+  'entry-not-in-queue': HttpStatus.NOT_FOUND,
+  'nothing-to-undo': HttpStatus.NOT_FOUND,
+  'undo-expired': HttpStatus.CONFLICT,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }`. */

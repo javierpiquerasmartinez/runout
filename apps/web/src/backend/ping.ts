@@ -1,3 +1,5 @@
+import { backendUrl } from './backendUrl'
+
 export interface PongMessage {
   event: 'pong'
   data: { sentAt: number; serverTime: number }
@@ -26,6 +28,8 @@ function isPong(message: unknown): message is PongMessage {
 }
 
 export function socketUrl(path: string, location: Location = window.location): string {
+  const backend = backendUrl()
+  if (backend) return `${backend.replace(/^http/, 'ws')}${path}`
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}${path}`
 }
