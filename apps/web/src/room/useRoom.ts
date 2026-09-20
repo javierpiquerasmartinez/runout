@@ -9,6 +9,11 @@ export interface RoomCommands {
   goToAction(actionIndex: number): void
   /** Gives a Hand in the Queue another Author: a Participant's identity id. */
   reassignAuthor(handId: string, authorId: string): void
+  /** Puts the Queue's active Entries in this order, the same for everyone. */
+  reorderQueue(order: string[]): void
+  /** Removes a Queue Entry; undoable for 10 s. */
+  removeQueueEntry(id: string): void
+  undoQueueRemoval(id: string): void
 }
 
 /**
@@ -56,6 +61,9 @@ export function useRoom(code: string, token: string, displayName: string | null)
       loadHand: (handId) => send('playback.load', { handId }),
       goToAction: (actionIndex) => send('playback.goTo', { actionIndex }),
       reassignAuthor: (handId, authorId) => send('queue.reassignAuthor', { handId, authorId }),
+      reorderQueue: (order) => send('queue.reorder', { order }),
+      removeQueueEntry: (id) => send('queue.remove', { id }),
+      undoQueueRemoval: (id) => send('queue.undoRemoval', { id }),
     }),
     [send],
   )

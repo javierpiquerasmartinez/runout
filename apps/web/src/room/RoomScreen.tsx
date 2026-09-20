@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
@@ -9,6 +9,7 @@ import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
+import { SegmentedControl } from '../ui/SegmentedControl'
 import { followLink } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
 import { ImportDialog } from './ImportDialog'
@@ -18,6 +19,7 @@ import {
   positionsLabel,
   potLabel,
   sameHandLabel,
+  siteLabel,
   stakeLabel,
   streetLabel,
 } from './queueEntryView'
@@ -32,6 +34,26 @@ import { useHand, type HandLoad } from './useHand'
 import type { RoomCommands } from './useRoom'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
+
+type ShowdownFilter = 'any' | 'yes' | 'no'
+
+interface QueueFilters {
+  author: string
+  position: string
+  finalStreet: string
+  showdown: ShowdownFilter
+}
+
+const noFilters: QueueFilters = { author: '', position: '', finalStreet: '', showdown: 'any' }
+
+function matchesFilters(entry: QueueEntry, filters: QueueFilters): boolean {
+  if (filters.author && entry.author.identityId !== filters.author) return false
+  if (filters.position && !entry.summary.positions.includes(filters.position)) return false
+  if (filters.finalStreet && entry.summary.finalStreet !== filters.finalStreet) return false
+  if (filters.showdown === 'yes' && !entry.summary.showdown) return false
+  if (filters.showdown === 'no' && entry.summary.showdown) return false
+  return true
+}
 
 /**
  * The Room, as in the "Sala" boards: header, Queue panel, table and side panel.
@@ -55,6 +77,12 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
   const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
   const loadedEntry = view.queue[loadedIndex]
+  // The Master may remove the loaded Hand's own Queue Entry; Playback (and this panel)
+  // keeps showing it from the last Queue Entry seen for it, per "leaves Playback untouched".
+  const [lastLoadedEntry, setLastLoadedEntry] = useState<QueueEntry | undefined>(undefined)
+  if (loadedEntry && loadedEntry.id !== lastLoadedEntry?.id) setLastLoadedEntry(loadedEntry)
+  const detailsEntry =
+    loadedEntry ?? (lastLoadedEntry?.handId === view.playback?.handId ? lastLoadedEntry : undefined)
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
   const next = view.queue[loadedIndex + 1]
   useShortcuts(isMaster, {
@@ -67,40 +95,14 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
       <RoomHeader view={view} isMaster={isMaster} />
 
       <div className="room__body">
-        <aside className="room-queue" aria-labelledby="room-queue-title">
-          <div className="room-panel__header">
-            <h2 id="room-queue-title" className="room-panel__title">
-              {t('room.queue.title')}
-            </h2>
-            <span className="room-queue__count ro-mono">{view.queue.length}</span>
-          </div>
-          <div className="room-queue__actions">
-            <button type="button" className="room-queue__import" onClick={() => setImporting(true)}>
-              <Icon name="add" size={15} />
-              {t(isMaster ? 'room.queue.import.master' : 'room.queue.import.guest')}
-            </button>
-          </div>
-          {/* Always mounted, so screen readers announce the outcome when it appears. */}
-          <p className="room-queue__status" role="status">
-            {importOutcome}
-          </p>
-          {view.queue.length === 0 ? (
-            <p className="room-queue__empty">{t('room.queue.empty')}</p>
-          ) : (
-            <ul className="room-queue__list">
-              {view.queue.map((entry) => (
-                <QueueRow
-                  key={entry.id}
-                  entry={entry}
-                  sameHand={sameHandLabel(entry, view.queue, i18n)}
-                  i18n={i18n}
-                  loaded={entry.handId === view.playback?.handId}
-                  onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
-                />
-              ))}
-            </ul>
-          )}
-        </aside>
+        <QueuePanel
+          view={view}
+          isMaster={isMaster}
+          commands={commands}
+          i18n={i18n}
+          onImport={() => setImporting(true)}
+          importOutcome={importOutcome}
+        />
 
         <main className="room-stage">
           {view.playback ? (
@@ -127,12 +129,13 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               {t('room.details.title')}
             </h2>
           </div>
-          {loadedEntry && (
+          {detailsEntry && (
             <CurrentHand
-              entry={loadedEntry}
+              entry={detailsEntry}
+              tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
               participants={view.participants}
-              isMaster={isMaster}
-              onReassign={(authorId) => commands.reassignAuthor(loadedEntry.handId, authorId)}
+              isMaster={isMaster && loadedEntry !== undefined}
+              onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
             />
           )}
           {table?.payout && <Payout payout={table.payout} />}
@@ -161,6 +164,228 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
         />
       )}
     </div>
+  )
+}
+
+const UNDO_WINDOW_MS = 10_000
+
+/**
+ * The Queue panel, from the "Sala" boards: Author, date, Positions, Stake,
+ * final pot, Final Street and Showdown per row, the loaded Hand highlighted.
+ * The Master reorders and removes rows (undoable); filters are personal and
+ * never leave this component. Collapses to give the table full width.
+ */
+function QueuePanel({
+  view,
+  isMaster,
+  commands,
+  i18n,
+  onImport,
+  importOutcome,
+}: {
+  view: InRoom
+  isMaster: boolean
+  commands: RoomCommands
+  i18n: Translator
+  onImport: () => void
+  importOutcome: string | null
+}) {
+  const { t } = i18n
+  const [collapsed, setCollapsed] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState<QueueFilters>(noFilters)
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null)
+  const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
+
+  const hasActiveFilters =
+    filters.author !== '' || filters.position !== '' || filters.finalStreet !== '' || filters.showdown !== 'any'
+  const visibleQueue = useMemo(() => view.queue.filter((entry) => matchesFilters(entry, filters)), [view.queue, filters])
+  const authors = useMemo(() => {
+    const byId = new Map(view.queue.map((entry) => [entry.author.identityId, entry.author]))
+    return [...byId.values()]
+  }, [view.queue])
+  const positions = useMemo(
+    () => [...new Set(view.queue.flatMap((entry) => entry.summary.positions))].sort(),
+    [view.queue],
+  )
+  const streets = ['preflop', 'flop', 'turn', 'river'] as const
+  // Where each Entry actually sits in the full Queue, for the move buttons' ends —
+  // the Queue itself may be filtered, but adjacency is always the real Queue's.
+  const indexById = useMemo(() => new Map(view.queue.map((entry, index) => [entry.id, index])), [view.queue])
+
+  function move(entry: QueueEntry, direction: -1 | 1) {
+    const order = view.queue.map((each) => each.id)
+    const from = order.indexOf(entry.id)
+    const to = from + direction
+    if (to < 0 || to >= order.length) return
+    ;[order[from], order[to]] = [order[to], order[from]]
+    commands.reorderQueue(order)
+  }
+
+  function remove(entry: QueueEntry) {
+    commands.removeQueueEntry(entry.id)
+    setPendingRemovalId(entry.id)
+    clearTimeout(undoTimer.current)
+    undoTimer.current = setTimeout(() => setPendingRemovalId(null), UNDO_WINDOW_MS)
+  }
+
+  function undo() {
+    if (!pendingRemovalId) return
+    commands.undoQueueRemoval(pendingRemovalId)
+    clearTimeout(undoTimer.current)
+    setPendingRemovalId(null)
+  }
+
+  return (
+    <aside className="room-queue" data-collapsed={collapsed || undefined} aria-labelledby="room-queue-title">
+      {collapsed ? (
+        <div className="room-panel__header room-panel__header--collapsed">
+          <IconButton
+            icon="chevron"
+            label={t('room.queue.expand')}
+            size="compact"
+            className="room-queue__toggle room-queue__toggle--expand"
+            onClick={() => setCollapsed(false)}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="room-panel__header">
+            <h2 id="room-queue-title" className="room-panel__title">
+              {t('room.queue.title')}
+            </h2>
+            <span className="room-queue__count ro-mono">{view.queue.length}</span>
+            <IconButton
+              icon="chevron"
+              label={t('room.queue.collapse')}
+              size="compact"
+              className="room-queue__toggle room-queue__toggle--collapse"
+              onClick={() => setCollapsed(true)}
+            />
+          </div>
+          <div className="room-queue__actions">
+            <button type="button" className="room-queue__import" onClick={onImport}>
+              <Icon name="add" size={15} />
+              {t(isMaster ? 'room.queue.import.master' : 'room.queue.import.guest')}
+            </button>
+          </div>
+          {/* Always mounted, so screen readers announce the outcome when it appears. */}
+          <p className="room-queue__status" role="status">
+            {importOutcome}
+          </p>
+          {view.queue.length > 0 && (
+            <div className="room-queue__toolbar">
+              <IconButton
+                icon="filter"
+                label={t('room.queue.filter')}
+                size="compact"
+                data-active={filtersOpen || hasActiveFilters || undefined}
+                onClick={() => setFiltersOpen((open) => !open)}
+              />
+              {hasActiveFilters && (
+                <span className="room-queue__filter-count ro-mono">
+                  {t('room.queue.filter.count', { count: visibleQueue.length, total: view.queue.length })}
+                </span>
+              )}
+            </div>
+          )}
+          {filtersOpen && (
+            <div className="room-queue__filters">
+              <label className="room-queue__filter-field">
+                <span>{t('room.queue.filter.author')}</span>
+                <select
+                  value={filters.author}
+                  onChange={(event) => setFilters((f) => ({ ...f, author: event.target.value }))}
+                >
+                  <option value="">{t('room.queue.filter.all')}</option>
+                  {authors.map((author) => (
+                    <option key={author.identityId} value={author.identityId}>
+                      {author.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="room-queue__filter-field">
+                <span>{t('room.queue.filter.position')}</span>
+                <select
+                  value={filters.position}
+                  onChange={(event) => setFilters((f) => ({ ...f, position: event.target.value }))}
+                >
+                  <option value="">{t('room.queue.filter.all')}</option>
+                  {positions.map((position) => (
+                    <option key={position} value={position}>
+                      {position}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="room-queue__filter-field">
+                <span>{t('room.queue.filter.finalStreet')}</span>
+                <select
+                  value={filters.finalStreet}
+                  onChange={(event) => setFilters((f) => ({ ...f, finalStreet: event.target.value }))}
+                >
+                  <option value="">{t('room.queue.filter.all')}</option>
+                  {streets.map((street) => (
+                    <option key={street} value={street}>
+                      {t(`room.queue.street.${street}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <SegmentedControl
+                label={t('room.queue.filter.showdown')}
+                value={filters.showdown}
+                onChange={(showdown) => setFilters((f) => ({ ...f, showdown }))}
+                options={[
+                  { value: 'any', label: t('room.queue.filter.showdown.any') },
+                  { value: 'yes', label: t('room.queue.filter.showdown.yes') },
+                  { value: 'no', label: t('room.queue.filter.showdown.no') },
+                ]}
+              />
+              {hasActiveFilters && (
+                <Button variant="secondary" size="compact" onClick={() => setFilters(noFilters)}>
+                  {t('room.queue.filter.clear')}
+                </Button>
+              )}
+            </div>
+          )}
+          {isMaster && pendingRemovalId && (
+            <div className="room-queue__undo" role="status">
+              <span>{t('room.queue.removed')}</span>
+              <Button variant="secondary" size="compact" onClick={undo}>
+                {t('room.queue.undo')}
+              </Button>
+            </div>
+          )}
+          {view.queue.length === 0 ? (
+            <p className="room-queue__empty">{t('room.queue.empty')}</p>
+          ) : visibleQueue.length === 0 ? (
+            <p className="room-queue__empty">{t('room.queue.filter.noMatches')}</p>
+          ) : (
+            <ul className="room-queue__list">
+              {visibleQueue.map((entry) => {
+                const fullIndex = indexById.get(entry.id) ?? -1
+                return (
+                  <QueueRow
+                    key={entry.id}
+                    entry={entry}
+                    sameHand={sameHandLabel(entry, view.queue, i18n)}
+                    i18n={i18n}
+                    loaded={entry.handId === view.playback?.handId}
+                    onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
+                    onMoveUp={isMaster && fullIndex > 0 ? () => move(entry, -1) : undefined}
+                    onMoveDown={isMaster && fullIndex < view.queue.length - 1 ? () => move(entry, 1) : undefined}
+                    onRemove={isMaster ? () => remove(entry) : undefined}
+                  />
+                )
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </aside>
   )
 }
 
@@ -321,16 +546,20 @@ function LoadedHand({
  */
 function CurrentHand({
   entry,
+  tableSize,
   participants,
   isMaster,
   onReassign,
 }: {
   entry: QueueEntry
+  /** Seats the table has; null until the Hand's Timeline has loaded. */
+  tableSize: number | null
   participants: Participant[]
   isMaster: boolean
   onReassign: (authorId: string) => void
 }) {
-  const { t } = useI18n()
+  const i18n = useI18n()
+  const { t } = i18n
   const [changing, setChanging] = useState(false)
   // The Author may have left the Room; they stay a choice so the list shows who it is.
   const choices = participants.some((p) => p.identityId === entry.author.identityId)
@@ -381,6 +610,36 @@ function CurrentHand({
             )}
           </dd>
         </div>
+        <div className="room-facts__row">
+          <dt>{t('room.current.stake')}</dt>
+          <dd className="room-facts__value">{stakeLabel(entry)}</dd>
+        </div>
+        <div className="room-facts__row">
+          <dt>{t('room.current.date')}</dt>
+          <dd className="room-facts__value">{playedAtLabel(entry, i18n)}</dd>
+        </div>
+        {tableSize !== null && (
+          <div className="room-facts__row">
+            <dt>{t('room.current.table')}</dt>
+            <dd className="room-facts__value">{t('room.current.tableSize', { max: tableSize })}</dd>
+          </div>
+        )}
+        <div className="room-facts__row">
+          <dt>{t('room.current.positions')}</dt>
+          <dd className="room-facts__value">{positionsLabel(entry, i18n)}</dd>
+        </div>
+        <div className="room-facts__row">
+          <dt>{t('room.current.finalPot')}</dt>
+          <dd className="room-facts__value">{potLabel(entry, i18n)}</dd>
+        </div>
+        <div className="room-facts__row">
+          <dt>{t('room.queue.filter.finalStreet')}</dt>
+          <dd className="room-facts__value">{streetLabel(entry, i18n)}</dd>
+        </div>
+        <div className="room-facts__row">
+          <dt>{t('room.current.site')}</dt>
+          <dd className="room-facts__value">{siteLabel(entry, i18n)}</dd>
+        </div>
       </dl>
     </section>
   )
@@ -420,6 +679,9 @@ function QueueRow({
   i18n,
   loaded,
   onLoad,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
 }: {
   entry: QueueEntry
   /** Names the other Heroes' Hands of the same real-world hand in the Queue, if any. */
@@ -428,7 +690,40 @@ function QueueRow({
   loaded: boolean
   /** Only the Master loads Hands; for Guests a row is information, not a control. */
   onLoad?: () => void
+  /** Undefined for a Guest, or at the Queue's ends (disabled, not hidden). */
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  /** Undefined for a Guest; only the Master removes a Queue Entry. */
+  onRemove?: () => void
 }) {
+  const { t } = i18n
+  const controls = onRemove !== undefined && (
+    <div className="queue-entry__controls">
+      <IconButton
+        icon="chevron"
+        label={t('room.queue.moveUp')}
+        size="compact"
+        className="queue-entry__move queue-entry__move--up"
+        disabledReason={onMoveUp ? undefined : t('room.queue.atStart')}
+        onClick={onMoveUp}
+      />
+      <IconButton
+        icon="chevron"
+        label={t('room.queue.moveDown')}
+        size="compact"
+        className="queue-entry__move queue-entry__move--down"
+        disabledReason={onMoveDown ? undefined : t('room.queue.atEnd')}
+        onClick={onMoveDown}
+      />
+      <IconButton
+        icon="delete"
+        label={t('room.queue.remove')}
+        size="compact"
+        className="queue-entry__remove"
+        onClick={onRemove}
+      />
+    </div>
+  )
   const content = (
     <>
       <div className="queue-entry__line">
@@ -463,6 +758,7 @@ function QueueRow({
       ) : (
         <div className="queue-entry__body">{content}</div>
       )}
+      {controls}
     </li>
   )
 }

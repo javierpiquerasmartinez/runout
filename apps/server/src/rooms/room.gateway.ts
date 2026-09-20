@@ -49,6 +49,19 @@ export interface ReassignAuthorCommand {
   authorId: string;
 }
 
+export interface ReorderQueueCommand {
+  /** Every active Queue Entry's id, in the new order. */
+  order: string[];
+}
+
+export interface RemoveQueueEntryCommand {
+  id: string;
+}
+
+export interface UndoQueueRemovalCommand {
+  id: string;
+}
+
 export interface RejectedEvent {
   command: string;
   reason: RejectionReason;
@@ -182,6 +195,55 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           command?.authorId,
         ),
       );
+      return undefined;
+    });
+  }
+
+  /** The Master reorders the Queue, the same order for everyone. */
+  @SubscribeMessage('queue.reorder')
+  reorder(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<ReorderQueueCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('queue.reorder', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const order = await this.queue.reorder(identity, roomId, command?.order);
+      this.publish(roomId, 'queue.reordered', { order });
+      return undefined;
+    });
+  }
+
+  /** The Master removes a Queue Entry; the Hand stays, undoable for 10 s. */
+  @SubscribeMessage('queue.remove')
+  remove(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<RemoveQueueEntryCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('queue.remove', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      this.publish(
+        roomId,
+        'queue.entryRemoved',
+        await this.queue.remove(identity, roomId, command?.id),
+      );
+      return undefined;
+    });
+  }
+
+  /** The Master undoes a removal within its 10 s window. */
+  @SubscribeMessage('queue.undoRemoval')
+  undoRemoval(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<UndoQueueRemovalCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('queue.undoRemoval', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const entry = await this.queue.undoRemoval(
+        identity,
+        roomId,
+        command?.id,
+      );
+      this.publish(roomId, 'queue.entryRestored', { entry });
       return undefined;
     });
   }

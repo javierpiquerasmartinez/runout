@@ -16,6 +16,10 @@ export type RejectionReason =
   | 'invalid-format'
   | 'preview-not-found'
   | 'author-not-in-room'
+  | 'invalid-queue-order'
+  | 'entry-not-in-queue'
+  | 'nothing-to-undo'
+  | 'undo-expired'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

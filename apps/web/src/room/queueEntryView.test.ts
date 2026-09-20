@@ -7,6 +7,7 @@ import {
   positionsLabel,
   potLabel,
   sameHandLabel,
+  siteLabel,
   stakeLabel,
   streetLabel,
 } from './queueEntryView'
@@ -54,6 +55,14 @@ describe('stakeLabel', () => {
     expect(stakeLabel(entry({ stake: { limit: 'pot-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' } }))).toBe(
       'PL10',
     )
+  })
+})
+
+describe('siteLabel', () => {
+  it('names the Poker Site', () => {
+    expect(siteLabel(entry({ site: 'pokerstars' }), es)).toBe('PokerStars')
+    expect(siteLabel(entry({ site: 'ggpoker' }), es)).toBe('GGPoker')
+    expect(siteLabel(entry({ site: 'winamax' }), es)).toBe('Winamax')
   })
 })
 

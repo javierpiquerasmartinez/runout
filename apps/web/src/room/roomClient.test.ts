@@ -105,6 +105,40 @@ describe('reduceRoom', () => {
     expect(apply({ type: 'entriesAdded', entries: [firstHand] })).toEqual({ phase: 'joining' })
   })
 
+  it('puts the Queue in the order the Master gives, resyncing position', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entriesReordered', order: ['entry-2', 'entry-1'] },
+    )
+
+    expect(view.phase === 'in-room' && view.queue).toEqual([
+      { ...secondHand, position: 1 },
+      { ...firstHand, position: 2 },
+    ])
+  })
+
+  it('removes a Queue Entry the Master removes', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entryRemoved', id: 'entry-1' },
+    )
+
+    expect(view.phase === 'in-room' && view.queue).toEqual([secondHand])
+  })
+
+  it('puts a restored Queue Entry back at its position', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entryRemoved', id: 'entry-1' },
+      { type: 'entryRestored', entry: firstHand },
+    )
+
+    expect(view.phase === 'in-room' && view.queue).toEqual([firstHand, secondHand])
+  })
+
   it('gives a Hand in the Queue the Author the Master reassigned it to', () => {
     const view = apply(
       snapshot,
@@ -178,6 +212,16 @@ describe('parseServerMessage', () => {
         }),
       ),
     ).toEqual({ type: 'authorChanged', handId: 'hand-1', author: { identityId: 'id-marta', displayName: 'Marta' } })
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'queue.reordered', data: { order: ['entry-2', 'entry-1'] } })),
+    ).toEqual({ type: 'entriesReordered', order: ['entry-2', 'entry-1'] })
+    expect(parseServerMessage(JSON.stringify({ event: 'queue.entryRemoved', data: { id: 'entry-1' } }))).toEqual({
+      type: 'entryRemoved',
+      id: 'entry-1',
+    })
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'queue.entryRestored', data: { entry: firstHand } })),
+    ).toEqual({ type: 'entryRestored', entry: firstHand })
   })
 
   it('ignores anything that is not a Room event', () => {

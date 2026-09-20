@@ -118,6 +118,8 @@ export const queueEntries = pgTable(
     /** 1 for the first Hand; new entries go after the last one. */
     position: integer('position').notNull(),
     addedAt: timestamp('added_at', { withTimezone: true }).notNull(),
+    /** Set when the Master removes it; null while it's active. Undoable for 10 s. */
+    removedAt: timestamp('removed_at', { withTimezone: true }),
   },
   (table) => [index('queue_entries_room_id_idx').on(table.roomId)],
 );

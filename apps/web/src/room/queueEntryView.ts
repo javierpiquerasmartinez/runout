@@ -29,6 +29,11 @@ export function stakeLabel(entry: Described): string {
   return `${LIMIT_PREFIX[entry.stake.limit]}${entry.stake.bigBlind}`
 }
 
+/** The Poker Site's display name: "PokerStars". */
+export function siteLabel(entry: Pick<QueueEntry, 'site'>, { t }: Translator): string {
+  return t(`pokerSite.${entry.site}`)
+}
+
 /** The final pot in big blinds, in the UI language: "Bote 10,5 BB". */
 export function potLabel(entry: Described, { t, formatNumber }: Translator): string {
   const bigBlinds = entry.summary.finalPot / entry.stake.bigBlind

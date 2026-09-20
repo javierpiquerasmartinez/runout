@@ -72,6 +72,9 @@ export type RoomEvent =
   | { type: 'participantLeft'; identityId: string }
   | { type: 'entriesAdded'; entries: QueueEntry[] }
   | { type: 'authorChanged'; handId: string; author: Author }
+  | { type: 'entriesReordered'; order: string[] }
+  | { type: 'entryRemoved'; id: string }
+  | { type: 'entryRestored'; entry: QueueEntry }
   | { type: 'playbackChanged'; playback: Playback }
   | { type: 'rejected'; command: string; reason: RejectionReason }
   | { type: 'disconnected' }
@@ -119,6 +122,24 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         ...view,
         queue: view.queue.map((entry) => (entry.handId === event.handId ? { ...entry, author: event.author } : entry)),
       }
+    case 'entriesReordered': {
+      if (view.phase !== 'in-room') return view
+      const byId = new Map(view.queue.map((entry) => [entry.id, entry]))
+      const reordered = event.order
+        .map((id) => byId.get(id))
+        .filter((entry): entry is QueueEntry => entry !== undefined)
+        .map((entry, index) => ({ ...entry, position: index + 1 }))
+      return { ...view, queue: reordered }
+    }
+    case 'entryRemoved':
+      if (view.phase !== 'in-room') return view
+      return { ...view, queue: view.queue.filter((entry) => entry.id !== event.id) }
+    case 'entryRestored': {
+      if (view.phase !== 'in-room') return view
+      const restored = [...view.queue.filter((entry) => entry.id !== event.entry.id), event.entry]
+      restored.sort((a, b) => a.position - b.position)
+      return { ...view, queue: restored }
+    }
     case 'playbackChanged':
       if (view.phase !== 'in-room') return view
       return { ...view, playback: event.playback }
@@ -150,6 +171,12 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'entriesAdded', entries: data.entries as QueueEntry[] }
     case 'queue.authorChanged':
       return { type: 'authorChanged', handId: String(data.handId), author: data.author as Author }
+    case 'queue.reordered':
+      return { type: 'entriesReordered', order: (data.order as unknown[]).map(String) }
+    case 'queue.entryRemoved':
+      return { type: 'entryRemoved', id: String(data.id) }
+    case 'queue.entryRestored':
+      return { type: 'entryRestored', entry: data.entry as QueueEntry }
     case 'playback.changed':
       return { type: 'playbackChanged', playback: { handId: String(data.handId), actionIndex: Number(data.actionIndex) } }
     case 'rejected':
