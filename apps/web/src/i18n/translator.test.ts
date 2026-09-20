@@ -45,4 +45,23 @@ describe('time formatting', () => {
     const at = new Date('2026-09-19T21:05:07Z')
     expect(createTranslator('es').formatTime(at, { timeZone: 'UTC' })).toBe('21:05:07')
   })
+
+  it('says how long ago something was, in its largest unit', () => {
+    const now = new Date('2026-09-19T21:00:00Z')
+    const ago = (ms: number) => new Date(now.getTime() - ms)
+    const { formatRelative } = createTranslator('es')
+
+    expect(formatRelative(ago(21 * 24 * 3_600_000), now)).toBe('hace 21 días')
+    expect(formatRelative(ago(3 * 3_600_000), now)).toBe('hace 3 horas')
+    expect(formatRelative(ago(90_000), now)).toBe('hace 1 minuto')
+    expect(formatRelative(ago(800 * 24 * 3_600_000), now)).toBe('hace 2 años')
+    // The language's own word wins where it has one.
+    expect(formatRelative(ago(25 * 3_600_000), now)).toBe('ayer')
+  })
+
+  it('reads anything under a minute as now, never as a negative age', () => {
+    const now = new Date('2026-09-19T21:00:00Z')
+    expect(createTranslator('en').formatRelative(new Date(now.getTime() - 5_000), now)).toBe('this minute')
+    expect(createTranslator('en').formatRelative(now, now)).toBe('this minute')
+  })
 })

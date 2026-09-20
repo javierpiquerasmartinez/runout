@@ -43,6 +43,8 @@ export function RoomPage({ code }: { code: string }) {
   }, [code, token])
 
   if (view.phase === 'in-room') return <RoomScreen view={view} commands={commands} />
+  if (view.phase === 'closed') return <Over room={view.room} what="closed" />
+  if (view.phase === 'kicked') return <Over room={view.room} what="kicked" />
   if (view.phase === 'rejected' && view.reason === 'invalid-display-name' && lookup.state === 'found') {
     return <ConfirmName room={lookup.room} rejected onConfirm={setDisplayName} />
   }
@@ -105,6 +107,25 @@ function ConfirmName({
           {t('room.confirm.submit')}
         </Button>
       </form>
+    </RoomGate>
+  )
+}
+
+/**
+ * A Room that has ended for this person: the Master closed it, or removed
+ * them. Either way it never takes them back, so the only way on is home.
+ */
+function Over({ room, what }: { room: RoomSummary; what: 'closed' | 'kicked' }) {
+  const { t } = useI18n()
+  return (
+    <RoomGate>
+      <div className="room-gate__card" role="alert">
+        <h1 className="room-gate__title ro-serif">{t(`room.${what}.title`)}</h1>
+        <p className="room-gate__body">{t(`room.${what}.body`, { name: room.name })}</p>
+        <Button variant="secondary" onClick={() => navigate('/')}>
+          {t('room.backHome')}
+        </Button>
+      </div>
     </RoomGate>
   )
 }

@@ -10,7 +10,7 @@ import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { SegmentedControl } from '../ui/SegmentedControl'
-import { followLink } from '../routing'
+import { followLink, navigate } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
 import { ImportDialog } from './ImportDialog'
 import {
@@ -25,6 +25,7 @@ import {
 } from './queueEntryView'
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
+import { RoomDialog } from './RoomDialog'
 import type { Participant, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
 import { useShortcuts } from './shortcuts'
@@ -45,6 +46,12 @@ interface QueueFilters {
 }
 
 const noFilters: QueueFilters = { author: '', position: '', finalStreet: '', showdown: 'any' }
+
+/** The decision the Room is asking for right now, if any. */
+type RoomDecision =
+  | { kind: 'leave' }
+  | { kind: 'close' }
+  | { kind: 'kick'; participant: Participant }
 
 function matchesFilters(entry: QueueEntry, filters: QueueFilters): boolean {
   if (filters.author && entry.author.identityId !== filters.author) return false
@@ -67,6 +74,9 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const me = view.participants.find((p) => p.identityId === view.you)
   const isMaster = me?.role === 'master'
   const masterNotice = useMasterNotice(view)
+  const [decision, setDecision] = useState<RoomDecision | null>(null)
+  // Who the Master is handing the Room to on their way out, until the role moves.
+  const [leavingTo, setLeavingTo] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
@@ -90,10 +100,19 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
     'previous-hand': previous && (() => commands.loadHand(previous.handId)),
     'next-hand': next && (() => commands.loadHand(next.handId)),
   })
+  // A handover can still be refused (it may lose a race to a failover), so the
+  // Master only walks out once the Room says the role has moved.
+  useEffect(() => {
+    if (leavingTo !== null && !isMaster) navigate('/')
+  }, [leavingTo, isMaster])
 
   return (
     <div className="room">
-      <RoomHeader view={view} isMaster={isMaster} />
+      <RoomHeader
+        view={view}
+        isMaster={isMaster}
+        onLeave={() => (isMaster ? setDecision({ kind: 'leave' }) : navigate('/'))}
+      />
 
       <div className="room__body">
         <QueuePanel
@@ -160,6 +179,11 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
                       ? () => commands.handOverMaster(participant.identityId)
                       : undefined
                   }
+                  onKick={
+                    isMaster && participant.identityId !== view.you
+                      ? () => setDecision({ kind: 'kick', participant })
+                      : undefined
+                  }
                 />
               ))}
             </ul>
@@ -173,7 +197,120 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           onImported={(imported, discarded) => reportImport({ state: 'done', imported, discarded })}
         />
       )}
+      {decision && (
+        <RoomDecisionDialog
+          decision={decision}
+          view={view}
+          commands={commands}
+          handingOverTo={leavingTo}
+          onHandOver={(identityId) => {
+            commands.handOverMaster(identityId)
+            setLeavingTo(identityId)
+          }}
+          onClose={() => setDecision(null)}
+          onCloseRoom={() => setDecision({ kind: 'close' })}
+        />
+      )}
     </div>
+  )
+}
+
+/**
+ * What the Room asks before something irreversible. A Master cannot simply
+ * walk out (H1.7): they hand the role to someone present, or close the
+ * Room for everyone.
+ */
+function RoomDecisionDialog({
+  decision,
+  view,
+  commands,
+  handingOverTo,
+  onHandOver,
+  onClose,
+  onCloseRoom,
+}: {
+  decision: RoomDecision
+  view: InRoom
+  commands: RoomCommands
+  /** The Participant the Master is on their way out through, while it settles. */
+  handingOverTo: string | null
+  onHandOver: (identityId: string) => void
+  onClose: () => void
+  onCloseRoom: () => void
+}) {
+  const { t } = useI18n()
+
+  // Kicking and closing ask the same thing: one red act, or nothing.
+  if (decision.kind !== 'leave') {
+    const asked =
+      decision.kind === 'kick'
+        ? {
+            title: t('room.kick.title', { name: decision.participant.displayName }),
+            body: t('room.kick.body'),
+            label: t('room.kick.confirm'),
+            act: () => commands.kick(decision.participant.identityId),
+          }
+        : {
+            title: t('room.close.title'),
+            body: t('room.close.body'),
+            label: t('room.close.confirm'),
+            act: () => commands.closeRoom(),
+          }
+    return (
+      <RoomDialog
+        title={asked.title}
+        body={asked.body}
+        onClose={onClose}
+        actions={
+          <Button
+            variant="destructive"
+            autoFocus
+            onClick={() => {
+              asked.act()
+              onClose()
+            }}
+          >
+            {asked.label}
+          </Button>
+        }
+      />
+    )
+  }
+
+  const successors = view.participants.filter((participant) => participant.identityId !== view.you)
+  return (
+    <RoomDialog
+      title={t('room.leave.master.title')}
+      body={t('room.leave.master.body')}
+      onClose={onClose}
+      actions={
+        <Button variant="destructive" onClick={onCloseRoom}>
+          {t('room.leave.close')}
+        </Button>
+      }
+    >
+      {successors.length > 0 ? (
+        <ul className="room-dialog__choices">
+          {successors.map((participant) => (
+            <li key={participant.identityId}>
+              <button
+                type="button"
+                className="room-dialog__choice"
+                aria-busy={participant.identityId === handingOverTo || undefined}
+                // Still focusable while the handover settles, as a locked control is.
+                onClick={() => handingOverTo === null && onHandOver(participant.identityId)}
+              >
+                <Avatar name={participant.displayName} seed={participant.identityId} size={24} />
+                <span className="room-dialog__choice-name">{participant.displayName}</span>
+                <Icon name="master" size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="room-dialog__body">{t('room.leave.master.alone')}</p>
+      )}
+    </RoomDialog>
   )
 }
 
@@ -399,7 +536,16 @@ function QueuePanel({
   )
 }
 
-function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
+function RoomHeader({
+  view,
+  isMaster,
+  onLeave,
+}: {
+  view: InRoom
+  isMaster: boolean
+  /** A Guest walks out; the Master is asked to hand the role over or close first. */
+  onLeave: () => void
+}) {
   const { t } = useI18n()
   const master = view.participants.find((p) => p.role === 'master')
   // Guests see the Master named apart, so the stack shows everyone else.
@@ -466,6 +612,10 @@ function RoomHeader({ view, isMaster }: { view: InRoom; isMaster: boolean }) {
         <Icon name={isMaster ? 'master' : 'profile'} size={14} />
         {t(isMaster ? 'room.master' : 'room.guest')}
       </span>
+      <Button variant="ghost" size="compact" className="room-header__leave" onClick={onLeave}>
+        <Icon name="close" size={14} />
+        {t('room.leave')}
+      </Button>
       <a href={settingsPath} className="room-header__nav" aria-label={t('room.settings')} onClick={followLink}>
         <Icon name="settings" size={17} />
       </a>
@@ -839,6 +989,7 @@ function ParticipantRow({
   isYou,
   authored,
   onHandOver,
+  onKick,
 }: {
   participant: Participant
   isYou: boolean
@@ -846,6 +997,8 @@ function ParticipantRow({
   authored: number
   /** Only the Master hands the role on, and never to themselves. */
   onHandOver?: () => void
+  /** Only the Master removes someone, and never themselves. */
+  onKick?: () => void
 }) {
   const { t } = useI18n()
   const role: MessageKey = participant.role === 'master' ? 'room.master' : 'room.guest'
@@ -874,6 +1027,15 @@ function ParticipantRow({
           size="compact"
           className="room-participant__hand-over"
           onClick={onHandOver}
+        />
+      )}
+      {onKick && (
+        <IconButton
+          icon="delete"
+          label={t('room.participants.kick', { name: participant.displayName })}
+          size="compact"
+          className="room-participant__kick"
+          onClick={onKick}
         />
       )}
     </li>

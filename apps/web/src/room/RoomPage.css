@@ -1162,6 +1162,13 @@
   margin-left: 2px;
 }
 
+.room-participant__kick {
+  flex-shrink: 0;
+}
+.room-participant__kick:hover {
+  color: var(--alert-ink);
+}
+
 .room-participants__status {
   margin: 0 0 10px;
   font-size: 11.5px;
@@ -1443,6 +1450,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-secondary);
+}
+
+/* The way out of the Room. A Master is asked to choose first. */
+.room-header__leave {
+  flex-shrink: 0;
+  gap: 6px;
 }
 
 .room-header__nav {

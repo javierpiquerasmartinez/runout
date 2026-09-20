@@ -1,6 +1,7 @@
+import type { ReactElement } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { RoomScreen } from './RoomScreen'
@@ -26,9 +27,29 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
   }
 }
 
+function screenOf(view: InRoom, commands: RoomCommands) {
+  const session = {
+    token: 'token',
+    identity: { id: view.you, displayName: 'Javier', screenNames: [] },
+    rememberDisplayName: () => {},
+    rememberScreenNames: () => {},
+  }
+  return (
+    <I18nProvider initialLocale="en">
+      <SessionContext.Provider value={session}>
+        <RoomScreen view={view} commands={commands} />
+      </SessionContext.Provider>
+    </I18nProvider>
+  )
+}
+
+let showAgain: ((ui: ReactElement) => void) | undefined
+
 function renderRoom(view: InRoom) {
   const commands = {
     handOverMaster: vi.fn(),
+    kick: vi.fn(),
+    closeRoom: vi.fn(),
     loadHand: vi.fn(),
     goToAction: vi.fn(),
     reassignAuthor: vi.fn(),
@@ -36,20 +57,13 @@ function renderRoom(view: InRoom) {
     removeQueueEntry: vi.fn(),
     undoQueueRemoval: vi.fn(),
   } satisfies RoomCommands
-  const session = {
-    token: 'token',
-    identity: { id: view.you, displayName: 'Javier', screenNames: [] },
-    rememberDisplayName: () => {},
-    rememberScreenNames: () => {},
-  }
-  render(
-    <I18nProvider initialLocale="en">
-      <SessionContext.Provider value={session}>
-        <RoomScreen view={view} commands={commands} />
-      </SessionContext.Provider>
-    </I18nProvider>,
-  )
+  showAgain = render(screenOf(view, commands)).rerender
   return commands
+}
+
+/** The same screen again with a new view, as a Room event would leave it. */
+function rerenderRoom(view: InRoom, commands: RoomCommands) {
+  showAgain?.(screenOf(view, commands))
 }
 
 describe('RoomScreen · the Master role', () => {
@@ -94,5 +108,107 @@ describe('RoomScreen · the Master role', () => {
     expect(
       screen.getAllByRole('status').map((region) => region.textContent),
     ).toContain('The Master lost connection. Marta is now the Master')
+  })
+})
+
+describe('RoomScreen · the end of a Room', () => {
+  const originalPath = window.location.pathname
+
+  beforeEach(() => {
+    window.history.pushState(null, '', '/room/RNT4K9PX')
+  })
+
+  afterEach(() => {
+    window.history.pushState(null, '', originalPath)
+  })
+
+  it('asks the Master to confirm before removing someone, and never offers it on their own row', async () => {
+    const commands = renderRoom(roomView())
+
+    expect(screen.queryByRole('button', { name: 'Remove Javier' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
+
+    expect(screen.getByRole('heading', { name: 'Remove Marta?' })).toBeTruthy()
+    expect(commands.kick).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(commands.kick).toHaveBeenCalledWith('id-marta')
+  })
+
+  it('leaves the Room untouched when the Master cancels the removal', async () => {
+    const commands = renderRoom(roomView())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(commands.kick).not.toHaveBeenCalled()
+    expect(screen.queryByRole('heading', { name: 'Remove Marta?' })).toBeNull()
+  })
+
+  it('offers a Guest no way to remove anyone', () => {
+    renderRoom(roomView({ you: 'id-marta' }))
+
+    expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull()
+  })
+
+  it('makes the Master choose between handing the role over and closing the Room', async () => {
+    const view = roomView()
+    const commands = renderRoom(view)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }))
+
+    expect(screen.getByRole('heading', { name: 'You are the Master of this room' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    expect(commands.handOverMaster).toHaveBeenCalledWith('id-marta')
+    // Still in the Room: the role has not moved yet, so neither has the Master.
+    expect(window.location.pathname).toBe('/room/RNT4K9PX')
+
+    rerenderRoom(
+      { ...view, participants: [{ ...javier, role: 'guest' }, { ...marta, role: 'master' }] },
+      commands,
+    )
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('keeps a Master whose handover was refused where they are', async () => {
+    const view = roomView()
+    const commands = renderRoom(view)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    // The Room says nothing back: the role never moved, so neither does the Master.
+    rerenderRoom(view, commands)
+
+    expect(window.location.pathname).toBe('/room/RNT4K9PX')
+  })
+
+  it('warns that a closed Room never reopens before closing it', async () => {
+    const commands = renderRoom(roomView())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close the room' }))
+
+    expect(screen.getByRole('heading', { name: 'Close the room?' })).toBeTruthy()
+    expect(commands.closeRoom).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Close the room' }))
+    expect(commands.closeRoom).toHaveBeenCalled()
+  })
+
+  it('tells a Master alone in the Room there is nobody to hand the role to', async () => {
+    renderRoom(roomView({ participants: [javier] }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }))
+
+    expect(screen.getByText('Nobody else is connected to hand control to.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Close the room' })).toBeTruthy()
+  })
+
+  it('lets a Guest walk out without asking anything', async () => {
+    const commands = renderRoom(roomView({ you: 'id-marta' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }))
+
+    expect(window.location.pathname).toBe('/')
+    expect(commands.closeRoom).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
