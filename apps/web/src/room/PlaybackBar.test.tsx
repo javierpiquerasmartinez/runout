@@ -42,7 +42,7 @@ const hand: HandWithTimeline = {
   },
 }
 
-const inSync: RoomSync = { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false }
+const inSync: RoomSync = { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 1 }
 const noGuests: GuestsFollowing = { total: 0, inSync: 0, latencyMs: null }
 
 function renderBar(actionIndex: number, isMaster: boolean, sync: RoomSync = inSync, guests = noGuests) {

@@ -275,7 +275,6 @@ export const es = {
   'room.table.waitingGuest': 'Esperando a que el Master cargue una mano.',
   'room.details.title': 'Detalles',
   'room.participants.title': 'En la sala',
-  'room.participants.present': 'Conectado',
   'room.joining': 'Entrando en la sala…',
   'room.disconnected': 'Se ha perdido la conexión con la sala. Recarga la página para volver a entrar.',
   'room.reload': 'Recargar',

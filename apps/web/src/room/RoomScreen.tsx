@@ -25,6 +25,7 @@ import {
 } from './queueEntryView'
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
+import { SyncIndicator } from './SyncIndicator'
 import { RoomDialog } from './RoomDialog'
 import type { Participant, ParticipantPresence, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
@@ -136,11 +137,22 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               onGoTo={commands.goToAction}
             />
           ) : (
-            <div className="room-stage__felt">
-              <div className="room-stage__table">
-                <p>{t(isMaster ? 'room.table.waitingMaster' : 'room.table.waitingGuest')}</p>
+            <>
+              <div className="room-stage__felt">
+                <div className="room-stage__table">
+                  <p>{t(isMaster ? 'room.table.waitingMaster' : 'room.table.waitingGuest')}</p>
+                </div>
               </div>
-            </div>
+              {/* No Hand, no transport bar — but whether the Room is still
+                  there is worth knowing before one is loaded too. */}
+              <div className="room-stage__standby">
+                <SyncIndicator
+                  sync={view.sync}
+                  isMaster={isMaster}
+                  guests={guestsFollowing(view.participants, view.presence)}
+                />
+              </div>
+            </>
           )}
         </main>
 

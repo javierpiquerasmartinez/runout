@@ -118,6 +118,27 @@ describe('RoomPresence heartbeats', () => {
     });
   });
 
+  it('lets a tab that is keeping up speak for one left behind', () => {
+    const presence = withBoth();
+    presence.enter(room, javier.identityId, javier, 'javier-second-tab', start);
+    // An old tab, still open and still beating, sitting on a stale revision.
+    presence.beat('javier-tab', { at: at(2_000), latencyMs: 300, revision: 2 });
+    presence.beat('javier-second-tab', {
+      at: at(1_000),
+      latencyMs: 25,
+      revision: 9,
+    });
+
+    const [javierPresence] = presence.following(room, 9, at(2_000));
+
+    expect(javierPresence).toEqual({
+      identityId: javier.identityId,
+      presence: 'connected',
+      latencyMs: 25,
+      inSync: true,
+    });
+  });
+
   it('ignores a heartbeat from a connection that is in no Room', () => {
     const presence = withBoth();
 

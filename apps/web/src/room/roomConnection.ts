@@ -14,6 +14,8 @@ export const HEARTBEAT_EVERY_MS = 5_000
 export const HEARTBEAT_MIN_GAP_MS = 250
 /** How long each reconnection waits, one step further down after every failure. */
 export const RECONNECT_BACKOFF_MS = [500, 1_000, 2_000, 5_000, 10_000]
+/** How long to wait before asking for the Room again, when the answer never came. */
+export const RESYNC_RETRY_MS = 2_000
 
 /** The socket the manager drives. A real WebSocket is one; a test's fake is another. */
 export interface RoomSocket {

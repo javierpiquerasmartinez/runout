@@ -101,6 +101,12 @@ export interface RoomSync {
   failedAttempts: number
   /** True while what is held is not to be trusted and a full snapshot is owed. */
   awaitingSnapshot: boolean
+  /**
+   * The highest revision that has gone past on the wire, applied or dropped.
+   * A snapshot that comes back older than this was already out of date when
+   * it was drawn, and another is asked for.
+   */
+  seenRevision: number
 }
 
 /** How many reconnections have to fail before a reload is worth offering. */
@@ -171,6 +177,11 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
       // Whatever was held is dropped: this is the Room as it stands.
       const { room, you, participants, queue, playback, revision, presence } = event.snapshot
       const held = view.phase === 'in-room' ? view : null
+      const seenRevision = Math.max(held?.sync.seenRevision ?? 0, revision)
+      // Changes can go past while a snapshot is being drawn. One that lands
+      // behind them is still better than what was held, and is taken — but it
+      // is not the Room as it stands, so another is owed.
+      const stale = revision < seenRevision
       return {
         phase: 'in-room',
         room,
@@ -180,7 +191,14 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         playback,
         revision,
         presence,
-        sync: { state: 'synced', latencyMs: held?.sync.latencyMs ?? null, failedAttempts: 0, awaitingSnapshot: false },
+        sync: {
+          state: stale ? 'recovering' : 'synced',
+          latencyMs: held?.sync.latencyMs ?? null,
+          // Getting an answer at all means the connection is back.
+          failedAttempts: 0,
+          awaitingSnapshot: stale,
+          seenRevision,
+        },
         // A recovery is not news: an announcement being read stays on screen.
         masterChange: held?.masterChange ?? null,
       }
@@ -224,11 +242,28 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
  */
 function applyChange(view: RoomView, change: RoomChange & { revision: number }): RoomView {
   if (view.phase !== 'in-room') return view
-  if (view.sync.awaitingSnapshot) return view
-  if (change.revision <= view.revision) return view
-  if (change.revision > view.revision + 1) return recovering(view)
-  const next = applied(view, change)
+  const seen = withSeen(view, change.revision)
+  // The end of a Room is the end of it: no snapshot will ever say otherwise,
+  // so it lands whatever else is owed, rather than waiting for one that a
+  // Room nobody is in any more can no longer answer.
+  if (endsTheRoom(change, view.you)) return applied(seen, change)
+  if (seen.sync.awaitingSnapshot) return seen
+  if (change.revision <= seen.revision) return seen
+  if (change.revision > seen.revision + 1) return recovering(seen)
+  const next = applied(seen, change)
   return next.phase === 'in-room' ? { ...next, revision: change.revision } : next
+}
+
+/** Whether this change is the last word for the Participant reading it. */
+function endsTheRoom(change: RoomChange, you: string): boolean {
+  return change.type === 'roomClosed' || (change.type === 'participantKicked' && change.identityId === you)
+}
+
+/** Records that this revision has gone past, whether or not it was applied. */
+function withSeen(view: InRoom, revision: number): InRoom {
+  const seenRevision = Math.max(view.sync.seenRevision, revision)
+  if (seenRevision === view.sync.seenRevision) return view
+  return { ...view, sync: { ...view.sync, seenRevision } }
 }
 
 /** What is on screen is no longer the Room: a full snapshot is owed. */

@@ -23,7 +23,7 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
     playback: null,
     revision: 1,
     presence: [],
-    sync: { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false },
+    sync: { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 1 },
     masterChange: null,
     ...view,
   }
@@ -242,12 +242,12 @@ describe('RoomScreen · staying in sync', () => {
 
   it('marks the Room live while it is recovering, and offline only when it is', () => {
     const commands = renderRoom(
-      roomView({ sync: { state: 'recovering', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: true } }),
+      roomView({ sync: { state: 'recovering', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: true, seenRevision: 2 } }),
     )
     expect(screen.getByText('LIVE')).toBeTruthy()
 
     rerenderRoom(
-      roomView({ sync: { state: 'offline', latencyMs: 42, failedAttempts: 1, awaitingSnapshot: true } }),
+      roomView({ sync: { state: 'offline', latencyMs: 42, failedAttempts: 1, awaitingSnapshot: true, seenRevision: 2 } }),
       commands,
     )
 

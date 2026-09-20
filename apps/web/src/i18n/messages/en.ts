@@ -276,7 +276,6 @@ export const en: Messages = {
   'room.table.waitingGuest': 'Waiting for the Master to load a hand.',
   'room.details.title': 'Details',
   'room.participants.title': 'In the room',
-  'room.participants.present': 'Connected',
   'room.joining': 'Joining the room…',
   'room.disconnected': 'The connection to the room was lost. Reload the page to rejoin.',
   'room.reload': 'Reload',

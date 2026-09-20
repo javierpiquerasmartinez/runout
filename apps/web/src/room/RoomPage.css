@@ -493,16 +493,27 @@
  * Action that got through.
  */
 .room-stage[data-sync='recovering'] .room-stage__play,
-.room-stage[data-sync='recovering'] .room-stage__felt {
+.room-stage[data-sync='recovering'] .room-stage__felt,
+.room-stage[data-sync='offline'] .room-stage__play,
+.room-stage[data-sync='offline'] .room-stage__felt {
   opacity: 0.7;
   transition: opacity var(--transition);
 }
 .room-stage[data-sync='offline'] .room-stage__play,
 .room-stage[data-sync='offline'] .room-stage__felt {
-  opacity: 0.7;
   filter: grayscale(0.55);
   pointer-events: none;
   user-select: none;
+}
+
+/* The same strip as the transport bar's, for a Room with no Hand loaded. */
+.room-stage__standby {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-divider);
+  background: var(--color-panel);
 }
 
 @keyframes ro-sync-pulse {

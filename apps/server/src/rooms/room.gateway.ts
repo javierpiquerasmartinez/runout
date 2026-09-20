@@ -590,8 +590,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Sends one change of the Room's shared state, taking the next revision for
    * it. A Participant left out still counts the revision as spent: their own
-   * snapshot already holds the change, so the sequence stays unbroken for
-   * everyone.
+   * snapshot already holds the change, so no Participant is left with a hole
+   * in the Revisions they have seen.
    */
   private broadcast(
     roomId: string,

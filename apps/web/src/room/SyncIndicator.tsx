@@ -30,9 +30,7 @@ export function SyncIndicator({
   const { t, formatNumber } = useI18n()
   // While the connection is in doubt that is the news, whoever is looking.
   const inControl = isMaster && sync.state === 'synced'
-  const label = inControl
-    ? t('room.playback.youControl')
-    : t(`room.playback.${sync.state === 'synced' ? 'synced' : sync.state}`)
+  const label = inControl ? t('room.playback.youControl') : t(`room.playback.${sync.state}`)
 
   return (
     <div className="sync-indicator" role="status">
@@ -43,7 +41,8 @@ export function SyncIndicator({
       {sync.state === 'offline' ? (
         <Offline failedAttempts={sync.failedAttempts} />
       ) : (
-        <span className="sync-indicator__detail">
+        // The figures it carries go in mono, as every figure in Runout does.
+        <span className="sync-indicator__detail ro-mono">
           {isMaster
             ? guestsLine(guests, t, formatNumber)
             : latencyLine(sync.latencyMs, sync.state === 'synced', t, formatNumber)}

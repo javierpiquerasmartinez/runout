@@ -3,8 +3,8 @@
  * state takes the next revision, and the change is sent carrying it, so a
  * Participant can tell a change they missed from one they already have.
  *
- * Revisions are per Room and live only as long as the Room does: they are a
- * sequence number for one session, never an identifier of anything.
+ * A Revision belongs to one Room and lives only as long as that Room does:
+ * it says where the Room stands, never which Room or which change it is.
  */
 export class RoomRevisions {
   private readonly revisions = new Map<string, number>();

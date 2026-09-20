@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { initialRoomView, reduceRoom, type RoomView } from './roomClient'
-import { RoomConnection } from './roomConnection'
+import { RESYNC_RETRY_MS, RoomConnection } from './roomConnection'
 
 /** What a Participant can ask of the Room. The server decides whether they may. */
 export interface RoomCommands {
@@ -46,7 +46,13 @@ export function useRoom(code: string, token: string, displayName: string | null)
 
   const owed = view.phase === 'in-room' && view.sync.awaitingSnapshot
   useEffect(() => {
-    if (owed) connectionRef.current?.resync()
+    if (!owed) return
+    const ask = () => connectionRef.current?.resync()
+    ask()
+    // The ask can be lost, and the answer can land behind the Room it was
+    // drawn from; either way the Room is asked again until one arrives current.
+    const retry = setInterval(ask, RESYNC_RETRY_MS)
+    return () => clearInterval(retry)
   }, [owed])
 
   const revision = view.phase === 'in-room' ? view.revision : 0

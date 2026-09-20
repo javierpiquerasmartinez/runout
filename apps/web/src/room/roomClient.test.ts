@@ -88,7 +88,7 @@ describe('reduceRoom', () => {
       playback: null,
       revision: 4,
       presence: [],
-      sync: { state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false },
+      sync: { state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 4 },
       masterChange: null,
     })
   })
@@ -296,7 +296,58 @@ describe('reduceRoom, staying in sync', () => {
   it('holds everything back while a snapshot is owed', () => {
     const recovering = apply(snapshot, { type: 'entryRemoved', id: 'entry-1', revision: 9 })
     const after = reduceRoom(recovering, { type: 'participantJoined', participant: alberto, revision: 10 })
-    expect(after).toBe(recovering)
+
+    expect(inRoom(after)?.participants).toEqual([javier, marta])
+    expect(inRoom(after)?.revision).toBe(4)
+    expect(inRoom(after)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true })
+  })
+
+  it('takes the end of the Room even with a snapshot owed, rather than waiting for one', () => {
+    const recovering = apply(snapshot, { type: 'entryRemoved', id: 'entry-1', revision: 9 })
+
+    // A Room nobody is in any more can no longer answer the resync, so a
+    // closure that waited for one would leave the screen recovering forever.
+    expect(reduceRoom(recovering, { type: 'roomClosed', revision: 11 })).toEqual({
+      phase: 'closed',
+      room: { code: 'RNT4K9PX', name: 'Martes NL50' },
+    })
+    expect(reduceRoom(recovering, { type: 'participantKicked', identityId: 'id-marta', revision: 11 })).toEqual({
+      phase: 'kicked',
+      room: { code: 'RNT4K9PX', name: 'Martes NL50' },
+    })
+  })
+
+  it('still waits for the snapshot when it is someone else who was removed', () => {
+    const recovering = apply(snapshot, { type: 'entryRemoved', id: 'entry-1', revision: 9 })
+    const after = reduceRoom(recovering, { type: 'participantKicked', identityId: 'id-javier', revision: 11 })
+
+    expect(inRoom(after)?.participants).toEqual([javier, marta])
+    expect(inRoom(after)?.sync.awaitingSnapshot).toBe(true)
+  })
+
+  it('does not call itself caught up on a snapshot the Room has already moved past', () => {
+    // A change goes by while the snapshot is being drawn: it is dropped, and
+    // the snapshot that lands was drawn before it.
+    const view = apply(
+      snapshot,
+      { type: 'entryRemoved', id: 'entry-1', revision: 9 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 }, revision: 10 },
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 8 } },
+    )
+
+    expect(inRoom(view)?.revision).toBe(8)
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true, seenRevision: 10 })
+  })
+
+  it('is caught up once the snapshot is level with everything that went past', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entryRemoved', id: 'entry-1', revision: 9 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 }, revision: 10 },
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 10 } },
+    )
+
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'synced', awaitingSnapshot: false, seenRevision: 10 })
   })
 
   it('jumps straight to the Room as it stands when the snapshot comes back', () => {
@@ -333,7 +384,13 @@ describe('reduceRoom, staying in sync', () => {
       { type: 'connecting' },
       { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 20 } },
     )
-    expect(inRoom(view)?.sync).toEqual({ state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false })
+    expect(inRoom(view)?.sync).toEqual({
+      state: 'synced',
+      latencyMs: null,
+      failedAttempts: 0,
+      awaitingSnapshot: false,
+      seenRevision: 20,
+    })
   })
 
   it('counts the reconnections that fail, so a reload can be offered', () => {

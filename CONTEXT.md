@@ -111,6 +111,10 @@ _Avoid_: Status, online, idle
 What a Participant's browser sends every few seconds: that it is there, the Revision it has applied, and the round trip it last measured.
 _Avoid_: Ping, keepalive
 
+**Sync**:
+Whether what one Participant has on screen is the Room as it stands: synced, recovering (a Revision was missed, or the connection has just come back) or offline. About their own screen, where Presence is about how the Room sees them.
+_Avoid_: Connected, online, up to date
+
 **Hide Opponent Names**:
 A Playback switch, off whenever a Hand is loaded, that shows seats by Position instead of Screen Name unless the Screen Name belongs to a Participant of the Room.
 _Avoid_: Anonymise, hide nicks

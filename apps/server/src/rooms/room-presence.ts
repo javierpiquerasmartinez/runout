@@ -105,8 +105,12 @@ export class RoomPresence<Connection> {
 
   /**
    * How every Participant present is following the Room, in the order they
-   * joined. A Participant is read from their liveliest connection: one dead
-   * tab says nothing while another is still beating.
+   * joined. Each reading comes from whichever of their tabs answers it best:
+   * one tab left behind says nothing about them while another is keeping up.
+   *
+   * This is worked out whenever a heartbeat arrives, from anyone in the Room,
+   * so a Participant who falls silent is seen the next time one of the others
+   * beats. In a Room of one there is nobody it could be shown to.
    */
   following(
     roomId: string,
@@ -116,10 +120,12 @@ export class RoomPresence<Connection> {
     const room = this.rooms.get(roomId);
     if (!room) return [];
     return this.inJoinOrder(room).map((present) => {
-      const heartbeat = [...present.connections.values()].sort(
-        (a, b) => b.at.getTime() - a.at.getTime(),
-      )[0];
-      const silence = now.getTime() - heartbeat.at.getTime();
+      const heartbeats = [...present.connections.values()];
+      const beatAt = Math.max(...heartbeats.map((one) => one.at.getTime()));
+      const measured = heartbeats
+        .map((one) => one.latencyMs)
+        .filter((latencyMs): latencyMs is number => latencyMs !== null);
+      const silence = now.getTime() - beatAt;
       return {
         identityId: present.identityId,
         presence:
@@ -128,8 +134,8 @@ export class RoomPresence<Connection> {
             : silence >= UNSTABLE_AFTER_MS
               ? 'unstable'
               : 'connected',
-        latencyMs: heartbeat.latencyMs,
-        inSync: heartbeat.revision >= revision,
+        latencyMs: measured.length > 0 ? Math.min(...measured) : null,
+        inSync: Math.max(...heartbeats.map((one) => one.revision)) >= revision,
       };
     });
   }
