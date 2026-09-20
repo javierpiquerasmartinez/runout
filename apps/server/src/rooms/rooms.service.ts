@@ -97,6 +97,21 @@ export class RoomsService {
     };
   }
 
+  /** The open Room behind an id, for a Participant already inside it. */
+  async openById(roomId: string): Promise<Room> {
+    const [room] = await this.db
+      .select()
+      .from(rooms)
+      .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open')));
+    if (!room) throw new Rejected('room-not-found');
+    return {
+      id: room.id,
+      code: room.code,
+      name: room.name,
+      masterId: room.masterId,
+    };
+  }
+
   /**
    * The open Room behind a typed code, for someone who may still enter it.
    * A Room they were kicked from is `kicked-from-room`, never its name.

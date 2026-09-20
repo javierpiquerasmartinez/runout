@@ -5,6 +5,8 @@ import { I18nProvider } from '../i18n'
 import { createTranslator } from '../i18n/translator'
 import type { HandWithTimeline, Street, TableState } from './hand'
 import { PlaybackBar } from './PlaybackBar'
+import type { RoomSync } from './roomClient'
+import type { GuestsFollowing } from './syncView'
 import { tableView } from './tableView'
 
 const state = (street: Street): TableState => ({
@@ -40,12 +42,15 @@ const hand: HandWithTimeline = {
   },
 }
 
-function renderBar(actionIndex: number, isMaster: boolean) {
+const inSync: RoomSync = { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false }
+const noGuests: GuestsFollowing = { total: 0, inSync: 0, latencyMs: null }
+
+function renderBar(actionIndex: number, isMaster: boolean, sync: RoomSync = inSync, guests = noGuests) {
   const onGoTo = vi.fn()
   const view = tableView(hand, actionIndex, createTranslator('en'))
   render(
     <I18nProvider initialLocale="en">
-      <PlaybackBar view={view} isMaster={isMaster} connected onGoTo={onGoTo} />
+      <PlaybackBar view={view} isMaster={isMaster} sync={sync} guests={guests} onGoTo={onGoTo} />
     </I18nProvider>,
   )
   return onGoTo
@@ -83,5 +88,64 @@ describe('PlaybackBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Flop. Only the Master controls playback' }))
     await userEvent.click(screen.getByRole('button', { name: 'Next street. Only the Master controls playback' }))
     expect(onGoTo).not.toHaveBeenCalled()
+  })
+
+  it('freezes the table for the Master too, once the Room is out of reach', async () => {
+    const onGoTo = renderBar(1, true, { ...inSync, state: 'offline' })
+    const frozen = 'Offline: the table is frozen on the last Action it received.'
+
+    await userEvent.click(screen.getByRole('button', { name: `Next action. ${frozen}` }))
+    await userEvent.click(screen.getByRole('button', { name: `Flop. ${frozen}` }))
+
+    expect(onGoTo).not.toHaveBeenCalled()
+  })
+})
+
+describe('PlaybackBar, the sync indicator', () => {
+  const sync = (state: RoomSync['state'], over: Partial<RoomSync> = {}): RoomSync => ({
+    ...inSync,
+    state,
+    ...over,
+  })
+  const said = () => screen.getByRole('status').textContent ?? ''
+
+  it('tells a Guest they are with the Master, and how long the round trip takes', () => {
+    renderBar(1, false)
+    expect(said()).toContain('In sync with the Master')
+    expect(said()).toContain('42 ms latency · up to date')
+  })
+
+  it('says it is recovering, and stops claiming to be up to date', () => {
+    renderBar(1, false, sync('recovering'))
+    expect(said()).toContain('Recovering sync')
+    expect(said()).toContain('42 ms latency · catching up')
+  })
+
+  it('says there is no connection at all, and that the table is frozen', () => {
+    renderBar(1, false, sync('offline'))
+    expect(said()).toContain('Not connected to the room')
+    expect(screen.queryByRole('button', { name: /Reconnect/ })).toBeNull()
+  })
+
+  it('offers a reload once three reconnections have failed', () => {
+    renderBar(1, false, sync('offline', { failedAttempts: 3 }))
+    expect(screen.getByRole('button', { name: /Reconnect/ })).toBeTruthy()
+  })
+
+  it('tells the Master how many Guests are with them, and the slowest round trip', () => {
+    renderBar(1, true, inSync, { total: 3, inSync: 2, latencyMs: 118 })
+    expect(said()).toContain('You control the room')
+    expect(said()).toContain('2 guests in sync · 118 ms')
+  })
+
+  it('says so plainly when the Master is alone in the Room', () => {
+    renderBar(1, true)
+    expect(said()).toContain('No guests in the room')
+  })
+
+  it('drops "you control the room" while the Master’s own connection is in doubt', () => {
+    renderBar(1, true, sync('recovering'), { total: 1, inSync: 0, latencyMs: null })
+    expect(said()).toContain('Recovering sync')
+    expect(said()).not.toContain('You control the room')
   })
 })

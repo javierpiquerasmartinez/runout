@@ -21,8 +21,14 @@ import { MasterService, type MasterChanged } from './master.service.js';
 import { PlaybackService, type Playback } from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
 import { RoomClosure } from './room-closure.js';
-import { RoomPresence, type Participant } from './room-presence.js';
-import { RoomsService, type RoomSummary } from './rooms.service.js';
+import {
+  RoomPresence,
+  presenceChanged,
+  type Participant,
+  type ParticipantPresence,
+} from './room-presence.js';
+import { RoomRevisions } from './room-revisions.js';
+import { RoomsService, type Room, type RoomSummary } from './rooms.service.js';
 
 export interface JoinCommand {
   code: string;
@@ -37,6 +43,23 @@ export interface RoomSnapshot {
   queue: QueueEntry[];
   /** Null while no Hand is loaded. */
   playback: Playback | null;
+  /** The revision this snapshot is at. Every later change carries a higher one. */
+  revision: number;
+  /** How everyone in the Room is following it right now. */
+  presence: ParticipantPresence[];
+}
+
+export interface HeartbeatCommand {
+  /** The client's own clock when it sent this, echoed back so it can time the round trip. */
+  sentAt: number;
+  /** The last revision of the Room this client has applied. */
+  revision: number;
+  /** The round trip this client last measured, in ms; null before it has one. */
+  latencyMs: number | null;
+}
+
+export interface HeartbeatAck {
+  sentAt: number;
 }
 
 export interface HandOverMasterCommand {
@@ -96,6 +119,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly failover: MasterFailover;
   /** The Rooms nobody is connected to, waiting to close themselves. */
   private readonly closure: RoomClosure;
+  /** Where each Room is in its own history, so clients can spot what they missed. */
+  private readonly revisions = new RoomRevisions();
+  /** The last presence each Room was told about, so only real changes travel. */
+  private readonly presenceTold = new Map<string, ParticipantPresence[]>();
 
   constructor(
     private readonly identities: IdentityService,
@@ -103,7 +130,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly queue: QueueService,
     private readonly playback: PlaybackService,
     private readonly masters: MasterService,
-    @Inject(CLOCK) clock: Clock,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {
     this.failover = new MasterFailover(clock, (roomId) =>
       this.passOnMaster(roomId),
@@ -149,10 +176,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         String(command?.code ?? ''),
         command?.displayName,
       );
-      const [queue, playback] = await Promise.all([
-        this.queue.entries(room.id),
-        this.playback.current(room.id),
-      ]);
       if (socket.readyState !== WebSocket.OPEN) return undefined;
 
       this.leave(socket);
@@ -161,6 +184,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         room.masterId,
         participant,
         socket,
+        this.clock.now(),
       );
       this.closure.stop(room.id);
       // A Room whose Master ran out of grace while empty gives the role to
@@ -175,17 +199,83 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           participant: this.presence.participant(room.id, identity.id),
         });
       }
-      return {
-        event: 'room.snapshot',
-        data: {
-          room: { code: room.code, name: room.name },
-          you: identity.id,
-          participants: this.presence.participants(room.id),
-          queue,
-          playback,
-        },
-      };
+      return this.snapshot(socket, identity.id, room);
     });
+  }
+
+  /**
+   * A Participant who has lost the thread — a revision they never saw — asks
+   * for the Room as it stands. They are already in it: nobody else hears.
+   */
+  @SubscribeMessage('room.resync')
+  resync(
+    @ConnectedSocket() socket: WebSocket,
+  ): Promise<WsResponse<RoomSnapshot | RejectedEvent> | undefined> {
+    return this.rejecting('room.resync', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      return this.snapshot(
+        socket,
+        identity.id,
+        await this.rooms.openById(roomId),
+      );
+    });
+  }
+
+  /**
+   * A client says it is still there, how far behind the Room it is and what
+   * round trip it last measured; the reply echoes its own clock so it can
+   * measure the next one. This is the only thing presence is read from.
+   */
+  @SubscribeMessage('room.heartbeat')
+  heartbeat(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<HeartbeatCommand> | null,
+  ): WsResponse<HeartbeatAck> {
+    const place = this.presence.placeOf(socket);
+    if (place) {
+      this.presence.beat(socket, {
+        at: this.clock.now(),
+        latencyMs: reported(command?.latencyMs),
+        revision: reported(command?.revision) ?? 0,
+      });
+      this.reportPresence(place.roomId);
+    }
+    return {
+      event: 'room.heartbeatAck',
+      data: { sentAt: Number(command?.sentAt ?? 0) },
+    };
+  }
+
+  /**
+   * The Room as it stands, for one Participant. The revision is read before
+   * the Queue and the Playback, so a change landing mid-read is one the
+   * snapshot may already hold but the client is sent anyway: every event can
+   * be applied twice without harm, while a missed one cannot be recovered.
+   */
+  private async snapshot(
+    socket: WebSocket,
+    identityId: string,
+    room: Room,
+  ): Promise<WsResponse<RoomSnapshot>> {
+    const revision = this.revisions.current(room.id);
+    const [queue, playback] = await Promise.all([
+      this.queue.entries(room.id),
+      this.playback.current(room.id),
+    ]);
+    // A snapshot says as much as a heartbeat: they are at this revision now.
+    this.presence.applied(socket, revision, this.clock.now());
+    return {
+      event: 'room.snapshot',
+      data: {
+        room: { code: room.code, name: room.name },
+        you: identityId,
+        participants: this.presence.participants(room.id),
+        queue,
+        playback,
+        revision,
+        presence: this.following(room.id),
+      },
+    };
   }
 
   /**
@@ -227,6 +317,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Sent before they go, so their own tabs hear it too.
       this.publish(roomId, 'room.participantKicked', kicked);
       this.presence.evict(roomId, kicked.identityId);
+      this.reportPresence(roomId);
       this.watchIfEmpty(roomId);
       return undefined;
     });
@@ -349,11 +440,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): Promise<WsResponse<RejectedEvent> | undefined> {
     return this.rejecting('queue.undoRemoval', async () => {
       const { identity, roomId } = await this.inRoom(socket);
-      const entry = await this.queue.undoRemoval(
-        identity,
-        roomId,
-        command?.id,
-      );
+      const entry = await this.queue.undoRemoval(identity, roomId, command?.id);
       this.publish(roomId, 'queue.entryRestored', { entry });
       return undefined;
     });
@@ -414,6 +501,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.presence.clear(roomId);
     this.failover.stop(roomId);
     this.closure.stop(roomId);
+    this.revisions.forget(roomId);
+    this.presenceTold.delete(roomId);
   }
 
   /**
@@ -493,20 +582,60 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { identity, roomId: place.roomId };
   }
 
-  /** Sends an event to every connection in the Room. */
+  /** Sends a change to every connection in the Room, at the revision it makes. */
   publish(roomId: string, event: string, data: unknown): void {
     this.broadcast(roomId, undefined, event, data);
   }
 
+  /**
+   * Sends one change of the Room's shared state, taking the next revision for
+   * it. A Participant left out still counts the revision as spent: their own
+   * snapshot already holds the change, so the sequence stays unbroken for
+   * everyone.
+   */
   private broadcast(
     roomId: string,
     exceptIdentityId: string | undefined,
     event: string,
     data: unknown,
   ): void {
-    const message = JSON.stringify({ event, data });
+    const revision = this.revisions.next(roomId);
+    this.send(roomId, exceptIdentityId, { event, data, revision });
+    this.reportPresence(roomId);
+  }
+
+  /**
+   * Tells the Room how everyone in it is following, when that has changed.
+   * Presence carries no revision: each report replaces the last, and one
+   * going astray costs nothing but a few seconds of a stale reading.
+   */
+  private reportPresence(roomId: string): void {
+    const following = this.following(roomId);
+    if (!presenceChanged(this.presenceTold.get(roomId), following)) return;
+    this.presenceTold.set(roomId, following);
+    this.send(roomId, undefined, {
+      event: 'room.presence',
+      data: { participants: following },
+    });
+  }
+
+  /** How everyone in the Room is following it, as of now. */
+  private following(roomId: string): ParticipantPresence[] {
+    return this.presence.following(
+      roomId,
+      this.revisions.current(roomId),
+      this.clock.now(),
+    );
+  }
+
+  private send(
+    roomId: string,
+    exceptIdentityId: string | undefined,
+    message: { event: string; data: unknown; revision?: number },
+  ): void {
+    const raw = JSON.stringify(message);
     for (const socket of this.presence.connections(roomId, exceptIdentityId)) {
-      if (socket.readyState === WebSocket.OPEN) socket.send(message);
+      if (socket.readyState === WebSocket.OPEN) socket.send(raw);
     }
   }
 
@@ -525,4 +654,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw error;
     }
   }
+}
+
+/** A count a client reported, or null when it sent anything else. */
+function reported(raw: unknown): number | null {
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }

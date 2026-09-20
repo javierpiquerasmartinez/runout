@@ -1,28 +1,35 @@
 import { useI18n } from '../i18n'
-import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { guardLocked, lockedProps } from '../ui/locked'
+import type { RoomSync } from './roomClient'
 import type { StreetProgress } from './streetProgress'
+import { SyncIndicator } from './SyncIndicator'
+import type { GuestsFollowing } from './syncView'
 import type { TableView } from './tableView'
 
 /**
  * The transport bar of the "Sala" boards, minus play/pause and speed: the
  * Street progress bar, where Playback is, the step controls and who drives.
- * Guests see the same controls, locked, never hidden.
+ * Guests see the same controls, locked, never hidden — and so does everyone
+ * while the Room is out of reach, with the table frozen where it was left.
  */
 export function PlaybackBar({
   view,
   isMaster,
-  connected,
+  sync,
+  guests,
   onGoTo,
 }: {
   view: TableView
   isMaster: boolean
-  connected: boolean
+  sync: RoomSync
+  guests: GuestsFollowing
   onGoTo: (actionIndex: number) => void
 }) {
   const { t } = useI18n()
-  const masterOnly = isMaster ? undefined : t('room.playback.masterOnly')
+  // Nothing is asked of a Room we cannot reach: the table stays where it froze.
+  const frozen = sync.state === 'offline' ? t('room.playback.frozen') : undefined
+  const masterOnly = frozen ?? (isMaster ? undefined : t('room.playback.masterOnly'))
 
   return (
     <section className="playback-bar" aria-label={t('room.playback.label')}>
@@ -37,7 +44,7 @@ export function PlaybackBar({
         </div>
 
         <div className="playback-bar__controls">
-          {!isMaster && <span className="playback-bar__locked-note">{masterOnly}</span>}
+          {masterOnly && <span className="playback-bar__locked-note">{masterOnly}</span>}
           <IconButton
             icon="street-back"
             label={t('room.playback.previousStreet')}
@@ -65,17 +72,7 @@ export function PlaybackBar({
         </div>
 
         <div className="playback-bar__who">
-          {isMaster ? (
-            <span className="playback-bar__pill" data-tone="brass">
-              <Icon name="master" size={13} />
-              {t('room.playback.youControl')}
-            </span>
-          ) : (
-            <span className="playback-bar__pill" data-tone={connected ? 'sync' : 'muted'}>
-              <span className="playback-bar__dot" />
-              {t(connected ? 'room.playback.synced' : 'room.playback.offline')}
-            </span>
-          )}
+          <SyncIndicator sync={sync} isMaster={isMaster} guests={guests} />
         </div>
       </div>
     </section>

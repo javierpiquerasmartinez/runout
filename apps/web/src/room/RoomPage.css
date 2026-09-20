@@ -120,7 +120,15 @@
   border-radius: 50%;
   background: currentColor;
 }
-.room-header__live[data-offline] {
+.room-header__live[data-sync='recovering'] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+}
+.room-header__live[data-sync='recovering'] .room-header__live-dot {
+  animation: ro-sync-pulse 1.2s ease-in-out infinite;
+}
+.room-header__live[data-sync='offline'] {
   border-color: var(--color-border-strong);
   background: transparent;
   color: var(--text-muted);
@@ -476,6 +484,35 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+/*
+ * Section C of "Especificación del reproductor": while the Room is being
+ * recovered the table drops to 70% — what is drawn may no longer be true —
+ * and while there is no connection it freezes, untouchable, on the last
+ * Action that got through.
+ */
+.room-stage[data-sync='recovering'] .room-stage__play,
+.room-stage[data-sync='recovering'] .room-stage__felt {
+  opacity: 0.7;
+  transition: opacity var(--transition);
+}
+.room-stage[data-sync='offline'] .room-stage__play,
+.room-stage[data-sync='offline'] .room-stage__felt {
+  opacity: 0.7;
+  filter: grayscale(0.55);
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes ro-sync-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 
 .room-stage__felt {
@@ -1083,11 +1120,44 @@
   background: var(--sync-hover-bg);
   color: var(--sync-ink);
 }
+.playback-bar__pill[data-tone='alert'] {
+  border-color: var(--alert-border);
+  background: var(--alert-hover-bg);
+  color: var(--alert-ink);
+}
 .playback-bar__dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: currentColor;
+}
+.playback-bar__pill[data-state='recovering'] .playback-bar__dot {
+  animation: ro-sync-pulse 1.2s ease-in-out infinite;
+}
+
+/* Board C: the pill, with the round trip (or the Room's Guests) under it. */
+.sync-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.sync-indicator__detail {
+  font-size: 11.5px;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.sync-indicator__reload {
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playback-bar__pill[data-state='recovering'] .playback-bar__dot,
+  .room-header__live[data-sync='recovering'] .room-header__live-dot {
+    animation: none;
+  }
 }
 
 .room-side__section {
@@ -1147,13 +1217,29 @@
   color: var(--text-muted);
 }
 
+/*
+ * Connected, unstable or away, read from their heartbeats; a ring around it
+ * says they have not caught up with the Action everyone else is on.
+ */
 .room-participant__presence {
+  box-sizing: content-box;
   width: 7px;
   height: 7px;
   flex-shrink: 0;
   margin-left: auto;
   border-radius: 50%;
   background: var(--sync);
+}
+.room-participant__presence[data-presence='unstable'] {
+  background: var(--brass);
+}
+.room-participant__presence[data-presence='away'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--alert);
+}
+.room-participant__presence[data-behind] {
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: 2px;
 }
 
 /* Only the Master sees it, on every row but their own. */

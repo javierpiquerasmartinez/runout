@@ -21,7 +21,9 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
     participants: [javier, marta],
     queue: [],
     playback: null,
-    connected: true,
+    revision: 1,
+    presence: [],
+    sync: { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false },
     masterChange: null,
     ...view,
   }
@@ -210,5 +212,45 @@ describe('RoomScreen · the end of a Room', () => {
     expect(window.location.pathname).toBe('/')
     expect(commands.closeRoom).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('RoomScreen · staying in sync', () => {
+  it('tells the Master how each Participant is following the Room', () => {
+    renderRoom(
+      roomView({
+        presence: [
+          { identityId: 'id-javier', presence: 'connected', latencyMs: 12, inSync: true },
+          { identityId: 'id-marta', presence: 'away', latencyMs: 400, inSync: false },
+        ],
+      }),
+    )
+
+    expect(screen.getByTitle('Connected')).toBeTruthy()
+    expect(screen.getByTitle('No signal for over 30 s')).toBeTruthy()
+  })
+
+  it('flags a Participant who is connected but has not caught up', () => {
+    renderRoom(
+      roomView({
+        presence: [{ identityId: 'id-marta', presence: 'unstable', latencyMs: 900, inSync: false }],
+      }),
+    )
+
+    expect(screen.getByTitle('Unstable connection · Has not received the latest Action yet')).toBeTruthy()
+  })
+
+  it('marks the Room live while it is recovering, and offline only when it is', () => {
+    const commands = renderRoom(
+      roomView({ sync: { state: 'recovering', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: true } }),
+    )
+    expect(screen.getByText('LIVE')).toBeTruthy()
+
+    rerenderRoom(
+      roomView({ sync: { state: 'offline', latencyMs: 42, failedAttempts: 1, awaitingSnapshot: true } }),
+      commands,
+    )
+
+    expect(screen.getByText('OFFLINE')).toBeTruthy()
   })
 })

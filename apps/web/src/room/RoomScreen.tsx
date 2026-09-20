@@ -26,10 +26,11 @@ import {
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
 import { RoomDialog } from './RoomDialog'
-import type { Participant, QueueEntry, RoomView } from './roomClient'
+import type { Participant, ParticipantPresence, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
 import { useShortcuts } from './shortcuts'
 import { StreetLog } from './StreetLog'
+import { guestsFollowing, presenceOf } from './syncView'
 import { tableView, type PayoutView, type TableView } from './tableView'
 import { useHand, type HandLoad } from './useHand'
 import type { RoomCommands } from './useRoom'
@@ -96,7 +97,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
     loadedEntry ?? (lastLoadedEntry?.handId === view.playback?.handId ? lastLoadedEntry : undefined)
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
   const next = view.queue[loadedIndex + 1]
-  useShortcuts(isMaster, {
+  useShortcuts(isMaster && view.sync.state !== 'offline', {
     'previous-hand': previous && (() => commands.loadHand(previous.handId)),
     'next-hand': next && (() => commands.loadHand(next.handId)),
   })
@@ -124,7 +125,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           importOutcome={importOutcome}
         />
 
-        <main className="room-stage">
+        <main className="room-stage" data-sync={view.sync.state}>
           {view.playback ? (
             <LoadedHand
               view={view}
@@ -172,6 +173,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
                 <ParticipantRow
                   key={participant.identityId}
                   participant={participant}
+                  presence={presenceOf(view.presence, participant.identityId)}
                   isYou={participant.identityId === view.you}
                   authored={authoredCount(view.queue, participant.identityId)}
                   onHandOver={
@@ -588,9 +590,9 @@ function RoomHeader({
 
       <span className="room-header__spacer" />
 
-      <span className="room-header__live" data-offline={!view.connected || undefined}>
+      <span className="room-header__live" data-sync={view.sync.state}>
         <span className="room-header__live-dot" />
-        {t(view.connected ? 'room.live' : 'room.offline')}
+        {t(view.sync.state === 'offline' ? 'room.offline' : 'room.live')}
       </span>
       {!isMaster && master && (
         <span className="room-header__master">
@@ -649,7 +651,7 @@ function LoadedHand({
   const index = view.queue.findIndex((entry) => entry.handId === handId)
   const entry = view.queue[index]
   const goTo = (actionIndex: number | null) => (actionIndex === null ? undefined : () => onGoTo(actionIndex))
-  useShortcuts(isMaster && table !== null, {
+  useShortcuts(isMaster && table !== null && view.sync.state !== 'offline', {
     'previous-action': goTo(table?.canGoBack ? table.actionIndex - 1 : null),
     'next-action': goTo(table?.canGoForward ? table.actionIndex + 1 : null),
     'previous-street': goTo(table?.streets.previousStreet ?? null),
@@ -678,7 +680,13 @@ function LoadedHand({
             <PokerTable view={table} />
           </div>
           <StreetLog log={table.log} />
-          <PlaybackBar view={table} isMaster={isMaster} connected={view.connected} onGoTo={onGoTo} />
+          <PlaybackBar
+            view={table}
+            isMaster={isMaster}
+            sync={view.sync}
+            guests={guestsFollowing(view.participants, view.presence)}
+            onGoTo={onGoTo}
+          />
         </>
       ) : (
         <div className="room-stage__felt">
@@ -986,12 +994,15 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
 
 function ParticipantRow({
   participant,
+  presence,
   isYou,
   authored,
   onHandOver,
   onKick,
 }: {
   participant: Participant
+  /** How they are following the Room, or null before it has been reported. */
+  presence: ParticipantPresence | null
   isYou: boolean
   /** How many Hands in the Queue they are Author of. */
   authored: number
@@ -1017,9 +1028,7 @@ function ParticipantRow({
           })}
         </span>
       </span>
-      <span className="room-participant__presence" title={t('room.participants.present')}>
-        <span className="ro-visually-hidden">{t('room.participants.present')}</span>
-      </span>
+      <ParticipantPresenceDot presence={presence} />
       {onHandOver && (
         <IconButton
           icon="master"
@@ -1039,6 +1048,24 @@ function ParticipantRow({
         />
       )}
     </li>
+  )
+}
+
+/**
+ * How one Participant is following the Room: connected, unstable or away for
+ * over 30 s, and whether they have the Action everyone else is on.
+ */
+function ParticipantPresenceDot({ presence }: { presence: ParticipantPresence | null }) {
+  const { t } = useI18n()
+  const state = presence?.presence ?? 'connected'
+  const behind = presence !== null && presence.presence !== 'away' && !presence.inSync
+  const said = [t(`room.participants.presence.${state}`), behind ? t('room.participants.presence.behind') : null]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <span className="room-participant__presence" data-presence={state} data-behind={behind || undefined} title={said}>
+      <span className="ro-visually-hidden">{said}</span>
+    </span>
   )
 }
 
