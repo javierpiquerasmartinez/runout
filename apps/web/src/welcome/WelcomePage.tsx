@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api, reasonOf } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
 import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
-import { navigate } from '../routing'
+import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
 import type { JoinIntent } from '../room/joinIntent'
 import { roomPath } from '../room/roomCode'
@@ -16,6 +16,14 @@ import './WelcomePage.css'
 
 /** Same limit the server enforces. */
 const ROOM_NAME_MAX_LENGTH = 60
+
+/** An open Room this person has been in, as the server lists it. */
+interface OpenRoom extends RoomSummary {
+  /** Whether anyone is connected to it right now. */
+  live: boolean
+  /** When they first arrived in it, as an ISO instant. */
+  joinedAt: string
+}
 
 export function WelcomePage() {
   const { t } = useI18n()
@@ -42,10 +50,75 @@ export function WelcomePage() {
           </div>
           <JoinRoomCard />
         </div>
+
+        <RecentRooms />
       </div>
 
       <WelcomePreview />
     </main>
+  )
+}
+
+/**
+ * "Tus salas recientes" from the welcome board: the open Rooms this person
+ * has been in, the live ones marked. A closed Room never reopens, so it is
+ * not listed; neither is one they were removed from.
+ */
+function RecentRooms() {
+  const { t, formatRelative } = useI18n()
+  const { token } = useSession()
+  // The moment the list arrived, so every "how long ago" is read from one clock.
+  const [listed, setListed] = useState<{ rooms: OpenRoom[]; at: Date } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    api<OpenRoom[]>('/rooms', { token })
+      .then((rooms) => !cancelled && setListed({ rooms, at: new Date() }))
+      // Nothing to show is the same as nothing to say: the list stays away.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  if (!listed || listed.rooms.length === 0) return null
+  const { rooms, at: listedAt } = listed
+
+  /** How long ago they were last in it, or "hace un momento" within the minute. */
+  function since(joinedAt: string): string {
+    const joined = new Date(joinedAt)
+    return listedAt.getTime() - joined.getTime() < 60_000
+      ? t('welcome.rooms.justNow')
+      : formatRelative(joined, listedAt)
+  }
+
+  return (
+    <section className="welcome__rooms" aria-labelledby="welcome-rooms-title">
+      <span id="welcome-rooms-title" className="welcome__rooms-title ro-mono">
+        {t('welcome.rooms.title')}
+      </span>
+      <ul className="welcome-rooms">
+        {rooms.map((room) => (
+          <li key={room.code}>
+            <a
+              href={roomPath(room.code)}
+              className="welcome-room"
+              data-live={room.live || undefined}
+              aria-label={t('welcome.rooms.open', { name: room.name })}
+              onClick={followLink}
+            >
+              <span className="welcome-room__dot" aria-hidden="true" />
+              <span className="welcome-room__name">{room.name}</span>
+              {room.live ? (
+                <span className="welcome-room__live">{t('welcome.rooms.live')}</span>
+              ) : (
+                <span className="welcome-room__when ro-mono">{since(room.joinedAt)}</span>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

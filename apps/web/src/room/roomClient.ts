@@ -76,6 +76,8 @@ export type RoomEvent =
   | { type: 'snapshot'; snapshot: RoomSnapshot }
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
+  | { type: 'participantKicked'; identityId: string }
+  | { type: 'roomClosed' }
   | ({ type: 'masterChanged' } & MasterChange)
   | { type: 'entriesAdded'; entries: QueueEntry[] }
   | { type: 'authorChanged'; handId: string; author: Author }
@@ -90,6 +92,10 @@ export type RoomView =
   | { phase: 'joining' }
   | { phase: 'rejected'; reason: RejectionReason }
   | { phase: 'disconnected' }
+  /** The Master removed you; this Room is over for you and never takes you back. */
+  | { phase: 'kicked'; room: RoomSummary }
+  /** The session ended, for everyone. A closed Room never reopens. */
+  | { phase: 'closed'; room: RoomSummary }
   | {
       phase: 'in-room'
       room: RoomSummary
@@ -122,6 +128,13 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'participantLeft':
       if (view.phase !== 'in-room') return view
       return { ...view, participants: view.participants.filter((p) => p.identityId !== event.identityId) }
+    case 'participantKicked':
+      if (view.phase !== 'in-room') return view
+      if (event.identityId === view.you) return { phase: 'kicked', room: view.room }
+      return { ...view, participants: view.participants.filter((p) => p.identityId !== event.identityId) }
+    case 'roomClosed':
+      if (view.phase !== 'in-room') return view
+      return { phase: 'closed', room: view.room }
     case 'masterChanged': {
       if (view.phase !== 'in-room') return view
       // The role is the only thing that moves: whoever held it becomes a Guest.
@@ -164,7 +177,9 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'rejected':
       return event.command === 'room.join' ? { phase: 'rejected', reason: event.reason } : view
     case 'disconnected':
-      return view.phase === 'in-room' ? { ...view, connected: false } : { phase: 'disconnected' }
+      if (view.phase === 'in-room') return { ...view, connected: false }
+      // A Room that is already over stays as it is: the drop explains nothing.
+      return view.phase === 'joining' ? { phase: 'disconnected' } : view
   }
 }
 
@@ -185,6 +200,10 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'participantJoined', participant: data.participant as Participant }
     case 'room.participantLeft':
       return { type: 'participantLeft', identityId: String(data.identityId) }
+    case 'room.participantKicked':
+      return { type: 'participantKicked', identityId: String(data.identityId) }
+    case 'room.closed':
+      return { type: 'roomClosed' }
     case 'room.masterChanged':
       return {
         type: 'masterChanged',

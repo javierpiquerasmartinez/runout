@@ -71,6 +71,38 @@ export class RoomPresence<Connection> {
     return place;
   }
 
+  /**
+   * Takes one Participant out of the Room, whatever they have open. Returns
+   * the connections that were theirs, so each can be told why.
+   */
+  evict(roomId: string, identityId: string): Connection[] {
+    const room = this.rooms.get(roomId);
+    const present = room?.present.get(identityId);
+    if (!room || !present) return [];
+    const connections = [...present.connections] as Connection[];
+    for (const connection of connections) this.roomOf.delete(connection);
+    room.present.delete(identityId);
+    if (room.present.size === 0) this.rooms.delete(roomId);
+    return connections;
+  }
+
+  /** Empties the Room: it is closed, and nobody is in it any more. */
+  clear(roomId: string): Connection[] {
+    const room = this.rooms.get(roomId);
+    if (!room) return [];
+    const connections = [...room.present.values()].flatMap(
+      (present) => [...present.connections] as Connection[],
+    );
+    for (const connection of connections) this.roomOf.delete(connection);
+    this.rooms.delete(roomId);
+    return connections;
+  }
+
+  /** Whether anyone at all is connected to the Room right now. */
+  isLive(roomId: string): boolean {
+    return (this.rooms.get(roomId)?.present.size ?? 0) > 0;
+  }
+
   /** Who holds the Master role of a Room, while anyone is present in it. */
   masterOf(roomId: string): string | null {
     return this.rooms.get(roomId)?.masterId ?? null;

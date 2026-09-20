@@ -215,6 +215,32 @@ describe('reduceRoom', () => {
     expect(view).toMatchObject({ phase: 'in-room', connected: false, participants: [javier, marta] })
   })
 
+  it('takes a kicked Participant out of the list for everyone else', () => {
+    const view = apply(snapshot, { type: 'participantKicked', identityId: javier.identityId })
+    expect(view).toMatchObject({ phase: 'in-room', participants: [marta] })
+  })
+
+  it('ends the Room for the Participant who was kicked', () => {
+    expect(apply(snapshot, { type: 'participantKicked', identityId: 'id-marta' })).toEqual({
+      phase: 'kicked',
+      room: { code: 'RNT4K9PX', name: 'Martes NL50' },
+    })
+  })
+
+  it('shows a closed Room as closed, not as a blank screen', () => {
+    expect(apply(snapshot, { type: 'roomClosed' })).toEqual({
+      phase: 'closed',
+      room: { code: 'RNT4K9PX', name: 'Martes NL50' },
+    })
+  })
+
+  it('keeps a Room that is over on screen when the connection then drops', () => {
+    const closed = apply(snapshot, { type: 'roomClosed' }, { type: 'disconnected' })
+    expect(closed).toEqual({ phase: 'closed', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
+    const kicked = apply(snapshot, { type: 'participantKicked', identityId: 'id-marta' }, { type: 'disconnected' })
+    expect(kicked).toEqual({ phase: 'kicked', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
+  })
+
   it('reports a drop before joining as disconnected', () => {
     expect(apply({ type: 'disconnected' })).toEqual({ phase: 'disconnected' })
   })
@@ -229,6 +255,10 @@ describe('parseServerMessage', () => {
     expect(
       parseServerMessage(JSON.stringify({ event: 'rejected', data: { command: 'room.join', reason: 'room-not-found' } })),
     ).toEqual({ type: 'rejected', command: 'room.join', reason: 'room-not-found' })
+    expect(parseServerMessage(JSON.stringify({ event: 'room.participantKicked', data: { identityId: 'x' } }))).toEqual(
+      { type: 'participantKicked', identityId: 'x' },
+    )
+    expect(parseServerMessage(JSON.stringify({ event: 'room.closed', data: {} }))).toEqual({ type: 'roomClosed' })
     expect(
       parseServerMessage(JSON.stringify({ event: 'queue.entriesAdded', data: { entries: [firstHand] } })),
     ).toEqual({ type: 'entriesAdded', entries: [firstHand] })

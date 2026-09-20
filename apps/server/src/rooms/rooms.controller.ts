@@ -19,6 +19,14 @@ import { QueueService } from './queue.service.js';
 import { RoomGateway } from './room.gateway.js';
 import { RoomsService, type RoomSummary } from './rooms.service.js';
 
+/** An open Room someone has been in, as the welcome screen lists it. */
+interface OpenRoomView extends RoomSummary {
+  /** Whether anyone is connected to it right now. */
+  live: boolean;
+  /** When they first arrived in it, as an ISO instant. */
+  joinedAt: string;
+}
+
 /** The largest file one upload may carry. */
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -46,10 +54,33 @@ export class RoomsController {
     const creator = await this.identities.authenticate(
       bearerToken(authorization),
     );
-    return this.rooms.create(creator, {
+    const room = await this.rooms.create(creator, {
       name: body.name,
       displayName: body.displayName,
     });
+    // Its abandonment period starts now: a Room nobody ever joins still closes.
+    this.gateway.roomOpened(room.id);
+    return { code: room.code, name: room.name };
+  }
+
+  /**
+   * The open Rooms this identity has been in, newest first, for the welcome
+   * screen. Closed Rooms and Rooms they were kicked from are left out.
+   */
+  @Get()
+  async mine(
+    @Headers('authorization') authorization: string | undefined,
+  ): Promise<OpenRoomView[]> {
+    const identity = await this.identities.authenticate(
+      bearerToken(authorization),
+    );
+    const open = await this.rooms.openRoomsOf(identity.id);
+    return open.map((room) => ({
+      code: room.code,
+      name: room.name,
+      live: this.gateway.isLive(room.id),
+      joinedAt: room.joinedAt.toISOString(),
+    }));
   }
 
   /** Lets the web check a typed code, and name the Room, before joining. */
@@ -58,8 +89,10 @@ export class RoomsController {
     @Headers('authorization') authorization: string | undefined,
     @Param('code') code: string,
   ): Promise<RoomSummary> {
-    await this.identities.authenticate(bearerToken(authorization));
-    const room = await this.rooms.findOpen(code);
+    const identity = await this.identities.authenticate(
+      bearerToken(authorization),
+    );
+    const room = await this.rooms.findOpenFor(identity, code);
     return { code: room.code, name: room.name };
   }
 

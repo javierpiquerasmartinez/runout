@@ -12,6 +12,7 @@ export function createTranslator(locale: Locale) {
   const intlLocale = intlLocales[locale]
   const numberFormat = new Intl.NumberFormat(intlLocale)
   const listFormat = new Intl.ListFormat(intlLocale, { type: 'conjunction' })
+  const relativeFormat = new Intl.RelativeTimeFormat(intlLocale, { numeric: 'auto' })
 
   return {
     locale,
@@ -29,5 +30,36 @@ export function createTranslator(locale: Locale) {
       date.toLocaleTimeString(intlLocale, options),
     /** "Marta y Alberto": names joined the way the language does it. */
     formatList: (items: string[]) => listFormat.format(items),
+    /** "hace 21 días", "21 days ago": how long ago an instant was, in its largest unit. */
+    formatRelative: (date: Date, now: Date = new Date()) => {
+      const { amount, unit } = relativeUnit(date.getTime() - now.getTime())
+      return relativeFormat.format(amount, unit)
+    },
   }
+}
+
+/** Rounded steps, largest first: the unit a span of time is best read in. */
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['year', 365 * 24 * 3_600_000],
+  ['month', 30 * 24 * 3_600_000],
+  ['day', 24 * 3_600_000],
+  ['hour', 3_600_000],
+  ['minute', 60_000],
+]
+
+/**
+ * How to say a span of milliseconds: the largest unit it fills at least once,
+ * down to minutes, and 0 minutes ("ahora") for anything shorter.
+ */
+function relativeUnit(elapsedMs: number): {
+  amount: number
+  unit: Intl.RelativeTimeFormatUnit
+} {
+  const span = Math.abs(elapsedMs)
+  for (const [unit, size] of RELATIVE_UNITS) {
+    if (span >= size) {
+      return { amount: Math.trunc(elapsedMs / size), unit }
+    }
+  }
+  return { amount: 0, unit: 'minute' }
 }

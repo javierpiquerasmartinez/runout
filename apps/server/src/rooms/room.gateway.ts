@@ -20,6 +20,7 @@ import { MasterFailover } from './master-failover.js';
 import { MasterService, type MasterChanged } from './master.service.js';
 import { PlaybackService, type Playback } from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
+import { RoomClosure } from './room-closure.js';
 import { RoomPresence, type Participant } from './room-presence.js';
 import { RoomsService, type RoomSummary } from './rooms.service.js';
 
@@ -40,6 +41,11 @@ export interface RoomSnapshot {
 
 export interface HandOverMasterCommand {
   /** The identity id of the Participant taking the Master role. */
+  identityId: string;
+}
+
+export interface KickCommand {
+  /** The identity id of the Participant being removed from the Room. */
   identityId: string;
 }
 
@@ -88,6 +94,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly playbackChanges = new Map<string, Promise<unknown>>();
   /** The Rooms waiting for a Master who dropped. */
   private readonly failover: MasterFailover;
+  /** The Rooms nobody is connected to, waiting to close themselves. */
+  private readonly closure: RoomClosure;
 
   constructor(
     private readonly identities: IdentityService,
@@ -100,6 +108,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.failover = new MasterFailover(clock, (roomId) =>
       this.passOnMaster(roomId),
     );
+    this.closure = new RoomClosure(clock, (roomId) =>
+      this.closeAbandoned(roomId),
+    );
+  }
+
+  /** A Room has just been opened: its abandonment period starts at once. */
+  roomOpened(roomId: string): void {
+    this.closure.watch(roomId);
+  }
+
+  /** Whether anyone is connected to the Room right now. */
+  isLive(roomId: string): boolean {
+    return this.presence.isLive(roomId);
   }
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -141,6 +162,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         participant,
         socket,
       );
+      this.closure.stop(room.id);
       // A Room whose Master ran out of grace while empty gives the role to
       // whoever arrives first, before their own snapshot is drawn.
       if (identity.id === this.presence.masterOf(room.id)) {
@@ -166,14 +188,62 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  /**
+   * A Guest walks out. The Master cannot: they are refused with
+   * `master-must-choose` until they have handed the role over or closed the
+   * Room, so a session is never left without anyone driving it.
+   */
   @SubscribeMessage('room.leave')
   leaveRoom(
     @ConnectedSocket() socket: WebSocket,
   ): Promise<WsResponse<RejectedEvent> | undefined> {
     return this.rejecting('room.leave', async () => {
-      await this.authenticated(socket);
-      if (!this.presence.isInRoom(socket)) throw new Rejected('not-in-room');
+      const { identity, roomId } = await this.inRoom(socket);
+      if (await this.rooms.isMaster(roomId, identity.id)) {
+        throw new Rejected('master-must-choose');
+      }
       this.leave(socket);
+      return undefined;
+    });
+  }
+
+  /**
+   * The Master removes a Participant. They are out of the Room at once,
+   * whatever they have open, and the Room Code stops working for them; their
+   * Queue Entries are left exactly where they are.
+   */
+  @SubscribeMessage('room.kick')
+  kick(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<KickCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('room.kick', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const kicked = await this.rooms.kick(
+        identity,
+        roomId,
+        command?.identityId,
+      );
+      // Sent before they go, so their own tabs hear it too.
+      this.publish(roomId, 'room.participantKicked', kicked);
+      this.presence.evict(roomId, kicked.identityId);
+      this.watchIfEmpty(roomId);
+      return undefined;
+    });
+  }
+
+  /**
+   * The Master ends the session. Everyone is told, nobody is left in the Room
+   * and the Room Code stops working; the Hands it reviewed are untouched.
+   */
+  @SubscribeMessage('room.close')
+  close(
+    @ConnectedSocket() socket: WebSocket,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('room.close', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      await this.rooms.close(identity, roomId);
+      this.roomClosed(roomId);
       return undefined;
     });
   }
@@ -322,7 +392,28 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.broadcast(left.roomId, left.identityId, 'room.participantLeft', {
         identityId: left.identityId,
       });
+      this.watchIfEmpty(left.roomId);
     }
+  }
+
+  /** A Room nobody is connected to any more starts its abandonment period. */
+  private watchIfEmpty(roomId: string): void {
+    if (!this.presence.isLive(roomId)) this.closure.watch(roomId);
+  }
+
+  /** Closes a Room that has sat empty for the whole abandonment period. */
+  private async closeAbandoned(roomId: string): Promise<void> {
+    // Someone arrived while the closure was on its way to running.
+    if (this.presence.isLive(roomId)) return;
+    if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
+  }
+
+  /** Tells the Room it has closed and empties it; it never reopens. */
+  private roomClosed(roomId: string): void {
+    this.publish(roomId, 'room.closed', {});
+    this.presence.clear(roomId);
+    this.failover.stop(roomId);
+    this.closure.stop(roomId);
   }
 
   /**
