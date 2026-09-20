@@ -73,8 +73,12 @@ _Avoid_: Shared with me, collection, archive
 ### Room and queue
 
 **Room**:
-The shared space for exactly one study session: Participants, a Queue and the Playback. Closes only when its Master closes it, or after sitting empty for a while; a closed Room never reopens.
+The shared space for exactly one study session: Participants, a Queue and the Playback. Closes only when its Master closes it, or after 30 minutes with nobody connected; a closed Room never reopens.
 _Avoid_: Session, study session, table, lobby, group
+
+**Kick**:
+Taking a Participant out of a Room for good. Only the Master does it: the person leaves at once, the Room Code stops working for them, and the Queue Entries they brought stay where they are.
+_Avoid_: Ban, expel, expulsar (UI only), remove
 
 **Room Code**:
 The short code that lets a person join a Room. Valid only while the Room is open.

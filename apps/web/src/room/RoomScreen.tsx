@@ -75,6 +75,8 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const isMaster = me?.role === 'master'
   const masterNotice = useMasterNotice(view)
   const [decision, setDecision] = useState<RoomDecision | null>(null)
+  // Who the Master is handing the Room to on their way out, until the role moves.
+  const [leavingTo, setLeavingTo] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
@@ -98,6 +100,11 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
     'previous-hand': previous && (() => commands.loadHand(previous.handId)),
     'next-hand': next && (() => commands.loadHand(next.handId)),
   })
+  // A handover can still be refused (it may lose a race to a failover), so the
+  // Master only walks out once the Room says the role has moved.
+  useEffect(() => {
+    if (leavingTo !== null && !isMaster) navigate('/')
+  }, [leavingTo, isMaster])
 
   return (
     <div className="room">
@@ -195,6 +202,11 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           decision={decision}
           view={view}
           commands={commands}
+          handingOverTo={leavingTo}
+          onHandOver={(identityId) => {
+            commands.handOverMaster(identityId)
+            setLeavingTo(identityId)
+          }}
           onClose={() => setDecision(null)}
           onCloseRoom={() => setDecision({ kind: 'close' })}
         />
@@ -206,62 +218,59 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
 /**
  * What the Room asks before something irreversible. A Master cannot simply
  * walk out (H1.7): they hand the role to someone present, or close the
- * session for everyone.
+ * Room for everyone.
  */
 function RoomDecisionDialog({
   decision,
   view,
   commands,
+  handingOverTo,
+  onHandOver,
   onClose,
   onCloseRoom,
 }: {
   decision: RoomDecision
   view: InRoom
   commands: RoomCommands
+  /** The Participant the Master is on their way out through, while it settles. */
+  handingOverTo: string | null
+  onHandOver: (identityId: string) => void
   onClose: () => void
   onCloseRoom: () => void
 }) {
   const { t } = useI18n()
 
-  if (decision.kind === 'kick') {
-    const name = decision.participant.displayName
+  // Kicking and closing ask the same thing: one red act, or nothing.
+  if (decision.kind !== 'leave') {
+    const asked =
+      decision.kind === 'kick'
+        ? {
+            title: t('room.kick.title', { name: decision.participant.displayName }),
+            body: t('room.kick.body'),
+            label: t('room.kick.confirm'),
+            act: () => commands.kick(decision.participant.identityId),
+          }
+        : {
+            title: t('room.close.title'),
+            body: t('room.close.body'),
+            label: t('room.close.confirm'),
+            act: () => commands.closeRoom(),
+          }
     return (
       <RoomDialog
-        title={t('room.kick.title', { name })}
-        body={t('room.kick.body')}
+        title={asked.title}
+        body={asked.body}
         onClose={onClose}
         actions={
           <Button
             variant="destructive"
             autoFocus
             onClick={() => {
-              commands.kick(decision.participant.identityId)
+              asked.act()
               onClose()
             }}
           >
-            {t('room.kick.confirm')}
-          </Button>
-        }
-      />
-    )
-  }
-
-  if (decision.kind === 'close') {
-    return (
-      <RoomDialog
-        title={t('room.close.title')}
-        body={t('room.close.body')}
-        onClose={onClose}
-        actions={
-          <Button
-            variant="destructive"
-            autoFocus
-            onClick={() => {
-              commands.closeRoom()
-              onClose()
-            }}
-          >
-            {t('room.close.confirm')}
+            {asked.label}
           </Button>
         }
       />
@@ -287,10 +296,9 @@ function RoomDecisionDialog({
               <button
                 type="button"
                 className="room-dialog__choice"
-                onClick={() => {
-                  commands.handOverMaster(participant.identityId)
-                  navigate('/')
-                }}
+                aria-busy={participant.identityId === handingOverTo || undefined}
+                // Still focusable while the handover settles, as a locked control is.
+                onClick={() => handingOverTo === null && onHandOver(participant.identityId)}
               >
                 <Avatar name={participant.displayName} seed={participant.identityId} size={24} />
                 <span className="room-dialog__choice-name">{participant.displayName}</span>

@@ -23,7 +23,7 @@ import { RoomsService, type RoomSummary } from './rooms.service.js';
 interface OpenRoomView extends RoomSummary {
   /** Whether anyone is connected to it right now. */
   live: boolean;
-  /** When they first arrived in it, as an ISO instant. */
+  /** When they first arrived in it, kept across rejoins, as an ISO instant. */
   joinedAt: string;
 }
 
@@ -64,8 +64,9 @@ export class RoomsController {
   }
 
   /**
-   * The open Rooms this identity has been in, newest first, for the welcome
-   * screen. Closed Rooms and Rooms they were kicked from are left out.
+   * The open Rooms this identity has been in, the most recently joined first,
+   * for the welcome screen. Closed Rooms and Rooms they were kicked from are
+   * left out.
    */
   @Get()
   async mine(

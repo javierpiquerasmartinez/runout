@@ -21,7 +21,7 @@ const ROOM_NAME_MAX_LENGTH = 60
 interface OpenRoom extends RoomSummary {
   /** Whether anyone is connected to it right now. */
   live: boolean
-  /** When they first arrived in it, as an ISO instant. */
+  /** When they first arrived in it, kept across rejoins, as an ISO instant. */
   joinedAt: string
 }
 
@@ -84,8 +84,12 @@ function RecentRooms() {
   if (!listed || listed.rooms.length === 0) return null
   const { rooms, at: listedAt } = listed
 
-  /** How long ago they were last in it, or "hace un momento" within the minute. */
-  function since(joinedAt: string): string {
+  /**
+   * How long they have been a Participant of it: `joinedAt` is their first
+   * arrival, which the Room keeps across rejoins. "Hace un momento" inside
+   * the minute, where the locale would say "este minuto".
+   */
+  function inRoomSince(joinedAt: string): string {
     const joined = new Date(joinedAt)
     return listedAt.getTime() - joined.getTime() < 60_000
       ? t('welcome.rooms.justNow')
@@ -112,7 +116,7 @@ function RecentRooms() {
               {room.live ? (
                 <span className="welcome-room__live">{t('welcome.rooms.live')}</span>
               ) : (
-                <span className="welcome-room__when ro-mono">{since(room.joinedAt)}</span>
+                <span className="welcome-room__when ro-mono">{inRoomSince(room.joinedAt)}</span>
               )}
             </a>
           </li>

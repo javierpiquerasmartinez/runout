@@ -62,6 +62,11 @@
   border-color: var(--color-border-hover);
   background: var(--color-hover);
 }
+.room-dialog__choice[aria-busy] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+}
 .room-dialog__choice:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);

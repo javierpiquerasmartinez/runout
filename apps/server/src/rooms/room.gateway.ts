@@ -191,7 +191,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * A Guest walks out. The Master cannot: they are refused with
    * `master-must-choose` until they have handed the role over or closed the
-   * Room, so a session is never left without anyone driving it.
+   * Room, so a Room is never left without anyone driving it.
    */
   @SubscribeMessage('room.leave')
   leaveRoom(
@@ -233,11 +233,11 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * The Master ends the session. Everyone is told, nobody is left in the Room
+   * The Master closes the Room. Everyone is told, nobody is left in it
    * and the Room Code stops working; the Hands it reviewed are untouched.
    */
   @SubscribeMessage('room.close')
-  close(
+  closeRoom(
     @ConnectedSocket() socket: WebSocket,
   ): Promise<WsResponse<RejectedEvent> | undefined> {
     return this.rejecting('room.close', async () => {

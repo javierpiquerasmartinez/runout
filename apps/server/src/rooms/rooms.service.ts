@@ -26,7 +26,7 @@ export interface Room extends RoomSummary {
 /** An open Room someone has been in, for the welcome screen's list. */
 export interface OpenRoom extends RoomSummary {
   id: string;
-  /** When they first arrived in it. */
+  /** When they first arrived in it, kept across rejoins. */
   joinedAt: Date;
 }
 
@@ -103,17 +103,27 @@ export class RoomsService {
    */
   async findOpenFor(identity: Identity, typedCode: string): Promise<Room> {
     const room = await this.findOpen(typedCode);
+    if (await this.wasKicked(room.id, identity.id)) {
+      throw new Rejected('kicked-from-room');
+    }
+    return room;
+  }
+
+  /** Whether the Master of this Room has taken them out of it for good. */
+  private async wasKicked(
+    roomId: string,
+    identityId: string,
+  ): Promise<boolean> {
     const [membership] = await this.db
       .select({ kicked: roomMemberships.kicked })
       .from(roomMemberships)
       .where(
         and(
-          eq(roomMemberships.roomId, room.id),
-          eq(roomMemberships.identityId, identity.id),
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, identityId),
         ),
       );
-    if (membership?.kicked) throw new Rejected('kicked-from-room');
-    return room;
+    return membership?.kicked ?? false;
   }
 
   /**
@@ -223,7 +233,7 @@ export class RoomsService {
   }
 
   /**
-   * The Master ends the session for everyone. A closed Room never reopens and
+   * The Master closes the Room for everyone. A closed Room never reopens and
    * its Room Code stops working; the Hands it reviewed are untouched.
    */
   async close(master: Identity, roomId: string): Promise<void> {
