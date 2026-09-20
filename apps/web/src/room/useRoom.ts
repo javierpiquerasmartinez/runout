@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
-import { socketUrl } from '../backend/ping'
-import { initialRoomView, parseServerMessage, reduceRoom, type RoomView } from './roomClient'
+import { initialRoomView, reduceRoom, type RoomView } from './roomClient'
+import { RESYNC_RETRY_MS, RoomConnection } from './roomConnection'
 
 /** What a Participant can ask of the Room. The server decides whether they may. */
 export interface RoomCommands {
@@ -25,43 +25,42 @@ export interface RoomCommands {
 /**
  * Joins the Room over the WebSocket once `displayName` is known, and leaves it
  * when the screen goes away. Pass null to wait (e.g. while the name is confirmed).
+ *
+ * The connection manager keeps the socket up and the reducer holds the Room;
+ * this only carries what one says to the other. A revision nobody saw arrive,
+ * or a reconnection, leaves the view owed a snapshot, which is asked for here.
  */
 export function useRoom(code: string, token: string, displayName: string | null): [RoomView, RoomCommands] {
   const [view, dispatch] = useReducer(reduceRoom, initialRoomView)
-  const socketRef = useRef<WebSocket | null>(null)
+  const connectionRef = useRef<RoomConnection | null>(null)
 
   useEffect(() => {
     if (displayName === null) return
-    const socket = new WebSocket(`${socketUrl('/ws')}?token=${encodeURIComponent(token)}`)
-    socketRef.current = socket
-    const send = (event: string, data: unknown = {}) => socket.send(JSON.stringify({ event, data }))
-    // Detached on cleanup, so a socket being closed never touches a later one's view.
-    const controller = new AbortController()
-    const { signal } = controller
-
-    socket.addEventListener('open', () => send('room.join', { code, displayName }), { signal })
-    socket.addEventListener(
-      'message',
-      (message: MessageEvent<string>) => {
-        const event = parseServerMessage(message.data)
-        if (event) dispatch(event)
-      },
-      { signal },
-    )
-    socket.addEventListener('close', () => dispatch({ type: 'disconnected' }), { signal })
-
+    const connection = new RoomConnection({ code, token, displayName, onEvent: dispatch })
+    connectionRef.current = connection
     return () => {
-      if (socketRef.current === socket) socketRef.current = null
-      controller.abort()
-      if (socket.readyState === WebSocket.OPEN) send('room.leave')
-      socket.close()
+      if (connectionRef.current === connection) connectionRef.current = null
+      connection.close()
     }
   }, [code, token, displayName])
 
-  const send = useCallback((event: string, data: unknown) => {
-    const socket = socketRef.current
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ event, data }))
-  }, [])
+  const owed = view.phase === 'in-room' && view.sync.awaitingSnapshot
+  useEffect(() => {
+    if (!owed) return
+    const ask = () => connectionRef.current?.resync()
+    ask()
+    // The ask can be lost, and the answer can land behind the Room it was
+    // drawn from; either way the Room is asked again until one arrives current.
+    const retry = setInterval(ask, RESYNC_RETRY_MS)
+    return () => clearInterval(retry)
+  }, [owed])
+
+  const revision = view.phase === 'in-room' ? view.revision : 0
+  useEffect(() => {
+    connectionRef.current?.report(revision)
+  }, [revision])
+
+  const send = useCallback((event: string, data: unknown) => connectionRef.current?.send(event, data), [])
   const commands = useMemo<RoomCommands>(
     () => ({
       handOverMaster: (identityId) => send('room.handOver', { identityId }),

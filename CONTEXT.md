@@ -95,6 +95,26 @@ A Hand placed in a Room's Queue, with its position. Removing it leaves the Hand 
 The Room's shared replay state: which Hand is loaded, which Action it is on, and whether Hide Opponent Names is on. Only the Master changes it; there is no automatic play.
 _Avoid_: Player state, reproduction, speed, autoplay
 
+**Revision**:
+Where a Room is in its own history: a number that goes up by one with every change to its shared state, and that every change is sent carrying. It belongs to one session and identifies nothing.
+_Avoid_: Version, sequence number, event id
+
+**Snapshot**:
+The Room as it stands right now, at one Revision, sent whole. A Participant who missed a Revision, or who was away, takes one and drops everything they held.
+_Avoid_: State dump, refresh, full sync
+
+**Presence**:
+How well a Participant is following the Room, read from their Heartbeats: connected, unstable, or away once they have been silent for over 30 seconds. Separate from being in the Room at all.
+_Avoid_: Status, online, idle
+
+**Heartbeat**:
+What a Participant's browser sends every few seconds: that it is there, the Revision it has applied, and the round trip it last measured.
+_Avoid_: Ping, keepalive
+
+**Sync**:
+Whether what one Participant has on screen is the Room as it stands: synced, recovering (a Revision was missed, or the connection has just come back) or offline. About their own screen, where Presence is about how the Room sees them.
+_Avoid_: Connected, online, up to date
+
 **Hide Opponent Names**:
 A Playback switch, off whenever a Hand is loaded, that shows seats by Position instead of Screen Name unless the Screen Name belongs to a Participant of the Room.
 _Avoid_: Anonymise, hide nicks

@@ -3,6 +3,8 @@ import { WebSocket, type RawData } from 'ws';
 export interface Message<T = any> {
   event: string;
   data: T;
+  /** The revision a change to the Room's shared state produced, when it is one. */
+  revision?: number;
 }
 
 /**
@@ -46,26 +48,34 @@ export class RoomClient {
     matches: (data: T) => boolean = () => true,
     timeoutMs = 2_000,
   ): Promise<T> {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const index = this.received.findIndex(
-        (message) => message.event === event && matches(message.data as T),
-      );
-      if (index !== -1) return this.received.splice(index, 1)[0].data as T;
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
-        throw new Error(
-          `No "${event}" within ${timeoutMs} ms. Received: ${JSON.stringify(this.received)}`,
-        );
-      }
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, remaining);
-        this.waiters.push(() => {
-          clearTimeout(timer);
-          resolve();
-        });
-      });
-    }
+    return (await this.nextMessage<T>(event, matches, timeoutMs)).data;
+  }
+
+  /** The same, envelope and all, for a test that reads a message's revision. */
+  async nextMessage<T = any>(
+    event: string,
+    matches: (data: T) => boolean = () => true,
+    timeoutMs = 2_000,
+  ): Promise<Message<T>> {
+    const index = await this.waitFor(event, matches, timeoutMs);
+    return this.received.splice(index, 1)[0] as Message<T>;
+  }
+
+  /**
+   * Waits for a matching message of `event` without consuming it, for a test
+   * that then reads the whole run of messages as it arrived.
+   */
+  async until<T = any>(
+    event: string,
+    matches: (data: T) => boolean = () => true,
+    timeoutMs = 2_000,
+  ): Promise<void> {
+    await this.waitFor(event, matches, timeoutMs);
+  }
+
+  /** Asserts helper: every message received so far, in order, without consuming. */
+  messages(): Message[] {
+    return [...this.received];
   }
 
   /** Asserts helper: every message of `event` received so far, without consuming. */
@@ -81,5 +91,33 @@ export class RoomClient {
       this.socket.once('close', () => resolve());
       this.socket.close();
     });
+  }
+
+  /** The position of the first matching message, waiting for one to arrive. */
+  private async waitFor<T>(
+    event: string,
+    matches: (data: T) => boolean,
+    timeoutMs: number,
+  ): Promise<number> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const index = this.received.findIndex(
+        (message) => message.event === event && matches(message.data as T),
+      );
+      if (index !== -1) return index;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        throw new Error(
+          `No "${event}" within ${timeoutMs} ms. Received: ${JSON.stringify(this.received)}`,
+        );
+      }
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, remaining);
+        this.waiters.push(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    }
   }
 }

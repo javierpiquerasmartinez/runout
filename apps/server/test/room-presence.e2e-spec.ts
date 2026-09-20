@@ -14,6 +14,13 @@ interface Snapshot {
   participants: Participant[];
   queue: unknown[];
   playback: unknown;
+  revision: number;
+  presence: {
+    identityId: string;
+    presence: string;
+    latencyMs: number | null;
+    inSync: boolean;
+  }[];
 }
 
 describe('Joining a Room over the WebSocket (e2e)', () => {
@@ -64,6 +71,16 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
       ],
       queue: [],
       playback: null,
+      // Their own arrival is the Room's first change.
+      revision: 1,
+      presence: [
+        {
+          identityId: master.id,
+          presence: 'connected',
+          latencyMs: null,
+          inSync: true,
+        },
+      ],
     });
   });
 

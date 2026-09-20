@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  RELOAD_AFTER_FAILURES,
   initialRoomView,
   parseServerMessage,
   reduceRoom,
   type QueueEntry,
+  type RoomChange,
   type RoomEvent,
   type RoomView,
 } from './roomClient'
@@ -33,19 +35,50 @@ const snapshot: RoomEvent = {
     participants: [javier, marta],
     queue: [],
     playback: null,
+    revision: 4,
+    presence: [],
   },
 }
 
-function apply(...events: RoomEvent[]): RoomView {
-  return events.reduce(reduceRoom, initialRoomView)
+const changeTypes = new Set<string>([
+  'participantJoined',
+  'participantLeft',
+  'participantKicked',
+  'roomClosed',
+  'masterChanged',
+  'entriesAdded',
+  'authorChanged',
+  'entriesReordered',
+  'entryRemoved',
+  'entryRestored',
+  'playbackChanged',
+])
+
+/**
+ * Applies events in order. A change without a revision of its own is given the
+ * next one, as the server would; a change that states one is left alone, so a
+ * test can arrange a gap, a duplicate or a change that arrives out of order.
+ */
+function apply(...events: (RoomEvent | RoomChange)[]): RoomView {
+  let revision = 0
+  let view = initialRoomView
+  for (const event of events) {
+    if (event.type === 'snapshot') revision = event.snapshot.revision
+    const numbered = changeTypes.has(event.type) && !('revision' in event) ? { ...event, revision: ++revision } : event
+    if ('revision' in numbered && typeof numbered.revision === 'number') revision = Math.max(revision, numbered.revision)
+    view = reduceRoom(view, numbered as RoomEvent)
+  }
+  return view
 }
+
+const inRoom = (view: RoomView) => (view.phase === 'in-room' ? view : null)
 
 describe('reduceRoom', () => {
   it('is joining until the snapshot arrives', () => {
-    expect(initialRoomView).toEqual({ phase: 'joining' })
+    expect(initialRoomView).toEqual({ phase: 'joining', failedAttempts: 0 })
   })
 
-  it('lands on the Room from its snapshot', () => {
+  it('lands on the Room from its snapshot, in sync at its revision', () => {
     expect(apply(snapshot)).toEqual({
       phase: 'in-room',
       room: { code: 'RNT4K9PX', name: 'Martes NL50' },
@@ -53,7 +86,9 @@ describe('reduceRoom', () => {
       participants: [javier, marta],
       queue: [],
       playback: null,
-      connected: true,
+      revision: 4,
+      presence: [],
+      sync: { state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 4 },
       masterChange: null,
     })
   })
@@ -63,7 +98,7 @@ describe('reduceRoom', () => {
       type: 'snapshot',
       snapshot: { ...snapshot.snapshot, queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 4 } },
     })
-    expect(view.phase === 'in-room' && view.playback).toEqual({ handId: 'hand-1', actionIndex: 4 })
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 4 })
   })
 
   it('follows the Playback the Master sets', () => {
@@ -72,13 +107,12 @@ describe('reduceRoom', () => {
       { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } },
       { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3 } },
     )
-    expect(view.phase === 'in-room' && view.playback).toEqual({ handId: 'hand-1', actionIndex: 3 })
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 3 })
+    expect(inRoom(view)?.revision).toBe(6)
   })
 
   it('ignores Playback that arrives before the snapshot', () => {
-    expect(apply({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } })).toEqual({
-      phase: 'joining',
-    })
+    expect(apply({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } })).toEqual(initialRoomView)
   })
 
   it('keeps the Room as it is when a Playback command is refused', () => {
@@ -87,11 +121,8 @@ describe('reduceRoom', () => {
   })
 
   it('lands with the Queue the snapshot carries', () => {
-    const view = apply({
-      type: 'snapshot',
-      snapshot: { ...snapshot.snapshot, queue: [firstHand] },
-    })
-    expect(view.phase === 'in-room' && view.queue).toEqual([firstHand])
+    const view = apply({ type: 'snapshot', snapshot: { ...snapshot.snapshot, queue: [firstHand] } })
+    expect(inRoom(view)?.queue).toEqual([firstHand])
   })
 
   it('appends imported Hands at the end of the Queue', () => {
@@ -99,11 +130,11 @@ describe('reduceRoom', () => {
       { type: 'snapshot', snapshot: { ...snapshot.snapshot, queue: [firstHand] } },
       { type: 'entriesAdded', entries: [secondHand] },
     )
-    expect(view.phase === 'in-room' && view.queue).toEqual([firstHand, secondHand])
+    expect(inRoom(view)?.queue).toEqual([firstHand, secondHand])
   })
 
   it('ignores imported Hands that arrive before the snapshot', () => {
-    expect(apply({ type: 'entriesAdded', entries: [firstHand] })).toEqual({ phase: 'joining' })
+    expect(apply({ type: 'entriesAdded', entries: [firstHand] })).toEqual(initialRoomView)
   })
 
   it('puts the Queue in the order the Master gives, resyncing position', () => {
@@ -113,7 +144,7 @@ describe('reduceRoom', () => {
       { type: 'entriesReordered', order: ['entry-2', 'entry-1'] },
     )
 
-    expect(view.phase === 'in-room' && view.queue).toEqual([
+    expect(inRoom(view)?.queue).toEqual([
       { ...secondHand, position: 1 },
       { ...firstHand, position: 2 },
     ])
@@ -126,7 +157,7 @@ describe('reduceRoom', () => {
       { type: 'entryRemoved', id: 'entry-1' },
     )
 
-    expect(view.phase === 'in-room' && view.queue).toEqual([secondHand])
+    expect(inRoom(view)?.queue).toEqual([secondHand])
   })
 
   it('puts a restored Queue Entry back at its position', () => {
@@ -137,7 +168,7 @@ describe('reduceRoom', () => {
       { type: 'entryRestored', entry: firstHand },
     )
 
-    expect(view.phase === 'in-room' && view.queue).toEqual([firstHand, secondHand])
+    expect(inRoom(view)?.queue).toEqual([firstHand, secondHand])
   })
 
   it('gives a Hand in the Queue the Author the Master reassigned it to', () => {
@@ -147,31 +178,28 @@ describe('reduceRoom', () => {
       { type: 'authorChanged', handId: 'hand-2', author: { identityId: 'id-marta', displayName: 'Marta' } },
     )
 
-    expect(view.phase === 'in-room' && view.queue.map((entry) => entry.author.identityId)).toEqual([
-      'id-javier',
-      'id-marta',
-    ])
+    expect(inRoom(view)?.queue.map((entry) => entry.author.identityId)).toEqual(['id-javier', 'id-marta'])
   })
 
   it('adds a Participant who joins, at the end of the list', () => {
     const view = apply(snapshot, { type: 'participantJoined', participant: alberto })
-    expect(view.phase === 'in-room' && view.participants).toEqual([javier, marta, alberto])
+    expect(inRoom(view)?.participants).toEqual([javier, marta, alberto])
   })
 
   it('does not list a Participant twice', () => {
     const renamed = { ...marta, displayName: 'Marta R.' }
     const view = apply(snapshot, { type: 'participantJoined', participant: renamed })
-    expect(view.phase === 'in-room' && view.participants).toEqual([javier, renamed])
+    expect(inRoom(view)?.participants).toEqual([javier, renamed])
   })
 
   it('moves the Master role to the Participant it was handed to', () => {
     const view = apply(snapshot, { type: 'masterChanged', masterId: 'id-marta', reason: 'handover' })
 
-    expect(view.phase === 'in-room' && view.participants).toEqual([
+    expect(inRoom(view)?.participants).toEqual([
       { ...javier, role: 'guest' },
       { ...marta, role: 'master' },
     ])
-    expect(view.phase === 'in-room' && view.masterChange).toEqual({ masterId: 'id-marta', reason: 'handover' })
+    expect(inRoom(view)?.masterChange).toEqual({ masterId: 'id-marta', reason: 'handover' })
   })
 
   it('moves the role when it passes on its own, with the Master already gone', () => {
@@ -181,26 +209,21 @@ describe('reduceRoom', () => {
       { type: 'masterChanged', masterId: 'id-marta', reason: 'failover' },
     )
 
-    expect(view.phase === 'in-room' && view.participants).toEqual([{ ...marta, role: 'master' }])
-    expect(view.phase === 'in-room' && view.masterChange).toEqual({ masterId: 'id-marta', reason: 'failover' })
-  })
-
-  it('forgets an earlier handover once a fresh snapshot arrives', () => {
-    const view = apply(snapshot, { type: 'masterChanged', masterId: 'id-marta', reason: 'handover' }, snapshot)
-    expect(view.phase === 'in-room' && view.masterChange).toBeNull()
+    expect(inRoom(view)?.participants).toEqual([{ ...marta, role: 'master' }])
+    expect(inRoom(view)?.masterChange).toEqual({ masterId: 'id-marta', reason: 'failover' })
   })
 
   it('ignores a handover that arrives before the snapshot', () => {
-    expect(apply({ type: 'masterChanged', masterId: 'id-marta', reason: 'handover' })).toEqual({ phase: 'joining' })
+    expect(apply({ type: 'masterChanged', masterId: 'id-marta', reason: 'handover' })).toEqual(initialRoomView)
   })
 
   it('removes a Participant who leaves', () => {
     const view = apply(snapshot, { type: 'participantLeft', identityId: 'id-javier' })
-    expect(view.phase === 'in-room' && view.participants).toEqual([marta])
+    expect(inRoom(view)?.participants).toEqual([marta])
   })
 
   it('ignores Room events that arrive before the snapshot', () => {
-    expect(apply({ type: 'participantJoined', participant: alberto })).toEqual({ phase: 'joining' })
+    expect(apply({ type: 'participantJoined', participant: alberto })).toEqual(initialRoomView)
   })
 
   it('shows why joining was refused', () => {
@@ -208,11 +231,6 @@ describe('reduceRoom', () => {
       phase: 'rejected',
       reason: 'room-not-found',
     })
-  })
-
-  it('keeps the Room on screen, marked disconnected, when the connection drops', () => {
-    const view = apply(snapshot, { type: 'disconnected' })
-    expect(view).toMatchObject({ phase: 'in-room', connected: false, participants: [javier, marta] })
   })
 
   it('takes a kicked Participant out of the list for everyone else', () => {
@@ -240,52 +258,235 @@ describe('reduceRoom', () => {
     const kicked = apply(snapshot, { type: 'participantKicked', identityId: 'id-marta' }, { type: 'disconnected' })
     expect(kicked).toEqual({ phase: 'kicked', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
   })
+})
 
-  it('reports a drop before joining as disconnected', () => {
-    expect(apply({ type: 'disconnected' })).toEqual({ phase: 'disconnected' })
+describe('reduceRoom, staying in sync', () => {
+  it('counts a revision for every change, one after another', () => {
+    const view = apply(snapshot, { type: 'participantJoined', participant: alberto }, { type: 'entryRemoved', id: 'x' })
+    expect(inRoom(view)?.revision).toBe(6)
+  })
+
+  it('leaves the Room exactly as it was when a change arrives twice', () => {
+    const before = apply(snapshot, { type: 'entriesAdded', entries: [firstHand], revision: 5 })
+    const after = reduceRoom(before, { type: 'entriesAdded', entries: [firstHand], revision: 5 })
+
+    expect(after).toBe(before)
+    expect(inRoom(after)?.queue).toEqual([firstHand])
+  })
+
+  it('drops a change older than where the Room already stands', () => {
+    const before = apply(snapshot, { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3 } })
+    const after = reduceRoom(before, {
+      type: 'playbackChanged',
+      playback: { handId: 'hand-1', actionIndex: 1 },
+      revision: 4,
+    })
+    expect(after).toBe(before)
+  })
+
+  it('stops trusting what it holds the moment a revision is missing', () => {
+    const view = apply(snapshot, { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 9 }, revision: 7 })
+
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true })
+    // Nothing of the change is taken: the Room is not half of one state and half of another.
+    expect(inRoom(view)?.playback).toBeNull()
+    expect(inRoom(view)?.revision).toBe(4)
+  })
+
+  it('holds everything back while a snapshot is owed', () => {
+    const recovering = apply(snapshot, { type: 'entryRemoved', id: 'entry-1', revision: 9 })
+    const after = reduceRoom(recovering, { type: 'participantJoined', participant: alberto, revision: 10 })
+
+    expect(inRoom(after)?.participants).toEqual([javier, marta])
+    expect(inRoom(after)?.revision).toBe(4)
+    expect(inRoom(after)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true })
+  })
+
+  it('takes the end of the Room even with a snapshot owed, rather than waiting for one', () => {
+    const recovering = apply(snapshot, { type: 'entryRemoved', id: 'entry-1', revision: 9 })
+
+    // A Room nobody is in any more can no longer answer the resync, so a
+    // closure that waited for one would leave the screen recovering forever.
+    expect(reduceRoom(recovering, { type: 'roomClosed', revision: 11 })).toEqual({
+      phase: 'closed',
+      room: { code: 'RNT4K9PX', name: 'Martes NL50' },
+    })
+    expect(reduceRoom(recovering, { type: 'participantKicked', identityId: 'id-marta', revision: 11 })).toEqual({
+      phase: 'kicked',
+      room: { code: 'RNT4K9PX', name: 'Martes NL50' },
+    })
+  })
+
+  it('still waits for the snapshot when it is someone else who was removed', () => {
+    const recovering = apply(snapshot, { type: 'entryRemoved', id: 'entry-1', revision: 9 })
+    const after = reduceRoom(recovering, { type: 'participantKicked', identityId: 'id-javier', revision: 11 })
+
+    expect(inRoom(after)?.participants).toEqual([javier, marta])
+    expect(inRoom(after)?.sync.awaitingSnapshot).toBe(true)
+  })
+
+  it('does not call itself caught up on a snapshot the Room has already moved past', () => {
+    // A change goes by while the snapshot is being drawn: it is dropped, and
+    // the snapshot that lands was drawn before it.
+    const view = apply(
+      snapshot,
+      { type: 'entryRemoved', id: 'entry-1', revision: 9 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 }, revision: 10 },
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 8 } },
+    )
+
+    expect(inRoom(view)?.revision).toBe(8)
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true, seenRevision: 10 })
+  })
+
+  it('is caught up once the snapshot is level with everything that went past', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entryRemoved', id: 'entry-1', revision: 9 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 }, revision: 10 },
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 10 } },
+    )
+
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'synced', awaitingSnapshot: false, seenRevision: 10 })
+  })
+
+  it('jumps straight to the Room as it stands when the snapshot comes back', () => {
+    const view = apply(
+      snapshot,
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 9 }, revision: 7 },
+      {
+        type: 'snapshot',
+        snapshot: { ...snapshot.snapshot, revision: 12, playback: { handId: 'hand-2', actionIndex: 2 } },
+      },
+    )
+
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'synced', awaitingSnapshot: false })
+    expect(inRoom(view)?.revision).toBe(12)
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-2', actionIndex: 2 })
+  })
+
+  it('keeps the Room on screen, frozen, when the connection drops', () => {
+    const view = apply(snapshot, { type: 'disconnected' })
+    expect(view).toMatchObject({ phase: 'in-room', participants: [javier, marta] })
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'offline', awaitingSnapshot: true })
+  })
+
+  it('is recovering, not offline, from the moment the socket is back', () => {
+    const view = apply(snapshot, { type: 'disconnected' }, { type: 'connecting' })
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true })
+  })
+
+  it('is back in sync once the reconnection is answered with a snapshot', () => {
+    const view = apply(
+      snapshot,
+      { type: 'disconnected' },
+      { type: 'reconnectFailed' },
+      { type: 'connecting' },
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 20 } },
+    )
+    expect(inRoom(view)?.sync).toEqual({
+      state: 'synced',
+      latencyMs: null,
+      failedAttempts: 0,
+      awaitingSnapshot: false,
+      seenRevision: 20,
+    })
+  })
+
+  it('counts the reconnections that fail, so a reload can be offered', () => {
+    const view = apply(snapshot, ...Array.from({ length: RELOAD_AFTER_FAILURES }, () => ({ type: 'reconnectFailed' }) as const))
+    expect(inRoom(view)?.sync).toMatchObject({ state: 'offline', failedAttempts: RELOAD_AFTER_FAILURES })
+  })
+
+  it('gives up on a Room it never got into after three tries', () => {
+    const failing = { type: 'reconnectFailed' } as const
+    expect(apply(failing, failing)).toEqual({ phase: 'joining', failedAttempts: 2 })
+    expect(apply(failing, failing, failing)).toEqual({ phase: 'disconnected' })
+  })
+
+  it('keeps the round trip it measured across a recovery', () => {
+    const view = apply(
+      snapshot,
+      { type: 'latency', latencyMs: 42 },
+      { type: 'disconnected' },
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 30 } },
+    )
+    expect(inRoom(view)?.sync.latencyMs).toBe(42)
+  })
+
+  it('takes the presence of the Room whenever it is reported, revision or not', () => {
+    const presence = [{ identityId: 'id-javier', presence: 'unstable' as const, latencyMs: 120, inSync: false }]
+    const view = apply(snapshot, { type: 'presence', participants: presence })
+    expect(inRoom(view)?.presence).toEqual(presence)
+    expect(inRoom(view)?.revision).toBe(4)
   })
 })
 
 describe('parseServerMessage', () => {
-  it('reads Room events from the server', () => {
-    expect(parseServerMessage(JSON.stringify({ event: 'room.participantLeft', data: { identityId: 'x' } }))).toEqual({
+  const changed = (event: string, data: unknown, revision = 3) =>
+    parseServerMessage(JSON.stringify({ event, data, revision }))
+
+  it('reads a change of the Room at the revision it carries', () => {
+    expect(changed('room.participantLeft', { identityId: 'x' })).toEqual({
       type: 'participantLeft',
       identityId: 'x',
+      revision: 3,
     })
+    expect(changed('room.participantKicked', { identityId: 'x' })).toEqual({
+      type: 'participantKicked',
+      identityId: 'x',
+      revision: 3,
+    })
+    expect(changed('room.closed', {})).toEqual({ type: 'roomClosed', revision: 3 })
+    expect(changed('queue.entriesAdded', { entries: [firstHand] })).toEqual({
+      type: 'entriesAdded',
+      entries: [firstHand],
+      revision: 3,
+    })
+    expect(changed('playback.changed', { handId: 'hand-1', actionIndex: 2 })).toEqual({
+      type: 'playbackChanged',
+      playback: { handId: 'hand-1', actionIndex: 2 },
+      revision: 3,
+    })
+    expect(
+      changed('queue.authorChanged', { handId: 'hand-1', author: { identityId: 'id-marta', displayName: 'Marta' } }),
+    ).toEqual({
+      type: 'authorChanged',
+      handId: 'hand-1',
+      author: { identityId: 'id-marta', displayName: 'Marta' },
+      revision: 3,
+    })
+    expect(changed('queue.reordered', { order: ['entry-2', 'entry-1'] })).toEqual({
+      type: 'entriesReordered',
+      order: ['entry-2', 'entry-1'],
+      revision: 3,
+    })
+    expect(changed('queue.entryRemoved', { id: 'entry-1' })).toEqual({ type: 'entryRemoved', id: 'entry-1', revision: 3 })
+    expect(changed('queue.entryRestored', { entry: firstHand })).toEqual({
+      type: 'entryRestored',
+      entry: firstHand,
+      revision: 3,
+    })
+    expect(changed('room.masterChanged', { masterId: 'id-marta', reason: 'failover' })).toEqual({
+      type: 'masterChanged',
+      masterId: 'id-marta',
+      reason: 'failover',
+      revision: 3,
+    })
+  })
+
+  it('reads a snapshot, a presence report and a refusal, none of which carry one', () => {
+    expect(parseServerMessage(JSON.stringify({ event: 'room.snapshot', data: snapshot.snapshot }))).toEqual(snapshot)
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'room.presence', data: { participants: [] } })),
+    ).toEqual({ type: 'presence', participants: [] })
     expect(
       parseServerMessage(JSON.stringify({ event: 'rejected', data: { command: 'room.join', reason: 'room-not-found' } })),
     ).toEqual({ type: 'rejected', command: 'room.join', reason: 'room-not-found' })
-    expect(parseServerMessage(JSON.stringify({ event: 'room.participantKicked', data: { identityId: 'x' } }))).toEqual(
-      { type: 'participantKicked', identityId: 'x' },
-    )
-    expect(parseServerMessage(JSON.stringify({ event: 'room.closed', data: {} }))).toEqual({ type: 'roomClosed' })
-    expect(
-      parseServerMessage(JSON.stringify({ event: 'queue.entriesAdded', data: { entries: [firstHand] } })),
-    ).toEqual({ type: 'entriesAdded', entries: [firstHand] })
-    expect(
-      parseServerMessage(JSON.stringify({ event: 'playback.changed', data: { handId: 'hand-1', actionIndex: 2 } })),
-    ).toEqual({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 } })
-    expect(
-      parseServerMessage(
-        JSON.stringify({
-          event: 'queue.authorChanged',
-          data: { handId: 'hand-1', author: { identityId: 'id-marta', displayName: 'Marta' } },
-        }),
-      ),
-    ).toEqual({ type: 'authorChanged', handId: 'hand-1', author: { identityId: 'id-marta', displayName: 'Marta' } })
-    expect(
-      parseServerMessage(JSON.stringify({ event: 'queue.reordered', data: { order: ['entry-2', 'entry-1'] } })),
-    ).toEqual({ type: 'entriesReordered', order: ['entry-2', 'entry-1'] })
-    expect(parseServerMessage(JSON.stringify({ event: 'queue.entryRemoved', data: { id: 'entry-1' } }))).toEqual({
-      type: 'entryRemoved',
-      id: 'entry-1',
-    })
-    expect(
-      parseServerMessage(JSON.stringify({ event: 'queue.entryRestored', data: { entry: firstHand } })),
-    ).toEqual({ type: 'entryRestored', entry: firstHand })
-    expect(
-      parseServerMessage(JSON.stringify({ event: 'room.masterChanged', data: { masterId: 'id-marta', reason: 'failover' } })),
-    ).toEqual({ type: 'masterChanged', masterId: 'id-marta', reason: 'failover' })
+  })
+
+  it('drops a change with no revision, which could not be put in its place', () => {
+    expect(parseServerMessage(JSON.stringify({ event: 'room.closed', data: {} }))).toBeNull()
   })
 
   it('ignores anything that is not a Room event', () => {
