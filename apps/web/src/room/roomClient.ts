@@ -54,6 +54,12 @@ export interface Playback {
   actionIndex: number
 }
 
+/** The Master role moving, and why: handed over, or passed on after a drop. */
+export interface MasterChange {
+  masterId: string
+  reason: 'handover' | 'failover'
+}
+
 export interface RoomSnapshot {
   room: RoomSummary
   /** The identity id of this browser's Participant. */
@@ -70,6 +76,7 @@ export type RoomEvent =
   | { type: 'snapshot'; snapshot: RoomSnapshot }
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
+  | ({ type: 'masterChanged' } & MasterChange)
   | { type: 'entriesAdded'; entries: QueueEntry[] }
   | { type: 'authorChanged'; handId: string; author: Author }
   | { type: 'entriesReordered'; order: string[] }
@@ -92,6 +99,8 @@ export type RoomView =
       playback: Playback | null
       /** False once the connection drops: the view is kept but is no longer live. */
       connected: boolean
+      /** The last move of the Master role, to announce. Null until one happens. */
+      masterChange: MasterChange | null
     }
 
 export const initialRoomView: RoomView = { phase: 'joining' }
@@ -100,7 +109,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
       const { room, you, participants, queue, playback } = event.snapshot
-      return { phase: 'in-room', room, you, participants, queue, playback, connected: true }
+      return { phase: 'in-room', room, you, participants, queue, playback, connected: true, masterChange: null }
     }
     case 'participantJoined':
       if (view.phase !== 'in-room') return view
@@ -113,6 +122,15 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'participantLeft':
       if (view.phase !== 'in-room') return view
       return { ...view, participants: view.participants.filter((p) => p.identityId !== event.identityId) }
+    case 'masterChanged': {
+      if (view.phase !== 'in-room') return view
+      // The role is the only thing that moves: whoever held it becomes a Guest.
+      const participants = view.participants.map((p) => ({
+        ...p,
+        role: p.identityId === event.masterId ? ('master' as const) : ('guest' as const),
+      }))
+      return { ...view, participants, masterChange: { masterId: event.masterId, reason: event.reason } }
+    }
     case 'entriesAdded':
       if (view.phase !== 'in-room') return view
       return { ...view, queue: [...view.queue, ...event.entries] }
@@ -167,6 +185,12 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'participantJoined', participant: data.participant as Participant }
     case 'room.participantLeft':
       return { type: 'participantLeft', identityId: String(data.identityId) }
+    case 'room.masterChanged':
+      return {
+        type: 'masterChanged',
+        masterId: String(data.masterId),
+        reason: data.reason === 'failover' ? 'failover' : 'handover',
+      }
     case 'queue.entriesAdded':
       return { type: 'entriesAdded', entries: data.entries as QueueEntry[] }
     case 'queue.authorChanged':

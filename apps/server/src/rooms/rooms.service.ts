@@ -120,8 +120,8 @@ export class RoomsService {
     };
   }
 
-  /** Refuses with `not-in-room` anyone who isn't a Participant of the Room. */
-  async requireParticipant(roomId: string, identityId: string): Promise<void> {
+  /** Whether they are a Participant of the Room, kicked ones apart. */
+  async isParticipant(roomId: string, identityId: string): Promise<boolean> {
     const [membership] = await this.db
       .select({ kicked: roomMemberships.kicked })
       .from(roomMemberships)
@@ -131,7 +131,14 @@ export class RoomsService {
           eq(roomMemberships.identityId, identityId),
         ),
       );
-    if (!membership || membership.kicked) throw new Rejected('not-in-room');
+    return membership !== undefined && !membership.kicked;
+  }
+
+  /** Refuses with `not-in-room` anyone who isn't a Participant of the Room. */
+  async requireParticipant(roomId: string, identityId: string): Promise<void> {
+    if (!(await this.isParticipant(roomId, identityId))) {
+      throw new Rejected('not-in-room');
+    }
   }
 
   /** Refuses with `not-master` anyone but the open Room's Master. */

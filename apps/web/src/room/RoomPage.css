@@ -1156,6 +1156,23 @@
   background: var(--sync);
 }
 
+/* Only the Master sees it, on every row but their own. */
+.room-participant__hand-over {
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.room-participants__status {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.room-participants__status:empty {
+  display: none;
+}
+
 /* ---------- Before the Room: confirm the name, or say why not ---------- */
 
 .room-gate {
