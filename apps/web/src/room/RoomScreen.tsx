@@ -66,6 +66,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const { t } = i18n
   const me = view.participants.find((p) => p.identityId === view.you)
   const isMaster = me?.role === 'master'
+  const masterNotice = useMasterNotice(view)
   const [importing, setImporting] = useState(false)
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
@@ -143,6 +144,10 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
             <h3 id="room-participants-title" className="room-side__title">
               {t('room.participants.title')}
             </h3>
+            {/* Always mounted, so screen readers announce a change of Master when it happens. */}
+            <p className="room-participants__status" role="status">
+              {masterNotice}
+            </p>
             <ul className="room-participants" aria-live="polite">
               {view.participants.map((participant) => (
                 <ParticipantRow
@@ -150,6 +155,11 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
                   participant={participant}
                   isYou={participant.identityId === view.you}
                   authored={authoredCount(view.queue, participant.identityId)}
+                  onHandOver={
+                    isMaster && participant.identityId !== view.you
+                      ? () => commands.handOverMaster(participant.identityId)
+                      : undefined
+                  }
                 />
               ))}
             </ul>
@@ -828,11 +838,14 @@ function ParticipantRow({
   participant,
   isYou,
   authored,
+  onHandOver,
 }: {
   participant: Participant
   isYou: boolean
   /** How many Hands in the Queue they are Author of. */
   authored: number
+  /** Only the Master hands the role on, and never to themselves. */
+  onHandOver?: () => void
 }) {
   const { t } = useI18n()
   const role: MessageKey = participant.role === 'master' ? 'room.master' : 'room.guest'
@@ -854,9 +867,46 @@ function ParticipantRow({
       <span className="room-participant__presence" title={t('room.participants.present')}>
         <span className="ro-visually-hidden">{t('room.participants.present')}</span>
       </span>
+      {onHandOver && (
+        <IconButton
+          icon="master"
+          label={t('room.participants.handOver', { name: participant.displayName })}
+          size="compact"
+          className="room-participant__hand-over"
+          onClick={onHandOver}
+        />
+      )}
     </li>
   )
 }
+
+/**
+ * What to say when the Master role moves, for a few seconds: who has it now,
+ * and, when it passed on its own, that the former Master dropped.
+ */
+function useMasterNotice(view: InRoom): string | null {
+  const { t } = useI18n()
+  const [announced, setAnnounced] = useState<InRoom['masterChange']>(null)
+  const [change, setChange] = useState<InRoom['masterChange']>(null)
+  // Adjusted during render, as the last loaded Queue Entry is: each move of
+  // the role is announced once, and only until it goes stale.
+  if (view.masterChange !== announced) {
+    setAnnounced(view.masterChange)
+    setChange(view.masterChange)
+  }
+  useEffect(() => {
+    if (!change) return
+    const timer = setTimeout(() => setChange(null), MASTER_NOTICE_FOR_MS)
+    return () => clearTimeout(timer)
+  }, [change])
+
+  if (!change) return null
+  if (change.masterId === view.you) return t(`room.master.changed.${change.reason}.you`)
+  const master = view.participants.find((p) => p.identityId === change.masterId)
+  return master ? t(`room.master.changed.${change.reason}`, { name: master.displayName }) : null
+}
+
+const MASTER_NOTICE_FOR_MS = 6000
 
 const COPIED_FOR_MS = 2000
 

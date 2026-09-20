@@ -15,6 +15,8 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'room-not-found': HttpStatus.NOT_FOUND,
   'not-in-room': HttpStatus.FORBIDDEN,
   'not-master': HttpStatus.FORBIDDEN,
+  'not-a-participant': HttpStatus.BAD_REQUEST,
+  'already-master': HttpStatus.CONFLICT,
   'hand-not-found': HttpStatus.NOT_FOUND,
   'hand-not-in-queue': HttpStatus.NOT_FOUND,
   'no-hand-loaded': HttpStatus.CONFLICT,

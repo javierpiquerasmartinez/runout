@@ -10,6 +10,8 @@ export type RejectionReason =
   | 'room-not-found'
   | 'not-in-room'
   | 'not-master'
+  | 'not-a-participant'
+  | 'already-master'
   | 'hand-not-found'
   | 'hand-not-in-queue'
   | 'no-hand-loaded'

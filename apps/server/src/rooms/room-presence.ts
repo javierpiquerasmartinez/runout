@@ -71,6 +71,17 @@ export class RoomPresence<Connection> {
     return place;
   }
 
+  /** Who holds the Master role of a Room, while anyone is present in it. */
+  masterOf(roomId: string): string | null {
+    return this.rooms.get(roomId)?.masterId ?? null;
+  }
+
+  /** Moves the Master role, so every Participant is reported under its new roles. */
+  setMaster(roomId: string, masterId: string): void {
+    const room = this.rooms.get(roomId);
+    if (room) room.masterId = masterId;
+  }
+
   isInRoom(connection: Connection): boolean {
     return this.roomOf.has(connection);
   }

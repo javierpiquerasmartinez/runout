@@ -54,6 +54,7 @@ describe('reduceRoom', () => {
       queue: [],
       playback: null,
       connected: true,
+      masterChange: null,
     })
   })
 
@@ -163,6 +164,36 @@ describe('reduceRoom', () => {
     expect(view.phase === 'in-room' && view.participants).toEqual([javier, renamed])
   })
 
+  it('moves the Master role to the Participant it was handed to', () => {
+    const view = apply(snapshot, { type: 'masterChanged', masterId: 'id-marta', reason: 'handover' })
+
+    expect(view.phase === 'in-room' && view.participants).toEqual([
+      { ...javier, role: 'guest' },
+      { ...marta, role: 'master' },
+    ])
+    expect(view.phase === 'in-room' && view.masterChange).toEqual({ masterId: 'id-marta', reason: 'handover' })
+  })
+
+  it('moves the role when it passes on its own, with the Master already gone', () => {
+    const view = apply(
+      snapshot,
+      { type: 'participantLeft', identityId: 'id-javier' },
+      { type: 'masterChanged', masterId: 'id-marta', reason: 'failover' },
+    )
+
+    expect(view.phase === 'in-room' && view.participants).toEqual([{ ...marta, role: 'master' }])
+    expect(view.phase === 'in-room' && view.masterChange).toEqual({ masterId: 'id-marta', reason: 'failover' })
+  })
+
+  it('forgets an earlier handover once a fresh snapshot arrives', () => {
+    const view = apply(snapshot, { type: 'masterChanged', masterId: 'id-marta', reason: 'handover' }, snapshot)
+    expect(view.phase === 'in-room' && view.masterChange).toBeNull()
+  })
+
+  it('ignores a handover that arrives before the snapshot', () => {
+    expect(apply({ type: 'masterChanged', masterId: 'id-marta', reason: 'handover' })).toEqual({ phase: 'joining' })
+  })
+
   it('removes a Participant who leaves', () => {
     const view = apply(snapshot, { type: 'participantLeft', identityId: 'id-javier' })
     expect(view.phase === 'in-room' && view.participants).toEqual([marta])
@@ -222,6 +253,9 @@ describe('parseServerMessage', () => {
     expect(
       parseServerMessage(JSON.stringify({ event: 'queue.entryRestored', data: { entry: firstHand } })),
     ).toEqual({ type: 'entryRestored', entry: firstHand })
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'room.masterChanged', data: { masterId: 'id-marta', reason: 'failover' } })),
+    ).toEqual({ type: 'masterChanged', masterId: 'id-marta', reason: 'failover' })
   })
 
   it('ignores anything that is not a Room event', () => {

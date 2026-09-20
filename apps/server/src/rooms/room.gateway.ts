@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,11 +10,14 @@ import {
 } from '@nestjs/websockets';
 import type { IncomingMessage } from 'node:http';
 import { WebSocket } from 'ws';
+import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   IdentityService,
   type Identity,
 } from '../identity/identity.service.js';
 import { Rejected, type RejectionReason } from '../rejection/rejection.js';
+import { MasterFailover } from './master-failover.js';
+import { MasterService, type MasterChanged } from './master.service.js';
 import { PlaybackService, type Playback } from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
 import { RoomPresence, type Participant } from './room-presence.js';
@@ -33,6 +36,11 @@ export interface RoomSnapshot {
   queue: QueueEntry[];
   /** Null while no Hand is loaded. */
   playback: Playback | null;
+}
+
+export interface HandOverMasterCommand {
+  /** The identity id of the Participant taking the Master role. */
+  identityId: string;
 }
 
 export interface LoadHandCommand {
@@ -78,13 +86,21 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly presence = new RoomPresence<WebSocket>();
   /** The last Playback change of each Room, so changes apply and broadcast in order. */
   private readonly playbackChanges = new Map<string, Promise<unknown>>();
+  /** The Rooms waiting for a Master who dropped. */
+  private readonly failover: MasterFailover;
 
   constructor(
     private readonly identities: IdentityService,
     private readonly rooms: RoomsService,
     private readonly queue: QueueService,
     private readonly playback: PlaybackService,
-  ) {}
+    private readonly masters: MasterService,
+    @Inject(CLOCK) clock: Clock,
+  ) {
+    this.failover = new MasterFailover(clock, (roomId) =>
+      this.passOnMaster(roomId),
+    );
+  }
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
     const token =
@@ -125,6 +141,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         participant,
         socket,
       );
+      // A Room whose Master ran out of grace while empty gives the role to
+      // whoever arrives first, before their own snapshot is drawn.
+      if (identity.id === this.presence.masterOf(room.id)) {
+        this.failover.stop(room.id);
+      } else if (this.failover.expired(room.id)) {
+        await this.passOnMaster(room.id, identity.id);
+      }
       if (arrived) {
         this.broadcast(room.id, identity.id, 'room.participantJoined', {
           participant: this.presence.participant(room.id, identity.id),
@@ -151,6 +174,24 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.authenticated(socket);
       if (!this.presence.isInRoom(socket)) throw new Rejected('not-in-room');
       this.leave(socket);
+      return undefined;
+    });
+  }
+
+  /** The Master hands the role to another Participant; Playback carries on. */
+  @SubscribeMessage('room.handOver')
+  handOver(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<HandOverMasterCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('room.handOver', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const changed = await this.masters.handOver(
+        identity,
+        roomId,
+        command?.identityId,
+      );
+      this.masterChanged(roomId, changed);
       return undefined;
     });
   }
@@ -271,12 +312,64 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private leave(socket: WebSocket): void {
+    const place = this.presence.placeOf(socket);
+    const wasMaster =
+      place !== null &&
+      place.identityId === this.presence.masterOf(place.roomId);
     const left = this.presence.exit(socket);
     if (left) {
+      if (wasMaster) this.failover.watch(left.roomId);
       this.broadcast(left.roomId, left.identityId, 'room.participantLeft', {
         identityId: left.identityId,
       });
     }
+  }
+
+  /**
+   * Gives the Master role to the Participant present the longest, once the
+   * Master has been away too long. With nobody there to take it the watch is
+   * left armed, and the next Participant to arrive takes it instead.
+   */
+  private async passOnMaster(
+    roomId: string,
+    exceptIdentityId?: string,
+  ): Promise<void> {
+    const masterId = this.presence.masterOf(roomId);
+    if (masterId === null) return;
+    if (this.presence.participant(roomId, masterId)) {
+      this.failover.stop(roomId);
+      return;
+    }
+    const successor = this.presence.participants(roomId)[0];
+    if (!successor) return;
+    const changed = await this.masters.failOver(
+      roomId,
+      masterId,
+      successor.identityId,
+    );
+    if (!changed) {
+      this.failover.stop(roomId);
+      return;
+    }
+    this.masterChanged(roomId, changed, exceptIdentityId);
+  }
+
+  /**
+   * Records the new Master and tells the Room. A new Master who isn't
+   * connected starts a grace period of their own.
+   */
+  private masterChanged(
+    roomId: string,
+    changed: MasterChanged,
+    /** The arriving Participant, whose own snapshot already says it. */
+    exceptIdentityId?: string,
+  ): void {
+    this.presence.setMaster(roomId, changed.masterId);
+    this.failover.stop(roomId);
+    if (!this.presence.participant(roomId, changed.masterId)) {
+      this.failover.watch(roomId);
+    }
+    this.broadcast(roomId, exceptIdentityId, 'room.masterChanged', changed);
   }
 
   private async authenticated(socket: WebSocket): Promise<Identity> {
