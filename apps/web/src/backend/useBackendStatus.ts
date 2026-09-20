@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { backendUrl } from './backendUrl'
 import { latencyFromPong, pingMessage, socketUrl } from './ping'
 
 const PING_INTERVAL_MS = 2000
@@ -18,7 +19,7 @@ export function useHealth(): HttpStatus {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch('/api/health', { signal: controller.signal })
+    fetch(`${backendUrl() ?? ''}/api/health`, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const body = (await res.json()) as { serverTime: string }
