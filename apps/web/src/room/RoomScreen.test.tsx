@@ -1,17 +1,44 @@
 import type { ReactElement } from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { RoomScreen } from './RoomScreen'
-import type { Participant, RoomView } from './roomClient'
+import type { Note, Participant, QueueEntry, RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
 const javier: Participant = { identityId: 'id-javier', displayName: 'Javier', role: 'master' }
 const marta: Participant = { identityId: 'id-marta', displayName: 'Marta', role: 'guest' }
+
+const firstHand: QueueEntry = {
+  id: 'entry-1',
+  handId: 'hand-1',
+  position: 1,
+  author: { identityId: 'id-javier', displayName: 'Javier' },
+  site: 'pokerstars',
+  siteHandId: '262120750636',
+  playedAt: '2026-09-18T12:34:30.000Z',
+  stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+  summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+}
+
+const martasNote: Note = {
+  id: 'note-1',
+  seq: 1,
+  handId: 'hand-1',
+  writer: { identityId: 'id-marta', displayName: 'Marta' },
+  body: 'The turn jam is forced.',
+  writtenAt: '2026-09-18T13:00:00.000Z',
+  editedAt: null,
+}
+
+/** A Room with the first Hand loaded, which is what the Notes panel hangs off. */
+function roomWithLoadedHand(view: Partial<InRoom> = {}): InRoom {
+  return roomView({ queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 0 }, ...view })
+}
 
 function roomView(view: Partial<InRoom> = {}): InRoom {
   return {
@@ -21,6 +48,8 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
     participants: [javier, marta],
     queue: [],
     playback: null,
+    notes: [],
+    marks: [],
     revision: 1,
     presence: [],
     sync: { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 1 },
@@ -58,6 +87,11 @@ function renderRoom(view: InRoom) {
     reorderQueue: vi.fn(),
     removeQueueEntry: vi.fn(),
     undoQueueRemoval: vi.fn(),
+    writeNote: vi.fn(),
+    editNote: vi.fn(),
+    deleteNote: vi.fn(),
+    undoNoteDeletion: vi.fn(),
+    setMark: vi.fn(),
   } satisfies RoomCommands
   showAgain = render(screenOf(view, commands)).rerender
   return commands
@@ -252,5 +286,90 @@ describe('RoomScreen · staying in sync', () => {
     )
 
     expect(screen.getByText('OFFLINE')).toBeTruthy()
+  })
+})
+
+describe('RoomScreen \u00b7 Notes', () => {
+  it('lets any Participant write a Note on the loaded Hand', async () => {
+    const commands = renderRoom(roomWithLoadedHand({ you: 'id-marta' }))
+
+    await userEvent.type(screen.getByLabelText('Add a note about this hand'), 'BB can call with AQ.')
+    await userEvent.click(screen.getByRole('button', { name: 'Post note' }))
+
+    expect(commands.writeNote).toHaveBeenCalledWith('hand-1', 'BB can call with AQ.')
+    expect((screen.getByLabelText('Add a note about this hand') as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('writes nothing when the Note is blank', async () => {
+    const commands = renderRoom(roomWithLoadedHand())
+
+    await userEvent.type(screen.getByLabelText('Save a note about this hand'), '   ')
+    await userEvent.click(screen.getByRole('button', { name: 'Save note' }))
+
+    expect(commands.writeNote).not.toHaveBeenCalled()
+  })
+
+  it('shows every Note on the loaded Hand, with its writer, and no others', () => {
+    const elsewhere: Note = { ...martasNote, id: 'note-2', seq: 2, handId: 'hand-2', body: 'Another hand.' }
+    renderRoom(roomWithLoadedHand({ notes: [martasNote, elsewhere] }))
+
+    const notes = screen.getByRole('region', { name: 'Hand notes' })
+    expect(within(notes).getByText('The turn jam is forced.')).toBeTruthy()
+    expect(within(notes).getByText('Marta')).toBeTruthy()
+    expect(within(notes).queryByText('Another hand.')).toBeNull()
+  })
+
+  it('never moves Playback while a Note is being written', async () => {
+    const commands = renderRoom(roomWithLoadedHand())
+
+    await userEvent.type(screen.getByLabelText('Save a note about this hand'), 'k{ArrowRight}')
+
+    expect(commands.goToAction).not.toHaveBeenCalled()
+    expect(commands.loadHand).not.toHaveBeenCalled()
+  })
+
+  it('shows a Guest the edit and delete controls locked, with the reason', () => {
+    renderRoom(roomWithLoadedHand({ you: 'id-marta', notes: [martasNote] }))
+
+    const edit = screen.getByRole('button', { name: /^Edit Marta\u2019s note/ })
+    expect(edit.getAttribute('aria-disabled')).toBe('true')
+    expect(edit.getAttribute('title')).toBe('Only the Master can edit or delete a note.')
+    expect(screen.getByRole('button', { name: /^Delete Marta\u2019s note/ }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('lets the Master rewrite a Note', async () => {
+    const commands = renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Marta\u2019s note' }))
+    const field = screen.getByLabelText('Edit Marta\u2019s note')
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Forced jam.')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(commands.editNote).toHaveBeenCalledWith('note-1', 'Forced jam.')
+  })
+
+  it('offers the Master ten seconds to undo a deletion', async () => {
+    const commands = renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Marta\u2019s note' }))
+    expect(commands.deleteNote).toHaveBeenCalledWith('note-1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(commands.undoNoteDeletion).toHaveBeenCalledWith('note-1')
+  })
+})
+
+describe('RoomScreen \u00b7 Marks', () => {
+  it('lets a Participant Mark the loaded Hand for themselves, and take it off', async () => {
+    const view = roomWithLoadedHand({ you: 'id-marta' })
+    const commands = renderRoom(view)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mark this hand' }))
+    expect(commands.setMark).toHaveBeenCalledWith('hand-1', true)
+
+    rerenderRoom({ ...view, marks: ['hand-1'] }, commands)
+    await userEvent.click(screen.getByRole('button', { name: 'Remove the mark' }))
+    expect(commands.setMark).toHaveBeenCalledWith('hand-1', false)
   })
 })

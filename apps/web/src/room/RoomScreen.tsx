@@ -27,7 +27,7 @@ import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
 import { SyncIndicator } from './SyncIndicator'
 import { RoomDialog } from './RoomDialog'
-import type { Participant, ParticipantPresence, QueueEntry, RoomView } from './roomClient'
+import type { Note, Participant, ParticipantPresence, QueueEntry, RoomView } from './roomClient'
 import { formatRoomCode, roomLink } from './roomCode'
 import { useShortcuts } from './shortcuts'
 import { StreetLog } from './StreetLog'
@@ -168,7 +168,9 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
               participants={view.participants}
               isMaster={isMaster && loadedEntry !== undefined}
+              marked={view.marks.includes(detailsEntry.handId)}
               onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
+              onSetMark={(marked) => commands.setMark(detailsEntry.handId, marked)}
             />
           )}
           {table?.payout && <Payout payout={table.payout} />}
@@ -202,6 +204,14 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               ))}
             </ul>
           </section>
+          {detailsEntry && (
+            <HandNotes
+              handId={detailsEntry.handId}
+              notes={view.notes}
+              isMaster={isMaster}
+              commands={commands}
+            />
+          )}
         </aside>
       </div>
       {importing && (
@@ -729,14 +739,19 @@ function CurrentHand({
   tableSize,
   participants,
   isMaster,
+  marked,
   onReassign,
+  onSetMark,
 }: {
   entry: QueueEntry
   /** Seats the table has; null until the Hand's Timeline has loaded. */
   tableSize: number | null
   participants: Participant[]
   isMaster: boolean
+  /** Whether this person has Marked the Hand. Nobody else ever sees it. */
+  marked: boolean
   onReassign: (authorId: string) => void
+  onSetMark: (marked: boolean) => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -750,6 +765,14 @@ function CurrentHand({
     <section className="room-side__section" aria-labelledby="room-current-title">
       <h3 id="room-current-title" className="room-side__title">
         {t('room.current.title')}
+        <IconButton
+          icon="mark"
+          label={t(marked ? 'room.mark.remove' : 'room.mark.add')}
+          size="compact"
+          className="room-side__mark"
+          data-marked={marked || undefined}
+          onClick={() => onSetMark(!marked)}
+        />
       </h3>
       <dl className="room-facts">
         <div className="room-facts__row">
@@ -822,6 +845,174 @@ function CurrentHand({
         </div>
       </dl>
     </section>
+  )
+}
+
+/**
+ * The "Notas de la mano" panel of the "Sala" boards: what the group concluded
+ * about the loaded Hand. Any Participant writes one; only the Master rewrites
+ * or deletes one, and a deletion can be undone for ten seconds. Guests see
+ * those controls locked with the reason, never hidden.
+ */
+function HandNotes({
+  handId,
+  notes,
+  isMaster,
+  commands,
+}: {
+  handId: string
+  /** Every Note in the Room; this panel reads the loaded Hand's own. */
+  notes: Note[]
+  isMaster: boolean
+  commands: RoomCommands
+}) {
+  const i18n = useI18n()
+  const { t } = i18n
+  const [draft, setDraft] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [pendingDeletionId, setPendingDeletionId] = useState<string | null>(null)
+  const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
+  // A Hand of one's own: a draft belongs to the Hand it was being written about.
+  const [draftFor, setDraftFor] = useState(handId)
+  if (draftFor !== handId) {
+    setDraftFor(handId)
+    setDraft('')
+    setEditing(null)
+  }
+
+  const onHand = notes.filter((note) => note.handId === handId)
+  const lockedReason = isMaster ? undefined : t('room.notes.locked')
+
+  function write() {
+    if (draft.trim() === '') return
+    commands.writeNote(handId, draft.trim())
+    setDraft('')
+  }
+
+  function remove(note: Note) {
+    commands.deleteNote(note.id)
+    setPendingDeletionId(note.id)
+    clearTimeout(undoTimer.current)
+    undoTimer.current = setTimeout(() => setPendingDeletionId(null), UNDO_WINDOW_MS)
+  }
+
+  function undo() {
+    if (!pendingDeletionId) return
+    commands.undoNoteDeletion(pendingDeletionId)
+    clearTimeout(undoTimer.current)
+    setPendingDeletionId(null)
+  }
+
+  return (
+    <section className="room-side__section room-notes" aria-labelledby="room-notes-title">
+      <h3 id="room-notes-title" className="room-side__title">
+        {t('room.notes.title')}
+      </h3>
+      {onHand.length > 0 && (
+        <ul className="room-notes__list">
+          {onHand.map((note) =>
+            editing === note.id ? (
+              <li key={note.id} className="room-notes__note">
+                <NoteEditor
+                  note={note}
+                  onSave={(body) => {
+                    commands.editNote(note.id, body)
+                    setEditing(null)
+                  }}
+                  onCancel={() => setEditing(null)}
+                />
+              </li>
+            ) : (
+              <li key={note.id} className="room-notes__note">
+                <div className="room-notes__by">
+                  <Avatar name={note.writer.displayName} seed={note.writer.identityId} size={18} />
+                  <span className="room-notes__writer">{note.writer.displayName}</span>
+                  <span className="room-notes__when ro-mono">
+                    {i18n.formatRelative(new Date(note.editedAt ?? note.writtenAt))}
+                    {note.editedAt && ` · ${t('room.notes.edited')}`}
+                  </span>
+                </div>
+                <p className="room-notes__body">{note.body}</p>
+                <div className="room-notes__controls">
+                  <IconButton
+                    icon="note"
+                    label={t('room.notes.edit', { name: note.writer.displayName })}
+                    size="compact"
+                    disabledReason={lockedReason}
+                    onClick={() => setEditing(note.id)}
+                  />
+                  <IconButton
+                    icon="delete"
+                    label={t('room.notes.delete', { name: note.writer.displayName })}
+                    size="compact"
+                    disabledReason={lockedReason}
+                    onClick={() => remove(note)}
+                  />
+                </div>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+      {isMaster && pendingDeletionId && (
+        <div className="room-notes__undo" role="status">
+          <span>{t('room.notes.deleted')}</span>
+          <Button variant="secondary" size="compact" onClick={undo}>
+            {t('room.queue.undo')}
+          </Button>
+        </div>
+      )}
+      <textarea
+        className="room-notes__field"
+        aria-label={t(isMaster ? 'room.notes.write.master' : 'room.notes.write.guest')}
+        placeholder={t(isMaster ? 'room.notes.placeholder.master' : 'room.notes.placeholder.guest')}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <Button variant="secondary" className="room-notes__save" onClick={write}>
+        {t(isMaster ? 'room.notes.save' : 'room.notes.post')}
+      </Button>
+    </section>
+  )
+}
+
+/** One Note being rewritten in place by the Master, from its current wording. */
+function NoteEditor({
+  note,
+  onSave,
+  onCancel,
+}: {
+  note: Note
+  onSave: (body: string) => void
+  onCancel: () => void
+}) {
+  const { t } = useI18n()
+  const [body, setBody] = useState(note.body)
+
+  return (
+    <>
+      <textarea
+        className="room-notes__field"
+        aria-label={t('room.notes.edit', { name: note.writer.displayName })}
+        value={body}
+        autoFocus
+        onChange={(event) => setBody(event.target.value)}
+      />
+      <div className="room-notes__controls">
+        <Button
+          variant="secondary"
+          size="compact"
+          disabledReason={body.trim() === '' ? t('room.notes.empty') : undefined}
+          onClick={() => onSave(body.trim())}
+        >
+          {t('room.notes.confirmEdit')}
+        </Button>
+        <Button variant="ghost" size="compact" onClick={onCancel}>
+          {t('room.notes.cancelEdit')}
+        </Button>
+      </div>
+    </>
   )
 }
 

@@ -14,6 +14,8 @@ interface Snapshot {
   participants: Participant[];
   queue: unknown[];
   playback: unknown;
+  notes: unknown[];
+  marks: string[];
   revision: number;
   presence: {
     identityId: string;
@@ -71,6 +73,8 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
       ],
       queue: [],
       playback: null,
+      notes: [],
+      marks: [],
       // Their own arrival is the Room's first change.
       revision: 1,
       presence: [

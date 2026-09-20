@@ -4,6 +4,7 @@ import {
   initialRoomView,
   parseServerMessage,
   reduceRoom,
+  type Note,
   type QueueEntry,
   type RoomChange,
   type RoomEvent,
@@ -27,6 +28,16 @@ const firstHand: QueueEntry = {
 }
 const secondHand: QueueEntry = { ...firstHand, id: 'entry-2', handId: 'hand-2', position: 2 }
 
+const note: Note = {
+  id: 'note-1',
+  seq: 1,
+  handId: 'hand-1',
+  writer: { identityId: 'id-marta', displayName: 'Marta' },
+  body: 'El jam de CO en el turn es forzado.',
+  writtenAt: '2026-09-18T13:00:00.000Z',
+  editedAt: null,
+}
+
 const snapshot: RoomEvent = {
   type: 'snapshot',
   snapshot: {
@@ -35,6 +46,8 @@ const snapshot: RoomEvent = {
     participants: [javier, marta],
     queue: [],
     playback: null,
+    notes: [],
+    marks: [],
     revision: 4,
     presence: [],
   },
@@ -52,6 +65,10 @@ const changeTypes = new Set<string>([
   'entryRemoved',
   'entryRestored',
   'playbackChanged',
+  'noteWritten',
+  'noteEdited',
+  'noteRemoved',
+  'noteRestored',
 ])
 
 /**
@@ -86,6 +103,8 @@ describe('reduceRoom', () => {
       participants: [javier, marta],
       queue: [],
       playback: null,
+      notes: [],
+      marks: [],
       revision: 4,
       presence: [],
       sync: { state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 4 },
@@ -422,6 +441,54 @@ describe('reduceRoom, staying in sync', () => {
   })
 })
 
+describe('reduceRoom · Notes and Marks', () => {
+  it('lands with the Notes and this person\u2019s own Marks the snapshot carries', () => {
+    const view = apply({ type: 'snapshot', snapshot: { ...snapshot.snapshot, notes: [note], marks: ['hand-1'] } })
+    expect(inRoom(view)?.notes).toEqual([note])
+    expect(inRoom(view)?.marks).toEqual(['hand-1'])
+  })
+
+  it('adds a Note as it is written, once even if the change arrives twice', () => {
+    const view = apply(snapshot, { type: 'noteWritten', note, revision: 5 }, { type: 'noteWritten', note, revision: 5 })
+    expect(inRoom(view)?.notes).toEqual([note])
+  })
+
+  it('replaces a Note the Master has rewritten, in its place', () => {
+    const second: Note = { ...note, id: 'note-2', seq: 2, body: 'Yo pagaria con AQ.' }
+    const edited: Note = { ...note, body: 'Jam forzado.', editedAt: '2026-09-18T13:05:00.000Z' }
+    const view = apply(
+      snapshot,
+      { type: 'noteWritten', note },
+      { type: 'noteWritten', note: second },
+      { type: 'noteEdited', note: edited },
+    )
+    expect(inRoom(view)?.notes).toEqual([edited, second])
+  })
+
+  it('takes a deleted Note away, and puts a restored one back in its place', () => {
+    const second: Note = { ...note, id: 'note-2', seq: 2, body: 'Yo pagaria con AQ.' }
+    const deleted = apply(
+      snapshot,
+      { type: 'noteWritten', note },
+      { type: 'noteWritten', note: second },
+      { type: 'noteRemoved', id: 'note-1' },
+    )
+    expect(inRoom(deleted)?.notes).toEqual([second])
+
+    const restored = reduceRoom(deleted, { type: 'noteRestored', note, revision: 8 })
+    expect(inRoom(restored)?.notes).toEqual([note, second])
+  })
+
+  it('takes a Mark on and off for its own person, without touching the revision', () => {
+    const marked = apply(snapshot, { type: 'markChanged', handId: 'hand-1', marked: true })
+    expect(inRoom(marked)?.marks).toEqual(['hand-1'])
+    expect(inRoom(marked)?.revision).toBe(4)
+
+    const unmarked = reduceRoom(marked, { type: 'markChanged', handId: 'hand-1', marked: false })
+    expect(inRoom(unmarked)?.marks).toEqual([])
+  })
+})
+
 describe('parseServerMessage', () => {
   const changed = (event: string, data: unknown, revision = 3) =>
     parseServerMessage(JSON.stringify({ event, data, revision }))
@@ -473,6 +540,16 @@ describe('parseServerMessage', () => {
       reason: 'failover',
       revision: 3,
     })
+    expect(changed('notes.written', { note })).toEqual({ type: 'noteWritten', note, revision: 3 })
+    expect(changed('notes.edited', { note })).toEqual({ type: 'noteEdited', note, revision: 3 })
+    expect(changed('notes.removed', { id: 'note-1' })).toEqual({ type: 'noteRemoved', id: 'note-1', revision: 3 })
+    expect(changed('notes.restored', { note })).toEqual({ type: 'noteRestored', note, revision: 3 })
+  })
+
+  it('reads a Mark, which is this person\u2019s alone and carries no revision', () => {
+    expect(parseServerMessage(JSON.stringify({ event: 'hand.markChanged', data: { handId: 'hand-1', marked: true } }))).toEqual(
+      { type: 'markChanged', handId: 'hand-1', marked: true },
+    )
   })
 
   it('reads a snapshot, a presence report and a refusal, none of which carry one', () => {

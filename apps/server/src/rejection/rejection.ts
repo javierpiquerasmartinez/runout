@@ -27,7 +27,9 @@ export type RejectionReason =
   | 'invalid-queue-order'
   | 'entry-not-in-queue'
   | 'nothing-to-undo'
-  | 'undo-expired';
+  | 'undo-expired'
+  | 'invalid-note'
+  | 'note-not-found';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

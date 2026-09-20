@@ -236,6 +236,12 @@ export class RoomPresence<Connection> {
       .flatMap((present) => [...present.connections.keys()] as Connection[]);
   }
 
+  /** One Participant's own connections: their tabs, and nobody else's. */
+  connectionsOf(roomId: string, identityId: string): Connection[] {
+    const present = this.rooms.get(roomId)?.present.get(identityId);
+    return present ? ([...present.connections.keys()] as Connection[]) : [];
+  }
+
   private heartbeatOf(connection: Connection): Heartbeat | undefined {
     return this.presentAt(connection)?.connections.get(connection);
   }

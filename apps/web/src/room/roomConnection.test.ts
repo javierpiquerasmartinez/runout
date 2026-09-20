@@ -15,6 +15,8 @@ const room: RoomSnapshot = {
   participants: [],
   queue: [],
   playback: null,
+  notes: [],
+  marks: [],
   revision: 7,
   presence: [],
 }

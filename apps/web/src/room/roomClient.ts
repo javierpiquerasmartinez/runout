@@ -51,6 +51,24 @@ export interface QueueEntry {
   }
 }
 
+/**
+ * A written conclusion on a Hand, with its writer and date. Mirrors the
+ * server's shape. Only the Master of a Room the Hand is in may rewrite or
+ * delete one; outside a Room a Note is only ever read.
+ */
+export interface Note {
+  id: string
+  /** Where it falls among the Notes written, as the server orders them. */
+  seq: number
+  handId: string
+  writer: Author
+  body: string
+  /** When it was written, as an ISO instant. */
+  writtenAt: string
+  /** When a Master last rewrote it; null while it stands as written. */
+  editedAt: string | null
+}
+
 /** The Room's shared replay state. The Hand itself is fetched by id. */
 export interface Playback {
   handId: string
@@ -85,6 +103,10 @@ export interface RoomSnapshot {
   queue: QueueEntry[]
   /** Null while no Hand is loaded. */
   playback: Playback | null
+  /** Every Note on the Hands in the Queue, oldest first. */
+  notes: Note[]
+  /** The Hands in the Queue this person has Marked. Nobody else is told. */
+  marks: string[]
   /** The revision this snapshot is at; every later change carries a higher one. */
   revision: number
   presence: ParticipantPresence[]
@@ -131,11 +153,20 @@ export type RoomChange =
   | { type: 'entryRemoved'; id: string }
   | { type: 'entryRestored'; entry: QueueEntry }
   | { type: 'playbackChanged'; playback: Playback }
+  | { type: 'noteWritten'; note: Note }
+  | { type: 'noteEdited'; note: Note }
+  | { type: 'noteRemoved'; id: string }
+  | { type: 'noteRestored'; note: Note }
 
 export type RoomEvent =
   | { type: 'snapshot'; snapshot: RoomSnapshot }
   /** The Room's presence, which carries no revision: each report replaces the last. */
   | { type: 'presence'; participants: ParticipantPresence[] }
+  /**
+   * This person's own Mark on a Hand. It is theirs alone, so it is no part of
+   * what the Room shares and carries no revision of its own.
+   */
+  | { type: 'markChanged'; handId: string; marked: boolean }
   | { type: 'latency'; latencyMs: number }
   /** The socket is open again; the Room as it stands is on its way. */
   | { type: 'connecting' }
@@ -159,6 +190,10 @@ export type RoomView =
       participants: Participant[]
       queue: QueueEntry[]
       playback: Playback | null
+      /** Every Note on the Hands in the Queue, oldest first. */
+      notes: Note[]
+      /** The Hands this person has Marked. Private: nobody else's are ever here. */
+      marks: string[]
       /** The revision of the last change applied: where this view stands. */
       revision: number
       presence: ParticipantPresence[]
@@ -175,7 +210,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
       // Whatever was held is dropped: this is the Room as it stands.
-      const { room, you, participants, queue, playback, revision, presence } = event.snapshot
+      const { room, you, participants, queue, playback, notes, marks, revision, presence } = event.snapshot
       const held = view.phase === 'in-room' ? view : null
       const seenRevision = Math.max(held?.sync.seenRevision ?? 0, revision)
       // Changes can go past while a snapshot is being drawn. One that lands
@@ -189,6 +224,8 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         participants,
         queue,
         playback,
+        notes,
+        marks,
         revision,
         presence,
         sync: {
@@ -206,6 +243,11 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     case 'presence':
       if (view.phase !== 'in-room') return view
       return { ...view, presence: event.participants }
+    case 'markChanged': {
+      if (view.phase !== 'in-room') return view
+      const marks = view.marks.filter((handId) => handId !== event.handId)
+      return { ...view, marks: event.marked ? [...marks, event.handId] : marks }
+    }
     case 'latency':
       if (view.phase !== 'in-room') return view
       return { ...view, sync: { ...view.sync, latencyMs: event.latencyMs } }
@@ -321,6 +363,20 @@ function applied(view: InRoom, change: RoomChange): RoomView {
     }
     case 'playbackChanged':
       return { ...view, playback: change.playback }
+    case 'noteWritten':
+      return view.notes.some((note) => note.id === change.note.id)
+        ? view
+        : { ...view, notes: [...view.notes, change.note] }
+    case 'noteEdited':
+      return { ...view, notes: view.notes.map((note) => (note.id === change.note.id ? change.note : note)) }
+    case 'noteRemoved':
+      return { ...view, notes: view.notes.filter((note) => note.id !== change.id) }
+    case 'noteRestored': {
+      // Back where it was written: Notes read in the order they were left.
+      const notes = [...view.notes.filter((note) => note.id !== change.note.id), change.note]
+      notes.sort((a, b) => a.seq - b.seq)
+      return { ...view, notes }
+    }
   }
 }
 
@@ -339,6 +395,8 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'snapshot', snapshot: data as RoomSnapshot }
     case 'room.presence':
       return { type: 'presence', participants: data.participants as ParticipantPresence[] }
+    case 'hand.markChanged':
+      return { type: 'markChanged', handId: String(data.handId), marked: data.marked === true }
     case 'rejected':
       return { type: 'rejected', command: String(data.command), reason: data.reason as RejectionReason }
     default: {
@@ -378,6 +436,14 @@ function parseChange(event: unknown, data: any): RoomChange | null {
       return { type: 'entryRestored', entry: data.entry as QueueEntry }
     case 'playback.changed':
       return { type: 'playbackChanged', playback: { handId: String(data.handId), actionIndex: Number(data.actionIndex) } }
+    case 'notes.written':
+      return { type: 'noteWritten', note: data.note as Note }
+    case 'notes.edited':
+      return { type: 'noteEdited', note: data.note as Note }
+    case 'notes.removed':
+      return { type: 'noteRemoved', id: String(data.id) }
+    case 'notes.restored':
+      return { type: 'noteRestored', note: data.note as Note }
     default:
       return null
   }
