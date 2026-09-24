@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { WelcomePage } from './WelcomePage'
+import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 
 interface OpenRoom {
   code: string
@@ -31,9 +32,10 @@ afterEach(() => {
 function renderWelcome() {
   const session = {
     token: 'token',
-    identity: { id: 'me', displayName: 'Javier', screenNames: [] },
+    identity: { id: 'me', displayName: 'Javier', screenNames: [], preferences: DEFAULT_PREFERENCES },
     rememberDisplayName: () => {},
     rememberScreenNames: () => {},
+    changePreferences: async () => {},
   }
   render(
     <I18nProvider initialLocale="en">

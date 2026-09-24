@@ -247,16 +247,16 @@ describe('tableView: pots and bets', () => {
     // Oak_BB has just moved all in; Hero9max called Elm_UTG's all-in before that.
     const hero = tableView(nineMax, 9, es).seats.find((seat) => seat.screenName === 'Hero9max')!
 
-    expect(hero.chip).toEqual({ kind: 'bet', label: '19,9 BB', potShare: null })
+    expect(hero.chip).toEqual({ kind: 'bet', label: '19,9 BB', secondary: null, potShare: null })
   })
 
   it('shows blinds and a straddle without a share of the pot', () => {
     const view = tableView(straddled, 0, es)
 
     expect(view.seats.filter((seat) => seat.chip).map((seat) => [seat.screenName, seat.chip])).toEqual([
-      ['Larch4', { kind: 'bet', label: '0,5 BB', potShare: null }],
-      ['Maple5', { kind: 'bet', label: '1 BB', potShare: null }],
-      ['Olive6', { kind: 'bet', label: '2 BB', potShare: null }],
+      ['Larch4', { kind: 'bet', label: '0,5 BB', secondary: null, potShare: null }],
+      ['Maple5', { kind: 'bet', label: '1 BB', secondary: null, potShare: null }],
+      ['Olive6', { kind: 'bet', label: '2 BB', secondary: null, potShare: null }],
     ])
   })
 
@@ -264,7 +264,7 @@ describe('tableView: pots and bets', () => {
     // Turn: Olive6 bets her last $31.
     const olive = tableView(straddled, 14, es).seats.find((seat) => seat.screenName === 'Olive6')!
 
-    expect(olive.chip).toEqual({ kind: 'all-in', label: 'all-in 62 BB', potShare: null })
+    expect(olive.chip).toEqual({ kind: 'all-in', label: 'all-in 62 BB', secondary: null, potShare: null })
     expect(olive.stack).toBe('0 BB')
     expect(olive.allInLabel).toBe('all-in 100 BB')
   })
@@ -275,9 +275,9 @@ describe('tableView: pots and bets', () => {
     expect(view.pot).toBe('311 BB')
     expect(view.potDetail).toBeNull()
     expect(view.sidePots).toEqual([
-      { label: 'BOTE PRINCIPAL', amount: '81 BB', contestants: '4 jugadores' },
-      { label: 'BOTE LATERAL 1', amount: '90 BB', contestants: '3 jugadores' },
-      { label: 'BOTE LATERAL 2', amount: '140 BB', contestants: 'Hero9max vs Spruce9' },
+      { label: 'BOTE PRINCIPAL', amount: '81 BB', secondary: null, contestants: '4 jugadores' },
+      { label: 'BOTE LATERAL 1', amount: '90 BB', secondary: null, contestants: '3 jugadores' },
+      { label: 'BOTE LATERAL 2', amount: '140 BB', secondary: null, contestants: 'Hero9max vs Spruce9' },
     ])
   })
 
@@ -410,6 +410,76 @@ describe('tableView: Showdown', () => {
     expect(label('four-of-a-kind', ['Q'])[0]).toBe('Póker de damas · gana 197,5 BB')
     expect(label('straight-flush', ['9'])[1]).toBe('Straight flush, five to nine · wins 197.5 BB')
     expect(label('straight-flush', ['A'])).toEqual(['Escalera real · gana 197,5 BB', 'Royal flush · wins 197.5 BB'])
+  })
+})
+
+describe('tableView: the Display Unit and pot percentages', () => {
+  /** Intl puts a no-break space between an Amount and a currency sign that follows it. */
+  const nbsp = ' '
+  const inAmounts = { displayUnit: 'amount', potPercentage: true } as const
+  const inBoth = { displayUnit: 'both', potPercentage: true } as const
+  /** Every seat named, as when Hide Opponent Names is off. */
+  const shown = { hideOpponentNames: false, participantScreenNames: [] }
+
+  it('reads everything in big blinds by default, with nothing beside it', () => {
+    const view = tableView(hand, 0, es)
+
+    expect(view.seats.map((seat) => seat.stackSecondary)).toEqual([null, null, null, null])
+    expect(view.potSecondary).toBeNull()
+    expect(view.seats[1].chip).toMatchObject({ label: '0,5 BB', secondary: null })
+  })
+
+  it('reads Stacks, bets and the pot as Amounts in the Hand History’s currency, formatted for the language', () => {
+    const view = tableView(hand, 0, es, shown, inAmounts)
+
+    expect(view.seats.map((seat) => seat.stack)).toEqual([
+      `10,00${nbsp}€`,
+      `11,31${nbsp}€`,
+      `11,94${nbsp}€`,
+      `11,10${nbsp}€`,
+    ])
+    expect(view.seats[1].chip).toMatchObject({ label: `0,05${nbsp}€`, secondary: null })
+    expect(view.pot).toBe(`0,15${nbsp}€`)
+    expect(view.potSecondary).toBeNull()
+    expect(tableView(hand, 0, en, shown, inAmounts).seats[1].stack).toBe('€11.31')
+    expect(tableView(straddled, 10, en, shown, inAmounts).pot).toBe('$14.25')
+  })
+
+  it('writes the Actions in the same unit as the table', () => {
+    expect(tableView(hand, 2, es, shown, inAmounts).lastAction).toBe(`Preflop · iMapleAA sube a 0,30${nbsp}€`)
+    expect(tableView(straddled, 10, en, shown, inAmounts).log.entries[1]).toEqual({
+      text: 'Hero6 bets $4.50',
+      tone: 'latest',
+    })
+    expect(tableView(straddled, 10, en, shown, inAmounts).potDetail).toBe('$9.75 + $4.50 in play')
+  })
+
+  it('with both, keeps big blinds first and puts the Amount beside the figures, for the table to dim', () => {
+    const view = tableView(hand, 0, es, shown, inBoth)
+
+    expect([view.seats[1].stack, view.seats[1].stackSecondary]).toEqual(['113,1 BB', `11,31${nbsp}€`])
+    expect(view.seats[1].chip).toMatchObject({ label: '0,5 BB', secondary: `0,05${nbsp}€` })
+    expect([view.pot, view.potSecondary]).toEqual(['1,5 BB', `0,15${nbsp}€`])
+    const end = nineMax.timeline.states.length - 1
+    expect(tableView(nineMax, end, en, shown, inBoth).sidePots?.map((pot) => [pot.amount, pot.secondary])).toEqual([
+      ['81 BB', '$40.50'],
+      ['90 BB', '$45.00'],
+      ['140 BB', '$70.00'],
+    ])
+  })
+
+  it('with both, keeps the sentences calm: big blinds only', () => {
+    expect(tableView(hand, 2, es, shown, inBoth).lastAction).toBe('Preflop · iMapleAA sube a 3 BB')
+  })
+
+  it('shows each bet’s share of the pot unless it is turned off', () => {
+    const hero = (potPercentage: boolean) =>
+      tableView(straddled, 10, es, shown, { displayUnit: 'big-blinds', potPercentage }).seats.find(
+        (seat) => seat.screenName === 'Hero6',
+      )?.chip
+
+    expect(hero(true)).toMatchObject({ label: '9 BB', potShare: '46% bote' })
+    expect(hero(false)).toMatchObject({ label: '9 BB', potShare: null })
   })
 })
 

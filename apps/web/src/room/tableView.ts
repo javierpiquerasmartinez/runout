@@ -1,6 +1,8 @@
 import type { MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
+import type { Preferences } from '../preferences/preferences'
 import type { Action, HandWithTimeline, MadeHand, PlayerState, Position, Rank, Street, TableState } from './hand'
+import { quantity, type Quantity } from './quantity'
 import { streetProgress, type StreetProgress } from './streetProgress'
 
 /*
@@ -17,8 +19,10 @@ export interface SeatView {
   position: Position
   /** Where the seat sits: 0 is the bottom centre (the Hero), then clockwise. */
   slot: number
-  /** The Stack in big blinds: "113,1 BB". */
+  /** The Stack in the Display Unit: "113,1 BB". */
   stack: string
+  /** The Stack as an Amount beside `stack`, when both units are shown: "11,31 €". */
+  stackSecondary: string | null
   /** The chips in front of the player on this Street: a bet or an all-in. A check puts none. */
   chip: ChipView | null
   /** What they last did on this Street, next to them: "APUESTA", "PASA"… */
@@ -44,13 +48,20 @@ export interface SeatView {
 export interface ChipView {
   kind: 'bet' | 'all-in'
   label: string
-  /** A bet or raise as a share of the pot it went into: "33% bote". Not for calls, blinds or all-ins. */
+  /** The Amount beside `label`, when both units are shown. */
+  secondary: string | null
+  /**
+   * A bet or raise as a share of the pot it went into: "33% bote". Not for
+   * calls, blinds or all-ins, nor for a reader who turned it off.
+   */
   potShare: string | null
 }
 
 export interface PotView {
   label: string
   amount: string
+  /** The Amount beside `amount`, when both units are shown. */
+  secondary: string | null
   /** "Marta vs grindr_22", or "3 jugadores" when more contest it. */
   contestants: string
 }
@@ -83,6 +94,8 @@ export interface TableView {
   board: (string | null)[]
   /** Everything in the middle, bets in play included. */
   pot: string
+  /** The pot as an Amount beside `pot`, when both units are shown. */
+  potSecondary: string | null
   /** "19,5 BB + 6,5 BB en juego" when some of the pot is still in play on this Street. */
   potDetail: string | null
   /** The main pot and each side pot, once there are side pots. */
@@ -119,11 +132,22 @@ const NAMES_SHOWN: SeatNaming = { hideOpponentNames: false, participantScreenNam
 
 const LOG_LENGTH = 6
 
+/** The personal preferences the table is drawn with. */
+export type TablePreferences = Pick<Preferences, 'displayUnit' | 'potPercentage'>
+
+const DEFAULT_TABLE_PREFERENCES: TablePreferences = { displayUnit: 'big-blinds', potPercentage: true }
+
+/**
+ * Every quantity is in the reader's Display Unit. With both units the figures
+ * standing on their own carry the Amount as well, beside the big blinds;
+ * sentences (the log, the last Action, outcomes) keep to big blinds alone.
+ */
 export function tableView(
   hand: HandWithTimeline,
   actionIndex: number,
   i18n: Translator,
   naming: SeatNaming = NAMES_SHOWN,
+  preferences: TablePreferences = DEFAULT_TABLE_PREFERENCES,
 ): TableView {
   const { t } = i18n
   const { seats, states, hero, buttonSeat } = hand.timeline
@@ -131,8 +155,9 @@ export function tableView(
   const last = states.length - 1
   const index = Math.min(Math.max(actionIndex, 0), last)
   const state = states[index]
-  const bigBlinds = (amount: number, options?: Intl.NumberFormatOptions) =>
-    bigBlindsLabel(amount, hand.stake.bigBlind, i18n, options)
+  const measure = (amount: number, options?: Intl.NumberFormatOptions) =>
+    quantity(amount, hand.stake, preferences.displayUnit, i18n, options)
+  const inUnit: InUnit = (amount, options) => measure(amount, options).primary
   const heroSeat = seats.find((seat) => seat.screenName === hero.screenName)?.seat ?? seats[0]?.seat ?? 1
   const slots = Math.max(hand.tableSize, ...seats.map((seat) => seat.seat))
   const result = state.result
@@ -146,6 +171,7 @@ export function tableView(
 
   const gathered = state.pots.reduce((sum, pot) => sum + pot.amount, 0)
   const inPlay = state.players.reduce((sum, p) => sum + p.bet, 0)
+  const pot = measure(state.pot)
 
   return {
     slots,
@@ -153,11 +179,12 @@ export function tableView(
       .map((seat) => {
         const player = state.players.find((p) => p.screenName === seat.screenName)
         const isHero = seat.screenName === hero.screenName
+        const stack = measure(player?.stack ?? seat.startingStack)
         const shown = revealed.get(seat.screenName)
         const won = winnings.get(seat.screenName)
         const outcome = [
           shown && madeHandLabel(shown.madeHand, i18n),
-          won !== undefined && t('room.table.wins', { amount: bigBlinds(won) }),
+          won !== undefined && t('room.table.wins', { amount: inUnit(won) }),
         ].filter((part) => typeof part === 'string')
         return {
           screenName: seat.screenName,
@@ -165,11 +192,12 @@ export function tableView(
           nameHidden: isHidden(seat.screenName),
           position: seat.position,
           slot: (seat.seat - heroSeat + slots) % slots,
-          stack: bigBlinds(player?.stack ?? seat.startingStack),
-          chip: player && !result ? chipOf(player, states, index, bigBlinds, i18n) : null,
+          stack: stack.primary,
+          stackSecondary: stack.secondary,
+          chip: player && !result ? chipOf(player, states, index, measure, preferences.potPercentage, i18n) : null,
           move: result ? null : moveOf(seat.screenName, states, index, i18n),
           allInLabel:
-            player?.allIn && won === undefined ? t('room.table.allIn', { amount: bigBlinds(player.committed) }) : null,
+            player?.allIn && won === undefined ? t('room.table.allIn', { amount: inUnit(player.committed) }) : null,
           folded: player?.folded ?? false,
           toAct: state.toAct === seat.screenName,
           dealer: seat.seat === buttonSeat,
@@ -180,27 +208,32 @@ export function tableView(
           outcome: outcome.length > 0 ? outcome.join(' · ') : null,
           netResult:
             won !== undefined && player
-              ? bigBlinds(won - player.committed, { signDisplay: 'always' })
+              ? inUnit(won - player.committed, { signDisplay: 'always' })
               : null,
         }
       })
       .sort((a, b) => a.slot - b.slot),
     board: Array.from({ length: 5 }, (_, i) => state.board[i] ?? null),
-    pot: bigBlinds(state.pot),
+    pot: pot.primary,
+    potSecondary: pot.secondary,
     potDetail:
       gathered > 0 && inPlay > 0
-        ? t('room.table.potInPlay', { gathered: bigBlinds(gathered), inPlay: bigBlinds(inPlay) })
+        ? t('room.table.potInPlay', { gathered: inUnit(gathered), inPlay: inUnit(inPlay) })
         : null,
     sidePots:
       state.pots.length > 1
-        ? state.pots.map((pot, i) => ({
-            label: potName(i, state.pots.length, TABLE_POT_NAMES, i18n),
-            amount: bigBlinds(pot.amount),
-            contestants:
-              pot.contestants.length <= 2
-                ? pot.contestants.map(nameOf).join(t('room.versus'))
-                : t('room.table.contestants', { count: pot.contestants.length }),
-          }))
+        ? state.pots.map((side, i) => {
+            const { primary, secondary } = measure(side.amount)
+            return {
+              label: potName(i, state.pots.length, TABLE_POT_NAMES, i18n),
+              amount: primary,
+              secondary,
+              contestants:
+                side.contestants.length <= 2
+                  ? side.contestants.map(nameOf).join(t('room.versus'))
+                  : t('room.table.contestants', { count: side.contestants.length }),
+            }
+          })
         : null,
     street: state.street,
     actionIndex: index,
@@ -209,8 +242,8 @@ export function tableView(
     canGoBack: index > 0,
     canGoForward: index < last,
     streets: streetProgress(hand.timeline, index),
-    lastAction: lastActionOf(hand, index, nameOf, bigBlinds, i18n),
-    log: logOf(hand, index, winnings, nameOf, bigBlinds, i18n),
+    lastAction: lastActionOf(hand, index, nameOf, inUnit, i18n),
+    log: logOf(hand, index, winnings, nameOf, inUnit, i18n),
     winningCards: [
       ...new Set(
         (result?.revealed ?? []).filter((r) => winnings.has(r.screenName)).flatMap((r) => r.madeHand.cards),
@@ -220,18 +253,20 @@ export function tableView(
       ? {
           pots: result.pots.map((pot, i) => ({
             label: potName(i, result.pots.length, PAYOUT_POT_NAMES, i18n),
-            amount: bigBlinds(pot.winners.reduce((sum, winner) => sum + winner.amount, 0)),
+            amount: inUnit(pot.winners.reduce((sum, winner) => sum + winner.amount, 0)),
             winners: pot.winners.map(({ screenName, amount }) =>
-              t('room.log.wins', { name: nameOf(screenName), amount: bigBlinds(amount) }),
+              t('room.log.wins', { name: nameOf(screenName), amount: inUnit(amount) }),
             ),
           })),
-          rake: result.rake > 0 ? t('room.payout.rake', { amount: bigBlinds(result.rake) }) : null,
+          rake: result.rake > 0 ? t('room.payout.rake', { amount: inUnit(result.rake) }) : null,
         }
       : null,
   }
 }
 
-type BigBlinds = (amount: number, options?: Intl.NumberFormatOptions) => string
+/** A quantity in the Display Unit, for a sentence: its primary figure alone. */
+type InUnit = (amount: number, options?: Intl.NumberFormatOptions) => string
+type Measure = (amount: number, options?: Intl.NumberFormatOptions) => Quantity
 
 /** What the table calls a player: their Screen Name, or their Position when it is to be hidden. */
 type NameOf = (screenName: string) => string
@@ -291,30 +326,19 @@ function streetActions(states: TableState[], index: number): number[] {
   return found
 }
 
-function bigBlindsLabel(
-  amount: number,
-  bigBlind: number,
-  { t, formatNumber }: Translator,
-  options?: Intl.NumberFormatOptions,
-): string {
-  return t('room.table.bigBlinds', {
-    value: formatNumber(amount / bigBlind, { maximumFractionDigits: 1, ...options }),
-  })
-}
-
 /** What led to this step, for the line under the Action counter. */
 function lastActionOf(
   hand: HandWithTimeline,
   index: number,
   nameOf: NameOf,
-  bigBlinds: BigBlinds,
+  inUnit: InUnit,
   i18n: Translator,
 ): string {
   const { t } = i18n
   const state = hand.timeline.states[index]
   const street = t(`room.playback.street.${state.street}`)
   if (state.action) {
-    return `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, nameOf, bigBlinds, i18n)}`
+    return `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, nameOf, inUnit, i18n)}`
   }
   if (state.result) {
     return `${hand.timeline.showdown ? t('room.playback.showdown') : street} · ${t('room.playback.handOver')}`
@@ -335,18 +359,21 @@ function chipOf(
   player: PlayerState,
   states: TableState[],
   index: number,
-  bigBlinds: BigBlinds,
+  measure: Measure,
+  potPercentage: boolean,
   { t, formatNumber }: Translator,
 ): ChipView | null {
   const latest = streetActions(states, index).findLast((i) => states[i].action?.screenName === player.screenName)
   const move = latest === undefined ? null : states[latest].action
 
   if (player.bet === 0) return null
-  const amount = bigBlinds(player.bet)
-  if (player.allIn) return { kind: 'all-in', label: t('room.table.allIn', { amount }), potShare: null }
-  if (latest === undefined || (move?.type !== 'bet' && move?.type !== 'raise')) {
+  const { primary, secondary } = measure(player.bet)
+  if (player.allIn) {
+    return { kind: 'all-in', label: t('room.table.allIn', { amount: primary }), secondary, potShare: null }
+  }
+  if (!potPercentage || latest === undefined || (move?.type !== 'bet' && move?.type !== 'raise')) {
     // Calls follow someone else's sizing; blinds and straddles are posted.
-    return { kind: 'bet', label: amount, potShare: null }
+    return { kind: 'bet', label: primary, secondary, potShare: null }
   }
   // The pot the player faced, their own chips on this Street left out.
   const before = states[latest - 1]
@@ -354,7 +381,8 @@ function chipOf(
   const faced = before.pot - own
   return {
     kind: 'bet',
-    label: amount,
+    label: primary,
+    secondary,
     potShare: t('room.table.potShare', {
       percent: formatNumber((player.bet / faced) * 100, { maximumFractionDigits: 0 }),
     }),
@@ -366,7 +394,7 @@ function logOf(
   index: number,
   winnings: Map<string, number>,
   nameOf: NameOf,
-  bigBlinds: BigBlinds,
+  inUnit: InUnit,
   i18n: Translator,
 ): LogView {
   const { t, formatNumber } = i18n
@@ -382,25 +410,25 @@ function logOf(
     }
   } else {
     for (const i of streetActions(states, index).slice(-LOG_LENGTH)) {
-      entries.push({ text: actionLabel(states[i].action!, nameOf, bigBlinds, i18n), tone: i === index ? 'latest' : 'past' })
+      entries.push({ text: actionLabel(states[i].action!, nameOf, inUnit, i18n), tone: i === index ? 'latest' : 'past' })
     }
   }
   if (state.toAct) entries.push({ text: t('room.log.pending', { name: nameOf(state.toAct) }), tone: 'pending' })
   for (const [screenName, amount] of winnings) {
-    entries.push({ text: t('room.log.wins', { name: nameOf(screenName), amount: bigBlinds(amount) }), tone: 'winner' })
+    entries.push({ text: t('room.log.wins', { name: nameOf(screenName), amount: inUnit(amount) }), tone: 'winner' })
   }
 
   let aside: string | null = null
   if (result) {
-    const [main, ...sides] = result.pots.map((pot) => bigBlinds(pot.amount))
+    const [main, ...sides] = result.pots.map((pot) => inUnit(pot.amount))
     aside =
       sides.length === 0
-        ? t('room.log.pot', { amount: bigBlinds(state.pot) })
+        ? t('room.log.pot', { amount: inUnit(state.pot) })
         : sides.length === 1
           ? t('room.log.potWithSide', { main, side: sides[0] })
           : t('room.log.potWithSides', { main, sides: sides.join(' + ') })
   } else if (state.effectiveStack !== null) {
-    const stack = bigBlinds(state.effectiveStack)
+    const stack = inUnit(state.effectiveStack)
     aside =
       state.spr === null
         ? t('room.log.effective', { stack })
@@ -451,7 +479,7 @@ function madeHandLabel({ category, ranks, cards }: MadeHand, { t }: Translator):
   }
 }
 
-function actionLabel(action: Action, nameOf: NameOf, bigBlinds: BigBlinds, { t }: Translator): string {
+function actionLabel(action: Action, nameOf: NameOf, inUnit: InUnit, { t }: Translator): string {
   const name = nameOf(action.screenName)
   switch (action.type) {
     case 'fold':
@@ -459,8 +487,8 @@ function actionLabel(action: Action, nameOf: NameOf, bigBlinds: BigBlinds, { t }
       return t(`room.playback.action.${action.type}`, { name })
     case 'call':
     case 'bet':
-      return t(`room.playback.action.${action.type}`, { name, amount: bigBlinds(action.amount) })
+      return t(`room.playback.action.${action.type}`, { name, amount: inUnit(action.amount) })
     case 'raise':
-      return t('room.playback.action.raise', { name, amount: bigBlinds(action.to) })
+      return t('room.playback.action.raise', { name, amount: inUnit(action.to) })
   }
 }

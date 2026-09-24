@@ -63,6 +63,8 @@ export class RoomConnection {
   private lastBeatAt = Number.NEGATIVE_INFINITY
   private cancelBeat: (() => void) | null = null
   private cancelRetry: (() => void) | null = null
+  /** The name every join, the first and each one after a drop, goes in under. */
+  private displayName: string
 
   constructor(options: RoomConnectionOptions) {
     this.options = {
@@ -71,7 +73,16 @@ export class RoomConnection {
       now: () => Date.now(),
       ...options,
     }
+    this.displayName = options.displayName
     this.connect()
+  }
+
+  /**
+   * The Participant changed their Display Name, and the Room has already been
+   * told. Only coming back after a drop needs it: the name travels with the join.
+   */
+  rename(displayName: string): void {
+    this.displayName = displayName
   }
 
   /** Sends a command to the Room. Dropped while the socket is down. */
@@ -123,7 +134,7 @@ export class RoomConnection {
   private opened(): void {
     this.open = true
     this.options.onEvent({ type: 'connecting' })
-    this.send('room.join', { code: this.options.code, displayName: this.options.displayName })
+    this.send('room.join', { code: this.options.code, displayName: this.displayName })
   }
 
   private received(raw: string): void {

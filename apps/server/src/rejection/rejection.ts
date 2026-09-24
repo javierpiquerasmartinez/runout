@@ -6,6 +6,7 @@ export type RejectionReason =
   | 'unauthenticated'
   | 'invalid-display-name'
   | 'invalid-screen-names'
+  | 'invalid-preferences'
   | 'invalid-room-name'
   | 'room-not-found'
   | 'not-in-room'

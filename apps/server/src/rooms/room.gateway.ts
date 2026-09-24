@@ -174,6 +174,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.closure = new RoomClosure(clock, (roomId) =>
       this.closeAbandoned(roomId),
     );
+    identities.onRenamed((identity) => this.renamed(identity));
     identities.onScreenNamesChanged((identityId, screenNames) =>
       this.screenNamesChanged(identityId, screenNames),
     );
@@ -631,6 +632,20 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         identityId: left.identityId,
       });
       this.watchIfEmpty(left.roomId);
+    }
+  }
+
+  /**
+   * Someone has a new Display Name: every Room they are in right now shows it
+   * at once, their own tabs included.
+   */
+  private renamed({ id, displayName }: Identity): void {
+    if (displayName === null) return;
+    for (const roomId of this.presence.rename(id, displayName)) {
+      this.publish(roomId, 'room.participantRenamed', {
+        identityId: id,
+        displayName,
+      });
     }
   }
 

@@ -195,6 +195,19 @@ describe('RoomConnection', () => {
     expect(latest().of('room.join')).toHaveLength(1)
   })
 
+  it('comes back under the Display Name it was last given, not the one it joined with', () => {
+    const { clock, connection, latest, join } = connect()
+    join()
+
+    connection.rename('Marta G.')
+    expect(latest().of('room.join')).toHaveLength(1)
+    latest().drop()
+    clock.advance(RECONNECT_BACKOFF_MS[0])
+    latest().open()
+
+    expect(latest().of('room.join')[0].data).toEqual({ code: 'RNT4K9PX', displayName: 'Marta G.' })
+  })
+
   it('waits longer before each further try, and counts the ones that fail', () => {
     const { clock, sockets, latest, types } = connect()
 

@@ -31,6 +31,8 @@ export interface RoomCommands {
   undoNoteRemoval(id: string): void
   /** Marks a Hand for this person alone, or takes the Mark off. */
   setMark(handId: string, marked: boolean): void
+  /** The Participant has a new Display Name (the Room already knows): rejoins use it. */
+  rejoinAs(displayName: string): void
 }
 
 /**
@@ -89,6 +91,7 @@ export function useRoom(code: string, token: string, displayName: string | null)
       removeNote: (id) => send('notes.remove', { id }),
       undoNoteRemoval: (id) => send('notes.undoRemoval', { id }),
       setMark: (handId, marked) => send('hand.setMark', { handId, marked }),
+      rejoinAs: (displayName) => connectionRef.current?.rename(displayName),
     }),
     [send],
   )

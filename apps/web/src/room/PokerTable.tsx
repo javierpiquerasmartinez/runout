@@ -3,6 +3,7 @@ import { useI18n } from '../i18n'
 import { Card, CardBack, CardSlot } from '../ui/Card'
 import { Icon } from '../ui/Icon'
 import { asPercent, cachedBetCentres, seatCentre } from './tableLayout'
+import { Secondary } from '../ui/Secondary'
 import type { SeatView, TableView } from './tableView'
 
 /*
@@ -34,7 +35,10 @@ export function PokerTable({ view }: { view: TableView }) {
             {view.sidePots.map((pot, index) => (
               <div key={index} className="poker-table__side-pot" data-main={index === 0 || undefined}>
                 <span className="poker-table__side-pot-label ro-mono">{pot.label}</span>
-                <span className="poker-table__side-pot-value ro-mono">{pot.amount}</span>
+                <span className="poker-table__side-pot-value ro-mono">
+                  {pot.amount}
+                  <Secondary value={pot.secondary} />
+                </span>
                 <span className="poker-table__side-pot-who ro-mono">{pot.contestants}</span>
               </div>
             ))}
@@ -43,7 +47,10 @@ export function PokerTable({ view }: { view: TableView }) {
         ) : (
           <div className="poker-table__pot">
             <span className="poker-table__pot-label ro-mono">{t('room.table.pot')}</span>
-            <span className="poker-table__pot-value ro-mono">{view.pot}</span>
+            <span className="poker-table__pot-value ro-mono">
+              {view.pot}
+              <Secondary value={view.potSecondary} />
+            </span>
             {view.potDetail && <span className="poker-table__pot-detail ro-mono">{view.potDetail}</span>}
           </div>
         )}
@@ -63,7 +70,10 @@ export function PokerTable({ view }: { view: TableView }) {
               style={asPercent(bets.get(seat.slot)!)}
             >
               <span className="poker-table__bet-chip" />
-              <span className="poker-table__bet-amount">{seat.chip.label}</span>
+              <span className="poker-table__bet-amount">
+                {seat.chip.label}
+                <Secondary value={seat.chip.secondary} />
+              </span>
               {seat.chip.potShare && <span className="poker-table__bet-share">{seat.chip.potShare}</span>}
             </span>
           ),
@@ -126,7 +136,10 @@ function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; 
           {!seat.nameHidden && <span className="seat__position ro-mono">{seat.position}</span>}
         </div>
         <div className="seat__line seat__line--stack">
-          <span className="seat__stack ro-mono">{seat.stack}</span>
+          <span className="seat__stack ro-mono">
+            {seat.stack}
+            <Secondary value={seat.stackSecondary} />
+          </span>
           {seat.netResult && <span className="seat__note seat__note--won ro-mono">{seat.netResult}</span>}
           {seat.allInLabel && <span className="seat__note seat__note--all-in ro-mono">{seat.allInLabel}</span>}
         </div>

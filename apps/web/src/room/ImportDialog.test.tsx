@@ -5,6 +5,7 @@ import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPreview } from './importBatch'
+import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 
 const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
   hero,
@@ -71,9 +72,10 @@ function renderDialog() {
   const onImported = vi.fn()
   const session = {
     token: 'token',
-    identity: { id: 'me', displayName: 'Javier', screenNames: ['Javier_PS'] },
+    identity: { id: 'me', displayName: 'Javier', screenNames: ['Javier_PS'], preferences: DEFAULT_PREFERENCES },
     rememberDisplayName: () => {},
     rememberScreenNames: vi.fn(),
+    changePreferences: async () => {},
   }
   render(
     <I18nProvider initialLocale="en">

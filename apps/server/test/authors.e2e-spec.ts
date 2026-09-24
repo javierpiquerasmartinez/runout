@@ -122,7 +122,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
         .get('/api/identities/me')
         .set('Authorization', `Bearer ${me.token}`)
         .expect(200);
-      expect(later.body).toEqual({
+      expect(later.body).toMatchObject({
         id: me.id,
         displayName: null,
         screenNames: ['iMapleAA', 'Javier_PS'],
