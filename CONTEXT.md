@@ -157,3 +157,18 @@ _Avoid_: Chips, fichas
 
 **Display Unit**:
 A person's choice of how quantities are shown: in big blinds, as Amounts, or both.
+One of the Preferences.
+
+### Preferences
+
+**Preferences**:
+How one person reads the table: Deck Style, four-colour classic deck, pot percentage on bets, Display Unit, Theme and language. Personal and stored with their identity: they never change what anyone else in the Room sees. Hide Opponent Names is not one of them; it belongs to Playback.
+_Avoid_: Settings (the screen, not the choices), options, profile
+
+**Deck Style**:
+How a person's cards are drawn: the classic ivory deck (four colours or two) or the full-suit deck, whose face is the suit's colour and which is always four-colour. Both share the same geometry.
+_Avoid_: Skin, card theme
+
+**Theme**:
+The colour scheme a person's screens use: dark (the default), light, or following the operating system.
+_Avoid_: Mode, appearance
