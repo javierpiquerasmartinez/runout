@@ -3,7 +3,7 @@ import type { RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
 
 /** The Room this person is in, held while they step out to Settings. */
-export interface RoomSession {
+export interface HeldRoom {
   code: string
   view: RoomView
   commands: RoomCommands
@@ -12,9 +12,9 @@ export interface RoomSession {
   confirmDisplayName: (displayName: string) => void
 }
 
-export const RoomSessionContext = createContext<RoomSession | null>(null)
+export const HeldRoomContext = createContext<HeldRoom | null>(null)
 
 /** The Room in progress, or null when there is none (e.g. Settings opened from the welcome screen). */
-export function useRoomSession(): RoomSession | null {
-  return useContext(RoomSessionContext)
+export function useHeldRoom(): HeldRoom | null {
+  return useContext(HeldRoomContext)
 }

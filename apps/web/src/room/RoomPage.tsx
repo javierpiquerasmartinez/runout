@@ -10,7 +10,7 @@ import { TextField } from '../ui/TextField'
 import type { RoomSummary } from './roomClient'
 import { formatRoomCode } from './roomCode'
 import { RoomScreen } from './RoomScreen'
-import { useRoomSession } from './roomSessionContext'
+import { useHeldRoom } from './heldRoomContext'
 import './RoomPage.css'
 
 type Lookup =
@@ -21,12 +21,12 @@ type Lookup =
 /**
  * `/room/<code>`. Arriving from a link asks only to confirm the Display Name;
  * arriving from "Create" already has it and goes straight in. The Room itself
- * is held by the `RoomSession` around it.
+ * is held by the `RoomHolder` around it.
  */
 export function RoomPage({ code }: { code: string }) {
   const { token } = useSession()
-  const room = useRoomSession()
-  if (!room) throw new Error('RoomPage must be rendered inside <RoomSession>')
+  const room = useHeldRoom()
+  if (!room) throw new Error('RoomPage must be rendered inside <RoomHolder>')
   const { view, commands, displayName, confirmDisplayName: setDisplayName } = room
   const [lookup, setLookup] = useState<Lookup>({ state: 'loading' })
 

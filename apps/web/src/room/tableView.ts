@@ -156,6 +156,7 @@ export function tableView(
 
   const gathered = state.pots.reduce((sum, pot) => sum + pot.amount, 0)
   const inPlay = state.players.reduce((sum, p) => sum + p.bet, 0)
+  const pot = measure(state.pot)
 
   return {
     slots,
@@ -196,23 +197,26 @@ export function tableView(
       })
       .sort((a, b) => a.slot - b.slot),
     board: Array.from({ length: 5 }, (_, i) => state.board[i] ?? null),
-    pot: measure(state.pot).primary,
-    potSecondary: measure(state.pot).secondary,
+    pot: pot.primary,
+    potSecondary: pot.secondary,
     potDetail:
       gathered > 0 && inPlay > 0
         ? t('room.table.potInPlay', { gathered: inUnit(gathered), inPlay: inUnit(inPlay) })
         : null,
     sidePots:
       state.pots.length > 1
-        ? state.pots.map((pot, i) => ({
-            label: potName(i, state.pots.length, TABLE_POT_NAMES, i18n),
-            amount: measure(pot.amount).primary,
-            secondary: measure(pot.amount).secondary,
-            contestants:
-              pot.contestants.length <= 2
-                ? pot.contestants.join(t('room.versus'))
-                : t('room.table.contestants', { count: pot.contestants.length }),
-          }))
+        ? state.pots.map((side, i) => {
+            const { primary, secondary } = measure(side.amount)
+            return {
+              label: potName(i, state.pots.length, TABLE_POT_NAMES, i18n),
+              amount: primary,
+              secondary,
+              contestants:
+                side.contestants.length <= 2
+                  ? side.contestants.join(t('room.versus'))
+                  : t('room.table.contestants', { count: side.contestants.length }),
+            }
+          })
         : null,
     street: state.street,
     actionIndex: index,

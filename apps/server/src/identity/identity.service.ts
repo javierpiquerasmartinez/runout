@@ -16,7 +16,7 @@ export interface Preferences {
   deckStyle: 'classic' | 'full-suit';
   /** The classic deck in four colours; the full-suit deck always has them. */
   fourColour: boolean;
-  /** A bet's share of the pot, next to its chips. */
+  /** A bet's share of the pot, next to the bet. */
   potPercentage: boolean;
   displayUnit: 'big-blinds' | 'amount' | 'both';
   theme: 'dark' | 'light' | 'system';
@@ -231,9 +231,11 @@ function validPreferenceChanges(raw: unknown): Partial<Preferences> {
     throw new Rejected('invalid-preferences');
   }
   for (const [key, value] of Object.entries(raw)) {
-    const allowed: readonly unknown[] | undefined =
-      PREFERENCE_VALUES[key as keyof Preferences];
-    if (!Object.hasOwn(PREFERENCE_VALUES, key) || !allowed?.includes(value)) {
+    const known = Object.hasOwn(PREFERENCE_VALUES, key);
+    const allowed: readonly unknown[] = known
+      ? PREFERENCE_VALUES[key as keyof Preferences]
+      : [];
+    if (!allowed.includes(value)) {
       throw new Rejected('invalid-preferences');
     }
   }

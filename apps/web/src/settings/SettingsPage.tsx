@@ -6,7 +6,7 @@ import { DISPLAY_NAME_MAX_LENGTH, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
 import type { DeckStyle, DisplayUnit, Preferences, Theme } from '../preferences/preferences'
 import { quantity } from '../room/quantity'
-import { useRoomSession } from '../room/roomSessionContext'
+import { useHeldRoom } from '../room/heldRoomContext'
 import { roomPath } from '../room/roomCode'
 import { followLink, navigate } from '../routing'
 import { Avatar } from '../ui/Avatar'
@@ -76,7 +76,7 @@ export function SettingsPage() {
 /** Back to the Room still going on behind this page, or simply back. */
 function BackLink() {
   const { t } = useI18n()
-  const room = useRoomSession()
+  const room = useHeldRoom()
   if (room?.view.phase === 'in-room') {
     return (
       <a href={roomPath(room.code)} className="settings__back-to-room" onClick={followLink}>
@@ -93,11 +93,14 @@ function BackLink() {
   )
 }
 
+/** The profile field a save failed on. */
+type ProfileField = 'displayName' | 'screenNames'
+
 type Saving =
   | { state: 'editing' }
   | { state: 'saving' }
   | { state: 'saved' }
-  | { state: 'failed'; field: 'displayName' | 'screenNames'; reason: FailureReason }
+  | { state: 'failed'; field: ProfileField; reason: FailureReason }
 
 /** Display Name and Screen Names, saved together. A new Display Name shows in the Room at once. */
 function ProfileCard() {
@@ -112,7 +115,7 @@ function ProfileCard() {
   async function save(event: FormEvent) {
     event.preventDefault()
     setSaving({ state: 'saving' })
-    let field: 'displayName' | 'screenNames' = 'displayName'
+    let field: ProfileField = 'displayName'
     try {
       if (nameChanged) {
         const saved = await api<Identity>('/identities/me/display-name', {
@@ -139,7 +142,7 @@ function ProfileCard() {
     }
   }
 
-  const failed = (field: 'displayName' | 'screenNames') =>
+  const failed = (field: ProfileField) =>
     saving.state === 'failed' && saving.field === field ? t(`reason.${saving.reason}`) : undefined
   const edit = (set: (value: string) => void) => (value: string) => {
     set(value)
@@ -254,6 +257,7 @@ function TableReadingCard() {
         <Toggle
           label={t('settings.fourColour.label')}
           checked={fourColour}
+          disabledReason={deckStyle === 'full-suit' ? t('settings.fourColour.fullSuit') : undefined}
           onChange={(checked) => change({ fourColour: checked })}
         />
       </SettingRow>

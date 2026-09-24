@@ -8,7 +8,7 @@ export interface Preferences {
   deckStyle: DeckStyle
   /** The classic deck in four colours; the full-suit deck always has them. */
   fourColour: boolean
-  /** A bet's share of the pot, next to its chips. */
+  /** A bet's share of the pot, next to the bet. */
   potPercentage: boolean
   displayUnit: DisplayUnit
   theme: Theme
