@@ -17,7 +17,9 @@ import {
 } from '../identity/identity.service.js';
 import { Rejected, type RejectionReason } from '../rejection/rejection.js';
 import { MasterFailover } from './master-failover.js';
+import { MarksService } from './marks.service.js';
 import { MasterService, type MasterChanged } from './master.service.js';
+import { NotesService, type Note } from './notes.service.js';
 import { PlaybackService, type Playback } from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
 import { RoomClosure } from './room-closure.js';
@@ -43,6 +45,10 @@ export interface RoomSnapshot {
   queue: QueueEntry[];
   /** Null while no Hand is loaded. */
   playback: Playback | null;
+  /** Every Note on the Hands in the Queue, oldest first. */
+  notes: Note[];
+  /** The Hands in the Queue this Participant has Marked. Nobody else is told. */
+  marks: string[];
   /** The revision this snapshot is at. Every later change carries a higher one. */
   revision: number;
   /** How everyone in the Room is following it right now. */
@@ -99,6 +105,30 @@ export interface UndoQueueRemovalCommand {
   id: string;
 }
 
+export interface WriteNoteCommand {
+  handId: string;
+  body: string;
+}
+
+export interface EditNoteCommand {
+  id: string;
+  body: string;
+}
+
+export interface RemoveNoteCommand {
+  id: string;
+}
+
+export interface UndoNoteRemovalCommand {
+  id: string;
+}
+
+export interface SetMarkCommand {
+  handId: string;
+  /** True to Mark the Hand, false to take the Mark off. */
+  marked: boolean;
+}
+
 export interface RejectedEvent {
   command: string;
   reason: RejectionReason;
@@ -130,6 +160,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly queue: QueueService,
     private readonly playback: PlaybackService,
     private readonly masters: MasterService,
+    private readonly notes: NotesService,
+    private readonly marks: MarksService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {
     this.failover = new MasterFailover(clock, (roomId) =>
@@ -258,9 +290,11 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     room: Room,
   ): Promise<WsResponse<RoomSnapshot>> {
     const revision = this.revisions.current(room.id);
-    const [queue, playback] = await Promise.all([
+    const [queue, playback, notes, marks] = await Promise.all([
       this.queue.entries(room.id),
       this.playback.current(room.id),
+      this.notes.inRoom(room.id),
+      this.marks.inRoom(identityId, room.id),
     ]);
     // A snapshot says as much as a heartbeat: they are at this revision now.
     this.presence.applied(socket, revision, this.clock.now());
@@ -272,6 +306,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         participants: this.presence.participants(room.id),
         queue,
         playback,
+        notes,
+        marks,
         revision,
         presence: this.following(room.id),
       },
@@ -441,7 +477,101 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.rejecting('queue.undoRemoval', async () => {
       const { identity, roomId } = await this.inRoom(socket);
       const entry = await this.queue.undoRemoval(identity, roomId, command?.id);
-      this.publish(roomId, 'queue.entryRestored', { entry });
+      // Its Notes went with it when it was removed; they come back with it.
+      const notes = await this.notes.ofHands([entry.handId]);
+      this.publish(roomId, 'queue.entryRestored', { entry, notes });
+      return undefined;
+    });
+  }
+
+  /** Any Participant writes a Note on a Hand in the Queue; everyone sees it. */
+  @SubscribeMessage('notes.write')
+  writeNote(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<WriteNoteCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('notes.write', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const note = await this.notes.write(
+        identity,
+        roomId,
+        command?.handId,
+        command?.body,
+      );
+      this.publish(roomId, 'notes.written', { note });
+      return undefined;
+    });
+  }
+
+  /** The Master rewrites a Note. Guests are refused, whatever their screen offers. */
+  @SubscribeMessage('notes.edit')
+  editNote(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<EditNoteCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('notes.edit', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const note = await this.notes.edit(
+        identity,
+        roomId,
+        command?.id,
+        command?.body,
+      );
+      this.publish(roomId, 'notes.edited', { note });
+      return undefined;
+    });
+  }
+
+  /** The Master deletes a Note; it can be brought back for 10 s. */
+  @SubscribeMessage('notes.remove')
+  removeNote(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<RemoveNoteCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('notes.remove', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      this.publish(
+        roomId,
+        'notes.removed',
+        await this.notes.remove(identity, roomId, command?.id),
+      );
+      return undefined;
+    });
+  }
+
+  /** The Master undoes a deletion within its 10 s window. */
+  @SubscribeMessage('notes.undoRemoval')
+  undoNoteRemoval(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<UndoNoteRemovalCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('notes.undoRemoval', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const note = await this.notes.undoRemoval(identity, roomId, command?.id);
+      this.publish(roomId, 'notes.restored', { note });
+      return undefined;
+    });
+  }
+
+  /**
+   * A Participant Marks a Hand, or takes the Mark off. A Mark is private: the
+   * answer goes to that person's own tabs and to nobody else, and it changes
+   * nothing the Room shares, so it takes no revision.
+   */
+  @SubscribeMessage('hand.setMark')
+  setMark(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<SetMarkCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('hand.setMark', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      const mark = await this.marks.set(
+        identity,
+        roomId,
+        command?.handId,
+        command?.marked,
+      );
+      this.sendTo(roomId, identity.id, 'hand.markChanged', mark);
       return undefined;
     });
   }
@@ -585,6 +715,35 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /** Sends a change to every connection in the Room, at the revision it makes. */
   publish(roomId: string, event: string, data: unknown): void {
     this.broadcast(roomId, undefined, event, data);
+  }
+
+  /**
+   * Tells the Room about Queue Entries that have just joined it, with the
+   * Notes the Hands already carry: a Hand reviewed in an earlier Room arrives
+   * written on, and those Notes are visible wherever the Hand is seen.
+   */
+  async entriesAdded(roomId: string, entries: QueueEntry[]): Promise<void> {
+    const notes = await this.notes.ofHands(
+      entries.map((entry) => entry.handId),
+    );
+    this.publish(roomId, 'queue.entriesAdded', { entries, notes });
+  }
+
+  /**
+   * Sends something only one Participant may know to their own connections.
+   * It carries no revision: it is not part of what the Room shares, so
+   * nobody else's run of Revisions has a hole where it went.
+   */
+  private sendTo(
+    roomId: string,
+    identityId: string,
+    event: string,
+    data: unknown,
+  ): void {
+    const raw = JSON.stringify({ event, data });
+    for (const socket of this.presence.connectionsOf(roomId, identityId)) {
+      if (socket.readyState === WebSocket.OPEN) socket.send(raw);
+    }
   }
 
   /**

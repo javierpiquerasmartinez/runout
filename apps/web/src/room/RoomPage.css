@@ -1180,6 +1180,10 @@
 }
 
 .room-side__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 400;
@@ -1568,4 +1572,122 @@
 .room-header__nav:hover {
   background: var(--color-hover);
   color: var(--text-primary);
+}
+
+/*
+ * The "Notas de la mano" panel of the "Sala" boards: the Notes already on the
+ * loaded Hand, then the field to write one. It takes what is left of the side
+ * panel, as the board draws it, and scrolls when the Notes outgrow it.
+ */
+.room-notes {
+  flex-grow: 1;
+  min-height: 0;
+  border-bottom: 0;
+}
+
+.room-notes__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.room-notes__note {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+
+.room-notes__by {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.room-notes__writer {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.room-notes__when {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.room-notes__body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.room-notes__controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.room-notes__field {
+  flex-grow: 1;
+  min-height: 80px;
+  box-sizing: border-box;
+  padding: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.room-notes__save {
+  justify-content: center;
+}
+
+.room-notes__undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/*
+ * "Marcar" and "Nota" at the right of the loaded Hand's header row, as both
+ * "Sala" boards draw them: bordered, transparent, 30 px.
+ */
+.room-stage__spacer {
+  margin-left: auto;
+}
+
+.room-stage__mark,
+.room-stage__note {
+  height: 30px;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* A Marked Hand fills the flag, the way the "marcar" icon is drawn full. */
+.room-stage__mark[data-marked] {
+  border-color: var(--brass-soft-border);
+  color: var(--brass-ink);
+}
+
+.room-stage__mark[data-marked] .ro-icon {
+  fill: currentColor;
 }

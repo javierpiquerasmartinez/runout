@@ -5,7 +5,7 @@ import { hands, queueEntries, roomMemberships } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
-import type { Stake } from './hand.js';
+import type { Hand, Stake } from './hand.js';
 import { timeline, type Timeline } from './replay/timeline.js';
 
 /** What the web needs to draw a Hand at any Action. It never changes. */
@@ -27,6 +27,25 @@ export class HandsService {
    * `hand-not-found`, so a Hand's existence isn't revealed.
    */
   async withTimeline(viewer: Identity, id: string): Promise<HandWithTimeline> {
+    const content = await this.visibleTo(viewer, id);
+    return {
+      id,
+      stake: content.stake,
+      tableSize: content.tableSize,
+      timeline: timeline(content),
+    };
+  }
+
+  /**
+   * Refuses with `hand-not-found` unless the Hand is one this viewer may see,
+   * for what hangs off a Hand rather than being part of it (its Notes).
+   */
+  async requireVisible(viewer: Identity, id: string): Promise<void> {
+    await this.visibleTo(viewer, id);
+  }
+
+  /** The Hand as it was imported, for a viewer who may see it. */
+  private async visibleTo(viewer: Identity, id: string): Promise<Hand> {
     if (!isUuid(id)) throw new Rejected('hand-not-found');
     const [row] = await this.db
       .selectDistinct({ content: hands.content })
@@ -52,11 +71,6 @@ export class HandsService {
       )
       .limit(1);
     if (!row) throw new Rejected('hand-not-found');
-    return {
-      id,
-      stake: row.content.stake,
-      tableSize: row.content.tableSize,
-      timeline: timeline(row.content),
-    };
+    return row.content;
   }
 }

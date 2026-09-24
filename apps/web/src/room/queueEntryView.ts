@@ -40,12 +40,17 @@ export function potLabel(entry: Described, { t, formatNumber }: Translator): str
   return t('room.queue.pot', { value: formatNumber(bigBlinds, { maximumFractionDigits: 2 }) })
 }
 
-/** When the Hand was played, date and time in the UI language: "18 sept · 12:34". */
-export function playedAtLabel(entry: Described, { formatDate, formatTime }: Translator, timeZone?: string): string {
-  const at = new Date(entry.playedAt)
+/** An instant, date and time in the UI language: "18 sept · 12:34". */
+export function dateTimeLabel(iso: string, { formatDate, formatTime }: Translator, timeZone?: string): string {
+  const at = new Date(iso)
   const date = formatDate(at, { day: 'numeric', month: 'short', timeZone })
   const time = formatTime(at, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
   return `${date} · ${time}`
+}
+
+/** When the Hand was played, date and time in the UI language: "18 sept · 12:34". */
+export function playedAtLabel(entry: Described, i18n: Translator, timeZone?: string): string {
+  return dateTimeLabel(entry.playedAt, i18n, timeZone)
 }
 
 /**

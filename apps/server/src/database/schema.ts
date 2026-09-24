@@ -1,6 +1,7 @@
 // Drizzle schema. Tables are added here as features need them; run
 // `pnpm db:generate` after changing this file to write a migration.
 import {
+  bigserial,
   boolean,
   index,
   integer,
@@ -159,4 +160,46 @@ export const importPreviews = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   },
   (table) => [index('import_previews_created_at_idx').on(table.createdAt)],
+);
+
+/**
+ * A written conclusion attached to a Hand. It outlives the Room it was
+ * written in, and only the Master of a Room the Hand is in may edit or
+ * delete it; deletion is soft, so it can be undone for 10 s.
+ */
+export const notes = pgTable(
+  'notes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** The order they were written in, which two Notes of the same instant still have. */
+    seq: bigserial('seq', { mode: 'number' }).notNull(),
+    handId: uuid('hand_id')
+      .notNull()
+      .references(() => hands.id),
+    writerId: uuid('writer_id')
+      .notNull()
+      .references(() => identities.id),
+    body: text('body').notNull(),
+    writtenAt: timestamp('written_at', { withTimezone: true }).notNull(),
+    /** Set the first time a Master rewrites it; null while it stands as written. */
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    /** Set when a Master deletes it; null while it is there. Undoable for 10 s. */
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+  },
+  (table) => [index('notes_hand_id_idx').on(table.handId)],
+);
+
+/** A private flag one person puts on a Hand to find it again. Only they see it. */
+export const marks = pgTable(
+  'marks',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    handId: uuid('hand_id')
+      .notNull()
+      .references(() => hands.id),
+    markedAt: timestamp('marked_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.identityId, table.handId] })],
 );

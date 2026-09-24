@@ -33,6 +33,8 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'entry-not-in-queue': HttpStatus.NOT_FOUND,
   'nothing-to-undo': HttpStatus.NOT_FOUND,
   'undo-expired': HttpStatus.CONFLICT,
+  'invalid-note': HttpStatus.BAD_REQUEST,
+  'note-not-found': HttpStatus.NOT_FOUND,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }`. */
