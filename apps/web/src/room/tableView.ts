@@ -10,6 +10,10 @@ import { streetProgress, type StreetProgress } from './streetProgress'
 
 export interface SeatView {
   screenName: string
+  /** What the seat is labelled: its Screen Name, or its Position under Hide Opponent Names. */
+  name: string
+  /** Hide Opponent Names has put the seat's Position where its Screen Name would go. */
+  nameHidden: boolean
   position: Position
   /** Where the seat sits: 0 is the bottom centre (the Hero), then clockwise. */
   slot: number
@@ -104,11 +108,26 @@ export interface TableView {
   payout: PayoutView | null
 }
 
+/** How the Room wants players named: the Playback switch, and whose Screen Names are its own. */
+export interface SeatNaming {
+  hideOpponentNames: boolean
+  /** Every Screen Name of every Participant of the Room. */
+  participantScreenNames: string[]
+}
+
+const NAMES_SHOWN: SeatNaming = { hideOpponentNames: false, participantScreenNames: [] }
+
 const LOG_LENGTH = 6
 
-export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Translator): TableView {
+export function tableView(
+  hand: HandWithTimeline,
+  actionIndex: number,
+  i18n: Translator,
+  naming: SeatNaming = NAMES_SHOWN,
+): TableView {
   const { t } = i18n
   const { seats, states, hero, buttonSeat } = hand.timeline
+  const nameOf = playerNames(hand, naming)
   const last = states.length - 1
   const index = Math.min(Math.max(actionIndex, 0), last)
   const state = states[index]
@@ -142,6 +161,8 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
         ].filter((part) => typeof part === 'string')
         return {
           screenName: seat.screenName,
+          name: nameOf(seat.screenName),
+          nameHidden: nameOf(seat.screenName) !== seat.screenName,
           position: seat.position,
           slot: (seat.seat - heroSeat + slots) % slots,
           stack: bigBlinds(player?.stack ?? seat.startingStack),
@@ -177,7 +198,7 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
             amount: bigBlinds(pot.amount),
             contestants:
               pot.contestants.length <= 2
-                ? pot.contestants.join(t('room.versus'))
+                ? pot.contestants.map(nameOf).join(t('room.versus'))
                 : t('room.table.contestants', { count: pot.contestants.length }),
           }))
         : null,
@@ -188,8 +209,8 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
     canGoBack: index > 0,
     canGoForward: index < last,
     streets: streetProgress(hand.timeline, index),
-    lastAction: lastActionOf(hand, index, bigBlinds, i18n),
-    log: logOf(hand, index, winnings, bigBlinds, i18n),
+    lastAction: lastActionOf(hand, index, nameOf, bigBlinds, i18n),
+    log: logOf(hand, index, winnings, nameOf, bigBlinds, i18n),
     winningCards: [
       ...new Set(
         (result?.revealed ?? []).filter((r) => winnings.has(r.screenName)).flatMap((r) => r.madeHand.cards),
@@ -201,7 +222,7 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
             label: potName(i, result.pots.length, PAYOUT_POT_NAMES, i18n),
             amount: bigBlinds(pot.winners.reduce((sum, winner) => sum + winner.amount, 0)),
             winners: pot.winners.map(({ screenName, amount }) =>
-              t('room.log.wins', { name: screenName, amount: bigBlinds(amount) }),
+              t('room.log.wins', { name: nameOf(screenName), amount: bigBlinds(amount) }),
             ),
           })),
           rake: result.rake > 0 ? t('room.payout.rake', { amount: bigBlinds(result.rake) }) : null,
@@ -211,6 +232,21 @@ export function tableView(hand: HandWithTimeline, actionIndex: number, i18n: Tra
 }
 
 type BigBlinds = (amount: number, options?: Intl.NumberFormatOptions) => string
+
+/** What the table calls a player: their Screen Name, or their Position when it is to be hidden. */
+type NameOf = (screenName: string) => string
+
+/**
+ * Under Hide Opponent Names, a player whose Screen Name belongs to no
+ * Participant of the Room is called by their Position. Screen Names match
+ * whatever their case, as they do when a Hand's Author is found.
+ */
+function playerNames(hand: HandWithTimeline, { hideOpponentNames, participantScreenNames }: SeatNaming): NameOf {
+  if (!hideOpponentNames) return (screenName) => screenName
+  const own = new Set(participantScreenNames.map((name) => name.toLowerCase()))
+  const positions = new Map(hand.timeline.seats.map((seat) => [seat.screenName, seat.position]))
+  return (screenName) => (own.has(screenName.toLowerCase()) ? screenName : (positions.get(screenName) ?? screenName))
+}
 
 interface PotNames {
   /** The only pot, when there are no side pots. */
@@ -263,11 +299,19 @@ function bigBlindsLabel(
 }
 
 /** What led to this step, for the line under the Action counter. */
-function lastActionOf(hand: HandWithTimeline, index: number, bigBlinds: BigBlinds, i18n: Translator): string {
+function lastActionOf(
+  hand: HandWithTimeline,
+  index: number,
+  nameOf: NameOf,
+  bigBlinds: BigBlinds,
+  i18n: Translator,
+): string {
   const { t } = i18n
   const state = hand.timeline.states[index]
   const street = t(`room.playback.street.${state.street}`)
-  if (state.action) return `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, bigBlinds, i18n)}`
+  if (state.action) {
+    return `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, nameOf, bigBlinds, i18n)}`
+  }
   if (state.result) {
     return `${hand.timeline.showdown ? t('room.playback.showdown') : street} · ${t('room.playback.handOver')}`
   }
@@ -317,6 +361,7 @@ function logOf(
   hand: HandWithTimeline,
   index: number,
   winnings: Map<string, number>,
+  nameOf: NameOf,
   bigBlinds: BigBlinds,
   i18n: Translator,
 ): LogView {
@@ -329,16 +374,16 @@ function logOf(
   if (result && showdown) {
     for (const { screenName, cards } of result.revealed) {
       if (screenName === hero.screenName) continue
-      entries.push({ text: t('room.log.shows', { name: screenName, cards: cards.map(cardText).join('') }), tone: 'past' })
+      entries.push({ text: t('room.log.shows', { name: nameOf(screenName), cards: cards.map(cardText).join('') }), tone: 'past' })
     }
   } else {
     for (const i of streetActions(states, index).slice(-LOG_LENGTH)) {
-      entries.push({ text: actionLabel(states[i].action!, bigBlinds, i18n), tone: i === index ? 'latest' : 'past' })
+      entries.push({ text: actionLabel(states[i].action!, nameOf, bigBlinds, i18n), tone: i === index ? 'latest' : 'past' })
     }
   }
-  if (state.toAct) entries.push({ text: t('room.log.pending', { name: state.toAct }), tone: 'pending' })
-  for (const [name, amount] of winnings) {
-    entries.push({ text: t('room.log.wins', { name, amount: bigBlinds(amount) }), tone: 'winner' })
+  if (state.toAct) entries.push({ text: t('room.log.pending', { name: nameOf(state.toAct) }), tone: 'pending' })
+  for (const [screenName, amount] of winnings) {
+    entries.push({ text: t('room.log.wins', { name: nameOf(screenName), amount: bigBlinds(amount) }), tone: 'winner' })
   }
 
   let aside: string | null = null
@@ -402,8 +447,8 @@ function madeHandLabel({ category, ranks, cards }: MadeHand, { t }: Translator):
   }
 }
 
-function actionLabel(action: Action, bigBlinds: BigBlinds, { t }: Translator): string {
-  const name = action.screenName
+function actionLabel(action: Action, nameOf: NameOf, bigBlinds: BigBlinds, { t }: Translator): string {
+  const name = nameOf(action.screenName)
   switch (action.type) {
     case 'fold':
     case 'check':

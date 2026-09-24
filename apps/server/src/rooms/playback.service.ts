@@ -17,6 +17,8 @@ export interface Playback {
   handId: string;
   /** 0 is the Initial State; n is the table after Action n. */
   actionIndex: number;
+  /** Seats that belong to no Participant are shown by Position, on every table. */
+  hideOpponentNames: boolean;
 }
 
 /** Loading a Hand and moving through it. Only the Master may change Playback. */
@@ -31,13 +33,17 @@ export class PlaybackService {
   /** The Room's Playback, or null while no Hand has been loaded. */
   async current(roomId: string): Promise<Playback | null> {
     const [row] = await this.db
-      .select({ handId: playbacks.handId, actionIndex: playbacks.actionIndex })
+      .select({
+        handId: playbacks.handId,
+        actionIndex: playbacks.actionIndex,
+        hideOpponentNames: playbacks.hideOpponentNames,
+      })
       .from(playbacks)
       .where(eq(playbacks.roomId, roomId));
     return row ?? null;
   }
 
-  /** Loads a Hand from the Room's Queue at its Initial State. */
+  /** Loads a Hand from the Room's Queue at its Initial State, with every name shown. */
   async load(
     master: Identity,
     roomId: string,
@@ -58,7 +64,7 @@ export class PlaybackService {
       .limit(1);
     if (!queued) throw new Rejected('hand-not-in-queue');
 
-    const playback = { handId, actionIndex: 0 };
+    const playback = { handId, actionIndex: 0, hideOpponentNames: false };
     const updatedAt = this.clock.now();
     await this.db
       .insert(playbacks)
@@ -82,7 +88,11 @@ export class PlaybackService {
   ): Promise<Playback> {
     await this.rooms.requireMaster(roomId, master.id);
     const [loaded] = await this.db
-      .select({ handId: playbacks.handId, content: hands.content })
+      .select({
+        handId: playbacks.handId,
+        hideOpponentNames: playbacks.hideOpponentNames,
+        content: hands.content,
+      })
       .from(playbacks)
       .innerJoin(hands, eq(hands.id, playbacks.handId))
       .where(eq(playbacks.roomId, roomId));
@@ -100,6 +110,33 @@ export class PlaybackService {
       .update(playbacks)
       .set({ actionIndex, updatedAt: this.clock.now() })
       .where(eq(playbacks.roomId, roomId));
-    return { handId: loaded.handId, actionIndex };
+    return {
+      handId: loaded.handId,
+      actionIndex,
+      hideOpponentNames: loaded.hideOpponentNames,
+    };
+  }
+
+  /** Turns Hide Opponent Names on or off for the loaded Hand, where Playback is. */
+  async hideOpponentNames(
+    master: Identity,
+    roomId: string,
+    hidden: unknown,
+  ): Promise<Playback> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if (typeof hidden !== 'boolean') {
+      throw new Rejected('invalid-hide-opponent-names');
+    }
+    const [playback] = await this.db
+      .update(playbacks)
+      .set({ hideOpponentNames: hidden, updatedAt: this.clock.now() })
+      .where(eq(playbacks.roomId, roomId))
+      .returning({
+        handId: playbacks.handId,
+        actionIndex: playbacks.actionIndex,
+        hideOpponentNames: playbacks.hideOpponentNames,
+      });
+    if (!playback) throw new Rejected('no-hand-loaded');
+    return playback;
   }
 }

@@ -57,6 +57,13 @@
       "when": 1789933666492,
       "tag": "0007_notes_and_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790232023931,
+      "tag": "0008_hide_opponent_names",
+      "breakpoints": true
     }
   ]
 }

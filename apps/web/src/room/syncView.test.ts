@@ -3,9 +3,9 @@ import type { Participant, ParticipantPresence } from './roomClient'
 import { guestsFollowing, presenceOf } from './syncView'
 
 const participants: Participant[] = [
-  { identityId: 'id-javier', displayName: 'Javier', role: 'master' },
-  { identityId: 'id-marta', displayName: 'Marta', role: 'guest' },
-  { identityId: 'id-alberto', displayName: 'Alberto', role: 'guest' },
+  { identityId: 'id-javier', displayName: 'Javier', role: 'master', screenNames: [] },
+  { identityId: 'id-marta', displayName: 'Marta', role: 'guest', screenNames: [] },
+  { identityId: 'id-alberto', displayName: 'Alberto', role: 'guest', screenNames: [] },
 ]
 
 const following = (identityId: string, over: Partial<ParticipantPresence> = {}): ParticipantPresence => ({

@@ -78,6 +78,10 @@ export interface KickCommand {
   identityId: string;
 }
 
+export interface HideOpponentNamesCommand {
+  hidden: boolean;
+}
+
 export interface LoadHandCommand {
   handId: string;
 }
@@ -169,6 +173,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
     this.closure = new RoomClosure(clock, (roomId) =>
       this.closeAbandoned(roomId),
+    );
+    identities.onScreenNamesChanged((identityId, screenNames) =>
+      this.screenNamesChanged(identityId, screenNames),
     );
   }
 
@@ -415,6 +422,20 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  /** The Master shows seats outside the Room by Position, or by name again, on every table. */
+  @SubscribeMessage('playback.hideOpponentNames')
+  hideOpponentNames(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<HideOpponentNamesCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.changePlayback(
+      'playback.hideOpponentNames',
+      socket,
+      (master, roomId) =>
+        this.playback.hideOpponentNames(master, roomId, command?.hidden),
+    );
+  }
+
   /** The Master gives a Hand in the Queue another Author, for everyone. */
   @SubscribeMessage('queue.reassignAuthor')
   reassignAuthor(
@@ -610,6 +631,21 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         identityId: left.identityId,
       });
       this.watchIfEmpty(left.roomId);
+    }
+  }
+
+  /**
+   * Someone replaced their Screen Names: every Room they are in is told, as
+   * Hide Opponent Names decides by them which seats keep their names.
+   */
+  private screenNamesChanged(identityId: string, screenNames: string[]): void {
+    for (const roomId of this.presence.setScreenNames(
+      identityId,
+      screenNames,
+    )) {
+      this.publish(roomId, 'room.participantChanged', {
+        participant: this.presence.participant(roomId, identityId),
+      });
     }
   }
 

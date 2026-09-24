@@ -6,6 +6,7 @@ interface Participant {
   identityId: string;
   displayName: string;
   role: 'master' | 'guest';
+  screenNames: string[];
 }
 
 interface Snapshot {
@@ -69,7 +70,12 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
       room: { code: room.code, name: 'Martes NL50' },
       you: master.id,
       participants: [
-        { identityId: master.id, displayName: 'Javier', role: 'master' },
+        {
+          identityId: master.id,
+          displayName: 'Javier',
+          role: 'master',
+          screenNames: [],
+        },
       ],
       queue: [],
       playback: null,
@@ -104,14 +110,25 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
     const guestView = await guestSocket.next<Snapshot>('room.snapshot');
     expect(guestView.you).toBe(guest.id);
     expect(guestView.participants).toEqual([
-      { identityId: master.id, displayName: 'Javier', role: 'master' },
-      { identityId: guest.id, displayName: 'Marta', role: 'guest' },
+      {
+        identityId: master.id,
+        displayName: 'Javier',
+        role: 'master',
+        screenNames: [],
+      },
+      {
+        identityId: guest.id,
+        displayName: 'Marta',
+        role: 'guest',
+        screenNames: [],
+      },
     ]);
     expect(await masterSocket.next('room.participantJoined')).toEqual({
       participant: {
         identityId: guest.id,
         displayName: 'Marta',
         role: 'guest',
+        screenNames: [],
       },
     });
 

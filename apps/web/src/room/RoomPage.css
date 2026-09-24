@@ -1077,6 +1077,16 @@
   align-items: flex-end;
 }
 
+/* Where Playback is, then the Hide Opponent Names switch under it. */
+.playback-bar__where {
+  gap: 10px;
+}
+.playback-bar__said {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .playback-bar__counter {
   font-size: 13px;
   font-weight: 600;

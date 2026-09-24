@@ -15,6 +15,8 @@ export interface Participant {
   identityId: string
   displayName: string
   role: Role
+  /** Their Screen Names: seats that Hide Opponent Names leaves named. */
+  screenNames: string[]
 }
 
 export interface RoomSummary {
@@ -74,6 +76,8 @@ export interface Playback {
   handId: string
   /** 0 is the Initial State; n is the table after Action n. */
   actionIndex: number
+  /** Seats that belong to no Participant are shown by Position, on every table. */
+  hideOpponentNames: boolean
 }
 
 /** The Master role moving, and why: handed over, or passed on after a drop. */
@@ -145,6 +149,8 @@ export type RoomChange =
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
   | { type: 'participantKicked'; identityId: string }
+  /** Someone in the Room replaced their Screen Names. */
+  | { type: 'participantChanged'; participant: Participant }
   | { type: 'roomClosed' }
   | ({ type: 'masterChanged' } & MasterChange)
   /** New Queue Entries, with the Notes their Hands already carry from earlier Rooms. */
@@ -324,6 +330,13 @@ function applied(view: InRoom, change: RoomChange): RoomView {
           ? view.participants.map((p) => (p.identityId === change.participant.identityId ? change.participant : p))
           : [...view.participants, change.participant],
       }
+    case 'participantChanged':
+      return {
+        ...view,
+        participants: view.participants.map((p) =>
+          p.identityId === change.participant.identityId ? change.participant : p,
+        ),
+      }
     case 'participantLeft':
       return { ...view, participants: view.participants.filter((p) => p.identityId !== change.identityId) }
     case 'participantKicked':
@@ -434,6 +447,8 @@ function parseChange(event: unknown, data: any): RoomChange | null {
       return { type: 'participantLeft', identityId: String(data.identityId) }
     case 'room.participantKicked':
       return { type: 'participantKicked', identityId: String(data.identityId) }
+    case 'room.participantChanged':
+      return { type: 'participantChanged', participant: data.participant as Participant }
     case 'room.closed':
       return { type: 'roomClosed' }
     case 'room.masterChanged':
@@ -453,7 +468,14 @@ function parseChange(event: unknown, data: any): RoomChange | null {
     case 'queue.entryRestored':
       return { type: 'entryRestored', entry: data.entry as QueueEntry, notes: (data.notes ?? []) as Note[] }
     case 'playback.changed':
-      return { type: 'playbackChanged', playback: { handId: String(data.handId), actionIndex: Number(data.actionIndex) } }
+      return {
+        type: 'playbackChanged',
+        playback: {
+          handId: String(data.handId),
+          actionIndex: Number(data.actionIndex),
+          hideOpponentNames: data.hideOpponentNames === true,
+        },
+      }
     case 'notes.written':
       return { type: 'noteWritten', note: data.note as Note }
     case 'notes.edited':

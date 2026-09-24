@@ -7,6 +7,7 @@ interface Participant {
   identityId: string;
   displayName: string;
   role: 'master' | 'guest';
+  screenNames: string[];
 }
 
 interface Snapshot {
@@ -208,6 +209,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       expect(await masterSocket.next('playback.changed')).toEqual({
         handId,
         actionIndex: 0,
+        hideOpponentNames: false,
       });
     });
 

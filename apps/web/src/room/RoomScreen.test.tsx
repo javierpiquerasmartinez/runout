@@ -10,8 +10,8 @@ import type { RoomCommands } from './useRoom'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
-const javier: Participant = { identityId: 'id-javier', displayName: 'Javier', role: 'master' }
-const marta: Participant = { identityId: 'id-marta', displayName: 'Marta', role: 'guest' }
+const javier: Participant = { identityId: 'id-javier', displayName: 'Javier', role: 'master', screenNames: [] }
+const marta: Participant = { identityId: 'id-marta', displayName: 'Marta', role: 'guest', screenNames: [] }
 
 const firstHand: QueueEntry = {
   id: 'entry-1',
@@ -39,7 +39,7 @@ const martasNote: Note = {
 
 /** A Room with the first Hand loaded, which is what the Notes panel hangs off. */
 function roomWithLoadedHand(view: Partial<InRoom> = {}): InRoom {
-  return roomView({ queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 0 }, ...view })
+  return roomView({ queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 0, hideOpponentNames: false }, ...view })
 }
 
 function roomView(view: Partial<InRoom> = {}): InRoom {
@@ -85,6 +85,7 @@ function renderRoom(view: InRoom) {
     closeRoom: vi.fn(),
     loadHand: vi.fn(),
     goToAction: vi.fn(),
+    hideOpponentNames: vi.fn(),
     reassignAuthor: vi.fn(),
     reorderQueue: vi.fn(),
     removeQueueEntry: vi.fn(),
@@ -125,7 +126,7 @@ describe('RoomScreen · the Master role', () => {
     renderRoom(
       roomView({
         you: 'id-marta',
-        participants: [{ ...javier, role: 'guest' }, { ...marta, role: 'master' }],
+        participants: [{ ...javier, role: 'guest', screenNames: [] }, { ...marta, role: 'master' }],
         masterChange: { masterId: 'id-marta', reason: 'handover' },
       }),
     )
@@ -138,7 +139,7 @@ describe('RoomScreen · the Master role', () => {
     renderRoom(
       roomView({
         you: 'id-javier',
-        participants: [{ ...javier, role: 'guest' }, { ...marta, role: 'master' }],
+        participants: [{ ...javier, role: 'guest', screenNames: [] }, { ...marta, role: 'master' }],
         masterChange: { masterId: 'id-marta', reason: 'failover' },
       }),
     )
@@ -201,7 +202,7 @@ describe('RoomScreen · the end of a Room', () => {
     expect(window.location.pathname).toBe('/room/RNT4K9PX')
 
     rerenderRoom(
-      { ...view, participants: [{ ...javier, role: 'guest' }, { ...marta, role: 'master' }] },
+      { ...view, participants: [{ ...javier, role: 'guest', screenNames: [] }, { ...marta, role: 'master' }] },
       commands,
     )
     expect(window.location.pathname).toBe('/')
@@ -368,7 +369,7 @@ describe('RoomScreen \u00b7 Notes', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
 
     // The Master loads the next Hand: an undo of a Note nobody can see is no offer.
-    rerenderRoom({ ...view, playback: { handId: 'hand-2', actionIndex: 0 } }, commands)
+    rerenderRoom({ ...view, playback: { handId: 'hand-2', actionIndex: 0, hideOpponentNames: false } }, commands)
 
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
   })

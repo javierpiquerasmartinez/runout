@@ -412,3 +412,62 @@ describe('tableView: Showdown', () => {
     expect(label('straight-flush', ['A'])).toEqual(['Escalera real · gana 197,5 BB', 'Royal flush · wins 197.5 BB'])
   })
 })
+
+describe('tableView: Hide Opponent Names', () => {
+  /** A Room where only the Hero's player and BIRCHWOODS are Participants. */
+  const hidden = { hideOpponentNames: true, participantScreenNames: ['imapleaa', 'BIRCHWOODS'] }
+
+  it('shows every seat by its Screen Name while the switch is off', () => {
+    const view = tableView(hand, 0, es, { ...hidden, hideOpponentNames: false })
+
+    expect(view.seats.map((seat) => [seat.name, seat.nameHidden])).toEqual([
+      ['iMapleAA', false],
+      ['Alder239', false],
+      ['BIRCHWOODS', false],
+      ['Cedar31lse', false],
+    ])
+    expect(tableView(hand, 0, es).seats.map((seat) => seat.name)).toEqual([
+      'iMapleAA',
+      'Alder239',
+      'BIRCHWOODS',
+      'Cedar31lse',
+    ])
+  })
+
+  it('shows seats that belong to no Participant by their Position, and Participants’ by their Screen Name, whatever its case', () => {
+    const view = tableView(hand, 0, es, hidden)
+
+    expect(view.seats.map((seat) => [seat.name, seat.nameHidden])).toEqual([
+      ['iMapleAA', false],
+      ['SB', true],
+      ['BIRCHWOODS', false],
+      ['CO', true],
+    ])
+  })
+
+  it('hides the Hero too when the Hero is nobody in the Room', () => {
+    const view = tableView(hand, 0, es, { hideOpponentNames: true, participantScreenNames: [] })
+
+    expect(view.seats.map((seat) => seat.name)).toEqual(['BTN', 'SB', 'BB', 'CO'])
+  })
+
+  it('names hidden players by their Position wherever the table writes about them', () => {
+    expect(tableView(hand, 1, en, hidden).lastAction).toBe('Preflop · CO folds')
+    expect(tableView(hand, 0, es, hidden).log.entries).toEqual([{ text: 'CO · pendiente', tone: 'pending' }])
+
+    const last = nineMax.timeline.states.length - 1
+    const view = tableView(nineMax, last, es, { hideOpponentNames: true, participantScreenNames: ['Hero9max'] })
+    const position = (screenName: string) =>
+      nineMax.timeline.seats.find((seat) => seat.screenName === screenName)!.position
+    expect(view.log.entries.map((entry) => entry.text)).toEqual([
+      `${position('Oak_BB')} muestra Q♠Q♣`,
+      `${position('Elm_UTG')} muestra K♠K♦`,
+      `${position('Spruce9')} muestra A♣Q♦`,
+      `${position('Elm_UTG')} gana 79 BB`,
+      'Hero9max gana 226 BB',
+    ])
+    // Nothing the table writes gives them away; `screenName` only tells seats apart.
+    const written = JSON.stringify(view, (key, value) => (key === 'screenName' ? undefined : value))
+    expect(written).not.toMatch(/Oak_BB|Elm_UTG|Spruce9/)
+  })
+})

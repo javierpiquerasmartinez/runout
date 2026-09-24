@@ -11,9 +11,9 @@ import {
   type RoomView,
 } from './roomClient'
 
-const javier = { identityId: 'id-javier', displayName: 'Javier', role: 'master' } as const
-const marta = { identityId: 'id-marta', displayName: 'Marta', role: 'guest' } as const
-const alberto = { identityId: 'id-alberto', displayName: 'Alberto', role: 'guest' } as const
+const javier = { identityId: 'id-javier', displayName: 'Javier', role: 'master', screenNames: [] as string[] } as const
+const marta = { identityId: 'id-marta', displayName: 'Marta', role: 'guest', screenNames: [] as string[] } as const
+const alberto = { identityId: 'id-alberto', displayName: 'Alberto', role: 'guest', screenNames: [] as string[] } as const
 
 const firstHand: QueueEntry = {
   id: 'entry-1',
@@ -57,6 +57,7 @@ const changeTypes = new Set<string>([
   'participantJoined',
   'participantLeft',
   'participantKicked',
+  'participantChanged',
   'roomClosed',
   'masterChanged',
   'entriesAdded',
@@ -115,23 +116,23 @@ describe('reduceRoom', () => {
   it('lands a late Participant on the loaded Hand at its current Action', () => {
     const view = apply({
       type: 'snapshot',
-      snapshot: { ...snapshot.snapshot, queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 4 } },
+      snapshot: { ...snapshot.snapshot, queue: [firstHand], playback: { handId: 'hand-1', actionIndex: 4, hideOpponentNames: false } },
     })
-    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 4 })
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 4, hideOpponentNames: false })
   })
 
   it('follows the Playback the Master sets', () => {
     const view = apply(
       snapshot,
-      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } },
-      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3 } },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0, hideOpponentNames: false } },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3, hideOpponentNames: false } },
     )
-    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 3 })
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 3, hideOpponentNames: false })
     expect(inRoom(view)?.revision).toBe(6)
   })
 
   it('ignores Playback that arrives before the snapshot', () => {
-    expect(apply({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0 } })).toEqual(initialRoomView)
+    expect(apply({ type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 0, hideOpponentNames: false } })).toEqual(initialRoomView)
   })
 
   it('keeps the Room as it is when a Playback command is refused', () => {
@@ -209,6 +210,26 @@ describe('reduceRoom', () => {
     const renamed = { ...marta, displayName: 'Marta R.' }
     const view = apply(snapshot, { type: 'participantJoined', participant: renamed })
     expect(inRoom(view)?.participants).toEqual([javier, renamed])
+  })
+
+  it('takes a Participant’s new Screen Names', () => {
+    const renamed = { ...marta, screenNames: ['Marta_PS'] }
+    const view = apply(snapshot, { type: 'participantChanged', participant: renamed })
+    expect(inRoom(view)?.participants).toEqual([javier, renamed])
+  })
+
+  it('does not bring back a Participant who has already left when their Screen Names change', () => {
+    const view = apply(snapshot, { type: 'participantChanged', participant: { ...alberto, screenNames: ['A'] } })
+    expect(inRoom(view)?.participants).toEqual([javier, marta])
+  })
+
+  it('follows Hide Opponent Names as the Master switches it', () => {
+    const view = apply(
+      snapshot,
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3, hideOpponentNames: false } },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3, hideOpponentNames: true } },
+    )
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-1', actionIndex: 3, hideOpponentNames: true })
   })
 
   it('moves the Master role to the Participant it was handed to', () => {
@@ -294,17 +315,17 @@ describe('reduceRoom, staying in sync', () => {
   })
 
   it('drops a change older than where the Room already stands', () => {
-    const before = apply(snapshot, { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3 } })
+    const before = apply(snapshot, { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 3, hideOpponentNames: false } })
     const after = reduceRoom(before, {
       type: 'playbackChanged',
-      playback: { handId: 'hand-1', actionIndex: 1 },
+      playback: { handId: 'hand-1', actionIndex: 1, hideOpponentNames: false },
       revision: 4,
     })
     expect(after).toBe(before)
   })
 
   it('stops trusting what it holds the moment a revision is missing', () => {
-    const view = apply(snapshot, { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 9 }, revision: 7 })
+    const view = apply(snapshot, { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 9, hideOpponentNames: false }, revision: 7 })
 
     expect(inRoom(view)?.sync).toMatchObject({ state: 'recovering', awaitingSnapshot: true })
     // Nothing of the change is taken: the Room is not half of one state and half of another.
@@ -350,7 +371,7 @@ describe('reduceRoom, staying in sync', () => {
     const view = apply(
       snapshot,
       { type: 'entryRemoved', id: 'entry-1', revision: 9 },
-      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 }, revision: 10 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2, hideOpponentNames: false }, revision: 10 },
       { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 8 } },
     )
 
@@ -362,7 +383,7 @@ describe('reduceRoom, staying in sync', () => {
     const view = apply(
       snapshot,
       { type: 'entryRemoved', id: 'entry-1', revision: 9 },
-      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2 }, revision: 10 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 2, hideOpponentNames: false }, revision: 10 },
       { type: 'snapshot', snapshot: { ...snapshot.snapshot, revision: 10 } },
     )
 
@@ -372,16 +393,16 @@ describe('reduceRoom, staying in sync', () => {
   it('jumps straight to the Room as it stands when the snapshot comes back', () => {
     const view = apply(
       snapshot,
-      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 9 }, revision: 7 },
+      { type: 'playbackChanged', playback: { handId: 'hand-1', actionIndex: 9, hideOpponentNames: false }, revision: 7 },
       {
         type: 'snapshot',
-        snapshot: { ...snapshot.snapshot, revision: 12, playback: { handId: 'hand-2', actionIndex: 2 } },
+        snapshot: { ...snapshot.snapshot, revision: 12, playback: { handId: 'hand-2', actionIndex: 2, hideOpponentNames: false } },
       },
     )
 
     expect(inRoom(view)?.sync).toMatchObject({ state: 'synced', awaitingSnapshot: false })
     expect(inRoom(view)?.revision).toBe(12)
-    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-2', actionIndex: 2 })
+    expect(inRoom(view)?.playback).toEqual({ handId: 'hand-2', actionIndex: 2, hideOpponentNames: false })
   })
 
   it('keeps the Room on screen, frozen, when the connection drops', () => {
@@ -525,9 +546,17 @@ describe('parseServerMessage', () => {
       notes: [note],
       revision: 3,
     })
-    expect(changed('playback.changed', { handId: 'hand-1', actionIndex: 2 })).toEqual({
+    expect(changed('playback.changed', { handId: 'hand-1', actionIndex: 2, hideOpponentNames: false })).toEqual({
       type: 'playbackChanged',
-      playback: { handId: 'hand-1', actionIndex: 2 },
+      playback: { handId: 'hand-1', actionIndex: 2, hideOpponentNames: false },
+      revision: 3,
+    })
+    expect(changed('playback.changed', { handId: 'hand-1', actionIndex: 2, hideOpponentNames: true })).toMatchObject({
+      playback: { hideOpponentNames: true },
+    })
+    expect(changed('room.participantChanged', { participant: { ...marta, screenNames: ['Marta_PS'] } })).toEqual({
+      type: 'participantChanged',
+      participant: { ...marta, screenNames: ['Marta_PS'] },
       revision: 3,
     })
     expect(
