@@ -57,6 +57,13 @@
       "when": 1789933666492,
       "tag": "0007_notes_and_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790232127056,
+      "tag": "0008_preferences",
+      "breakpoints": true
     }
   ]
 }

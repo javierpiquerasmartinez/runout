@@ -6,6 +6,7 @@ import {
   playedAtLabel,
   positionsLabel,
   potLabel,
+  potSecondaryLabel,
   sameHandLabel,
   siteLabel,
   stakeLabel,
@@ -72,6 +73,15 @@ describe('potLabel', () => {
     expect(potLabel(entry(), createTranslator('en'))).toBe('Pot 10.5 BB')
     const exact = entry({ summary: { ...entry().summary, finalPot: 100 } })
     expect(potLabel(exact, es)).toBe('Bote 10 BB')
+  })
+
+  it('reads it in the Display Unit, with the Amount beside big blinds when both are on', () => {
+    expect(potLabel(entry(), es, 'amount')).toBe('Bote 1,05\u00a0€')
+    expect(potLabel(entry(), createTranslator('en'), 'amount')).toBe('Pot €1.05')
+    expect(potLabel(entry(), es, 'both')).toBe('Bote 10,5 BB')
+    expect(potSecondaryLabel(entry(), es, 'both')).toBe('1,05\u00a0€')
+    expect(potSecondaryLabel(entry(), es, 'big-blinds')).toBeNull()
+    expect(potSecondaryLabel(entry(), es, 'amount')).toBeNull()
   })
 })
 

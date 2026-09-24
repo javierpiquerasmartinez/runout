@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { api } from '../backend/api'
 import { useI18n } from '../i18n'
+import { PreferencesContext } from '../preferences/context'
+import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
+import { useTheme } from '../preferences/theme'
 import { Button } from '../ui/Button'
 import { SessionContext } from './context'
 import { loadSession, type Session } from './identity'
@@ -7,9 +11,12 @@ import './SessionProvider.css'
 
 type Loading = { state: 'loading' } | { state: 'ready'; session: Session } | { state: 'error' }
 
-/** Renders its children once this browser's identity is known. */
+/**
+ * Renders its children once this browser's identity is known, read the way
+ * that identity prefers: theme, language, deck and units.
+ */
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { t } = useI18n()
+  const { t, setLocale } = useI18n()
   const [loading, setLoading] = useState<Loading>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
@@ -33,9 +40,54 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const rememberDisplayName = useCallback((displayName: string) => remember({ displayName }), [remember])
   const rememberScreenNames = useCallback((screenNames: string[]) => remember({ screenNames }), [remember])
 
+  const token = loading.state === 'ready' ? loading.session.token : null
+  const preferences = loading.state === 'ready' ? loading.session.identity.preferences : DEFAULT_PREFERENCES
+  const changePreferences = useCallback(
+    async (changes: Partial<Preferences>) => {
+      if (token === null) return
+      const setEach = (update: (current: Preferences) => Preferences) =>
+        setLoading((current) =>
+          current.state === 'ready'
+            ? {
+                state: 'ready',
+                session: {
+                  ...current.session,
+                  identity: { ...current.session.identity, preferences: update(current.session.identity.preferences) },
+                },
+              }
+            : current,
+        )
+      let before: Preferences = DEFAULT_PREFERENCES
+      setEach((current) => {
+        before = current
+        return { ...current, ...changes }
+      })
+      try {
+        await api<Preferences>('/identities/me/preferences', { token, method: 'PATCH', body: changes })
+      } catch (error) {
+        // Back to what it was, unless something changed it again meanwhile.
+        setEach((current) => {
+          const reverted = { ...current }
+          for (const key of Object.keys(changes) as (keyof Preferences)[]) {
+            if (current[key] === changes[key]) Object.assign(reverted, { [key]: before[key] })
+          }
+          return reverted
+        })
+        throw error
+      }
+    },
+    [token],
+  )
+
+  useTheme(preferences.theme)
+  useEffect(() => setLocale(preferences.language), [preferences.language, setLocale])
+
   const value = useMemo(
-    () => (loading.state === 'ready' ? { ...loading.session, rememberDisplayName, rememberScreenNames } : null),
-    [loading, rememberDisplayName, rememberScreenNames],
+    () =>
+      loading.state === 'ready'
+        ? { ...loading.session, rememberDisplayName, rememberScreenNames, changePreferences }
+        : null,
+    [loading, rememberDisplayName, rememberScreenNames, changePreferences],
   )
 
   if (loading.state === 'loading') {
@@ -61,5 +113,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       </main>
     )
   }
-  return <SessionContext value={value}>{children}</SessionContext>
+  return (
+    <SessionContext value={value}>
+      <PreferencesContext value={preferences}>{children}</PreferencesContext>
+    </SessionContext>
+  )
 }

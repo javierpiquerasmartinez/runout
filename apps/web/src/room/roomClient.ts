@@ -145,6 +145,7 @@ export type RoomChange =
   | { type: 'participantJoined'; participant: Participant }
   | { type: 'participantLeft'; identityId: string }
   | { type: 'participantKicked'; identityId: string }
+  | { type: 'participantRenamed'; identityId: string; displayName: string }
   | { type: 'roomClosed' }
   | ({ type: 'masterChanged' } & MasterChange)
   /** New Queue Entries, with the Notes their Hands already carry from earlier Rooms. */
@@ -329,6 +330,18 @@ function applied(view: InRoom, change: RoomChange): RoomView {
     case 'participantKicked':
       if (change.identityId === view.you) return { phase: 'kicked', room: view.room }
       return { ...view, participants: view.participants.filter((p) => p.identityId !== change.identityId) }
+    case 'participantRenamed': {
+      // Every place the Room shows them by name follows.
+      const { identityId, displayName } = change
+      const renamed = <T extends { identityId: string; displayName: string }>(who: T): T =>
+        who.identityId === identityId ? { ...who, displayName } : who
+      return {
+        ...view,
+        participants: view.participants.map(renamed),
+        queue: view.queue.map((entry) => ({ ...entry, author: renamed(entry.author) })),
+        notes: view.notes.map((note) => ({ ...note, writer: renamed(note.writer) })),
+      }
+    }
     case 'roomClosed':
       return { phase: 'closed', room: view.room }
     case 'masterChanged': {
@@ -434,6 +447,8 @@ function parseChange(event: unknown, data: any): RoomChange | null {
       return { type: 'participantLeft', identityId: String(data.identityId) }
     case 'room.participantKicked':
       return { type: 'participantKicked', identityId: String(data.identityId) }
+    case 'room.participantRenamed':
+      return { type: 'participantRenamed', identityId: String(data.identityId), displayName: String(data.displayName) }
     case 'room.closed':
       return { type: 'roomClosed' }
     case 'room.masterChanged':

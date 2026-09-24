@@ -7,11 +7,10 @@ import { followLink, navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { BrandMark } from '../ui/BrandMark'
 import { TextField } from '../ui/TextField'
-import { readJoinIntent } from './joinIntent'
 import type { RoomSummary } from './roomClient'
 import { formatRoomCode } from './roomCode'
 import { RoomScreen } from './RoomScreen'
-import { useRoom } from './useRoom'
+import { useRoomSession } from './roomSessionContext'
 import './RoomPage.css'
 
 type Lookup =
@@ -21,13 +20,15 @@ type Lookup =
 
 /**
  * `/room/<code>`. Arriving from a link asks only to confirm the Display Name;
- * arriving from "Create" already has it and goes straight in.
+ * arriving from "Create" already has it and goes straight in. The Room itself
+ * is held by the `RoomSession` around it.
  */
 export function RoomPage({ code }: { code: string }) {
   const { token } = useSession()
-  const [displayName, setDisplayName] = useState<string | null>(() => readJoinIntent()?.displayName ?? null)
+  const room = useRoomSession()
+  if (!room) throw new Error('RoomPage must be rendered inside <RoomSession>')
+  const { view, commands, displayName, confirmDisplayName: setDisplayName } = room
   const [lookup, setLookup] = useState<Lookup>({ state: 'loading' })
-  const [view, commands] = useRoom(code, token, displayName)
 
   // Also run when arriving from "Create": a refused name falls back to the name form.
   useEffect(() => {

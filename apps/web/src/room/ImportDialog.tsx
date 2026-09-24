@@ -20,7 +20,9 @@ import {
   type SourceFormat,
   unmatchedHeroes,
 } from './importBatch'
-import { playedAtLabel, positionsLabel, potLabel, streetLabel } from './queueEntryView'
+import { playedAtLabel, positionsLabel, potLabel, potSecondaryLabel, streetLabel } from './queueEntryView'
+import { usePreferences } from '../preferences/context'
+import { Secondary } from '../ui/Secondary'
 import './ImportDialog.css'
 
 type Tab = 'files' | 'paste'
@@ -413,6 +415,7 @@ function HandPreviewPanel({
   i18n: Translator
 }) {
   const { t } = i18n
+  const { displayUnit } = usePreferences()
   if (hands.length === 0) {
     return (
       <div className="import-preview">
@@ -441,7 +444,10 @@ function HandPreviewPanel({
         </div>
         <div>
           <dt>{t('import.preview.pot')}</dt>
-          <dd className="import-preview__pot ro-mono">{potLabel(hand, i18n)}</dd>
+          <dd className="import-preview__pot ro-mono">
+            {potLabel(hand, i18n, displayUnit)}
+            <Secondary value={potSecondaryLabel(hand, i18n, displayUnit)} />
+          </dd>
         </div>
         <div>
           <dt>{t('import.preview.street')}</dt>

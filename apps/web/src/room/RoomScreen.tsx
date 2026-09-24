@@ -10,6 +10,8 @@ import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { SegmentedControl } from '../ui/SegmentedControl'
+import { Secondary } from '../ui/Secondary'
+import { usePreferences } from '../preferences/context'
 import { followLink, navigate } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
 import { ImportDialog } from './ImportDialog'
@@ -19,6 +21,7 @@ import {
   playedAtLabel,
   positionsLabel,
   potLabel,
+  potSecondaryLabel,
   sameHandLabel,
   siteLabel,
   stakeLabel,
@@ -85,9 +88,12 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   // While the dialog is open, pasting goes to its own paste tab.
   usePasteToImport(view.room.code, !importing, reportImport)
   const { token } = useSession()
+  const preferences = usePreferences()
   const load = useHand(view.playback?.handId ?? null, token)
   const table =
-    view.playback && load.state === 'loaded' ? tableView(load.hand, view.playback.actionIndex, i18n) : null
+    view.playback && load.state === 'loaded'
+      ? tableView(load.hand, view.playback.actionIndex, i18n, preferences)
+      : null
   // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
   const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
   const loadedEntry = view.queue[loadedIndex]
@@ -804,6 +810,7 @@ function CurrentHand({
 }) {
   const i18n = useI18n()
   const { t } = i18n
+  const { displayUnit } = usePreferences()
   const [changing, setChanging] = useState(false)
   // The Author may have left the Room; they stay a choice so the list shows who it is.
   const choices = participants.some((p) => p.identityId === entry.author.identityId)
@@ -874,7 +881,10 @@ function CurrentHand({
         </div>
         <div className="room-facts__row">
           <dt>{t('room.current.finalPot')}</dt>
-          <dd className="room-facts__value">{potLabel(entry, i18n)}</dd>
+          <dd className="room-facts__value">
+            {potLabel(entry, i18n, displayUnit)}
+            <Secondary value={potSecondaryLabel(entry, i18n, displayUnit)} />
+          </dd>
         </div>
         <div className="room-facts__row">
           <dt>{t('room.queue.filter.finalStreet')}</dt>
@@ -1097,6 +1107,7 @@ function QueueRow({
   onRemove?: () => void
 }) {
   const { t } = i18n
+  const { displayUnit } = usePreferences()
   const controls = onRemove !== undefined && (
     <div className="queue-entry__controls">
       <IconButton
@@ -1138,7 +1149,10 @@ function QueueRow({
       </div>
       <div className="queue-entry__chips">
         <span className="queue-entry__chip ro-mono">{stakeLabel(entry)}</span>
-        <span className="queue-entry__chip ro-mono">{potLabel(entry, i18n)}</span>
+        <span className="queue-entry__chip ro-mono">
+          {potLabel(entry, i18n, displayUnit)}
+          <Secondary value={potSecondaryLabel(entry, i18n, displayUnit)} />
+        </span>
         {sameHand && (
           <span className="queue-entry__chip queue-entry__chip--same-hand">
             <Icon name="link" size={11} />

@@ -86,6 +86,11 @@
   --card-ink-red: #c1362f;
   --card-ink-blue: #1c6fb8;
   --card-ink-green: #1f7a45;
+  /* The full-suit deck's faces, the same in both themes. */
+  --card-full-spade: #1a2422;
+  --card-full-heart: #b02f28;
+  --card-full-diamond: #1a63a8;
+  --card-full-club: #1b6e3d;
   --card-back-bg: #17282f;
   --card-back-border: #2a3e47;
   --card-back-mark: #5e7c8a;
@@ -212,6 +217,11 @@
   --card-ink-red: #c1362f;
   --card-ink-blue: #1c6fb8;
   --card-ink-green: #1f7a45;
+  /* The full-suit deck's faces, the same in both themes. */
+  --card-full-spade: #1a2422;
+  --card-full-heart: #b02f28;
+  --card-full-diamond: #1a63a8;
+  --card-full-club: #1b6e3d;
   --card-back-bg: #17282f;
   --card-back-border: #2a3e47;
   --card-back-mark: #5e7c8a;

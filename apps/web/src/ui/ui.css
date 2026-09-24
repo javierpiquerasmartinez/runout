@@ -520,6 +520,17 @@
   height: 26px;
   font-size: 10.5px;
 }
+.ro-avatar--28 {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+/* The "Ajustes y perfil" board's profile card. */
+.ro-avatar--56 {
+  width: 56px;
+  height: 56px;
+  font-size: 19px;
+}
 .ro-avatar[data-palette='1'] {
   background: var(--avatar-1-bg);
   color: var(--avatar-1-ink);
@@ -553,7 +564,16 @@
   flex-shrink: 0;
 }
 
-/* ---------- Cards: board "Cartas", classic ivory deck, four colours ---------- */
+/* ---------- The Amount beside big blinds, when a reader shows both units ---------- */
+
+.ro-secondary {
+  font-size: 0.85em;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ---------- Cards: board "Cartas", classic ivory deck (four colours or two) and full-suit deck ---------- */
 
 .ro-card {
   --card-w: 54px;
@@ -617,6 +637,53 @@
 }
 .ro-card[data-suit='c'] {
   color: var(--card-ink-green);
+}
+/* The classic deck in two colours: diamonds red, clubs black. */
+.ro-card[data-two-colour][data-suit='d'] {
+  color: var(--card-ink-red);
+}
+.ro-card[data-two-colour][data-suit='c'] {
+  color: var(--card-ink-black);
+}
+
+/*
+ * The full-suit deck: the suit is the face, in ivory; rank at 62% of the
+ * width, a small suit bottom right at 30%, and a 1 px inner rule so two cards
+ * of one suit side by side don't read as one block. Same geometry as the classic.
+ */
+.ro-card[data-deck='full-suit'] {
+  --card-rank: calc(var(--card-w) * 0.62);
+  --card-ten: calc(var(--card-w) * 0.62 * 0.78);
+  --card-suit: calc(var(--card-w) * 0.3);
+  --card-suit-inset: calc(var(--card-pad) - 1px);
+  justify-content: flex-start;
+  background: var(--card-suit-bg);
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(244 241 234 / 18%);
+  color: var(--card-face);
+}
+.ro-card--hero[data-deck='full-suit'] {
+  --card-pad: 4px;
+}
+.ro-card--opponent[data-deck='full-suit'] {
+  --card-pad: 3px;
+}
+.ro-card[data-deck='full-suit'][data-suit='s'] {
+  --card-suit-bg: var(--card-full-spade);
+}
+.ro-card[data-deck='full-suit'][data-suit='h'] {
+  --card-suit-bg: var(--card-full-heart);
+}
+.ro-card[data-deck='full-suit'][data-suit='d'] {
+  --card-suit-bg: var(--card-full-diamond);
+}
+.ro-card[data-deck='full-suit'][data-suit='c'] {
+  --card-suit-bg: var(--card-full-club);
+}
+.ro-card[data-deck='full-suit'] .ro-card__suit {
+  position: absolute;
+  right: max(2px, var(--card-suit-inset));
+  bottom: max(2px, var(--card-suit-inset));
+  opacity: 0.88;
 }
 
 .ro-card__rank {

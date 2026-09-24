@@ -14,7 +14,7 @@ function paletteIndex(seed: string): number {
   return (hash % PALETTE_SIZE) + 1
 }
 
-export function Avatar({ name, seed, size = 26 }: { name: string; seed: string; size?: 18 | 20 | 24 | 26 }) {
+export function Avatar({ name, seed, size = 26 }: { name: string; seed: string; size?: 18 | 20 | 24 | 26 | 28 | 56 }) {
   return (
     <span className={`ro-avatar ro-avatar--${size}`} data-palette={paletteIndex(seed)} aria-hidden="true">
       {initialsOf(name)}

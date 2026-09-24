@@ -1,10 +1,13 @@
 import { api, ApiError } from '../backend/api'
+import type { Preferences } from '../preferences/preferences'
 
 export interface Identity {
   id: string
   displayName: string | null
   /** The names this person plays under on Poker Sites; Hands' Heroes are matched against them. */
   screenNames: string[]
+  /** How this person reads the table; kept by the server, restored on every visit. */
+  preferences: Preferences
 }
 
 export interface Session {

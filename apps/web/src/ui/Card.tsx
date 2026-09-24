@@ -1,8 +1,11 @@
 import { useI18n } from '../i18n'
+import { usePreferences } from '../preferences/context'
+import type { DeckStyle } from '../preferences/preferences'
 
 /*
- * Card sprites from the "Cartas" board: the classic ivory deck, four-colour,
- * in its four sizes. Rank top left, suit bottom right; tens read "10".
+ * Card sprites from the "Cartas" board: the classic ivory deck (four colours
+ * or two) and the full-suit deck, in their four sizes. Rank top left, suit
+ * bottom right; tens read "10". Each reader sees the deck they chose.
  */
 
 export type CardSize = 'community' | 'hero' | 'opponent' | 'list'
@@ -21,6 +24,13 @@ function parse(card: string): { rank: string; suit: Suit } {
   return { rank: card.slice(0, -1), suit: card.slice(-1) as Suit }
 }
 
+/** Which deck to draw a card in; the reader's own unless a preview says otherwise. */
+export interface Deck {
+  style: DeckStyle
+  /** The classic deck in four colours; the full-suit deck always has them. */
+  fourColour: boolean
+}
+
 /**
  * A card face up. `winning` outlines it as part of a winning hand; `flip`
  * turns it over as it appears, for cards shown at Showdown.
@@ -30,17 +40,23 @@ export function Card({
   size,
   winning,
   flip,
+  deck,
 }: {
   card: string
   size: CardSize
   winning?: boolean
   flip?: boolean
+  deck?: Deck
 }) {
   const { t } = useI18n()
+  const preferences = usePreferences()
+  const { style, fourColour } = deck ?? { style: preferences.deckStyle, fourColour: preferences.fourColour }
   const { rank, suit } = parse(card)
   return (
     <span
       className={`ro-card ro-card--${size}`}
+      data-deck={style}
+      data-two-colour={(style === 'classic' && !fourColour) || undefined}
       data-suit={suit}
       data-ten={rank === '10' || undefined}
       data-winning={winning || undefined}

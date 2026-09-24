@@ -7,6 +7,7 @@ import { SessionContext } from '../identity/context'
 import { RoomScreen } from './RoomScreen'
 import type { Note, Participant, QueueEntry, RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
+import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
@@ -63,9 +64,10 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
 function screenOf(view: InRoom, commands: RoomCommands) {
   const session = {
     token: 'token',
-    identity: { id: view.you, displayName: 'Javier', screenNames: [] },
+    identity: { id: view.you, displayName: 'Javier', screenNames: [], preferences: DEFAULT_PREFERENCES },
     rememberDisplayName: () => {},
     rememberScreenNames: () => {},
+    changePreferences: async () => {},
   }
   return (
     <I18nProvider initialLocale="en">
@@ -94,6 +96,7 @@ function renderRoom(view: InRoom) {
     removeNote: vi.fn(),
     undoNoteRemoval: vi.fn(),
     setMark: vi.fn(),
+    rejoinAs: vi.fn(),
   } satisfies RoomCommands
   showAgain = render(screenOf(view, commands)).rerender
   return commands

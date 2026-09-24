@@ -22,8 +22,8 @@ export function createTranslator(locale: Locale) {
       ),
     formatNumber: (value: number, options?: Intl.NumberFormatOptions) =>
       options ? new Intl.NumberFormat(intlLocale, options).format(value) : numberFormat.format(value),
-    formatCurrency: (amount: number, currency: string) =>
-      new Intl.NumberFormat(intlLocale, { style: 'currency', currency }).format(amount),
+    formatCurrency: (amount: number, currency: string, options?: Intl.NumberFormatOptions) =>
+      new Intl.NumberFormat(intlLocale, { style: 'currency', currency, ...options }).format(amount),
     formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) =>
       date.toLocaleDateString(intlLocale, options),
     formatTime: (date: Date, options?: Intl.DateTimeFormatOptions) =>

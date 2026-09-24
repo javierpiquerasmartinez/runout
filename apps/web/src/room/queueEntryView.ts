@@ -1,4 +1,6 @@
 import type { Translator } from '../i18n/translator'
+import type { DisplayUnit } from '../preferences/preferences'
+import { quantity, type Quantity } from './quantity'
 import type { QueueEntry } from './roomClient'
 
 /*
@@ -34,10 +36,18 @@ export function siteLabel(entry: Pick<QueueEntry, 'site'>, { t }: Translator): s
   return t(`pokerSite.${entry.site}`)
 }
 
-/** The final pot in big blinds, in the UI language: "Bote 10,5 BB". */
-export function potLabel(entry: Described, { t, formatNumber }: Translator): string {
-  const bigBlinds = entry.summary.finalPot / entry.stake.bigBlind
-  return t('room.queue.pot', { value: formatNumber(bigBlinds, { maximumFractionDigits: 2 }) })
+/** The final pot in the Display Unit and the UI language: "Bote 10,5 BB", "Bote 1,05 €". */
+export function potLabel(entry: Described, i18n: Translator, unit: DisplayUnit = 'big-blinds'): string {
+  return i18n.t('room.queue.pot', { amount: finalPot(entry, i18n, unit).primary })
+}
+
+/** The final pot as an Amount, beside `potLabel` when both units are shown; null otherwise. */
+export function potSecondaryLabel(entry: Described, i18n: Translator, unit: DisplayUnit): string | null {
+  return finalPot(entry, i18n, unit).secondary
+}
+
+function finalPot(entry: Described, i18n: Translator, unit: DisplayUnit): Quantity {
+  return quantity(entry.summary.finalPot, entry.stake, unit, i18n, { maximumFractionDigits: 2 })
 }
 
 /** An instant, date and time in the UI language: "18 sept · 12:34". */

@@ -11,6 +11,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   unauthenticated: HttpStatus.UNAUTHORIZED,
   'invalid-display-name': HttpStatus.BAD_REQUEST,
   'invalid-screen-names': HttpStatus.BAD_REQUEST,
+  'invalid-preferences': HttpStatus.BAD_REQUEST,
   'invalid-room-name': HttpStatus.BAD_REQUEST,
   'room-not-found': HttpStatus.NOT_FOUND,
   'not-in-room': HttpStatus.FORBIDDEN,

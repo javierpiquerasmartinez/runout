@@ -185,6 +185,21 @@ export class RoomPresence<Connection> {
     return connections;
   }
 
+  /**
+   * Gives a Participant a new Display Name in every Room they are present in.
+   * Returns those Rooms, so each can be told.
+   */
+  rename(identityId: string, displayName: string): string[] {
+    const renamed: string[] = [];
+    for (const [roomId, room] of this.rooms) {
+      const present = room.present.get(identityId);
+      if (!present) continue;
+      present.displayName = displayName;
+      renamed.push(roomId);
+    }
+    return renamed;
+  }
+
   /** Whether anyone at all is connected to the Room right now. */
   isLive(roomId: string): boolean {
     return (this.rooms.get(roomId)?.present.size ?? 0) > 0;

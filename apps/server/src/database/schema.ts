@@ -41,6 +41,25 @@ export const screenNames = pgTable(
   (table) => [primaryKey({ columns: [table.identityId, table.screenName] })],
 );
 
+/**
+ * How one person reads the table: personal, never shared with the Room. An
+ * identity without a row reads it the default way.
+ */
+export const preferences = pgTable('preferences', {
+  identityId: uuid('identity_id')
+    .primaryKey()
+    .references(() => identities.id),
+  deckStyle: text('deck_style', { enum: ['classic', 'full-suit'] }).notNull(),
+  /** The classic deck in four colours; the full-suit deck always has them. */
+  fourColour: boolean('four_colour').notNull(),
+  potPercentage: boolean('pot_percentage').notNull(),
+  displayUnit: text('display_unit', {
+    enum: ['big-blinds', 'amount', 'both'],
+  }).notNull(),
+  theme: text('theme', { enum: ['dark', 'light', 'system'] }).notNull(),
+  language: text('language', { enum: ['es', 'en'] }).notNull(),
+});
+
 export const rooms = pgTable('rooms', {
   id: uuid('id').primaryKey().defaultRandom(),
   /** 8 characters, stored without the dash and upper-case. Never reused. */

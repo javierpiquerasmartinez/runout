@@ -57,6 +57,7 @@ const changeTypes = new Set<string>([
   'participantJoined',
   'participantLeft',
   'participantKicked',
+  'participantRenamed',
   'roomClosed',
   'masterChanged',
   'entriesAdded',
@@ -209,6 +210,30 @@ describe('reduceRoom', () => {
     const renamed = { ...marta, displayName: 'Marta R.' }
     const view = apply(snapshot, { type: 'participantJoined', participant: renamed })
     expect(inRoom(view)?.participants).toEqual([javier, renamed])
+  })
+
+  it('shows a Participant’s new Display Name everywhere it appears: the list, the Queue and the Notes', () => {
+    const view = apply(
+      snapshot,
+      { type: 'entriesAdded', entries: [firstHand, { ...secondHand, author: note.writer }], notes: [note] },
+      { type: 'participantRenamed', identityId: 'id-marta', displayName: 'Marta G.' },
+    )
+
+    expect(inRoom(view)?.participants).toEqual([javier, { ...marta, displayName: 'Marta G.' }])
+    expect(inRoom(view)?.queue.map((entry) => entry.author.displayName)).toEqual(['Javier', 'Marta G.'])
+    expect(inRoom(view)?.notes.map((each) => each.writer.displayName)).toEqual(['Marta G.'])
+  })
+
+  it('reads a rename from the wire', () => {
+    expect(
+      parseServerMessage(
+        JSON.stringify({
+          event: 'room.participantRenamed',
+          data: { identityId: 'id-marta', displayName: 'Marta G.' },
+          revision: 5,
+        }),
+      ),
+    ).toEqual({ type: 'participantRenamed', identityId: 'id-marta', displayName: 'Marta G.', revision: 5 })
   })
 
   it('moves the Master role to the Participant it was handed to', () => {

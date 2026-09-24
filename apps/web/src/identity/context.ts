@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { Preferences } from '../preferences/preferences'
 import type { Session } from './identity'
 
 export type SessionContextValue = Session & {
@@ -6,6 +7,11 @@ export type SessionContextValue = Session & {
   rememberDisplayName: (displayName: string) => void
   /** Keeps the Screen Names just saved on the server. */
   rememberScreenNames: (screenNames: string[]) => void
+  /**
+   * Applies some preferences at once and stores them with the identity. If the
+   * server refuses, they go back to what they were and the promise rejects.
+   */
+  changePreferences: (changes: Partial<Preferences>) => Promise<void>
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null)

@@ -5,6 +5,7 @@ export type RejectionReason =
   | 'unauthenticated'
   | 'invalid-display-name'
   | 'invalid-screen-names'
+  | 'invalid-preferences'
   | 'invalid-room-name'
   | 'room-not-found'
   | 'not-in-room'
@@ -45,7 +46,7 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST' | 'PUT'; body?: unknown } = {},
+  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`

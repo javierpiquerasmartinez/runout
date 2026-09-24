@@ -1,8 +1,10 @@
+import { useState, type ReactNode } from 'react'
 import { useHealth, usePing } from './backend/useBackendStatus'
 import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
 import { SessionProvider } from './identity/SessionProvider'
 import { RoomPage } from './room/RoomPage'
+import { RoomSession } from './room/RoomSession'
 import { SettingsPage, settingsPath } from './settings/SettingsPage'
 import { roomCodeFromPath } from './room/roomCode'
 import { usePath } from './routing'
@@ -18,9 +20,25 @@ function App() {
   const code = roomCodeFromPath(path)
   return (
     <SessionProvider>
-      {/* Keyed by code, so moving to another Room starts from a clean slate. */}
-      {code ? <RoomPage key={code} code={code} /> : <Screen path={path} />}
+      <InRoom path={path}>{code ? <RoomPage code={code} /> : <Screen path={path} />}</InRoom>
     </SessionProvider>
+  )
+}
+
+/**
+ * Holds the Room this person is in while they are on its screen or have
+ * stepped out to Settings; any other screen leaves it.
+ */
+function InRoom({ path, children }: { path: string; children: ReactNode }) {
+  const [held, setHeld] = useState(() => roomCodeFromPath(path))
+  const code = roomCodeFromPath(path) ?? (path === settingsPath ? held : null)
+  if (code !== held) setHeld(code)
+  if (!code) return children
+  // Keyed by code, so moving to another Room starts from a clean slate.
+  return (
+    <RoomSession key={code} code={code}>
+      {children}
+    </RoomSession>
   )
 }
 
