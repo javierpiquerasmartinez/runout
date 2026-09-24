@@ -116,7 +116,7 @@ function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; 
     <div
       className="seat"
       role="group"
-      aria-label={seat.screenName}
+      aria-label={seat.name}
       data-hero={seat.hero || undefined}
       data-to-act={seat.toAct || undefined}
       data-folded={seat.folded || undefined}
@@ -130,9 +130,10 @@ function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; 
       {seat.hero && status && <span className="seat__status ro-mono">{status}</span>}
       <div className="seat__plate">
         <div className="seat__line">
-          <span className="seat__name">{seat.screenName}</span>
+          <span className="seat__name">{seat.name}</span>
           {seat.hero && <span className="seat__hero">{t('room.table.hero')}</span>}
-          <span className="seat__position ro-mono">{seat.position}</span>
+          {/* A hidden name is the Position already. */}
+          {!seat.nameHidden && <span className="seat__position ro-mono">{seat.position}</span>}
         </div>
         <div className="seat__line seat__line--stack">
           <span className="seat__stack ro-mono">

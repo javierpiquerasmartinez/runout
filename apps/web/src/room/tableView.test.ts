@@ -418,6 +418,8 @@ describe('tableView: the Display Unit and pot percentages', () => {
   const nbsp = ' '
   const inAmounts = { displayUnit: 'amount', potPercentage: true } as const
   const inBoth = { displayUnit: 'both', potPercentage: true } as const
+  /** Every seat named, as when Hide Opponent Names is off. */
+  const shown = { hideOpponentNames: false, participantScreenNames: [] }
 
   it('reads everything in big blinds by default, with nothing beside it', () => {
     const view = tableView(hand, 0, es)
@@ -428,7 +430,7 @@ describe('tableView: the Display Unit and pot percentages', () => {
   })
 
   it('reads Stacks, bets and the pot as Amounts in the Hand History’s currency, formatted for the language', () => {
-    const view = tableView(hand, 0, es, inAmounts)
+    const view = tableView(hand, 0, es, shown, inAmounts)
 
     expect(view.seats.map((seat) => seat.stack)).toEqual([
       `10,00${nbsp}€`,
@@ -439,27 +441,27 @@ describe('tableView: the Display Unit and pot percentages', () => {
     expect(view.seats[1].chip).toMatchObject({ label: `0,05${nbsp}€`, secondary: null })
     expect(view.pot).toBe(`0,15${nbsp}€`)
     expect(view.potSecondary).toBeNull()
-    expect(tableView(hand, 0, en, inAmounts).seats[1].stack).toBe('€11.31')
-    expect(tableView(straddled, 10, en, inAmounts).pot).toBe('$14.25')
+    expect(tableView(hand, 0, en, shown, inAmounts).seats[1].stack).toBe('€11.31')
+    expect(tableView(straddled, 10, en, shown, inAmounts).pot).toBe('$14.25')
   })
 
   it('writes the Actions in the same unit as the table', () => {
-    expect(tableView(hand, 2, es, inAmounts).lastAction).toBe(`Preflop · iMapleAA sube a 0,30${nbsp}€`)
-    expect(tableView(straddled, 10, en, inAmounts).log.entries[1]).toEqual({
+    expect(tableView(hand, 2, es, shown, inAmounts).lastAction).toBe(`Preflop · iMapleAA sube a 0,30${nbsp}€`)
+    expect(tableView(straddled, 10, en, shown, inAmounts).log.entries[1]).toEqual({
       text: 'Hero6 bets $4.50',
       tone: 'latest',
     })
-    expect(tableView(straddled, 10, en, inAmounts).potDetail).toBe('$9.75 + $4.50 in play')
+    expect(tableView(straddled, 10, en, shown, inAmounts).potDetail).toBe('$9.75 + $4.50 in play')
   })
 
   it('with both, keeps big blinds first and puts the Amount beside the figures, for the table to dim', () => {
-    const view = tableView(hand, 0, es, inBoth)
+    const view = tableView(hand, 0, es, shown, inBoth)
 
     expect([view.seats[1].stack, view.seats[1].stackSecondary]).toEqual(['113,1 BB', `11,31${nbsp}€`])
     expect(view.seats[1].chip).toMatchObject({ label: '0,5 BB', secondary: `0,05${nbsp}€` })
     expect([view.pot, view.potSecondary]).toEqual(['1,5 BB', `0,15${nbsp}€`])
     const end = nineMax.timeline.states.length - 1
-    expect(tableView(nineMax, end, en, inBoth).sidePots?.map((pot) => [pot.amount, pot.secondary])).toEqual([
+    expect(tableView(nineMax, end, en, shown, inBoth).sidePots?.map((pot) => [pot.amount, pot.secondary])).toEqual([
       ['81 BB', '$40.50'],
       ['90 BB', '$45.00'],
       ['140 BB', '$70.00'],
@@ -467,16 +469,83 @@ describe('tableView: the Display Unit and pot percentages', () => {
   })
 
   it('with both, keeps the sentences calm: big blinds only', () => {
-    expect(tableView(hand, 2, es, inBoth).lastAction).toBe('Preflop · iMapleAA sube a 3 BB')
+    expect(tableView(hand, 2, es, shown, inBoth).lastAction).toBe('Preflop · iMapleAA sube a 3 BB')
   })
 
   it('shows each bet’s share of the pot unless it is turned off', () => {
     const hero = (potPercentage: boolean) =>
-      tableView(straddled, 10, es, { displayUnit: 'big-blinds', potPercentage }).seats.find(
+      tableView(straddled, 10, es, shown, { displayUnit: 'big-blinds', potPercentage }).seats.find(
         (seat) => seat.screenName === 'Hero6',
       )?.chip
 
     expect(hero(true)).toMatchObject({ label: '9 BB', potShare: '46% bote' })
     expect(hero(false)).toMatchObject({ label: '9 BB', potShare: null })
+  })
+})
+
+describe('tableView: Hide Opponent Names', () => {
+  /** A Room where only the Hero's player and BIRCHWOODS are Participants. */
+  const hidden = { hideOpponentNames: true, participantScreenNames: ['imapleaa', 'BIRCHWOODS'] }
+
+  it('shows every seat by its Screen Name while the switch is off', () => {
+    const view = tableView(hand, 0, es, { ...hidden, hideOpponentNames: false })
+
+    expect(view.seats.map((seat) => [seat.name, seat.nameHidden])).toEqual([
+      ['iMapleAA', false],
+      ['Alder239', false],
+      ['BIRCHWOODS', false],
+      ['Cedar31lse', false],
+    ])
+    expect(tableView(hand, 0, es).seats.map((seat) => seat.name)).toEqual([
+      'iMapleAA',
+      'Alder239',
+      'BIRCHWOODS',
+      'Cedar31lse',
+    ])
+  })
+
+  it('shows seats that belong to no Participant by their Position, and Participants’ by their Screen Name, whatever its case', () => {
+    const view = tableView(hand, 0, es, hidden)
+
+    expect(view.seats.map((seat) => [seat.name, seat.nameHidden])).toEqual([
+      ['iMapleAA', false],
+      ['SB', true],
+      ['BIRCHWOODS', false],
+      ['CO', true],
+    ])
+  })
+
+  it('knows a hidden seat from one whose Screen Name happens to be its Position', () => {
+    const named = { ...hand, timeline: { ...hand.timeline, seats: hand.timeline.seats.map((seat) =>
+      seat.screenName === 'BIRCHWOODS' ? { ...seat, screenName: 'BB' } : seat) } }
+
+    const bb = tableView(named, 0, es, { hideOpponentNames: true, participantScreenNames: ['bb'] }).seats[2]
+    expect([bb.name, bb.nameHidden]).toEqual(['BB', false])
+  })
+
+  it('hides the Hero too when the Hero is nobody in the Room', () => {
+    const view = tableView(hand, 0, es, { hideOpponentNames: true, participantScreenNames: [] })
+
+    expect(view.seats.map((seat) => seat.name)).toEqual(['BTN', 'SB', 'BB', 'CO'])
+  })
+
+  it('names hidden players by their Position wherever the table writes about them', () => {
+    expect(tableView(hand, 1, en, hidden).lastAction).toBe('Preflop · CO folds')
+    expect(tableView(hand, 0, es, hidden).log.entries).toEqual([{ text: 'CO · pendiente', tone: 'pending' }])
+
+    const last = nineMax.timeline.states.length - 1
+    const view = tableView(nineMax, last, es, { hideOpponentNames: true, participantScreenNames: ['Hero9max'] })
+    const position = (screenName: string) =>
+      nineMax.timeline.seats.find((seat) => seat.screenName === screenName)!.position
+    expect(view.log.entries.map((entry) => entry.text)).toEqual([
+      `${position('Oak_BB')} muestra Q♠Q♣`,
+      `${position('Elm_UTG')} muestra K♠K♦`,
+      `${position('Spruce9')} muestra A♣Q♦`,
+      `${position('Elm_UTG')} gana 79 BB`,
+      'Hero9max gana 226 BB',
+    ])
+    // Nothing the table writes gives them away; `screenName` only tells seats apart.
+    const written = JSON.stringify(view, (key, value) => (key === 'screenName' ? undefined : value))
+    expect(written).not.toMatch(/Oak_BB|Elm_UTG|Spruce9/)
   })
 })

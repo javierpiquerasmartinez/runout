@@ -6,6 +6,7 @@ import { startApp, type RunningApp } from './support/app.js';
 interface Playback {
   handId: string;
   actionIndex: number;
+  hideOpponentNames: boolean;
 }
 
 describe('Playback (e2e)', () => {
@@ -77,7 +78,7 @@ describe('Playback (e2e)', () => {
 
     masterSocket.send('playback.load', { handId });
 
-    const expected = { handId, actionIndex: 0 };
+    const expected = { handId, actionIndex: 0, hideOpponentNames: false };
     expect(await masterSocket.next('playback.changed')).toEqual(expected);
     expect(await guestSocket.next('playback.changed')).toEqual(expected);
   });
@@ -91,11 +92,13 @@ describe('Playback (e2e)', () => {
     expect(await guestSocket.next('playback.changed')).toEqual({
       handId,
       actionIndex: 3,
+      hideOpponentNames: false,
     });
     masterSocket.send('playback.goTo', { actionIndex: 2 });
     expect(await guestSocket.next('playback.changed')).toEqual({
       handId,
       actionIndex: 2,
+      hideOpponentNames: false,
     });
   });
 
@@ -121,6 +124,7 @@ describe('Playback (e2e)', () => {
     expect(await guestSocket.next('playback.changed')).toEqual({
       handId,
       actionIndex: 5,
+      hideOpponentNames: false,
     });
     expect(guestSocket.all('playback.changed')).toEqual([]);
   });
@@ -150,6 +154,7 @@ describe('Playback (e2e)', () => {
     expect(await masterSocket.next('playback.changed')).toEqual({
       handId,
       actionIndex: 14,
+      hideOpponentNames: false,
     });
     for (const actionIndex of [15, -1, 1.5, 'x']) {
       masterSocket.send('playback.goTo', { actionIndex });
@@ -172,7 +177,11 @@ describe('Playback (e2e)', () => {
 
     const { playback } = await join(late.token, code, 'Alberto');
 
-    expect(playback).toEqual({ handId, actionIndex: 4 });
+    expect(playback).toEqual({
+      handId,
+      actionIndex: 4,
+      hideOpponentNames: false,
+    });
   });
 
   it('gives no Playback in the snapshot while nothing is loaded', async () => {
@@ -182,6 +191,136 @@ describe('Playback (e2e)', () => {
     const { playback } = await join(late.token, code, 'Alberto');
 
     expect(playback).toBeNull();
+  });
+
+  it('switches Hide Opponent Names on every table when the Master toggles it, and keeps the Action', async () => {
+    const { masterSocket, guestSocket, handId } = await roomWithAHand();
+    masterSocket.send('playback.load', { handId });
+    masterSocket.send('playback.goTo', { actionIndex: 3 });
+    await guestSocket.next(
+      'playback.changed',
+      (p: Playback) => p.actionIndex === 3,
+    );
+
+    masterSocket.send('playback.hideOpponentNames', { hidden: true });
+    const hidden = { handId, actionIndex: 3, hideOpponentNames: true };
+    expect(
+      await masterSocket.next(
+        'playback.changed',
+        (p: Playback) => p.hideOpponentNames,
+      ),
+    ).toEqual(hidden);
+    expect(
+      await guestSocket.next(
+        'playback.changed',
+        (p: Playback) => p.hideOpponentNames,
+      ),
+    ).toEqual(hidden);
+
+    masterSocket.send('playback.hideOpponentNames', { hidden: false });
+    expect(await guestSocket.next('playback.changed')).toEqual({
+      handId,
+      actionIndex: 0,
+      hideOpponentNames: false,
+    });
+    expect(await guestSocket.next('playback.changed')).toEqual({
+      ...hidden,
+      hideOpponentNames: false,
+    });
+  });
+
+  it('includes Hide Opponent Names in the snapshot, and turns it off whenever a Hand is loaded', async () => {
+    const { code, masterSocket, guestSocket, handId } = await roomWithAHand();
+    masterSocket.send('playback.load', { handId });
+    masterSocket.send('playback.hideOpponentNames', { hidden: true });
+    await guestSocket.next(
+      'playback.changed',
+      (p: Playback) => p.hideOpponentNames,
+    );
+
+    const late = await issueIdentity();
+    const { playback } = await join(late.token, code, 'Alberto');
+    expect(playback).toEqual({
+      handId,
+      actionIndex: 0,
+      hideOpponentNames: true,
+    });
+
+    masterSocket.send('playback.load', { handId });
+    expect(
+      await guestSocket.next(
+        'playback.changed',
+        (p: Playback) => !p.hideOpponentNames,
+      ),
+    ).toEqual({ handId, actionIndex: 0, hideOpponentNames: false });
+  });
+
+  it('refuses Hide Opponent Names to a Guest, with nothing loaded, or with anything but a yes or no', async () => {
+    const { masterSocket, guestSocket, handId } = await roomWithAHand();
+
+    masterSocket.send('playback.hideOpponentNames', { hidden: true });
+    expect(await masterSocket.next('rejected')).toEqual({
+      command: 'playback.hideOpponentNames',
+      reason: 'no-hand-loaded',
+    });
+
+    masterSocket.send('playback.load', { handId });
+    await guestSocket.next('playback.changed');
+    guestSocket.send('playback.hideOpponentNames', { hidden: true });
+    expect(await guestSocket.next('rejected')).toEqual({
+      command: 'playback.hideOpponentNames',
+      reason: 'not-master',
+    });
+
+    for (const hidden of ['yes', 1, null]) {
+      masterSocket.send('playback.hideOpponentNames', { hidden });
+      expect(await masterSocket.next('rejected')).toEqual({
+        command: 'playback.hideOpponentNames',
+        reason: 'invalid-hide-opponent-names',
+      });
+    }
+    masterSocket.send('playback.hideOpponentNames', {});
+    expect(await masterSocket.next('rejected')).toEqual({
+      command: 'playback.hideOpponentNames',
+      reason: 'invalid-hide-opponent-names',
+    });
+    expect(guestSocket.all('playback.changed')).toEqual([]);
+  });
+
+  it('tells the Room each Participant’s Screen Names, and when they change', async () => {
+    const { code, master, guest, masterSocket, guestSocket } =
+      await roomWithAHand();
+    await request(running.httpServer)
+      .put('/api/identities/me/screen-names')
+      .set('Authorization', `Bearer ${guest.token}`)
+      .send({ screenNames: ['Marta_PS', 'marta.gg'] })
+      .expect(200);
+
+    const changed = {
+      participant: {
+        identityId: guest.id,
+        displayName: 'Marta',
+        role: 'guest',
+        screenNames: ['Marta_PS', 'marta.gg'],
+      },
+    };
+    expect(await masterSocket.next('room.participantChanged')).toEqual(changed);
+    expect(await guestSocket.next('room.participantChanged')).toEqual(changed);
+
+    const late = await issueIdentity();
+    const socket = await RoomClient.connect(running.wsUrl, late.token);
+    clients.push(socket);
+    socket.send('room.join', { code, displayName: 'Alberto' });
+    const snapshot = await socket.next<{
+      participants: { identityId: string; screenNames: string[] }[];
+    }>('room.snapshot');
+    expect(
+      snapshot.participants.map((p) => [p.identityId, p.screenNames]),
+    ).toEqual([
+      [master.id, []],
+      [guest.id, ['Marta_PS', 'marta.gg']],
+      [late.id, []],
+    ]);
   });
 
   it('serves the Hand with its Timeline by id to a Participant, and to nobody else', async () => {

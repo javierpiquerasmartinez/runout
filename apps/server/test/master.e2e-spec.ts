@@ -7,6 +7,7 @@ interface Participant {
   identityId: string;
   displayName: string;
   role: 'master' | 'guest';
+  screenNames: string[];
 }
 
 interface Snapshot {
@@ -161,6 +162,7 @@ describe('Master handover and failover (e2e)', () => {
       expect(await albertoSocket.next('playback.changed')).toEqual({
         handId: playback.handId,
         actionIndex: 3,
+        hideOpponentNames: false,
       });
     });
 
@@ -250,6 +252,7 @@ describe('Master handover and failover (e2e)', () => {
         identityId: master.id,
         displayName: 'Javier',
         role: 'master',
+        screenNames: [],
       });
       expect(martaSocket.all('room.masterChanged')).toEqual([]);
     });
@@ -274,8 +277,15 @@ describe('Master handover and failover (e2e)', () => {
     });
 
     it('waits for someone to be there before passing the role on', async () => {
-      const { code, master, marta, alberto, masterSocket, martaSocket, albertoSocket } =
-        await roomOfThree();
+      const {
+        code,
+        master,
+        marta,
+        alberto,
+        masterSocket,
+        martaSocket,
+        albertoSocket,
+      } = await roomOfThree();
 
       await Promise.all([
         masterSocket.close(),

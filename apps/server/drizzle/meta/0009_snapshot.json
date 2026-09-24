@@ -1,6 +1,6 @@
 {
-  "id": "d6434309-3172-40da-a3d4-d9329ec0bf62",
-  "prevId": "6eb6d7bd-b3c9-4fe3-ab34-e99128ec990d",
+  "id": "19aef955-c983-458f-a37f-3c1d594cc23d",
+  "prevId": "d6434309-3172-40da-a3d4-d9329ec0bf62",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -512,6 +512,75 @@
           "tableTo": "hands",
           "columnsFrom": [
             "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.preferences": {
+      "name": "preferences",
+      "schema": "",
+      "columns": {
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "deck_style": {
+          "name": "deck_style",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "four_colour": {
+          "name": "four_colour",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pot_percentage": {
+          "name": "pot_percentage",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_unit": {
+          "name": "display_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "theme": {
+          "name": "theme",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "preferences_identity_id_identities_id_fk": {
+          "name": "preferences_identity_id_identities_id_fk",
+          "tableFrom": "preferences",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
           ],
           "columnsTo": [
             "id"

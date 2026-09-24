@@ -11,11 +11,13 @@ const room = 'room-1';
 const javier = {
   identityId: 'id-javier',
   displayName: 'Javier',
+  screenNames: ['Javier_PS'],
   joinedAt: new Date('2026-01-01T10:00:00Z'),
 };
 const marta = {
   identityId: 'id-marta',
   displayName: 'Marta',
+  screenNames: [],
   joinedAt: new Date('2026-01-01T10:01:00Z'),
 };
 const start = new Date('2026-01-01T10:02:00Z');
@@ -228,5 +230,40 @@ describe('presenceChanged', () => {
       presenceChanged(following, and({ latencyMs: 40 + LATENCY_STEP_MS })),
     ).toBe(true);
     expect(presenceChanged(following, and({ latencyMs: null }))).toBe(true);
+  });
+});
+
+describe('RoomPresence Screen Names', () => {
+  it('gives each Participant the Screen Names they arrived with, refreshed by a later tab', () => {
+    const presence = new RoomPresence<string>();
+    presence.enter(room, javier.identityId, javier, 'javier-tab', start);
+    presence.enter(
+      room,
+      javier.identityId,
+      { ...javier, screenNames: ['Javier_PS', 'javi.gg'] },
+      'javier-tab-2',
+      start,
+    );
+
+    expect(presence.participant(room, javier.identityId)?.screenNames).toEqual([
+      'Javier_PS',
+      'javi.gg',
+    ]);
+  });
+
+  it('takes new Screen Names in every Room the person is in, and says which', () => {
+    const presence = new RoomPresence<string>();
+    presence.enter(room, javier.identityId, javier, 'javier-tab', start);
+    presence.enter('room-2', javier.identityId, javier, 'other-tab', start);
+    presence.enter('room-3', marta.identityId, marta, 'marta-tab', start);
+
+    expect(presence.setScreenNames(javier.identityId, ['J'])).toEqual([
+      room,
+      'room-2',
+    ]);
+    expect(
+      presence.participant('room-2', javier.identityId)?.screenNames,
+    ).toEqual(['J']);
+    expect(presence.setScreenNames('nobody', ['X'])).toEqual([]);
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE "playbacks" ADD COLUMN "hide_opponent_names" boolean DEFAULT false NOT NULL;

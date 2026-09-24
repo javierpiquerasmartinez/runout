@@ -92,7 +92,16 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const load = useHand(view.playback?.handId ?? null, token)
   const table =
     view.playback && load.state === 'loaded'
-      ? tableView(load.hand, view.playback.actionIndex, i18n, preferences)
+      ? tableView(
+          load.hand,
+          view.playback.actionIndex,
+          i18n,
+          {
+            hideOpponentNames: view.playback.hideOpponentNames,
+            participantScreenNames: view.participants.flatMap((p) => p.screenNames),
+          },
+          preferences,
+        )
       : null
   // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
   const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
@@ -143,6 +152,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               isMaster={isMaster}
               marked={view.marks.includes(view.playback.handId)}
               onGoTo={commands.goToAction}
+              onHideOpponentNames={commands.hideOpponentNames}
               onSetMark={(marked) => commands.setMark(view.playback!.handId, marked)}
             />
           ) : (
@@ -693,6 +703,7 @@ function LoadedHand({
   isMaster,
   marked,
   onGoTo,
+  onHideOpponentNames,
   onSetMark,
 }: {
   view: InRoom
@@ -704,6 +715,7 @@ function LoadedHand({
   /** Whether this person has Marked the loaded Hand. Nobody else ever sees it. */
   marked: boolean
   onGoTo: (actionIndex: number) => void
+  onHideOpponentNames: (hidden: boolean) => void
   onSetMark: (marked: boolean) => void
 }) {
   const i18n = useI18n()
@@ -768,6 +780,8 @@ function LoadedHand({
             sync={view.sync}
             guests={guestsFollowing(view.participants, view.presence)}
             onGoTo={onGoTo}
+            hideOpponentNames={view.playback?.hideOpponentNames ?? false}
+            onHideOpponentNames={onHideOpponentNames}
           />
         </>
       ) : (

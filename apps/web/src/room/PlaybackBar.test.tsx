@@ -45,12 +45,27 @@ const hand: HandWithTimeline = {
 const inSync: RoomSync = { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 1 }
 const noGuests: GuestsFollowing = { total: 0, inSync: 0, latencyMs: null }
 
-function renderBar(actionIndex: number, isMaster: boolean, sync: RoomSync = inSync, guests = noGuests) {
+function renderBar(
+  actionIndex: number,
+  isMaster: boolean,
+  sync: RoomSync = inSync,
+  guests = noGuests,
+  onHideOpponentNames = vi.fn(),
+  hideOpponentNames = false,
+) {
   const onGoTo = vi.fn()
   const view = tableView(hand, actionIndex, createTranslator('en'))
   render(
     <I18nProvider initialLocale="en">
-      <PlaybackBar view={view} isMaster={isMaster} sync={sync} guests={guests} onGoTo={onGoTo} />
+      <PlaybackBar
+        view={view}
+        isMaster={isMaster}
+        sync={sync}
+        guests={guests}
+        onGoTo={onGoTo}
+        hideOpponentNames={hideOpponentNames}
+        onHideOpponentNames={onHideOpponentNames}
+      />
     </I18nProvider>,
   )
   return onGoTo
@@ -98,6 +113,38 @@ describe('PlaybackBar', () => {
     await userEvent.click(screen.getByRole('button', { name: `Flop. ${frozen}` }))
 
     expect(onGoTo).not.toHaveBeenCalled()
+  })
+})
+
+describe('PlaybackBar, Hide Opponent Names', () => {
+  it('lets the Master switch it on and off', async () => {
+    const onHide = vi.fn()
+    renderBar(1, true, inSync, noGuests, onHide)
+    const toggle = screen.getByRole('switch', { name: 'Hide opponent names' })
+    expect(toggle).toHaveProperty('ariaChecked', 'false')
+
+    await userEvent.click(toggle)
+    expect(onHide.mock.calls).toEqual([[true]])
+  })
+
+  it('shows it switched on while it is on', async () => {
+    const onHide = vi.fn()
+    renderBar(1, true, inSync, noGuests, onHide, true)
+    const toggle = screen.getByRole('switch', { name: 'Hide opponent names' })
+    expect(toggle).toHaveProperty('ariaChecked', 'true')
+
+    await userEvent.click(toggle)
+    expect(onHide.mock.calls).toEqual([[false]])
+  })
+
+  it('shows Guests the switch, locked', async () => {
+    const onHide = vi.fn()
+    renderBar(1, false, inSync, noGuests, onHide, true)
+    const toggle = screen.getByRole('switch', { name: 'Hide opponent names. Only the Master controls playback' })
+    expect(toggle).toHaveProperty('ariaChecked', 'true')
+
+    await userEvent.click(toggle)
+    expect(onHide).not.toHaveBeenCalled()
   })
 })
 

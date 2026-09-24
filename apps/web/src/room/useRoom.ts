@@ -7,6 +7,8 @@ export interface RoomCommands {
   loadHand(handId: string): void
   /** Takes Playback to an absolute Action index; 0 is the Initial State. */
   goToAction(actionIndex: number): void
+  /** Shows seats that belong to no Participant by Position, on every table, or by name again. */
+  hideOpponentNames(hidden: boolean): void
   /** Hands the Master role to another Participant, by identity id. */
   handOverMaster(identityId: string): void
   /** Removes a Participant from the Room for good. Only the Master may. */
@@ -79,6 +81,7 @@ export function useRoom(code: string, token: string, displayName: string | null)
       closeRoom: () => send('room.close', {}),
       loadHand: (handId) => send('playback.load', { handId }),
       goToAction: (actionIndex) => send('playback.goTo', { actionIndex }),
+      hideOpponentNames: (hidden) => send('playback.hideOpponentNames', { hidden }),
       reassignAuthor: (handId, authorId) => send('queue.reassignAuthor', { handId, authorId }),
       reorderQueue: (order) => send('queue.reorder', { order }),
       removeQueueEntry: (id) => send('queue.remove', { id }),
