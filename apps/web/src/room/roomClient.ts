@@ -309,6 +309,11 @@ function endsTheRoom(change: RoomChange, you: string): boolean {
   return change.type === 'roomClosed' || (change.type === 'participantKicked' && change.identityId === you)
 }
 
+/** The Participants with this one's entry swapped for its new version. */
+function replaced(participants: Participant[], participant: Participant): Participant[] {
+  return participants.map((p) => (p.identityId === participant.identityId ? participant : p))
+}
+
 /** Records that this revision has gone past, whether or not it was applied. */
 function withSeen(view: InRoom, revision: number): InRoom {
   const seenRevision = Math.max(view.sync.seenRevision, revision)
@@ -327,16 +332,11 @@ function applied(view: InRoom, change: RoomChange): RoomView {
       return {
         ...view,
         participants: view.participants.some((p) => p.identityId === change.participant.identityId)
-          ? view.participants.map((p) => (p.identityId === change.participant.identityId ? change.participant : p))
+          ? replaced(view.participants, change.participant)
           : [...view.participants, change.participant],
       }
     case 'participantChanged':
-      return {
-        ...view,
-        participants: view.participants.map((p) =>
-          p.identityId === change.participant.identityId ? change.participant : p,
-        ),
-      }
+      return { ...view, participants: replaced(view.participants, change.participant) }
     case 'participantLeft':
       return { ...view, participants: view.participants.filter((p) => p.identityId !== change.identityId) }
     case 'participantKicked':

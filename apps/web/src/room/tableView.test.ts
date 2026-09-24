@@ -445,6 +445,14 @@ describe('tableView: Hide Opponent Names', () => {
     ])
   })
 
+  it('knows a hidden seat from one whose Screen Name happens to be its Position', () => {
+    const named = { ...hand, timeline: { ...hand.timeline, seats: hand.timeline.seats.map((seat) =>
+      seat.screenName === 'BIRCHWOODS' ? { ...seat, screenName: 'BB' } : seat) } }
+
+    const bb = tableView(named, 0, es, { hideOpponentNames: true, participantScreenNames: ['bb'] }).seats[2]
+    expect([bb.name, bb.nameHidden]).toEqual(['BB', false])
+  })
+
   it('hides the Hero too when the Hero is nobody in the Room', () => {
     const view = tableView(hand, 0, es, { hideOpponentNames: true, participantScreenNames: [] })
 

@@ -21,6 +21,13 @@ export interface Playback {
   hideOpponentNames: boolean;
 }
 
+/** Playback as it is read back from its row. */
+const playbackColumns = {
+  handId: playbacks.handId,
+  actionIndex: playbacks.actionIndex,
+  hideOpponentNames: playbacks.hideOpponentNames,
+};
+
 /** Loading a Hand and moving through it. Only the Master may change Playback. */
 @Injectable()
 export class PlaybackService {
@@ -33,11 +40,7 @@ export class PlaybackService {
   /** The Room's Playback, or null while no Hand has been loaded. */
   async current(roomId: string): Promise<Playback | null> {
     const [row] = await this.db
-      .select({
-        handId: playbacks.handId,
-        actionIndex: playbacks.actionIndex,
-        hideOpponentNames: playbacks.hideOpponentNames,
-      })
+      .select(playbackColumns)
       .from(playbacks)
       .where(eq(playbacks.roomId, roomId));
     return row ?? null;
@@ -131,11 +134,7 @@ export class PlaybackService {
       .update(playbacks)
       .set({ hideOpponentNames: hidden, updatedAt: this.clock.now() })
       .where(eq(playbacks.roomId, roomId))
-      .returning({
-        handId: playbacks.handId,
-        actionIndex: playbacks.actionIndex,
-        hideOpponentNames: playbacks.hideOpponentNames,
-      });
+      .returning(playbackColumns);
     if (!playback) throw new Rejected('no-hand-loaded');
     return playback;
   }

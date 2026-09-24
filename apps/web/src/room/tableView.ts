@@ -127,7 +127,7 @@ export function tableView(
 ): TableView {
   const { t } = i18n
   const { seats, states, hero, buttonSeat } = hand.timeline
-  const nameOf = playerNames(hand, naming)
+  const { nameOf, isHidden } = playerNames(hand, naming)
   const last = states.length - 1
   const index = Math.min(Math.max(actionIndex, 0), last)
   const state = states[index]
@@ -162,7 +162,7 @@ export function tableView(
         return {
           screenName: seat.screenName,
           name: nameOf(seat.screenName),
-          nameHidden: nameOf(seat.screenName) !== seat.screenName,
+          nameHidden: isHidden(seat.screenName),
           position: seat.position,
           slot: (seat.seat - heroSeat + slots) % slots,
           stack: bigBlinds(player?.stack ?? seat.startingStack),
@@ -241,11 +241,15 @@ type NameOf = (screenName: string) => string
  * Participant of the Room is called by their Position. Screen Names match
  * whatever their case, as they do when a Hand's Author is found.
  */
-function playerNames(hand: HandWithTimeline, { hideOpponentNames, participantScreenNames }: SeatNaming): NameOf {
-  if (!hideOpponentNames) return (screenName) => screenName
+function playerNames(
+  hand: HandWithTimeline,
+  { hideOpponentNames, participantScreenNames }: SeatNaming,
+): { nameOf: NameOf; isHidden: (screenName: string) => boolean } {
   const own = new Set(participantScreenNames.map((name) => name.toLowerCase()))
   const positions = new Map(hand.timeline.seats.map((seat) => [seat.screenName, seat.position]))
-  return (screenName) => (own.has(screenName.toLowerCase()) ? screenName : (positions.get(screenName) ?? screenName))
+  const isHidden = (screenName: string) =>
+    hideOpponentNames && !own.has(screenName.toLowerCase()) && positions.has(screenName)
+  return { nameOf: (screenName) => (isHidden(screenName) ? positions.get(screenName)! : screenName), isHidden }
 }
 
 interface PotNames {
