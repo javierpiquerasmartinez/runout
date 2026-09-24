@@ -147,19 +147,19 @@ describe('reduceRoom', () => {
   it('appends imported Hands at the end of the Queue', () => {
     const view = apply(
       { type: 'snapshot', snapshot: { ...snapshot.snapshot, queue: [firstHand] } },
-      { type: 'entriesAdded', entries: [secondHand] },
+      { type: 'entriesAdded', entries: [secondHand], notes: [] },
     )
     expect(inRoom(view)?.queue).toEqual([firstHand, secondHand])
   })
 
   it('ignores imported Hands that arrive before the snapshot', () => {
-    expect(apply({ type: 'entriesAdded', entries: [firstHand] })).toEqual(initialRoomView)
+    expect(apply({ type: 'entriesAdded', entries: [firstHand], notes: [] })).toEqual(initialRoomView)
   })
 
   it('puts the Queue in the order the Master gives, resyncing position', () => {
     const view = apply(
       snapshot,
-      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entriesAdded', entries: [firstHand, secondHand], notes: [] },
       { type: 'entriesReordered', order: ['entry-2', 'entry-1'] },
     )
 
@@ -172,7 +172,7 @@ describe('reduceRoom', () => {
   it('removes a Queue Entry the Master removes', () => {
     const view = apply(
       snapshot,
-      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entriesAdded', entries: [firstHand, secondHand], notes: [] },
       { type: 'entryRemoved', id: 'entry-1' },
     )
 
@@ -182,9 +182,9 @@ describe('reduceRoom', () => {
   it('puts a restored Queue Entry back at its position', () => {
     const view = apply(
       snapshot,
-      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entriesAdded', entries: [firstHand, secondHand], notes: [] },
       { type: 'entryRemoved', id: 'entry-1' },
-      { type: 'entryRestored', entry: firstHand },
+      { type: 'entryRestored', entry: firstHand, notes: [] },
     )
 
     expect(inRoom(view)?.queue).toEqual([firstHand, secondHand])
@@ -193,7 +193,7 @@ describe('reduceRoom', () => {
   it('gives a Hand in the Queue the Author the Master reassigned it to', () => {
     const view = apply(
       snapshot,
-      { type: 'entriesAdded', entries: [firstHand, secondHand] },
+      { type: 'entriesAdded', entries: [firstHand, secondHand], notes: [] },
       { type: 'authorChanged', handId: 'hand-2', author: { identityId: 'id-marta', displayName: 'Marta' } },
     )
 
@@ -286,8 +286,8 @@ describe('reduceRoom, staying in sync', () => {
   })
 
   it('leaves the Room exactly as it was when a change arrives twice', () => {
-    const before = apply(snapshot, { type: 'entriesAdded', entries: [firstHand], revision: 5 })
-    const after = reduceRoom(before, { type: 'entriesAdded', entries: [firstHand], revision: 5 })
+    const before = apply(snapshot, { type: 'entriesAdded', entries: [firstHand], revision: 5, notes: [] })
+    const after = reduceRoom(before, { type: 'entriesAdded', entries: [firstHand], revision: 5, notes: [] })
 
     expect(after).toBe(before)
     expect(inRoom(after)?.queue).toEqual([firstHand])
@@ -448,6 +448,20 @@ describe('reduceRoom · Notes and Marks', () => {
     expect(inRoom(view)?.marks).toEqual(['hand-1'])
   })
 
+  it('takes in the Notes a Hand already carries as it joins the Queue', () => {
+    const view = apply(snapshot, { type: 'entriesAdded', entries: [firstHand], notes: [note] })
+    expect(inRoom(view)?.notes).toEqual([note])
+    expect(inRoom(view)?.queue).toEqual([firstHand])
+  })
+
+  it('brings a restored Queue Entry\u2019s Notes back with it, without doubling one it kept', () => {
+    const view = apply(
+      { type: 'snapshot', snapshot: { ...snapshot.snapshot, queue: [firstHand], notes: [note] } },
+      { type: 'entryRestored', entry: secondHand, notes: [note] },
+    )
+    expect(inRoom(view)?.notes).toEqual([note])
+  })
+
   it('adds a Note as it is written, once even if the change arrives twice', () => {
     const view = apply(snapshot, { type: 'noteWritten', note, revision: 5 }, { type: 'noteWritten', note, revision: 5 })
     expect(inRoom(view)?.notes).toEqual([note])
@@ -505,9 +519,10 @@ describe('parseServerMessage', () => {
       revision: 3,
     })
     expect(changed('room.closed', {})).toEqual({ type: 'roomClosed', revision: 3 })
-    expect(changed('queue.entriesAdded', { entries: [firstHand] })).toEqual({
+    expect(changed('queue.entriesAdded', { entries: [firstHand], notes: [note] })).toEqual({
       type: 'entriesAdded',
       entries: [firstHand],
+      notes: [note],
       revision: 3,
     })
     expect(changed('playback.changed', { handId: 'hand-1', actionIndex: 2 })).toEqual({
@@ -529,9 +544,10 @@ describe('parseServerMessage', () => {
       revision: 3,
     })
     expect(changed('queue.entryRemoved', { id: 'entry-1' })).toEqual({ type: 'entryRemoved', id: 'entry-1', revision: 3 })
-    expect(changed('queue.entryRestored', { entry: firstHand })).toEqual({
+    expect(changed('queue.entryRestored', { entry: firstHand, notes: [note] })).toEqual({
       type: 'entryRestored',
       entry: firstHand,
+      notes: [note],
       revision: 3,
     })
     expect(changed('room.masterChanged', { masterId: 'id-marta', reason: 'failover' })).toEqual({

@@ -15,6 +15,7 @@ import { settingsPath } from '../settings/SettingsPage'
 import { ImportDialog } from './ImportDialog'
 import {
   authoredCount,
+  dateTimeLabel,
   playedAtLabel,
   positionsLabel,
   potLabel,
@@ -134,7 +135,9 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               load={load}
               table={table}
               isMaster={isMaster}
+              marked={view.marks.includes(view.playback.handId)}
               onGoTo={commands.goToAction}
+              onSetMark={(marked) => commands.setMark(view.playback!.handId, marked)}
             />
           ) : (
             <>
@@ -168,9 +171,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
               participants={view.participants}
               isMaster={isMaster && loadedEntry !== undefined}
-              marked={view.marks.includes(detailsEntry.handId)}
               onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
-              onSetMark={(marked) => commands.setMark(detailsEntry.handId, marked)}
             />
           )}
           {table?.payout && <Payout payout={table.payout} />}
@@ -340,6 +341,47 @@ function RoomDecisionDialog({
 
 const UNDO_WINDOW_MS = 10_000
 
+/** The Note field the loaded Hand's "Nota" button takes you to. */
+const NOTE_FIELD_ID = 'room-note-field'
+
+/**
+ * What was just removed and can still be taken back, for as long as the undo
+ * window lasts. The server is the one that decides: this only says how long
+ * the offer is worth making. `forget` drops the offer when what it refers to
+ * is no longer on screen.
+ */
+function usePendingUndo(undoCommand: (id: string) => void): {
+  pendingId: string | null
+  remove(id: string, removeCommand: (id: string) => void): void
+  undo(): void
+  forget(): void
+} {
+  const [pendingId, setPendingId] = useState<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  function forget() {
+    clearTimeout(timer.current)
+    setPendingId(null)
+  }
+
+  return {
+    pendingId,
+    remove(id, removeCommand) {
+      removeCommand(id)
+      setPendingId(id)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setPendingId(null), UNDO_WINDOW_MS)
+    },
+    undo() {
+      if (!pendingId) return
+      undoCommand(pendingId)
+      forget()
+    },
+    forget,
+  }
+}
+
 /**
  * The Queue panel, from the "Sala" boards: Author, date, Positions, Stake,
  * final pot, Final Street and Showdown per row, the loaded Hand highlighted.
@@ -365,9 +407,7 @@ function QueuePanel({
   const [collapsed, setCollapsed] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [filters, setFilters] = useState<QueueFilters>(noFilters)
-  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null)
-  const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(undoTimer.current), [])
+  const removal = usePendingUndo(commands.undoQueueRemoval)
 
   const hasActiveFilters =
     filters.author !== '' || filters.position !== '' || filters.finalStreet !== '' || filters.showdown !== 'any'
@@ -394,19 +434,6 @@ function QueuePanel({
     commands.reorderQueue(order)
   }
 
-  function remove(entry: QueueEntry) {
-    commands.removeQueueEntry(entry.id)
-    setPendingRemovalId(entry.id)
-    clearTimeout(undoTimer.current)
-    undoTimer.current = setTimeout(() => setPendingRemovalId(null), UNDO_WINDOW_MS)
-  }
-
-  function undo() {
-    if (!pendingRemovalId) return
-    commands.undoQueueRemoval(pendingRemovalId)
-    clearTimeout(undoTimer.current)
-    setPendingRemovalId(null)
-  }
 
   return (
     <aside className="room-queue" data-collapsed={collapsed || undefined} aria-labelledby="room-queue-title">
@@ -522,10 +549,10 @@ function QueuePanel({
               )}
             </div>
           )}
-          {isMaster && pendingRemovalId && (
+          {isMaster && removal.pendingId && (
             <div className="room-queue__undo" role="status">
               <span>{t('room.queue.removed')}</span>
-              <Button variant="secondary" size="compact" onClick={undo}>
+              <Button variant="secondary" size="compact" onClick={removal.undo}>
                 {t('room.queue.undo')}
               </Button>
             </div>
@@ -548,7 +575,7 @@ function QueuePanel({
                     onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
                     onMoveUp={isMaster && fullIndex > 0 ? () => move(entry, -1) : undefined}
                     onMoveDown={isMaster && fullIndex < view.queue.length - 1 ? () => move(entry, 1) : undefined}
-                    onRemove={isMaster ? () => remove(entry) : undefined}
+                    onRemove={isMaster ? () => removal.remove(entry.id, commands.removeQueueEntry) : undefined}
                   />
                 )
               })}
@@ -658,7 +685,9 @@ function LoadedHand({
   load,
   table,
   isMaster,
+  marked,
   onGoTo,
+  onSetMark,
 }: {
   view: InRoom
   handId: string
@@ -666,7 +695,10 @@ function LoadedHand({
   /** The table at the current Action, once the Hand is loaded. */
   table: TableView | null
   isMaster: boolean
+  /** Whether this person has Marked the loaded Hand. Nobody else ever sees it. */
+  marked: boolean
   onGoTo: (actionIndex: number) => void
+  onSetMark: (marked: boolean) => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -693,6 +725,28 @@ function LoadedHand({
             <span className="room-stage__by">
               {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
             </span>
+            <span className="room-stage__spacer" />
+            {/* Both "Sala" boards draw these two at the right of this row. */}
+            <Button
+              variant="ghost"
+              size="compact"
+              className="room-stage__mark"
+              data-marked={marked || undefined}
+              aria-pressed={marked}
+              onClick={() => onSetMark(!marked)}
+            >
+              <Icon name="mark" size={14} />
+              {t(marked ? 'room.mark.marked' : 'room.mark.add')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="compact"
+              className="room-stage__note"
+              onClick={() => document.getElementById(NOTE_FIELD_ID)?.focus()}
+            >
+              <Icon name="note" size={14} />
+              {t('room.notes.jump')}
+            </Button>
           </>
         )}
       </div>
@@ -739,19 +793,14 @@ function CurrentHand({
   tableSize,
   participants,
   isMaster,
-  marked,
   onReassign,
-  onSetMark,
 }: {
   entry: QueueEntry
   /** Seats the table has; null until the Hand's Timeline has loaded. */
   tableSize: number | null
   participants: Participant[]
   isMaster: boolean
-  /** Whether this person has Marked the Hand. Nobody else ever sees it. */
-  marked: boolean
   onReassign: (authorId: string) => void
-  onSetMark: (marked: boolean) => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -765,14 +814,6 @@ function CurrentHand({
     <section className="room-side__section" aria-labelledby="room-current-title">
       <h3 id="room-current-title" className="room-side__title">
         {t('room.current.title')}
-        <IconButton
-          icon="mark"
-          label={t(marked ? 'room.mark.remove' : 'room.mark.add')}
-          size="compact"
-          className="room-side__mark"
-          data-marked={marked || undefined}
-          onClick={() => onSetMark(!marked)}
-        />
       </h3>
       <dl className="room-facts">
         <div className="room-facts__row">
@@ -870,15 +911,15 @@ function HandNotes({
   const { t } = i18n
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
-  const [pendingDeletionId, setPendingDeletionId] = useState<string | null>(null)
-  const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(undoTimer.current), [])
-  // A Hand of one's own: a draft belongs to the Hand it was being written about.
-  const [draftFor, setDraftFor] = useState(handId)
-  if (draftFor !== handId) {
-    setDraftFor(handId)
+  const removal = usePendingUndo(commands.undoNoteRemoval)
+  // A draft, an edit and an undo all belong to the Hand they were about: on
+  // another Hand they would offer to change a Note nobody here can see.
+  const [shownFor, setShownFor] = useState(handId)
+  if (shownFor !== handId) {
+    setShownFor(handId)
     setDraft('')
     setEditing(null)
+    removal.forget()
   }
 
   const onHand = notes.filter((note) => note.handId === handId)
@@ -888,20 +929,6 @@ function HandNotes({
     if (draft.trim() === '') return
     commands.writeNote(handId, draft.trim())
     setDraft('')
-  }
-
-  function remove(note: Note) {
-    commands.deleteNote(note.id)
-    setPendingDeletionId(note.id)
-    clearTimeout(undoTimer.current)
-    undoTimer.current = setTimeout(() => setPendingDeletionId(null), UNDO_WINDOW_MS)
-  }
-
-  function undo() {
-    if (!pendingDeletionId) return
-    commands.undoNoteDeletion(pendingDeletionId)
-    clearTimeout(undoTimer.current)
-    setPendingDeletionId(null)
   }
 
   return (
@@ -928,8 +955,9 @@ function HandNotes({
                 <div className="room-notes__by">
                   <Avatar name={note.writer.displayName} seed={note.writer.identityId} size={18} />
                   <span className="room-notes__writer">{note.writer.displayName}</span>
-                  <span className="room-notes__when ro-mono">
-                    {i18n.formatRelative(new Date(note.editedAt ?? note.writtenAt))}
+                  {/* Dated by when it was written; a rewrite is said apart, never in its place. */}
+                  <span className="room-notes__when ro-mono" title={dateTimeLabel(note.writtenAt, i18n)}>
+                    {i18n.formatRelative(new Date(note.writtenAt))}
                     {note.editedAt && ` · ${t('room.notes.edited')}`}
                   </span>
                 </div>
@@ -947,7 +975,7 @@ function HandNotes({
                     label={t('room.notes.delete', { name: note.writer.displayName })}
                     size="compact"
                     disabledReason={lockedReason}
-                    onClick={() => remove(note)}
+                    onClick={() => removal.remove(note.id, commands.removeNote)}
                   />
                 </div>
               </li>
@@ -955,15 +983,16 @@ function HandNotes({
           )}
         </ul>
       )}
-      {isMaster && pendingDeletionId && (
+      {isMaster && removal.pendingId && (
         <div className="room-notes__undo" role="status">
-          <span>{t('room.notes.deleted')}</span>
-          <Button variant="secondary" size="compact" onClick={undo}>
+          <span>{t('room.notes.removed')}</span>
+          <Button variant="secondary" size="compact" onClick={removal.undo}>
             {t('room.queue.undo')}
           </Button>
         </div>
       )}
       <textarea
+        id={NOTE_FIELD_ID}
         className="room-notes__field"
         aria-label={t(isMaster ? 'room.notes.write.master' : 'room.notes.write.guest')}
         placeholder={t(isMaster ? 'room.notes.placeholder.master' : 'room.notes.placeholder.guest')}

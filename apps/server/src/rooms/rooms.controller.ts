@@ -115,9 +115,7 @@ export class RoomsController {
       code,
       body.text,
     );
-    if (entries.length > 0) {
-      this.gateway.publish(room.id, 'queue.entriesAdded', { entries });
-    }
+    if (entries.length > 0) await this.gateway.entriesAdded(room.id, entries);
     return { imported: entries.length, discarded };
   }
 
@@ -170,9 +168,7 @@ export class RoomsController {
       code,
       body.previews,
     );
-    if (entries.length > 0) {
-      this.gateway.publish(room.id, 'queue.entriesAdded', { entries });
-    }
+    if (entries.length > 0) await this.gateway.entriesAdded(room.id, entries);
     return { imported: entries.length };
   }
 }

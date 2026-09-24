@@ -1,23 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import {
-  identities,
-  marks,
-  notes,
-  queueEntries,
-} from '../database/schema.js';
+import { identities, notes, queueEntries } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
+import { requireQueued } from './queued-hand.js';
 import { RoomsService } from './rooms.service.js';
+import { requireUndoable } from './undo-window.js';
 
 /** The longest a Note may be. Long enough for a conclusion, not for an essay. */
-export const NOTE_MAX_LENGTH = 2_000;
-
-/** How long a deleted Note can still be brought back. */
-const UNDO_WINDOW_MS = 10_000;
+const NOTE_MAX_LENGTH = 2_000;
 
 /** A Note as everyone who can see the Hand reads it. */
 export interface Note {
@@ -35,9 +29,9 @@ export interface Note {
 
 /**
  * The conclusions written on Hands. Any Participant writes one; only the
- * Master of a Room the Hand is in rewrites or deletes it, and a deletion can
- * be undone for 10 s. Notes outlive the Room they were written in, and
- * outside one they are only ever read.
+ * Master of a Room the Hand is in rewrites or removes it, and a removal can
+ * be undone for as long as the undo window lasts. Notes outlive the Room they
+ * were written in, and outside one they are only ever read.
  */
 @Injectable()
 export class NotesService {
@@ -66,15 +60,24 @@ export class NotesService {
     return rows.map(toNote);
   }
 
-  /** Every Note on one Hand, oldest first. Read-only: the caller may see the Hand. */
-  async ofHand(handId: string): Promise<Note[]> {
+  /**
+   * Every Note on these Hands, oldest first. What a Hand brings with it as it
+   * joins a Queue: a Hand reviewed in an earlier Room arrives already written on.
+   */
+  async ofHands(handIds: string[]): Promise<Note[]> {
+    if (handIds.length === 0) return [];
     const rows = await this.db
       .select(noteColumns)
       .from(notes)
       .innerJoin(identities, eq(identities.id, notes.writerId))
-      .where(and(eq(notes.handId, handId), isNull(notes.removedAt)))
+      .where(and(inArray(notes.handId, handIds), isNull(notes.removedAt)))
       .orderBy(asc(notes.seq));
     return rows.map(toNote);
+  }
+
+  /** Every Note on one Hand, oldest first. Read-only: the caller may see the Hand. */
+  ofHand(handId: string): Promise<Note[]> {
+    return this.ofHands([handId]);
   }
 
   /** Any Participant writes a Note on a Hand in their Room's Queue. */
@@ -85,11 +88,11 @@ export class NotesService {
     body: unknown,
   ): Promise<Note> {
     await this.rooms.requireParticipant(roomId, writer.id);
-    await this.requireQueued(roomId, handId);
+    const queued = await requireQueued(this.db, roomId, handId);
     const [written] = await this.db
       .insert(notes)
       .values({
-        handId: handId as string,
+        handId: queued,
         writerId: writer.id,
         body: validBody(body),
         writtenAt: this.clock.now(),
@@ -105,32 +108,32 @@ export class NotesService {
     noteId: unknown,
     body: unknown,
   ): Promise<Note> {
-    const note = await this.editable(master, roomId, noteId);
+    const id = await this.editable(master, roomId, noteId);
     await this.db
       .update(notes)
       .set({ body: validBody(body), editedAt: this.clock.now() })
-      .where(eq(notes.id, note.id));
-    return this.byId(note.id);
+      .where(eq(notes.id, id));
+    return this.byId(id);
   }
 
   /**
-   * The Master deletes a Note, soft: it is gone for everyone at once, and
-   * undoing within 10 s brings it back as it was (see `undoRemoval`).
+   * The Master removes a Note, soft: it is gone for everyone at once, and
+   * undoing within the window brings it back as it was (see `undoRemoval`).
    */
   async remove(
     master: Identity,
     roomId: string,
     noteId: unknown,
   ): Promise<{ id: string }> {
-    const note = await this.editable(master, roomId, noteId);
+    const id = await this.editable(master, roomId, noteId);
     await this.db
       .update(notes)
       .set({ removedAt: this.clock.now() })
-      .where(eq(notes.id, note.id));
-    return { id: note.id };
+      .where(eq(notes.id, id));
+    return { id };
   }
 
-  /** The Master undoes a deletion within its 10 s window. */
+  /** The Master undoes a removal within its window. */
   async undoRemoval(
     master: Identity,
     roomId: string,
@@ -142,11 +145,9 @@ export class NotesService {
       .select({ handId: notes.handId, removedAt: notes.removedAt })
       .from(notes)
       .where(eq(notes.id, noteId));
-    if (!row || row.removedAt === null) throw new Rejected('nothing-to-undo');
-    await this.requireQueued(roomId, row.handId);
-    if (this.clock.now().getTime() - row.removedAt.getTime() > UNDO_WINDOW_MS) {
-      throw new Rejected('undo-expired');
-    }
+    if (!row) throw new Rejected('nothing-to-undo');
+    await requireQueued(this.db, roomId, row.handId);
+    requireUndoable(this.clock, row.removedAt);
     await this.db
       .update(notes)
       .set({ removedAt: null })
@@ -154,68 +155,15 @@ export class NotesService {
     return this.byId(noteId);
   }
 
-  /** The Hands this person has Marked among those in a Room's Queue. */
-  async marksInRoom(identityId: string, roomId: string): Promise<string[]> {
-    const rows = await this.db
-      .select({ handId: marks.handId })
-      .from(marks)
-      .innerJoin(
-        queueEntries,
-        and(
-          eq(queueEntries.handId, marks.handId),
-          eq(queueEntries.roomId, roomId),
-          isNull(queueEntries.removedAt),
-        ),
-      )
-      .where(eq(marks.identityId, identityId))
-      .orderBy(asc(marks.markedAt));
-    return rows.map((row) => row.handId);
-  }
-
-  /** Whether this person has Marked the Hand. Nobody else is ever told. */
-  async isMarked(identityId: string, handId: string): Promise<boolean> {
-    const [row] = await this.db
-      .select({ handId: marks.handId })
-      .from(marks)
-      .where(and(eq(marks.identityId, identityId), eq(marks.handId, handId)));
-    return row !== undefined;
-  }
-
   /**
-   * A Participant Marks a Hand in their Room's Queue, or takes the Mark off.
-   * The Mark is theirs alone: no other Participant ever hears of it.
-   */
-  async setMark(
-    person: Identity,
-    roomId: string,
-    handId: unknown,
-    marked: unknown,
-  ): Promise<{ handId: string; marked: boolean }> {
-    await this.rooms.requireParticipant(roomId, person.id);
-    await this.requireQueued(roomId, handId);
-    const id = handId as string;
-    if (marked === false) {
-      await this.db
-        .delete(marks)
-        .where(and(eq(marks.identityId, person.id), eq(marks.handId, id)));
-      return { handId: id, marked: false };
-    }
-    await this.db
-      .insert(marks)
-      .values({ identityId: person.id, handId: id, markedAt: this.clock.now() })
-      .onConflictDoNothing();
-    return { handId: id, marked: true };
-  }
-
-  /**
-   * The Note a Master may rewrite or delete: one on a Hand that is in the
-   * Queue of the Room they hold, and that is still there.
+   * The id of a Note a Master may rewrite or remove: one on a Hand that is in
+   * the Queue of the Room they hold, and that is still there.
    */
   private async editable(
     master: Identity,
     roomId: string,
     noteId: unknown,
-  ): Promise<{ id: string }> {
+  ): Promise<string> {
     await this.rooms.requireMaster(roomId, master.id);
     if (!isUuid(noteId)) throw new Rejected('note-not-found');
     const [row] = await this.db
@@ -223,25 +171,8 @@ export class NotesService {
       .from(notes)
       .where(and(eq(notes.id, noteId), isNull(notes.removedAt)));
     if (!row) throw new Rejected('note-not-found');
-    await this.requireQueued(roomId, row.handId);
-    return { id: row.id };
-  }
-
-  /** Refuses with `hand-not-in-queue` unless the Hand is in the Room's Queue. */
-  private async requireQueued(roomId: string, handId: unknown): Promise<void> {
-    if (!isUuid(handId)) throw new Rejected('hand-not-in-queue');
-    const [queued] = await this.db
-      .select({ id: queueEntries.id })
-      .from(queueEntries)
-      .where(
-        and(
-          eq(queueEntries.roomId, roomId),
-          eq(queueEntries.handId, handId),
-          isNull(queueEntries.removedAt),
-        ),
-      )
-      .limit(1);
-    if (!queued) throw new Rejected('hand-not-in-queue');
+    await requireQueued(this.db, roomId, row.handId);
+    return row.id;
   }
 
   private async byId(id: string): Promise<Note> {

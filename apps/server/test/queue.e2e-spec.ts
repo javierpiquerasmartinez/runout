@@ -113,9 +113,12 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     // Within the 2 s the issue allows (RoomClient.next's default timeout).
     expect(await masterSocket.next('queue.entriesAdded')).toEqual({
       entries: expected,
+      // A Hand nobody has written on yet brings no Notes with it.
+      notes: [],
     });
     expect(await guestSocket.next('queue.entriesAdded')).toEqual({
       entries: expected,
+      notes: [],
     });
   });
 

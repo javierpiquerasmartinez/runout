@@ -72,10 +72,11 @@ describe('Notes and Marks (e2e)', () => {
     const code = await createRoom(master.token);
     const masterRoom = await join(master.token, code, 'Javier');
     const guestRoom = await join(guest.token, code, 'Marta');
+    const text = freshHandHistory('pokerstars-session.txt');
     await request(running.httpServer)
       .post(`/api/rooms/${code}/hands`)
       .set('Authorization', `Bearer ${master.token}`)
-      .send({ text: freshHandHistory('pokerstars-session.txt') })
+      .send({ text })
       .expect(201);
     const { entries } = await masterRoom.socket.next<{
       entries: QueueEntry[];
@@ -88,6 +89,7 @@ describe('Notes and Marks (e2e)', () => {
       masterSocket: masterRoom.socket,
       guestSocket: guestRoom.socket,
       entries,
+      text,
     };
   }
 
@@ -345,6 +347,52 @@ describe('Notes and Marks (e2e)', () => {
         .set('Authorization', `Bearer ${guest.token}`)
         .expect(200);
       expect(res.body.marked).toBe(true);
+    });
+  });
+
+  describe('a Hand that already carries Notes', () => {
+    it('brings them with it into another Room, as it is imported', async () => {
+      const first = await roomWithHands();
+      first.guestSocket.send('notes.write', {
+        handId: first.entries[0].handId,
+        body: 'La conclusion de la otra sala.',
+      });
+      const { note } = await first.masterSocket.next<{ note: Note }>(
+        'notes.written',
+      );
+
+      // The same Hand History, imported by the same person into a new Room:
+      // one Hand row, the Notes it already has (ADR 0002).
+      const second = await createRoom(first.master.token);
+      const room = await join(first.master.token, second, 'Javier');
+      await request(running.httpServer)
+        .post(`/api/rooms/${second}/hands`)
+        .set('Authorization', `Bearer ${first.master.token}`)
+        .send({ text: first.text })
+        .expect(201);
+
+      const added = await room.socket.next<{ notes: Note[] }>(
+        'queue.entriesAdded',
+      );
+      expect(added.notes).toEqual([note]);
+    });
+
+    it('shows them again when the Master undoes removing their Queue Entry', async () => {
+      const { masterSocket, entries } = await roomWithHands();
+      masterSocket.send('notes.write', {
+        handId: entries[0].handId,
+        body: 'Sigue aqui despues de deshacer.',
+      });
+      const { note } = await masterSocket.next<{ note: Note }>('notes.written');
+
+      masterSocket.send('queue.remove', { id: entries[0].id });
+      await masterSocket.next('queue.entryRemoved');
+      masterSocket.send('queue.undoRemoval', { id: entries[0].id });
+
+      const restored = await masterSocket.next<{ notes: Note[] }>(
+        'queue.entryRestored',
+      );
+      expect(restored.notes).toEqual([note]);
     });
   });
 });

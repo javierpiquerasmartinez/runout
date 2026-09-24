@@ -21,6 +21,7 @@ import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { RoomsService, type Room } from './rooms.service.js';
+import { requireUndoable } from './undo-window.js';
 
 export interface Author {
   identityId: string;
@@ -559,12 +560,8 @@ export class QueueService {
         .select({ removedAt: queueEntries.removedAt })
         .from(queueEntries)
         .where(and(eq(queueEntries.id, id), eq(queueEntries.roomId, roomId)));
-      if (!row || row.removedAt === null) {
-        throw new Rejected('nothing-to-undo');
-      }
-      if (this.clock.now().getTime() - row.removedAt.getTime() > UNDO_WINDOW_MS) {
-        throw new Rejected('undo-expired');
-      }
+      if (!row) throw new Rejected('nothing-to-undo');
+      requireUndoable(this.clock, row.removedAt);
       await tx
         .update(queueEntries)
         .set({ removedAt: null })
@@ -582,7 +579,6 @@ export class QueueService {
   }
 }
 
-const UNDO_WINDOW_MS = 10_000;
 
 interface QueueEntryRow {
   id: string;

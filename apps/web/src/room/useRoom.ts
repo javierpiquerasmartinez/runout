@@ -24,9 +24,9 @@ export interface RoomCommands {
   writeNote(handId: string, body: string): void
   /** Rewrites a Note. Only the Master of a Room the Hand is in may. */
   editNote(id: string, body: string): void
-  /** Deletes a Note; undoable for 10 s. Only the Master may. */
-  deleteNote(id: string): void
-  undoNoteDeletion(id: string): void
+  /** Removes a Note; undoable for 10 s. Only the Master may. */
+  removeNote(id: string): void
+  undoNoteRemoval(id: string): void
   /** Marks a Hand for this person alone, or takes the Mark off. */
   setMark(handId: string, marked: boolean): void
 }
@@ -83,8 +83,8 @@ export function useRoom(code: string, token: string, displayName: string | null)
       undoQueueRemoval: (id) => send('queue.undoRemoval', { id }),
       writeNote: (handId, body) => send('notes.write', { handId, body }),
       editNote: (id, body) => send('notes.edit', { id, body }),
-      deleteNote: (id) => send('notes.remove', { id }),
-      undoNoteDeletion: (id) => send('notes.undoRemoval', { id }),
+      removeNote: (id) => send('notes.remove', { id }),
+      undoNoteRemoval: (id) => send('notes.undoRemoval', { id }),
       setMark: (handId, marked) => send('hand.setMark', { handId, marked }),
     }),
     [send],

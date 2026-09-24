@@ -147,11 +147,13 @@ export type RoomChange =
   | { type: 'participantKicked'; identityId: string }
   | { type: 'roomClosed' }
   | ({ type: 'masterChanged' } & MasterChange)
-  | { type: 'entriesAdded'; entries: QueueEntry[] }
+  /** New Queue Entries, with the Notes their Hands already carry from earlier Rooms. */
+  | { type: 'entriesAdded'; entries: QueueEntry[]; notes: Note[] }
   | { type: 'authorChanged'; handId: string; author: Author }
   | { type: 'entriesReordered'; order: string[] }
   | { type: 'entryRemoved'; id: string }
-  | { type: 'entryRestored'; entry: QueueEntry }
+  /** A Queue Entry back in the Queue, with the Notes that left the Room with it. */
+  | { type: 'entryRestored'; entry: QueueEntry; notes: Note[] }
   | { type: 'playbackChanged'; playback: Playback }
   | { type: 'noteWritten'; note: Note }
   | { type: 'noteEdited'; note: Note }
@@ -339,7 +341,11 @@ function applied(view: InRoom, change: RoomChange): RoomView {
     }
     case 'entriesAdded': {
       const held = new Set(view.queue.map((entry) => entry.id))
-      return { ...view, queue: [...view.queue, ...change.entries.filter((entry) => !held.has(entry.id))] }
+      return {
+        ...view,
+        queue: [...view.queue, ...change.entries.filter((entry) => !held.has(entry.id))],
+        notes: withNotes(view.notes, change.notes),
+      }
     }
     case 'authorChanged':
       return {
@@ -359,7 +365,7 @@ function applied(view: InRoom, change: RoomChange): RoomView {
     case 'entryRestored': {
       const restored = [...view.queue.filter((entry) => entry.id !== change.entry.id), change.entry]
       restored.sort((a, b) => a.position - b.position)
-      return { ...view, queue: restored }
+      return { ...view, queue: restored, notes: withNotes(view.notes, change.notes) }
     }
     case 'playbackChanged':
       return { ...view, playback: change.playback }
@@ -378,6 +384,18 @@ function applied(view: InRoom, change: RoomChange): RoomView {
       return { ...view, notes }
     }
   }
+}
+
+/**
+ * The Notes already held, plus the ones a Hand brought with it, in the order
+ * they were written. One that is already held is left as it is: applying the
+ * same change twice leaves the Room exactly as it was.
+ */
+function withNotes(held: Note[], arriving: Note[]): Note[] {
+  const known = new Set(held.map((note) => note.id))
+  const fresh = arriving.filter((note) => !known.has(note.id))
+  if (fresh.length === 0) return held
+  return [...held, ...fresh].sort((a, b) => a.seq - b.seq)
 }
 
 /** Turns a raw WebSocket message into a Room event, or null for anything else. */
@@ -425,7 +443,7 @@ function parseChange(event: unknown, data: any): RoomChange | null {
         reason: data.reason === 'failover' ? 'failover' : 'handover',
       }
     case 'queue.entriesAdded':
-      return { type: 'entriesAdded', entries: data.entries as QueueEntry[] }
+      return { type: 'entriesAdded', entries: data.entries as QueueEntry[], notes: (data.notes ?? []) as Note[] }
     case 'queue.authorChanged':
       return { type: 'authorChanged', handId: String(data.handId), author: data.author as Author }
     case 'queue.reordered':
@@ -433,7 +451,7 @@ function parseChange(event: unknown, data: any): RoomChange | null {
     case 'queue.entryRemoved':
       return { type: 'entryRemoved', id: String(data.id) }
     case 'queue.entryRestored':
-      return { type: 'entryRestored', entry: data.entry as QueueEntry }
+      return { type: 'entryRestored', entry: data.entry as QueueEntry, notes: (data.notes ?? []) as Note[] }
     case 'playback.changed':
       return { type: 'playbackChanged', playback: { handId: String(data.handId), actionIndex: Number(data.actionIndex) } }
     case 'notes.written':

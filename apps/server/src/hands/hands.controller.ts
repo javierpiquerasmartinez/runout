@@ -1,11 +1,12 @@
 import { Controller, Get, Header, Headers, Param } from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
+import { MarksService } from '../rooms/marks.service.js';
 import { NotesService, type Note } from '../rooms/notes.service.js';
 import { HandsService, type HandWithTimeline } from './hands.service.js';
 
-/** What someone who is not in a Room knows about a Hand: its Notes, and their own Mark. */
-interface HandStudy {
+/** A Hand's Notes as they are read outside a Room, with this viewer's own Mark. */
+interface HandNotesView {
   /** Read-only here: Notes are only ever written, rewritten or deleted inside a Room. */
   notes: Note[];
   /** Whether this viewer has Marked the Hand. Nobody else is ever told. */
@@ -18,6 +19,7 @@ export class HandsController {
     private readonly identities: IdentityService,
     private readonly hands: HandsService,
     private readonly notes: NotesService,
+    private readonly marks: MarksService,
   ) {}
 
   /**
@@ -44,17 +46,17 @@ export class HandsController {
    */
   @Get(':id/notes')
   @Header('Cache-Control', 'private, no-cache')
-  async study(
+  async notesOf(
     @Headers('authorization') authorization: string | undefined,
     @Param('id') id: string,
-  ): Promise<HandStudy> {
+  ): Promise<HandNotesView> {
     const viewer = await this.identities.authenticate(
       bearerToken(authorization),
     );
     await this.hands.requireVisible(viewer, id);
     const [notes, marked] = await Promise.all([
       this.notes.ofHand(id),
-      this.notes.isMarked(viewer.id, id),
+      this.marks.isMarked(viewer.id, id),
     ]);
     return { notes, marked };
   }

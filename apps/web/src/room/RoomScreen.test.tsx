@@ -25,6 +25,8 @@ const firstHand: QueueEntry = {
   summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
 }
 
+const secondHand: QueueEntry = { ...firstHand, id: 'entry-2', handId: 'hand-2', position: 2 }
+
 const martasNote: Note = {
   id: 'note-1',
   seq: 1,
@@ -89,8 +91,8 @@ function renderRoom(view: InRoom) {
     undoQueueRemoval: vi.fn(),
     writeNote: vi.fn(),
     editNote: vi.fn(),
-    deleteNote: vi.fn(),
-    undoNoteDeletion: vi.fn(),
+    removeNote: vi.fn(),
+    undoNoteRemoval: vi.fn(),
     setMark: vi.fn(),
   } satisfies RoomCommands
   showAgain = render(screenOf(view, commands)).rerender
@@ -353,10 +355,31 @@ describe('RoomScreen \u00b7 Notes', () => {
     const commands = renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete Marta\u2019s note' }))
-    expect(commands.deleteNote).toHaveBeenCalledWith('note-1')
+    expect(commands.removeNote).toHaveBeenCalledWith('note-1')
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(commands.undoNoteDeletion).toHaveBeenCalledWith('note-1')
+    expect(commands.undoNoteRemoval).toHaveBeenCalledWith('note-1')
+  })
+
+  it('drops the undo of a removal when the Master moves on to another Hand', async () => {
+    const view = roomWithLoadedHand({ queue: [firstHand, secondHand], notes: [martasNote] })
+    const commands = renderRoom(view)
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Marta\u2019s note' }))
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
+
+    // The Master loads the next Hand: an undo of a Note nobody can see is no offer.
+    rerenderRoom({ ...view, playback: { handId: 'hand-2', actionIndex: 0 } }, commands)
+
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+  })
+
+  it('dates a Note by when it was written, and says when it was rewritten since', () => {
+    const edited: Note = { ...martasNote, editedAt: '2026-09-18T13:30:00.000Z' }
+    renderRoom(roomWithLoadedHand({ notes: [edited] }))
+
+    const when = screen.getByRole('region', { name: 'Hand notes' }).querySelector('.room-notes__when')
+    expect(when?.textContent).toContain('edited')
+    expect(when?.getAttribute('title')).toContain('18')
   })
 })
 
@@ -365,11 +388,11 @@ describe('RoomScreen \u00b7 Marks', () => {
     const view = roomWithLoadedHand({ you: 'id-marta' })
     const commands = renderRoom(view)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Mark this hand' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Mark' }))
     expect(commands.setMark).toHaveBeenCalledWith('hand-1', true)
 
     rerenderRoom({ ...view, marks: ['hand-1'] }, commands)
-    await userEvent.click(screen.getByRole('button', { name: 'Remove the mark' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Marked' }))
     expect(commands.setMark).toHaveBeenCalledWith('hand-1', false)
   })
 })

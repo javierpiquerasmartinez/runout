@@ -17,6 +17,7 @@ import {
 } from '../identity/identity.service.js';
 import { Rejected, type RejectionReason } from '../rejection/rejection.js';
 import { MasterFailover } from './master-failover.js';
+import { MarksService } from './marks.service.js';
 import { MasterService, type MasterChanged } from './master.service.js';
 import { NotesService, type Note } from './notes.service.js';
 import { PlaybackService, type Playback } from './playback.service.js';
@@ -160,6 +161,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly playback: PlaybackService,
     private readonly masters: MasterService,
     private readonly notes: NotesService,
+    private readonly marks: MarksService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {
     this.failover = new MasterFailover(clock, (roomId) =>
@@ -292,7 +294,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.queue.entries(room.id),
       this.playback.current(room.id),
       this.notes.inRoom(room.id),
-      this.notes.marksInRoom(identityId, room.id),
+      this.marks.inRoom(identityId, room.id),
     ]);
     // A snapshot says as much as a heartbeat: they are at this revision now.
     this.presence.applied(socket, revision, this.clock.now());
@@ -475,7 +477,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.rejecting('queue.undoRemoval', async () => {
       const { identity, roomId } = await this.inRoom(socket);
       const entry = await this.queue.undoRemoval(identity, roomId, command?.id);
-      this.publish(roomId, 'queue.entryRestored', { entry });
+      // Its Notes went with it when it was removed; they come back with it.
+      const notes = await this.notes.ofHands([entry.handId]);
+      this.publish(roomId, 'queue.entryRestored', { entry, notes });
       return undefined;
     });
   }
@@ -561,7 +565,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): Promise<WsResponse<RejectedEvent> | undefined> {
     return this.rejecting('hand.setMark', async () => {
       const { identity, roomId } = await this.inRoom(socket);
-      const mark = await this.notes.setMark(
+      const mark = await this.marks.set(
         identity,
         roomId,
         command?.handId,
@@ -711,6 +715,18 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /** Sends a change to every connection in the Room, at the revision it makes. */
   publish(roomId: string, event: string, data: unknown): void {
     this.broadcast(roomId, undefined, event, data);
+  }
+
+  /**
+   * Tells the Room about Queue Entries that have just joined it, with the
+   * Notes the Hands already carry: a Hand reviewed in an earlier Room arrives
+   * written on, and those Notes are visible wherever the Hand is seen.
+   */
+  async entriesAdded(roomId: string, entries: QueueEntry[]): Promise<void> {
+    const notes = await this.notes.ofHands(
+      entries.map((entry) => entry.handId),
+    );
+    this.publish(roomId, 'queue.entriesAdded', { entries, notes });
   }
 
   /**
