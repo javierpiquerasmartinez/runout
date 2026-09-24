@@ -138,6 +138,8 @@ export const playbacks = pgTable('playbacks', {
     .references(() => hands.id),
   /** 0 is the Initial State; n is the table after the Hand's Action n. */
   actionIndex: integer('action_index').notNull(),
+  /** Seats that belong to no Participant are shown by Position. Off whenever a Hand is loaded. */
+  hideOpponentNames: boolean('hide_opponent_names').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 

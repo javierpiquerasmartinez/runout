@@ -4,6 +4,8 @@ export interface Participant {
   identityId: string;
   displayName: string;
   role: 'master' | 'guest';
+  /** Their Screen Names: seats that Hide Opponent Names leaves named. */
+  screenNames: string[];
 }
 
 /** How well a Participant is keeping up with the Room, read from their heartbeats. */
@@ -35,6 +37,7 @@ export interface Heartbeat {
 interface Present {
   identityId: string;
   displayName: string;
+  screenNames: string[];
   joinedAt: Date;
   connections: Map<unknown, Heartbeat>;
 }
@@ -73,6 +76,7 @@ export class RoomPresence<Connection> {
     if (present) {
       present.connections.set(connection, arrival);
       present.displayName = participant.displayName;
+      present.screenNames = participant.screenNames;
       return false;
     }
     room.present.set(participant.identityId, {
@@ -221,6 +225,21 @@ export class RoomPresence<Connection> {
     );
   }
 
+  /**
+   * Takes someone's new Screen Names in every Room they are present in, and
+   * returns those Rooms.
+   */
+  setScreenNames(identityId: string, screenNames: string[]): string[] {
+    const changed: string[] = [];
+    for (const [roomId, room] of this.rooms) {
+      const present = room.present.get(identityId);
+      if (!present) continue;
+      present.screenNames = screenNames;
+      changed.push(roomId);
+    }
+    return changed;
+  }
+
   participant(roomId: string, identityId: string): Participant | null {
     const room = this.rooms.get(roomId);
     const present = room?.present.get(identityId);
@@ -265,6 +284,7 @@ export class RoomPresence<Connection> {
       identityId: present.identityId,
       displayName: present.displayName,
       role: present.identityId === room.masterId ? 'master' : 'guest',
+      screenNames: present.screenNames,
     };
   }
 }

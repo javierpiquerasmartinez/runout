@@ -1,6 +1,7 @@
 import { useI18n } from '../i18n'
 import { IconButton } from '../ui/IconButton'
 import { guardLocked, lockedProps } from '../ui/locked'
+import { Toggle } from '../ui/Toggle'
 import type { RoomSync } from './roomClient'
 import type { StreetProgress } from './streetProgress'
 import { SyncIndicator } from './SyncIndicator'
@@ -9,9 +10,10 @@ import type { TableView } from './tableView'
 
 /**
  * The transport bar of the "Sala" boards, minus play/pause and speed: the
- * Street progress bar, where Playback is, the step controls and who drives.
- * Guests see the same controls, locked, never hidden — and so does everyone
- * while the Room is out of reach, with the table frozen where it was left.
+ * Street progress bar, where Playback is, the step controls, the Hide
+ * Opponent Names switch and who drives. Guests see the same controls,
+ * locked, never hidden — and so does everyone while the Room is out of
+ * reach, with the table frozen where it was left.
  */
 export function PlaybackBar({
   view,
@@ -19,12 +21,16 @@ export function PlaybackBar({
   sync,
   guests,
   onGoTo,
+  hideOpponentNames,
+  onHideOpponentNames,
 }: {
   view: TableView
   isMaster: boolean
   sync: RoomSync
   guests: GuestsFollowing
   onGoTo: (actionIndex: number) => void
+  hideOpponentNames: boolean
+  onHideOpponentNames: (hidden: boolean) => void
 }) {
   const { t } = useI18n()
   // Nothing is asked of a Room we cannot reach: the table stays where it froze.
@@ -36,11 +42,20 @@ export function PlaybackBar({
       <StreetBar streets={view.streets} masterOnly={masterOnly} onGoTo={onGoTo} />
 
       <div className="playback-bar__row">
-        <div className="playback-bar__where" aria-live="polite">
-          <span className="playback-bar__counter ro-mono" data-guest={!isMaster || undefined}>
-            {t('room.playback.counter', { current: view.actionNumber, total: view.actionCount })}
-          </span>
-          <span className="playback-bar__action">{view.lastAction}</span>
+        <div className="playback-bar__where">
+          <div className="playback-bar__said" aria-live="polite">
+            <span className="playback-bar__counter ro-mono" data-guest={!isMaster || undefined}>
+              {t('room.playback.counter', { current: view.actionNumber, total: view.actionCount })}
+            </span>
+            <span className="playback-bar__action">{view.lastAction}</span>
+          </div>
+          <Toggle
+            label={t('room.playback.hideOpponentNames')}
+            checked={hideOpponentNames}
+            onChange={onHideOpponentNames}
+            disabledReason={masterOnly}
+            showLabel
+          />
         </div>
 
         <div className="playback-bar__controls">

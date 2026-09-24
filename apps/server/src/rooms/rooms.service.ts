@@ -34,6 +34,8 @@ export interface OpenRoom extends RoomSummary {
 export interface JoiningParticipant {
   identityId: string;
   displayName: string;
+  /** Theirs as they stand on arriving; Hide Opponent Names keeps these seats named. */
+  screenNames: string[];
   joinedAt: Date;
 }
 
@@ -170,11 +172,13 @@ export class RoomsService {
       })
       .returning();
     if (!membership) throw new Rejected('kicked-from-room');
+    const { screenNames } = await this.identities.profile(named);
     return {
       room,
       participant: {
         identityId: identity.id,
         displayName: named.displayName ?? '',
+        screenNames,
         joinedAt: membership.joinedAt,
       },
     };

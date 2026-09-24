@@ -19,6 +19,7 @@ export type RejectionReason =
   | 'hand-not-in-queue'
   | 'no-hand-loaded'
   | 'invalid-action-index'
+  | 'invalid-hide-opponent-names'
   | 'file-too-large'
   | 'unreadable-file'
   | 'invalid-format'

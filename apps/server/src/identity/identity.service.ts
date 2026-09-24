@@ -23,6 +23,11 @@ export const SCREEN_NAMES_MAX_COUNT = 20;
 /** Issues anonymous identities and recognises them by their bearer token (ADR 0003). */
 @Injectable()
 export class IdentityService {
+  private readonly screenNamesListeners: ((
+    identityId: string,
+    screenNames: string[],
+  ) => void)[] = [];
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -57,6 +62,13 @@ export class IdentityService {
     return { ...identity, screenNames: rows.map((row) => row.screenName) };
   }
 
+  /** Calls `listener` with someone's Screen Names each time they are replaced. */
+  onScreenNamesChanged(
+    listener: (identityId: string, screenNames: string[]) => void,
+  ): void {
+    this.screenNamesListeners.push(listener);
+  }
+
   /**
    * Replaces the identity's Screen Names. Hands already imported keep the
    * Author they were given.
@@ -76,6 +88,9 @@ export class IdentityService {
         })),
       );
     });
+    for (const listener of this.screenNamesListeners) {
+      listener(identity.id, names);
+    }
     return { ...identity, screenNames: names };
   }
 

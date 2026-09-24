@@ -134,7 +134,11 @@ describe('Sync robustness and presence (e2e)', () => {
     const snapshot = await guestSocket.next<Snapshot>('room.snapshot');
 
     expect(snapshot.revision).toBe(change.revision);
-    expect(snapshot.playback).toEqual({ handId, actionIndex: 0 });
+    expect(snapshot.playback).toEqual({
+      handId,
+      actionIndex: 0,
+      hideOpponentNames: false,
+    });
     expect(snapshot.queue.map((entry) => entry.handId)).toEqual([handId]);
   });
 
