@@ -4,6 +4,8 @@ import { DatabaseModule } from './database/database.module.js';
 import { HandsModule } from './hands/hands.module.js';
 import { HealthController } from './health/health.controller.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { ImportsModule } from './imports/imports.module.js';
+import { LibraryModule } from './library/library.module.js';
 import { PingGateway } from './realtime/ping.gateway.js';
 import { RoomsModule } from './rooms/rooms.module.js';
 
@@ -13,6 +15,8 @@ import { RoomsModule } from './rooms/rooms.module.js';
     DatabaseModule,
     IdentityModule,
     RoomsModule,
+    LibraryModule,
+    ImportsModule,
     HandsModule,
   ],
   controllers: [HealthController],

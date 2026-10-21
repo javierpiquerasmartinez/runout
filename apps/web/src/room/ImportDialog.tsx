@@ -11,10 +11,12 @@ import {
   batchHands,
   batchTotals,
   emptyBatch,
+  importsPath,
   MAX_FILE_BYTES,
   reduceBatch,
   SOURCE_FORMATS,
   type HandPreview,
+  type ImportDestination,
   type ImportItem,
   type ImportPreview,
   type SourceFormat,
@@ -34,19 +36,20 @@ type Source = File | string
  * The "Modal de importación de manos" board, adapted: the Importer drops
  * Tracker exports or pastes text, reviews what each file gave and what was
  * discarded, and confirms. The server reads each item into a preview; only
- * confirming puts Hands in the Queue. There is no Author picker (Authors come
- * from Screen Names) and no Library tab; the "detected Hero" block offers to
- * add a Hero nobody is recognised as to the Importer's Screen Names instead
- * of changing it.
+ * confirming puts Hands in the destination, a Room's Queue or the Importer's
+ * Library. There is no Author picker (Authors come from Screen Names) and no
+ * Library tab; into a Room, the "detected Hero" block offers to add a Hero
+ * nobody is recognised as to the Importer's Screen Names instead of changing
+ * it. A Library has no Authors, so it has neither.
  */
 export function ImportDialog({
-  room,
+  destination,
   onClose,
   onImported,
 }: {
-  room: { code: string; name: string }
+  destination: ImportDestination
   onClose: () => void
-  /** Called with how many Hands went into the Queue and how many were left out, just before closing. */
+  /** Called with how many Hands went in and how many were left out, just before closing. */
   onImported: (imported: number, discarded: number) => void
 }) {
   const i18n = useI18n()
@@ -66,6 +69,7 @@ export function ImportDialog({
   const totals = batchTotals(batch)
   const hands = batchHands(batch)
   const showingDiscarded = batch.items.find((item) => item.key === discardedOf && item.state === 'read')
+  const into = destination.kind
 
   useEffect(() => {
     const element = dialog.current
@@ -83,7 +87,7 @@ export function ImportDialog({
       body.append('file', source)
       if (format) body.append('format', format)
     }
-    api<ImportPreview>(`/rooms/${encodeURIComponent(room.code)}/imports/previews`, { token, method: 'POST', body })
+    api<ImportPreview>(`${importsPath(destination)}/previews`, { token, method: 'POST', body })
       .then((preview) => dispatch({ type: 'read', key, preview }))
       .catch((error: unknown) => dispatch({ type: 'failed', key, reason: reasonOf(error) }))
   }
@@ -135,7 +139,7 @@ export function ImportDialog({
   function confirm() {
     setConfirming(true)
     setConfirmFailure(null)
-    api<{ imported: number }>(`/rooms/${encodeURIComponent(room.code)}/imports`, {
+    api<{ imported: number }>(importsPath(destination), {
       token,
       method: 'POST',
       body: { previews: totals.previewIds },
@@ -151,7 +155,7 @@ export function ImportDialog({
   }
 
   const lockedReason = confirming
-    ? t('import.confirming')
+    ? t(`import.${into}.confirming`)
     : totals.reading
       ? t('import.confirm.reading')
       : totals.ready === 0
@@ -172,9 +176,11 @@ export function ImportDialog({
       <header className="import-dialog__header">
         <div className="import-dialog__heading">
           <h2 id="import-title" className="import-dialog__title">
-            {t('import.title')}
+            {t(`import.${into}.title`)}
           </h2>
-          <span className="import-dialog__subtitle">{t('import.subtitle', { room: room.name })}</span>
+          <span className="import-dialog__subtitle">
+            {destination.kind === 'room' ? t('import.room.subtitle', { room: destination.name }) : t('import.library.subtitle')}
+          </span>
         </div>
         <IconButton icon="close" label={t('import.close')} size="compact" onClick={onClose} />
       </header>
@@ -256,6 +262,7 @@ export function ImportDialog({
                   <FileRow
                     key={item.key}
                     item={item}
+                    into={into}
                     i18n={i18n}
                     onRemove={() => remove(item.key)}
                     onPickFormat={(format) => reread(item.key, format)}
@@ -268,9 +275,16 @@ export function ImportDialog({
         </div>
 
         <aside className="import-dialog__side">
-          <ClaimHeroes heroes={unmatchedHeroes(batch)} onClaimed={(screenName) => dispatch({ type: 'screenNameAdded', screenName })} />
+          {into === 'room' && (
+            <ClaimHeroes heroes={unmatchedHeroes(batch)} onClaimed={(screenName) => dispatch({ type: 'screenNameAdded', screenName })} />
+          )}
           {showingDiscarded?.state === 'read' ? (
-            <DiscardedPanel item={showingDiscarded} preview={showingDiscarded.preview} onBack={() => setDiscardedOf(null)} />
+            <DiscardedPanel
+              item={showingDiscarded}
+              preview={showingDiscarded.preview}
+              into={into}
+              onBack={() => setDiscardedOf(null)}
+            />
           ) : (
             <HandPreviewPanel hands={hands} index={previewIndex} onNext={() => setPreviewIndex((index) => (index + 1) % hands.length)} i18n={i18n} />
           )}
@@ -302,8 +316,8 @@ export function ImportDialog({
         <Button variant="primary" disabledReason={lockedReason} onClick={confirm}>
           <Icon name="add" size={16} />
           {totals.ready > 0
-            ? t(totals.ready === 1 ? 'import.confirm.one' : 'import.confirm.other', { count: totals.ready })
-            : t('import.confirm.empty')}
+            ? t(totals.ready === 1 ? `import.${into}.confirm.one` : `import.${into}.confirm.other`, { count: totals.ready })
+            : t(`import.${into}.confirm.empty`)}
         </Button>
       </footer>
     </dialog>
@@ -312,12 +326,14 @@ export function ImportDialog({
 
 function FileRow({
   item,
+  into,
   i18n,
   onRemove,
   onPickFormat,
   onShowDiscarded,
 }: {
   item: ImportItem
+  into: ImportDestination['kind']
   i18n: Translator
   onRemove: () => void
   onPickFormat: (format: SourceFormat) => void
@@ -331,7 +347,7 @@ function FileRow({
       <div className="import-file__text">
         <span className="import-file__name">{item.name}</span>
         <span className="import-file__meta ro-mono" aria-busy={item.state === 'reading' || undefined}>
-          {fileMeta(item, i18n)}
+          {fileMeta(item, into, i18n)}
         </span>
       </div>
       {item.state === 'read' && item.preview.format === null && (
@@ -379,7 +395,7 @@ function rowStatus(item: ImportItem): RowStatus {
 }
 
 /** "PokerStars · 42 manos · 1 ya en la cola · 3 descartadas", or why it gave nothing. */
-function fileMeta(item: ImportItem, { t }: Translator): string {
+function fileMeta(item: ImportItem, into: ImportDestination['kind'], { t }: Translator): string {
   if (item.state === 'reading') return t('import.file.reading')
   if (item.state === 'failed') return t(`reason.${item.reason}`)
   const { format, tried, hands, discarded } = item.preview
@@ -394,7 +410,9 @@ function fileMeta(item: ImportItem, { t }: Translator): string {
     t(hands.length === 1 ? 'import.file.hands.one' : 'import.file.hands.other', { count: hands.length }),
   ]
   if (duplicates > 0) {
-    parts.push(t(duplicates === 1 ? 'import.file.duplicates.one' : 'import.file.duplicates.other', { count: duplicates }))
+    parts.push(
+      t(duplicates === 1 ? `import.${into}.duplicates.one` : `import.${into}.duplicates.other`, { count: duplicates }),
+    )
   }
   if (left > 0) {
     parts.push(t(left === 1 ? 'import.file.discarded.one' : 'import.file.discarded.other', { count: left }))
@@ -461,10 +479,12 @@ function HandPreviewPanel({
           <dt>{t('import.preview.hero')}</dt>
           <dd className="ro-mono">{hand.hero}</dd>
         </div>
-        <div>
-          <dt>{t('import.preview.author')}</dt>
-          <dd>{hand.author.displayName}</dd>
-        </div>
+        {hand.author && (
+          <div>
+            <dt>{t('import.preview.author')}</dt>
+            <dd>{hand.author.displayName}</dd>
+          </div>
+        )}
       </dl>
       {hands.length > 1 && (
         <Button variant="secondary" size="compact" className="import-preview__next" onClick={onNext}>
@@ -534,7 +554,17 @@ function ClaimHeroes({ heroes, onClaimed }: { heroes: string[]; onClaimed: (scre
 }
 
 /** A file's discarded entries: each one's reason and original text. */
-function DiscardedPanel({ item, preview, onBack }: { item: ImportItem; preview: ImportPreview; onBack: () => void }) {
+function DiscardedPanel({
+  item,
+  preview,
+  into,
+  onBack,
+}: {
+  item: ImportItem
+  preview: ImportPreview
+  into: ImportDestination['kind']
+  onBack: () => void
+}) {
   const { t } = useI18n()
   return (
     <section className="import-discarded" aria-labelledby="import-discarded-title">
@@ -544,7 +574,7 @@ function DiscardedPanel({ item, preview, onBack }: { item: ImportItem; preview: 
       <ol className="import-discarded__list">
         {preview.discarded.map((entry, index) => (
           <li key={index} className="import-discarded__entry">
-            <span className="import-discarded__reason">{t(`import.discarded.reason.${entry.reason}`)}</span>
+            <span className="import-discarded__reason">{entry.reason === 'duplicate' ? t(`import.${into}.duplicate`) : t(`import.discarded.reason.${entry.reason}`)}</span>
             <pre className="import-discarded__text ro-mono" tabIndex={0}>
               {entry.text}
             </pre>

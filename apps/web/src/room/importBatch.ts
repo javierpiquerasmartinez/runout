@@ -20,14 +20,24 @@ export type DiscardReason =
   | 'run-it-twice'
   | 'duplicate'
 
+/** Where the dialog imports into: a Room's Queue, or the Importer's own Library. */
+export type ImportDestination = { kind: 'room'; code: string; name: string } | { kind: 'library' }
+
+/** The API path an import into `destination` goes to, previews under it. */
+export function importsPath(destination: ImportDestination): string {
+  return destination.kind === 'room' ? `/rooms/${encodeURIComponent(destination.code)}/imports` : '/library/imports'
+}
+
 /** What the dialog shows of each Hand the server read. */
-export type HandPreview = Pick<QueueEntry, 'author' | 'playedAt' | 'stake' | 'summary'> & {
+export type HandPreview = Pick<QueueEntry, 'playedAt' | 'stake' | 'summary'> & {
   /** The Hero's Screen Name, from the Hand History. */
   hero: string
   /** False when the Poker Site writes every Hero alike (`Hero`): no Screen Name can match it. */
   heroNamed: boolean
-  /** False when nobody in the Room has the Hero among their Screen Names, so the Importer is the Author. */
-  heroMatched: boolean
+  /** Into a Room only: who the Author would be. A Library has none. */
+  author?: QueueEntry['author']
+  /** Into a Room only: false when nobody in the Room has the Hero among their Screen Names, so the Importer is the Author. */
+  heroMatched?: boolean
   board: string[]
 }
 
@@ -148,7 +158,7 @@ export function batchHands(batch: ImportBatch): HandPreview[] {
 export function unmatchedHeroes(batch: ImportBatch): string[] {
   const heroes = new Map<string, string>()
   for (const hand of batchHands(batch)) {
-    if (hand.heroNamed && !hand.heroMatched && !heroes.has(hand.hero.toLowerCase())) {
+    if (hand.heroNamed && hand.heroMatched === false && !heroes.has(hand.hero.toLowerCase())) {
       heroes.set(hand.hero.toLowerCase(), hand.hero)
     }
   }

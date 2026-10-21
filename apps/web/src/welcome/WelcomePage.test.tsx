@@ -118,3 +118,16 @@ describe('WelcomePage · signing in', () => {
     expect(screen.getByRole('button', { name: 'Create a new room' })).toBeTruthy()
   })
 })
+
+describe('WelcomePage · the Library', () => {
+  it('leads an Account to its Library, and nobody else', async () => {
+    fakeGoogleIdentity()
+    renderWelcome()
+    expect((await screen.findByRole('link', { name: 'My library' })).getAttribute('href')).toBe('/library')
+  })
+
+  it('offers no Library to an anonymous identity', () => {
+    renderWelcome({ account: null, room: { code: 'RNT4K9PX' } })
+    expect(screen.queryByRole('link', { name: 'My library' })).toBeNull()
+  })
+})

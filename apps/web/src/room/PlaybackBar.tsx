@@ -8,34 +8,28 @@ import { SyncIndicator } from './SyncIndicator'
 import type { GuestsFollowing } from './syncView'
 import type { TableView } from './tableView'
 
+/** What the bar shows of a Room around the Playback: who drives it, and how in sync it is. */
+export interface PlaybackRoom {
+  isMaster: boolean
+  sync: RoomSync
+  guests: GuestsFollowing
+  hideOpponentNames: boolean
+  onHideOpponentNames: (hidden: boolean) => void
+}
+
 /**
  * The transport bar of the "Sala" boards, minus play/pause and speed: the
  * Street progress bar, where Playback is, the step controls, the Hide
  * Opponent Names switch and who drives. Guests see the same controls,
  * locked, never hidden — and so does everyone while the Room is out of
- * reach, with the table frozen where it was left.
+ * reach, with the table frozen where it was left. Without a `room` (a Hand
+ * replayed alone, from the Library) only the steps and where they are show.
  */
-export function PlaybackBar({
-  view,
-  isMaster,
-  sync,
-  guests,
-  onGoTo,
-  hideOpponentNames,
-  onHideOpponentNames,
-}: {
-  view: TableView
-  isMaster: boolean
-  sync: RoomSync
-  guests: GuestsFollowing
-  onGoTo: (actionIndex: number) => void
-  hideOpponentNames: boolean
-  onHideOpponentNames: (hidden: boolean) => void
-}) {
+export function PlaybackBar({ view, room, onGoTo }: { view: TableView; room?: PlaybackRoom; onGoTo: (actionIndex: number) => void }) {
   const { t } = useI18n()
   // Nothing is asked of a Room we cannot reach: the table stays where it froze.
-  const frozen = sync.state === 'offline' ? t('room.playback.frozen') : undefined
-  const masterOnly = frozen ?? (isMaster ? undefined : t('room.playback.masterOnly'))
+  const frozen = room?.sync.state === 'offline' ? t('room.playback.frozen') : undefined
+  const masterOnly = frozen ?? (!room || room.isMaster ? undefined : t('room.playback.masterOnly'))
 
   return (
     <section className="playback-bar" aria-label={t('room.playback.label')}>
@@ -44,18 +38,20 @@ export function PlaybackBar({
       <div className="playback-bar__row">
         <div className="playback-bar__where">
           <div className="playback-bar__said" aria-live="polite">
-            <span className="playback-bar__counter ro-mono" data-guest={!isMaster || undefined}>
+            <span className="playback-bar__counter ro-mono" data-guest={(room && !room.isMaster) || undefined}>
               {t('room.playback.counter', { current: view.actionNumber, total: view.actionCount })}
             </span>
             <span className="playback-bar__action">{view.lastAction}</span>
           </div>
-          <Toggle
-            label={t('room.playback.hideOpponentNames')}
-            checked={hideOpponentNames}
-            onChange={onHideOpponentNames}
-            disabledReason={masterOnly}
-            showLabel
-          />
+          {room && (
+            <Toggle
+              label={t('room.playback.hideOpponentNames')}
+              checked={room.hideOpponentNames}
+              onChange={room.onHideOpponentNames}
+              disabledReason={masterOnly}
+              showLabel
+            />
+          )}
         </div>
 
         <div className="playback-bar__controls">
@@ -87,7 +83,7 @@ export function PlaybackBar({
         </div>
 
         <div className="playback-bar__who">
-          <SyncIndicator sync={sync} isMaster={isMaster} guests={guests} />
+          {room && <SyncIndicator sync={room.sync} isMaster={room.isMaster} guests={room.guests} />}
         </div>
       </div>
     </section>

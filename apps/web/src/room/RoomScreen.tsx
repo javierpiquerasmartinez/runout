@@ -235,7 +235,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
       </div>
       {importing && (
         <ImportDialog
-          room={view.room}
+          destination={{ kind: 'room', code: view.room.code, name: view.room.name }}
           onClose={() => setImporting(false)}
           onImported={(imported, discarded) => reportImport({ state: 'done', imported, discarded })}
         />
@@ -778,12 +778,14 @@ function LoadedHand({
           <StreetLog log={table.log} />
           <PlaybackBar
             view={table}
-            isMaster={isMaster}
-            sync={view.sync}
-            guests={guestsFollowing(view.participants, view.presence)}
+            room={{
+              isMaster,
+              sync: view.sync,
+              guests: guestsFollowing(view.participants, view.presence),
+              hideOpponentNames: view.playback?.hideOpponentNames ?? false,
+              onHideOpponentNames,
+            }}
             onGoTo={onGoTo}
-            hideOpponentNames={view.playback?.hideOpponentNames ?? false}
-            onHideOpponentNames={onHideOpponentNames}
           />
         </>
       ) : (

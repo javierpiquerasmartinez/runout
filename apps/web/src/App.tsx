@@ -5,6 +5,9 @@ import { useI18n } from './i18n'
 import { FirstDisplayName } from './identity/ChooseDisplayName'
 import { useSession } from './identity/context'
 import { SessionProvider } from './identity/SessionProvider'
+import { libraryHandIdFromPath, libraryPath } from './library/library'
+import { LibraryHandPage } from './library/LibraryHandPage'
+import { LibraryPage } from './library/LibraryPage'
 import { RoomPage } from './room/RoomPage'
 import { RoomHolder } from './room/RoomHolder'
 import { SettingsPage, settingsPath } from './settings/SettingsPage'
@@ -49,7 +52,14 @@ function KeepRoom({ path, children }: { path: string; children: ReactNode }) {
 function Screen({ path }: { path: string }) {
   // Settings are an identity's: without one there is nothing to set yet.
   const { identity } = useSession()
-  return path === settingsPath && identity ? <SettingsPage /> : <WelcomePage />
+  if (path === settingsPath && identity) return <SettingsPage />
+  // Only an Account has a Library (ADR 0005); anyone else is sent to the start.
+  if (identity?.account) {
+    if (path === libraryPath) return <LibraryPage />
+    const handId = libraryHandIdFromPath(path)
+    if (handId) return <LibraryHandPage key={handId} handId={handId} />
+  }
+  return <WelcomePage />
 }
 
 function ConnectionStatus() {

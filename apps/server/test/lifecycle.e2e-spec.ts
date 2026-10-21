@@ -284,7 +284,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       expect(masterSocket.all('room.closed')).toEqual([]);
     });
 
-    it('leaves the Hands it reviewed reachable afterwards', async () => {
+    it('stops showing the Hands it reviewed to who has them in no Library', async () => {
       const { code, master, marta, masterSocket, martaSocket } =
         await roomOfTwo();
       const handId = await queueAHand(code, marta.token, [
@@ -299,7 +299,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
         await request(running.httpServer)
           .get(`/api/hands/${handId}`)
           .set('Authorization', `Bearer ${who.token}`)
-          .expect(200);
+          .expect(404);
       }
     });
   });

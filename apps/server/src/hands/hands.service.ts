@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, exists, or } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
-import { hands, queueEntries, roomMemberships } from '../database/schema.js';
+import {
+  hands,
+  libraryEntries,
+  queueEntries,
+  roomMemberships,
+  rooms,
+} from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -22,8 +28,8 @@ export class HandsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   /**
-   * The Hand with its Timeline, for someone who can see it: its Importer,
-   * its Author in a Room it was queued in, or a Participant of that Room.
+   * The Hand with its Timeline, for someone who can see it: who has it in
+   * their Library, or a Participant of an open Room whose Queue holds it.
    * Anyone else gets `hand-not-found`, so a Hand's existence isn't revealed.
    */
   async withTimeline(viewer: Identity, id: string): Promise<HandWithTimeline> {
@@ -47,11 +53,23 @@ export class HandsService {
   /** The Hand as it was imported, for a viewer who may see it. */
   private async visibleTo(viewer: Identity, id: string): Promise<Hand> {
     if (!isUuid(id)) throw new Rejected('hand-not-found');
-    const [row] = await this.db
-      .selectDistinct({ content: hands.content })
-      .from(hands)
-      .leftJoin(queueEntries, eq(queueEntries.handId, hands.id))
-      .leftJoin(
+    const inLibrary = this.db
+      .select({ handId: libraryEntries.handId })
+      .from(libraryEntries)
+      .where(
+        and(
+          eq(libraryEntries.handId, hands.id),
+          eq(libraryEntries.identityId, viewer.id),
+        ),
+      );
+    const inOpenRoom = this.db
+      .select({ handId: queueEntries.handId })
+      .from(queueEntries)
+      .innerJoin(
+        rooms,
+        and(eq(rooms.id, queueEntries.roomId), eq(rooms.status, 'open')),
+      )
+      .innerJoin(
         roomMemberships,
         and(
           eq(roomMemberships.roomId, queueEntries.roomId),
@@ -59,17 +77,11 @@ export class HandsService {
           eq(roomMemberships.kicked, false),
         ),
       )
-      .where(
-        and(
-          eq(hands.id, id),
-          or(
-            eq(queueEntries.authorId, viewer.id),
-            eq(hands.importerId, viewer.id),
-            eq(roomMemberships.identityId, viewer.id),
-          ),
-        ),
-      )
-      .limit(1);
+      .where(eq(queueEntries.handId, hands.id));
+    const [row] = await this.db
+      .select({ content: hands.content })
+      .from(hands)
+      .where(and(eq(hands.id, id), or(exists(inLibrary), exists(inOpenRoom))));
     if (!row) throw new Rejected('hand-not-found');
     return row.content;
   }

@@ -17,11 +17,11 @@ import {
 import { isUuid } from '../database/uuid.js';
 import {
   heroNamed,
-  heroSeat,
   type Hand,
   type PokerSite,
   type Stake,
 } from '../hands/hand.js';
+import { handKey, keyOf, storeHands } from '../hands/hand-store.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
@@ -61,8 +61,6 @@ export interface Attribution {
 /** A Hand an import is about to put in the Queue. */
 export interface Queued extends Attribution {
   hand: Hand;
-  /** Set when the Hand is already stored, from an earlier import (ADR 0002). */
-  storedId?: string;
 }
 
 export interface Pasted {
@@ -133,11 +131,7 @@ export class QueueService {
         return;
       }
       taken.add(key);
-      queued.push({
-        hand,
-        storedId: known?.id,
-        ...matched[index],
-      });
+      queued.push({ hand, ...matched[index] });
     });
     return { queued, duplicates };
   }
@@ -273,7 +267,12 @@ export class QueueService {
     const { queued } = await this.planImport(room.id, importer, read, [], tx);
     if (queued.length === 0) return [];
 
-    const handIds = await this.store(tx, importer, queued, now);
+    const handIds = await storeHands(
+      tx,
+      importer.id,
+      queued.map(({ hand }) => hand),
+      now,
+    );
     const added = await tx
       .insert(queueEntries)
       .values(
@@ -291,89 +290,6 @@ export class QueueService {
     return (await this.entries(room.id, tx)).filter((entry) =>
       addedIds.has(entry.id),
     );
-  }
-
-  /** Stores the Hands that aren't stored yet, and returns every Hand's id, in order. */
-  private async store(
-    tx: Transaction,
-    importer: Identity,
-    queued: Queued[],
-    now: Date,
-  ): Promise<string[]> {
-    const toStore = queued.filter((each) => each.storedId === undefined);
-    const ids = new Map(
-      queued.flatMap((each) =>
-        each.storedId ? [[keyOf(each.hand), each.storedId] as const] : [],
-      ),
-    );
-    if (toStore.length > 0) {
-      // Another Room's import may have stored one of them a moment ago; the
-      // uniqueness constraint turns it away and it is read back below.
-      const stored = await tx
-        .insert(hands)
-        .values(
-          toStore.map(({ hand }) => ({
-            site: hand.site,
-            siteHandId: hand.siteHandId,
-            heroScreenName: hand.hero.screenName,
-            heroSeat: heroSeat(hand),
-            importerId: importer.id,
-            sourceFormat: hand.sourceFormat,
-            playedAt: new Date(hand.playedAt),
-            smallBlind: hand.stake.smallBlind,
-            bigBlind: hand.stake.bigBlind,
-            currency: hand.stake.currency,
-            content: hand,
-            importedAt: now,
-          })),
-        )
-        .onConflictDoNothing({
-          target: [
-            hands.site,
-            hands.siteHandId,
-            hands.heroScreenName,
-            hands.heroSeat,
-          ],
-        })
-        .returning({
-          id: hands.id,
-          site: hands.site,
-          siteHandId: hands.siteHandId,
-          heroScreenName: hands.heroScreenName,
-          heroSeat: hands.heroSeat,
-        });
-      for (const row of stored) {
-        ids.set(
-          handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat),
-          row.id,
-        );
-      }
-      const missing = toStore.filter((each) => !ids.has(keyOf(each.hand)));
-      if (missing.length > 0) {
-        const rows = await tx
-          .select({
-            id: hands.id,
-            site: hands.site,
-            siteHandId: hands.siteHandId,
-            heroScreenName: hands.heroScreenName,
-            heroSeat: hands.heroSeat,
-          })
-          .from(hands)
-          .where(
-            inArray(
-              hands.siteHandId,
-              missing.map(({ hand }) => hand.siteHandId),
-            ),
-          );
-        for (const row of rows) {
-          ids.set(
-            handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat),
-            row.id,
-          );
-        }
-      }
-    }
-    return queued.map(({ hand }) => ids.get(keyOf(hand))!);
   }
 
   /**
@@ -614,23 +530,4 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
     stake: row.content.stake,
     summary: summarise(row.content),
   };
-}
-
-/** What makes a Hand the same Hand (ADR 0002). */
-function handKey(
-  site: string,
-  siteHandId: string,
-  hero: string,
-  seat: number,
-): string {
-  return JSON.stringify([site, siteHandId, hero, seat]);
-}
-
-function keyOf(hand: Hand): string {
-  return handKey(
-    hand.site,
-    hand.siteHandId,
-    hand.hero.screenName,
-    heroSeat(hand),
-  );
 }
