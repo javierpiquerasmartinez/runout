@@ -3,7 +3,17 @@ export interface GoogleIdentity {
   initialize(config: { client_id: string; callback: (response: { credential: string }) => void }): void
   renderButton(
     parent: HTMLElement,
-    options: { type?: 'standard'; theme?: 'outline' | 'filled_black'; size?: 'large'; text?: 'signin_with'; locale?: string },
+    options: {
+      type?: 'standard'
+      theme?: 'outline' | 'filled_black'
+      size?: 'large'
+      text?: 'signin_with'
+      shape?: 'rectangular'
+      logo_alignment?: 'left' | 'center'
+      /** In pixels; Google draws it at most 400 wide. */
+      width?: number
+      locale?: string
+    },
   ): void
   /** After signing out, so Google doesn't sign the same account straight back in. */
   disableAutoSelect(): void

@@ -4,11 +4,18 @@
   gap: 8px;
 }
 
-/* Google draws its own button inside; it keeps the height of a prominent button meanwhile. */
+/*
+ * Google draws its own button inside, in an iframe; it keeps the height of a
+ * prominent button meanwhile. The iframe takes the page's dark colour scheme
+ * and would paint an opaque white box around the button; a light one keeps
+ * it transparent. Where Google can't draw it as wide as the place, it is centred.
+ */
 .google-sign-in__button {
   min-height: 44px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  color-scheme: light;
 }
 
 .google-sign-in__error {
