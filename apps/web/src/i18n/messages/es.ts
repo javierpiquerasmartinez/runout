@@ -724,7 +724,7 @@ export const es = {
   'library.results.line.nonShowdown': 'Sin showdown',
   'library.results.unit': 'Unidad',
   'library.results.unit.big-blinds': 'Ciegas grandes',
-  'library.results.unit.amount': 'Dinero',
+  'library.results.unit.amount': 'Cantidad',
   'library.results.mixedCurrencies': 'Estas manos están en más de una moneda, así que solo se suman en ciegas grandes',
   'library.results.hand': 'Mano {hand}',
   'library.notes.title': 'Notas',

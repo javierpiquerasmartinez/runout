@@ -19,9 +19,10 @@ export interface ResultsPoint {
   amounts: ResultLines | null
 }
 
+/** The running Results over the Hands a Library filter keeps. */
 export interface Results {
   hands: number
-  /** The currency every Hand shares, or null when they mix. */
+  /** The currency every Hand shares, or null when they mix (or there are none). */
   currency: string | null
   totals: Omit<ResultsPoint, 'hand'>
   /** Downsampled by the server; the last one is the last Hand, equal to the totals. */

@@ -725,7 +725,7 @@ export const en: Messages = {
   'library.results.line.nonShowdown': 'Non-showdown',
   'library.results.unit': 'Unit',
   'library.results.unit.big-blinds': 'Big blinds',
-  'library.results.unit.amount': 'Money',
+  'library.results.unit.amount': 'Amount',
   'library.results.mixedCurrencies': 'These hands are in more than one currency, so they only add up in big blinds',
   'library.results.hand': 'Hand {hand}',
   'library.notes.title': 'Notes',

@@ -14,6 +14,7 @@ import type { Discarded } from '../hands/import/import.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
+import { boundedInt } from './query.js';
 import {
   libraryFilterWhere,
   markedBy,
@@ -303,16 +304,4 @@ export class LibraryService {
 
 function sortedUnique<T extends string>(values: T[]): T[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
-}
-
-/** A whole number from a query string, within bounds, or the fallback. */
-export function boundedInt(
-  raw: unknown,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  const value = typeof raw === 'string' ? Number(raw) : NaN;
-  if (!Number.isInteger(value)) return fallback;
-  return Math.min(max, Math.max(min, value));
 }

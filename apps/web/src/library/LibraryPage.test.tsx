@@ -265,6 +265,7 @@ describe('LibraryPage', () => {
 
       expect(await screen.findByText('No hands match these filters.')).toBeTruthy()
       expect(screen.queryByText('Your library is empty. Import your hand histories to keep them here.')).toBeNull()
+      expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
       expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
       expect(screen.getAllByRole('button', { name: 'Import hands' })).toHaveLength(2)
     })

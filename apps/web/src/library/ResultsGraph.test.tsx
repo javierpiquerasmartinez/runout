@@ -70,11 +70,11 @@ describe('ResultsGraph', () => {
   describe('unit', () => {
     const unitSwitch = () => screen.getByRole('radiogroup', { name: /^Unit/ })
 
-    it('switches to money when every Hand shares one currency', async () => {
+    it('switches to Amounts when every Hand shares one currency', async () => {
       renderGraph(euros)
       expect(within(unitSwitch()).getByRole('radio', { name: 'Big blinds' }).getAttribute('aria-checked')).toBe('true')
 
-      await userEvent.click(within(unitSwitch()).getByRole('radio', { name: 'Money' }))
+      await userEvent.click(within(unitSwitch()).getByRole('radio', { name: 'Amount' }))
 
       expect(within(legendEntry('Result')).getByText('+€0.40')).toBeTruthy()
       expect(within(legendEntry('Showdown')).getByText('+€0.49')).toBeTruthy()
@@ -85,10 +85,10 @@ describe('ResultsGraph', () => {
       expect(within(legendEntry('Result')).getByText('+4 BB')).toBeTruthy()
     })
 
-    it('starts in money for a reader whose Display Unit is the Amount', () => {
+    it('starts in Amounts for a reader whose Display Unit is the Amount', () => {
       renderGraph(euros, { ...DEFAULT_PREFERENCES, displayUnit: 'amount' })
 
-      expect(within(unitSwitch()).getByRole('radio', { name: 'Money' }).getAttribute('aria-checked')).toBe('true')
+      expect(within(unitSwitch()).getByRole('radio', { name: 'Amount' }).getAttribute('aria-checked')).toBe('true')
       expect(within(legendEntry('Result')).getByText('+€0.40')).toBeTruthy()
     })
 
@@ -102,10 +102,10 @@ describe('ResultsGraph', () => {
       renderGraph(mixed, { ...DEFAULT_PREFERENCES, displayUnit: 'amount' })
 
       expect(unitSwitch().getAttribute('aria-label')).toBe('Unit')
-      const money = within(unitSwitch()).getByRole('radio', { name: /^Money/ })
+      const money = within(unitSwitch()).getByRole('radio', { name: /^Amount/ })
       expect(money.getAttribute('aria-disabled')).toBe('true')
       expect(money.getAttribute('aria-label')).toBe(
-        'Money. These hands are in more than one currency, so they only add up in big blinds',
+        'Amount. These hands are in more than one currency, so they only add up in big blinds',
       )
       await userEvent.click(money)
 

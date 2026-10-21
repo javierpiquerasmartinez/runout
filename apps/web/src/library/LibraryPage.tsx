@@ -68,6 +68,8 @@ export function LibraryPage() {
   const changeFilter = (next: LibraryFilter) => {
     setFilter(next)
     setPageNumber(1)
+    // The graph of other Hands mustn't stay beside the new list.
+    setResults(null)
   }
   const setMark = (hand: LibraryHand, marked: boolean) => {
     api(`/library/hands/${encodeURIComponent(hand.id)}/mark`, { token, method: marked ? 'PUT' : 'DELETE' })

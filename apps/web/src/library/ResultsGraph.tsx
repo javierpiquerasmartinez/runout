@@ -3,12 +3,13 @@ import { CartesianGrid, Line, LineChart, ReferenceLine, Tooltip, XAxis, YAxis } 
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
+import type { DisplayUnit } from '../preferences/preferences'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { RESULT_LINES, type ResultLine, type ResultLines, type Results } from './results'
 import './ResultsGraph.css'
 
-/** What the graph adds up in: big blinds always, money only in one currency. */
-type GraphUnit = 'big-blinds' | 'amount'
+/** What the graph adds up in: big blinds always, Amounts only in one currency. */
+type GraphUnit = Exclude<DisplayUnit, 'both'>
 
 type Point = { hand: number } & ResultLines
 
@@ -18,9 +19,9 @@ type Point = { hand: number } & ResultLines
  * ResultsGraph.css, so the graph follows the Theme.
  */
 const STROKE: Record<ResultLine, string> = {
-  result: 'var(--chart-result)',
-  showdown: 'var(--chart-showdown)',
-  nonShowdown: 'var(--chart-non-showdown)',
+  result: 'var(--graph-result)',
+  showdown: 'var(--graph-showdown)',
+  nonShowdown: 'var(--graph-non-showdown)',
 }
 const AXIS_TICK = { fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }
 
@@ -34,9 +35,9 @@ export function ResultsGraph({ results }: { results: Results }) {
   const { t } = i18n
   const { displayUnit } = usePreferences()
   const [hidden, setHidden] = useState<ReadonlySet<ResultLine>>(new Set())
-  // Money when the reader reads Amounts first, as long as the Hands allow it.
-  const [wantsMoney, setWantsMoney] = useState(displayUnit === 'amount')
-  const unit: GraphUnit = wantsMoney && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
+  // Amounts when the reader reads them first, as long as the Hands allow it.
+  const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
+  const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
   const linesOf = (point: Omit<Results['points'][number], 'hand'>): ResultLines =>
     unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
@@ -69,12 +70,12 @@ export function ResultsGraph({ results }: { results: Results }) {
             { value: 'amount', label: t('library.results.unit.amount') },
           ]}
           value={unit}
-          onChange={(value) => setWantsMoney(value === 'amount')}
+          onChange={(value) => setWantsAmounts(value === 'amount')}
           disabledReason={results.currency ? undefined : t('library.results.mixedCurrencies')}
         />
       </div>
       <div className="results__body">
-        <div className="results__chart">
+        <div className="results__plot">
           <LineChart data={data} responsive style={{ width: '100%', height: '100%' }} margin={{ top: 8, right: 20, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--color-divider)" />
             <XAxis
@@ -124,9 +125,7 @@ export function ResultsGraph({ results }: { results: Results }) {
                 <span className="results__swatch" style={{ background: STROKE[line] }} aria-hidden="true" />
                 {t(`library.results.line.${line}`)}
               </button>
-              <span className="results__total ro-mono" data-sign={Math.sign(totals[line])}>
-                {format(totals[line])}
-              </span>
+              <span className="results__total ro-mono">{format(totals[line])}</span>
             </li>
           ))}
         </ul>

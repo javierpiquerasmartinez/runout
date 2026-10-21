@@ -111,12 +111,13 @@
   --avatar-4-ink: #e0645c;
 
   /*
-   * Graph lines, a tracker's usual reading: green Result, blue Showdown, red
-   * Non-showdown. They borrow the avatar inks, so each Theme gets its own.
+   * The Results Graph's lines, coloured as Trackers colour them. They borrow
+   * the avatar inks, so each Theme gets its own. Here red names a line; it
+   * never says "losing".
    */
-  --chart-result: var(--avatar-2-ink);
-  --chart-showdown: var(--avatar-3-ink);
-  --chart-non-showdown: var(--avatar-4-ink);
+  --graph-result: var(--avatar-2-ink);
+  --graph-showdown: var(--avatar-3-ink);
+  --graph-non-showdown: var(--avatar-4-ink);
 
   /* Elevation */
   --shadow-raised: 0 8px 22px rgb(0 0 0 / 50%);
