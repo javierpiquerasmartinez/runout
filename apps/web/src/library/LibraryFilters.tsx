@@ -97,11 +97,14 @@ export function LibraryFilters({
         onChange={(stake) => set({ stake })}
       />
       <span className="library-filters__spacer" />
-      {isFiltering(filter) && (
-        <button type="button" className="library-filters__clear" onClick={() => onChange(EMPTY_LIBRARY_FILTER)}>
-          {t('library.filter.clear')}
-        </button>
-      )}
+      {/* Always there, as on the board; it does nothing while nothing narrows the Library. */}
+      <button
+        type="button"
+        className="library-filters__clear"
+        onClick={() => isFiltering(filter) && onChange(EMPTY_LIBRARY_FILTER)}
+      >
+        {t('library.filter.clear')}
+      </button>
     </div>
   )
 }

@@ -195,7 +195,7 @@ describe('LibraryPage', () => {
 
       expect(lastFilterQuery()).toBe('')
       expect((within(filters).getByRole('combobox', { name: 'Poker site' }) as HTMLSelectElement).value).toBe('')
-      expect(within(filters).queryByRole('button', { name: 'Clear filters' })).toBeNull()
+      expect((within(filters).getByRole('combobox', { name: 'Hero' }) as HTMLSelectElement).value).toBe('')
     })
 
     it('narrows the period to a quick range of the viewer’s days', async () => {
@@ -240,7 +240,7 @@ describe('LibraryPage', () => {
       expect(within(collections).getByRole('button', { name: /Marked/ }).getAttribute('aria-current')).toBe('page')
     })
 
-    it('says when the filters match nothing, rather than inviting to import', async () => {
+    it('says when the filters match nothing, offering to clear them or import', async () => {
       renderLibrary()
       const filters = await screen.findByRole('group', { name: 'Filters' })
       pages['1'] = { ...pages['1'], total: 0, hands: [] }
@@ -249,6 +249,8 @@ describe('LibraryPage', () => {
 
       expect(await screen.findByText('No hands match these filters.')).toBeTruthy()
       expect(screen.queryByText('Your library is empty. Import your hand histories to keep them here.')).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
+      expect(screen.getAllByRole('button', { name: 'Import hands' })).toHaveLength(2)
     })
   })
 

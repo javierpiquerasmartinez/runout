@@ -219,7 +219,11 @@
 }
 .library-table .library-table__mark {
   width: 34px;
-  padding: 0 0 0 10px;
+  padding: 0 10px 0 0;
+}
+.library__empty-actions {
+  display: flex;
+  gap: 8px;
 }
 .library-table__hidden {
   position: absolute;

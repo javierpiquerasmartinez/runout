@@ -49,8 +49,19 @@ export interface LibraryPage {
   hands: LibraryHand[];
   /** What the whole Library holds to filter by, whatever this filter. */
   options: LibraryFilterOptions;
-  /** The whole Library's Hands, and how many of them are Marked. */
-  counts: { all: number; marked: number };
+  counts: LibraryCounts;
+}
+
+/** Whether a person has Marked a Hand, as they set it. */
+export interface MarkChange {
+  handId: string;
+  marked: boolean;
+}
+
+/** How many Hands a whole Library holds, and how many of them are Marked. */
+export interface LibraryCounts {
+  all: number;
+  marked: number;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -183,7 +194,7 @@ export class LibraryService {
     account: Identity,
     handId: string,
     marked: boolean,
-  ): Promise<{ handId: string; marked: boolean }> {
+  ): Promise<MarkChange> {
     if (!isUuid(handId) || !(await this.holds(account, handId))) {
       throw new Rejected('hand-not-found');
     }
@@ -237,9 +248,7 @@ export class LibraryService {
   }
 
   /** How many Hands the whole Library holds, and how many of them are Marked. */
-  private async counts(
-    account: Identity,
-  ): Promise<{ all: number; marked: number }> {
+  private async counts(account: Identity): Promise<LibraryCounts> {
     const [row] = await this.db
       .select({
         all: count(),

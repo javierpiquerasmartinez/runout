@@ -11,7 +11,11 @@ import {
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { parseLibraryFilter } from './library-filter.js';
-import { LibraryService, type LibraryPage } from './library.service.js';
+import {
+  LibraryService,
+  type LibraryPage,
+  type MarkChange,
+} from './library.service.js';
 
 @Controller('library')
 export class LibraryController {
@@ -47,7 +51,7 @@ export class LibraryController {
   async mark(
     @Headers('authorization') authorization: string | undefined,
     @Param('id') id: string,
-  ): Promise<{ handId: string; marked: boolean }> {
+  ): Promise<MarkChange> {
     const account = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
@@ -59,7 +63,7 @@ export class LibraryController {
   async unmark(
     @Headers('authorization') authorization: string | undefined,
     @Param('id') id: string,
-  ): Promise<{ handId: string; marked: boolean }> {
+  ): Promise<MarkChange> {
     const account = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );

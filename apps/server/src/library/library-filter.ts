@@ -33,7 +33,7 @@ const LIMITS: ReadonlySet<string> = new Set([
   'no-limit',
   'pot-limit',
   'fixed-limit',
-]);
+] satisfies Stake['limit'][]);
 
 /** Reads a Library filter from a request's query; `invalid-library-filter` if it can't. */
 export function parseLibraryFilter(

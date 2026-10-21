@@ -113,9 +113,15 @@ export function LibraryPage() {
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{t('library.noMatches')}</p>
-              <Button variant="secondary" onClick={() => changeFilter(EMPTY_LIBRARY_FILTER)}>
-                {t('library.filter.clear')}
-              </Button>
+              <div className="library__empty-actions">
+                <Button variant="secondary" onClick={() => changeFilter(EMPTY_LIBRARY_FILTER)}>
+                  {t('library.filter.clear')}
+                </Button>
+                <Button variant="primary" onClick={openImport}>
+                  <Icon name="import" size={16} />
+                  {t('library.import')}
+                </Button>
+              </div>
             </div>
           )}
           {page && page.counts.all === 0 && (
@@ -192,9 +198,6 @@ function HandTable({
       <table className="library-table" aria-label={t('library.all')}>
         <thead>
           <tr>
-            <th scope="col" className="library-table__mark">
-              <span className="library-table__hidden">{t('library.marked')}</span>
-            </th>
             <th scope="col" className="library-table__hand">
               {t('library.column.hand')}
             </th>
@@ -204,6 +207,9 @@ function HandTable({
             <th scope="col">{t('library.column.result')}</th>
             <th scope="col">{t('library.column.street')}</th>
             <th scope="col">{t('library.column.date')}</th>
+            <th scope="col" className="library-table__mark">
+              <span className="library-table__hidden">{t('library.marked')}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -216,17 +222,6 @@ function HandTable({
             })
             return (
               <tr key={hand.id} className="library-row">
-                <td className="library-table__mark">
-                  <IconButton
-                    icon="mark"
-                    size="compact"
-                    className="library-row__mark"
-                    label={t('library.mark', { positions, hero: hand.hero })}
-                    aria-pressed={hand.marked}
-                    data-marked={hand.marked || undefined}
-                    onClick={() => onSetMark(hand, !hand.marked)}
-                  />
-                </td>
                 <td className="library-table__hand">
                   <a
                     href={libraryHandPath(hand.id)}
@@ -257,6 +252,17 @@ function HandTable({
                   </span>
                 </td>
                 <td className="library-row__date ro-mono">{playedAtLabel(hand, i18n)}</td>
+                <td className="library-table__mark">
+                  <IconButton
+                    icon="mark"
+                    size="compact"
+                    className="library-row__mark"
+                    label={t('library.mark', { positions, hero: hand.hero })}
+                    aria-pressed={hand.marked}
+                    data-marked={hand.marked || undefined}
+                    onClick={() => onSetMark(hand, !hand.marked)}
+                  />
+                </td>
               </tr>
             )
           })}
