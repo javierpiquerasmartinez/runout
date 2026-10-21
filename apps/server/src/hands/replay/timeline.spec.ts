@@ -677,6 +677,30 @@ describe('Replay: a Splash', () => {
       1196,
     );
   });
+
+  it('goes to whoever won the main pot even when the Hand History’s pots don’t match the ones worked out', () => {
+    // A side pot this Hand never had: the pots are shown as one, but the
+    // Hand History still says who took the main pot.
+    const mismatched = {
+      ...splashed,
+      collected: [
+        { screenName: '24dfed21', amount: 300, pot: 0 },
+        { screenName: 'fbfabc70', amount: 25, pot: 1 },
+      ],
+    };
+
+    const { pots } = timeline(mismatched).states.at(-1)!.result!;
+    expect(pots).toEqual([
+      {
+        amount: 383,
+        contestants: ['fbfabc70', '24dfed21'],
+        winners: [
+          { screenName: '24dfed21', amount: 340 },
+          { screenName: 'fbfabc70', amount: 25 },
+        ],
+      },
+    ]);
+  });
 });
 
 describe('Replay: made hands at Showdown', () => {
