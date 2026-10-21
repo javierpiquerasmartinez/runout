@@ -331,7 +331,15 @@ function resultOf(
   }
   // The Hand History leaves the Splash out of what was collected: it goes to
   // whoever won the main pot, shared evenly, the odd hundredth to the first.
-  const mainWinners = pots[0]?.winners ?? [];
+  // When the pots are shown as one, the Hand History still says who took
+  // the main pot; failing that, every winner shares it.
+  const everyWinner = pots[0]?.winners ?? [];
+  const tookMainPot = everyWinner.filter((winner) =>
+    hand.collected.some(
+      ({ screenName, pot }) => screenName === winner.screenName && pot === 0,
+    ),
+  );
+  const mainWinners = tookMainPot.length > 0 ? tookMainPot : everyWinner;
   mainWinners.forEach((winner, index) => {
     const share = Math.floor(splash / mainWinners.length);
     winner.amount +=
