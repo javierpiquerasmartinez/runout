@@ -102,6 +102,15 @@ export async function signInWithGoogle(
   return session
 }
 
+/**
+ * Forgets an anonymous identity that ended with its Room: its token no longer
+ * works, so this browser goes on without one.
+ */
+export function forgetSession(storage: Storage = window.localStorage) {
+  removeToken(storage)
+  loading = Promise.resolve(null)
+}
+
 /** Ends this browser's session on the server and forgets its token; it goes on without an identity. */
 export async function endSession(token: string, storage: Storage = window.localStorage): Promise<void> {
   try {

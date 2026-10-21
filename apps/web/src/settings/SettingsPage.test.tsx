@@ -54,6 +54,6 @@ describe('SettingsPage · the Account', () => {
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
-    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google')
+    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google', false)
   })
 })

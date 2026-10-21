@@ -11,7 +11,7 @@ import { useRoom } from './useRoom'
  * preference or the Display Name never leaves the Room.
  */
 export function RoomHolder({ code, children }: { code: string; children: ReactNode }) {
-  const { token, identity } = useSession()
+  const { token, identity, forgetEnded } = useSession()
   const [displayName, setDisplayName] = useState<string | null>(() => readJoinIntent()?.displayName ?? null)
   // Without an identity yet, the Room waits for one: joining issues it.
   const [view, commands] = useRoom(code, token, displayName)
@@ -22,6 +22,12 @@ export function RoomHolder({ code, children }: { code: string; children: ReactNo
   useEffect(() => {
     if (currentName) commands.rejoinAs(currentName)
   }, [currentName, commands])
+
+  // An anonymous identity ends with its Room: this browser has none from now on.
+  const endedHere = view.phase === 'closed' && identity?.account === null && identity.room?.code === view.room.code
+  useEffect(() => {
+    if (endedHere) forgetEnded()
+  }, [endedHere, forgetEnded])
 
   const held = useMemo(
     () => ({ code, view, commands, displayName, confirmDisplayName: setDisplayName }),

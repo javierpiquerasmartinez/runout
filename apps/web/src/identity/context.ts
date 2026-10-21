@@ -14,11 +14,14 @@ interface SessionActions {
   changePreferences: (changes: Partial<Preferences>) => Promise<void>
   /**
    * Signs in with the ID token Google gave this browser; this browser becomes
-   * that Account, in place of the anonymous identity it held in a Room.
+   * that Account. Signing in from inside the Room of the anonymous identity it
+   * holds (`fromRoom`), the Account takes that identity's place there.
    */
-  signIn: (idToken: string) => Promise<void>
+  signIn: (idToken: string, fromRoom: boolean) => Promise<void>
   /** Signs this browser out, on the server too; it goes on without an identity. */
   signOut: () => Promise<void>
+  /** Forgets an anonymous identity whose Room has closed: it no longer works. */
+  forgetEnded: () => void
   /** Joins the Room `code` without an Account: a new anonymous identity, for that Room only. */
   joinAnonymously: (code: string, displayName: string) => Promise<void>
 }

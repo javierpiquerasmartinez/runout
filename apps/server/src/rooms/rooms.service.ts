@@ -1,13 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
-import { DATABASE, type Database } from '../database/database.js';
 import {
-  identities,
-  queueEntries,
-  roomMemberships,
-  rooms,
-} from '../database/schema.js';
+  DATABASE,
+  type Database,
+  type Transaction,
+} from '../database/database.js';
+import { queueEntries, roomMemberships, rooms } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import {
   IdentityService,
@@ -158,10 +157,7 @@ export class RoomsService {
     displayName: unknown,
   ): Promise<{ room: Room; participant: JoiningParticipant }> {
     const room = await this.findOpen(typedCode);
-    const [{ roomId: boundTo }] = await this.db
-      .select({ roomId: identities.roomId })
-      .from(identities)
-      .where(eq(identities.id, identity.id));
+    const boundTo = await this.identities.roomOf(identity.id);
     if (boundTo !== null && boundTo !== room.id) {
       throw new Rejected('identity-of-another-room');
     }
@@ -267,57 +263,65 @@ export class RoomsService {
    * An Account signed in from inside the Room as anonymous takes that
    * identity's place: its membership (with its join time, if earlier), the
    * Queue Entries it was the Author of, and the Master role if it held it.
-   * Whether the role moved.
+   * An Account the Master kicked takes none of it. Whether the role moved.
    */
   async takeOver(
+    tx: Transaction,
     roomId: string,
     anonymousId: string,
     accountId: string,
   ): Promise<{ masterMoved: boolean }> {
-    return this.db.transaction(async (tx) => {
-      const [left] = await tx
-        .delete(roomMemberships)
-        .where(
-          and(
-            eq(roomMemberships.roomId, roomId),
-            eq(roomMemberships.identityId, anonymousId),
-          ),
-        )
-        .returning();
-      if (!left || left.kicked) return { masterMoved: false };
-      await tx
-        .insert(roomMemberships)
-        .values({ roomId, identityId: accountId, joinedAt: left.joinedAt })
-        .onConflictDoUpdate({
-          target: [roomMemberships.roomId, roomMemberships.identityId],
-          set: {
-            joinedAt: sql`least(${roomMemberships.joinedAt}, excluded.joined_at)`,
-          },
-          // An Account the Master kicked stays out.
-          setWhere: eq(roomMemberships.kicked, false),
-        });
-      await tx
-        .update(queueEntries)
-        .set({ authorId: accountId })
-        .where(
-          and(
-            eq(queueEntries.roomId, roomId),
-            eq(queueEntries.authorId, anonymousId),
-          ),
-        );
-      const moved = await tx
-        .update(rooms)
-        .set({ masterId: accountId })
-        .where(
-          and(
-            eq(rooms.id, roomId),
-            eq(rooms.status, 'open'),
-            eq(rooms.masterId, anonymousId),
-          ),
-        )
-        .returning({ id: rooms.id });
-      return { masterMoved: moved.length > 0 };
-    });
+    const [left] = await tx
+      .select()
+      .from(roomMemberships)
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, anonymousId),
+        ),
+      );
+    if (!left || left.kicked) return { masterMoved: false };
+    await tx
+      .delete(roomMemberships)
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, anonymousId),
+        ),
+      );
+    const [placed] = await tx
+      .insert(roomMemberships)
+      .values({ roomId, identityId: accountId, joinedAt: left.joinedAt })
+      .onConflictDoUpdate({
+        target: [roomMemberships.roomId, roomMemberships.identityId],
+        set: {
+          joinedAt: sql`least(${roomMemberships.joinedAt}, excluded.joined_at)`,
+        },
+        setWhere: eq(roomMemberships.kicked, false),
+      })
+      .returning();
+    if (!placed) return { masterMoved: false };
+    await tx
+      .update(queueEntries)
+      .set({ authorId: accountId })
+      .where(
+        and(
+          eq(queueEntries.roomId, roomId),
+          eq(queueEntries.authorId, anonymousId),
+        ),
+      );
+    const moved = await tx
+      .update(rooms)
+      .set({ masterId: accountId })
+      .where(
+        and(
+          eq(rooms.id, roomId),
+          eq(rooms.status, 'open'),
+          eq(rooms.masterId, anonymousId),
+        ),
+      )
+      .returning({ id: rooms.id });
+    return { masterMoved: moved.length > 0 };
   }
 
   /**

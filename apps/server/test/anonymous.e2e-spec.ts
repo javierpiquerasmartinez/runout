@@ -418,6 +418,31 @@ describe('Anonymous identities last one Room (e2e)', () => {
       );
     });
 
+    it('takes nothing over for an Account the Master kicked from the Room', async () => {
+      const marta = await newAccount(running.httpServer, 'marta-subject');
+      const room = await roomWithAnonymousGuest();
+      await enter(marta.token, room.code, 'Marta G.');
+      await room.masterSocket.next('room.participantJoined');
+      room.masterSocket.send('room.kick', { identityId: marta.id });
+      await room.masterSocket.next('room.participantKicked');
+      room.masterSocket.send('room.handOver', {
+        identityId: room.anonymous.id,
+      });
+      await room.masterSocket.next('room.masterChanged');
+
+      await signInFrom(room.anonymous.token).expect(201);
+
+      await me(room.anonymous.token).expect(401);
+      const socket = await RoomClient.connect(running.wsUrl, marta.token);
+      clients.push(socket);
+      socket.send('room.join', { code: room.code, displayName: 'Marta G.' });
+      expect(await socket.next('rejected')).toEqual({
+        command: 'room.join',
+        reason: 'kicked-from-room',
+      });
+      expect(room.masterSocket.all('room.masterChanged')).toEqual([]);
+    });
+
     it('keeps the Display Name an Account already had', async () => {
       const marta = await newAccount(running.httpServer, 'marta-subject');
       await request(running.httpServer)

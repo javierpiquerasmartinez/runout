@@ -28,6 +28,7 @@ export function fakeSession(
     signIn: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
     joinAnonymously: vi.fn(async () => {}),
+    forgetEnded: vi.fn(),
     ...actions,
   }
 }

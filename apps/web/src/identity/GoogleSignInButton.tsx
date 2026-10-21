@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { usePreferences } from '../preferences/context'
+import { useHeldRoom } from '../room/heldRoomContext'
 import { useSession } from './context'
 import { googleClientId, loadGoogleIdentity } from './google'
 import './GoogleSignInButton.css'
@@ -18,6 +19,8 @@ const MAX_WIDTH = 400
 export function GoogleSignInButton() {
   const { t, locale } = useI18n()
   const { signIn } = useSession()
+  // Inside a Room (or in Settings with one behind), the Account takes this browser's place in it.
+  const fromRoom = useHeldRoom()?.view.phase === 'in-room'
   const { theme } = usePreferences()
   const slot = useRef<HTMLDivElement>(null)
   const clientId = googleClientId()
@@ -33,7 +36,7 @@ export function GoogleSignInButton() {
           client_id: clientId,
           callback: ({ credential }) => {
             setFailure(null)
-            signIn(credential).catch((error: unknown) => setFailure(reasonOf(error)))
+            signIn(credential, fromRoom).catch((error: unknown) => setFailure(reasonOf(error)))
           },
         })
         // As wide as the place it is given, as far as Google allows.
@@ -53,7 +56,7 @@ export function GoogleSignInButton() {
     return () => {
       cancelled = true
     }
-  }, [clientId, signIn, theme, locale])
+  }, [clientId, signIn, fromRoom, theme, locale])
 
   return (
     <div className="google-sign-in">

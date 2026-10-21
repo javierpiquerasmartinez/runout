@@ -6,7 +6,15 @@ import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preference
 import { useTheme } from '../preferences/theme'
 import { Button } from '../ui/Button'
 import { SessionContext } from './context'
-import { joinAnonymously, loadSession, endSession, signInWithGoogle, type Identity, type Session } from './identity'
+import {
+  endSession,
+  forgetSession,
+  joinAnonymously,
+  loadSession,
+  signInWithGoogle,
+  type Identity,
+  type Session,
+} from './identity'
 import './SessionProvider.css'
 
 type Loading = { state: 'loading' } | { state: 'ready'; session: Session | null } | { state: 'error' }
@@ -84,12 +92,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   const signIn = useCallback(
-    async (idToken: string) => {
-      const session = await signInWithGoogle(idToken, token)
+    async (idToken: string, fromRoom: boolean) => {
+      const session = await signInWithGoogle(idToken, fromRoom ? token : null)
+      // Outside its Room, an anonymous identity is simply left behind: its
+      // token goes, and the identity ends when the Room closes.
+      if (!fromRoom && token !== null) void endSession(token).catch(() => undefined)
       setLoading({ state: 'ready', session })
     },
     [token],
   )
+  const forgetEnded = useCallback(() => {
+    forgetSession()
+    setLoading({ state: 'ready', session: null })
+  }, [])
   const signOut = useCallback(async () => {
     if (token === null) return
     await endSession(token)
@@ -114,9 +129,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             signIn,
             signOut,
             joinAnonymously: joinRoom,
+            forgetEnded,
           }
         : null,
-    [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut, joinRoom],
+    [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut, joinRoom, forgetEnded],
   )
 
   if (loading.state === 'loading') {

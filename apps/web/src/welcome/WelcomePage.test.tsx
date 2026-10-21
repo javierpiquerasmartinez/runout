@@ -98,7 +98,7 @@ describe('WelcomePage · signing in', () => {
     expect(screen.getByText('Sign in with Google to create rooms and keep your hands.')).toBeTruthy()
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
-    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google')
+    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google', false)
   })
 
   it('still lets a visitor without an Account join a Room by code', async () => {

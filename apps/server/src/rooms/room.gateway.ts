@@ -11,6 +11,7 @@ import {
 import type { IncomingMessage } from 'node:http';
 import { WebSocket } from 'ws';
 import { CLOCK, type Clock } from '../clock/clock.js';
+import type { Transaction } from '../database/database.js';
 import {
   IdentityService,
   type Identity,
@@ -175,8 +176,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.closeAbandoned(roomId),
     );
     identities.onRenamed((identity) => this.renamed(identity));
-    identities.onTakeOver((anonymous, account) =>
-      this.takenOver(anonymous.roomId, anonymous.id, account.id),
+    identities.onTakeOver((tx, anonymous, account) =>
+      this.takenOver(tx, anonymous.roomId, anonymous.id, account.id),
     );
     identities.onScreenNamesChanged((identityId, screenNames) =>
       this.screenNamesChanged(identityId, screenNames),
@@ -673,24 +674,29 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * leaves the Room at once; the Account arrives when its browser rejoins.
    */
   private async takenOver(
+    tx: Transaction,
     roomId: string,
     anonymousId: string,
     accountId: string,
-  ): Promise<void> {
+  ): Promise<() => void> {
     const { masterMoved } = await this.rooms.takeOver(
+      tx,
       roomId,
       anonymousId,
       accountId,
     );
-    if (this.presence.evict(roomId, anonymousId).length > 0) {
-      this.publish(roomId, 'room.participantLeft', {
-        identityId: anonymousId,
-      });
-    }
-    if (masterMoved) {
-      this.masterChanged(roomId, { masterId: accountId, reason: 'sign-in' });
-    }
-    this.watchIfEmpty(roomId);
+    // The Room hears it only once it is so.
+    return () => {
+      if (this.presence.evict(roomId, anonymousId).length > 0) {
+        this.publish(roomId, 'room.participantLeft', {
+          identityId: anonymousId,
+        });
+      }
+      if (masterMoved) {
+        this.masterChanged(roomId, { masterId: accountId, reason: 'sign-in' });
+      }
+      this.watchIfEmpty(roomId);
+    };
   }
 
   /** A Room nobody is connected to any more starts its abandonment period. */

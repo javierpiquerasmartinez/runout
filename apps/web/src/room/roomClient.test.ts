@@ -610,6 +610,9 @@ describe('parseServerMessage', () => {
       reason: 'failover',
       revision: 3,
     })
+    expect(changed('room.masterChanged', { masterId: 'id-marta', reason: 'sign-in' })).toMatchObject({
+      reason: 'sign-in',
+    })
     expect(changed('notes.written', { note })).toEqual({ type: 'noteWritten', note, revision: 3 })
     expect(changed('notes.edited', { note })).toEqual({ type: 'noteEdited', note, revision: 3 })
     expect(changed('notes.removed', { id: 'note-1' })).toEqual({ type: 'noteRemoved', id: 'note-1', revision: 3 })

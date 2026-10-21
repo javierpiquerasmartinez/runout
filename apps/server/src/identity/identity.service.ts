@@ -68,12 +68,14 @@ export type RenameListener = (identity: Identity) => void;
 
 /**
  * Told when someone signs in from inside a Room as anonymous: the Account
- * takes the anonymous identity's place there, before that identity ends.
+ * takes the anonymous identity's place there, in the same transaction that
+ * ends that identity. What it answers runs once that has committed.
  */
 export type TakeOverListener = (
+  tx: Transaction,
   anonymous: { id: string; roomId: string },
   account: Identity,
-) => Promise<void>;
+) => Promise<() => void>;
 
 export const DISPLAY_NAME_MAX_LENGTH = 40;
 export const SCREEN_NAME_MAX_LENGTH = 50;
@@ -163,13 +165,20 @@ export class IdentityService {
     token: string | undefined,
     account: Identity,
   ): Promise<Identity> {
-    const anonymous = token ? await this.holder(token).catch(() => null) : null;
+    const anonymous = token ? await this.anonymousHolder(token) : null;
     if (anonymous?.roomId == null) return account;
     const { roomId } = anonymous;
-    for (const listener of this.takeOverListeners) {
-      await listener({ id: anonymous.id, roomId }, account);
-    }
-    await this.db.transaction((tx) => this.endAnonymous(tx, [anonymous.id]));
+    const committed = await this.db.transaction(async (tx) => {
+      const afterwards: (() => void)[] = [];
+      for (const listener of this.takeOverListeners) {
+        afterwards.push(
+          await listener(tx, { id: anonymous.id, roomId }, account),
+        );
+      }
+      await this.endAnonymous(tx, [anonymous.id]);
+      return afterwards;
+    });
+    for (const then of committed) then();
     if (account.displayName !== null || anonymous.displayName === null) {
       return account;
     }
@@ -230,6 +239,36 @@ export class IdentityService {
     const row = await this.holder(token);
     if (row.googleSubject === null) throw new Rejected('account-required');
     return toIdentity(row);
+  }
+
+  /**
+   * The stored identity holding `token`, when there is one: a token that no
+   * longer works just means there is nothing to take over.
+   */
+  private async anonymousHolder(
+    token: string,
+  ): Promise<typeof identities.$inferSelect | null> {
+    try {
+      return await this.holder(token);
+    } catch (error) {
+      if (error instanceof Rejected && error.reason === 'unauthenticated') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The one Room an anonymous identity exists for; null for an Account, which
+   * may enter any. `unauthenticated` for an identity that isn't there.
+   */
+  async roomOf(identityId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ roomId: identities.roomId })
+      .from(identities)
+      .where(eq(identities.id, identityId));
+    if (!row) throw new Rejected('unauthenticated');
+    return row.roomId;
   }
 
   /** The stored identity holding `token`, or `unauthenticated`. */

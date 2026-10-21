@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
+import { HeldRoomContext } from './heldRoomContext'
 import { RoomScreen } from './RoomScreen'
 import type { Note, Participant, QueueEntry, RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
@@ -410,6 +411,27 @@ describe('RoomScreen · without an Account', () => {
     const notice = screen.getByRole('region', { name: 'Without an account' })
     expect(notice.textContent).toContain('what you do in this room is lost when it closes')
     expect(await within(notice).findByRole('button', { name: 'Sign in with Google' })).toBeTruthy()
+  })
+
+  it('signs them in as an Account that takes their place in this Room', async () => {
+    fakeGoogleIdentity('id-token-from-google')
+    const view = roomView({ you: 'id-marta' })
+    const session = fakeSession({ id: 'id-marta', account: null, room: { code: 'RNT4K9PX' } })
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionContext.Provider value={session}>
+          <HeldRoomContext
+            value={{ code: 'RNT4K9PX', view, commands: {} as RoomCommands, displayName: 'Marta', confirmDisplayName: vi.fn() }}
+          >
+            <RoomScreen view={view} commands={{} as RoomCommands} />
+          </HeldRoomContext>
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
+
+    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google', true)
   })
 
   it('says nothing of the kind to an Account', () => {
