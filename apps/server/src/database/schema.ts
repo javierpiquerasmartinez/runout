@@ -138,6 +138,10 @@ export const hands = pgTable(
     smallBlind: integer('small_blind').notNull(),
     bigBlind: integer('big_blind').notNull(),
     currency: text('currency').notNull(),
+    /** The Hero's Result as an Amount, worked out from `content` at import. */
+    heroResult: integer('hero_result').notNull(),
+    /** Whether the Hero reached Showdown, worked out from `content` at import. */
+    heroReachedShowdown: boolean('hero_reached_showdown').notNull(),
     content: jsonb('content').$type<Hand>().notNull(),
     importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
   },

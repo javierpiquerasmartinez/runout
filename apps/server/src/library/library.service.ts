@@ -23,6 +23,8 @@ export interface LibraryHand {
   holeCards: string[];
   playedAt: string;
   stake: Stake;
+  /** The Hero's Result, as an Amount. */
+  result: number;
   summary: HandSummary;
 }
 
@@ -112,7 +114,11 @@ export class LibraryService {
     const [[{ total }], rows] = await Promise.all([
       this.db.select({ total: count() }).from(libraryEntries).where(mine),
       this.db
-        .select({ id: hands.id, content: hands.content })
+        .select({
+          id: hands.id,
+          result: hands.heroResult,
+          content: hands.content,
+        })
         .from(libraryEntries)
         .innerJoin(hands, eq(hands.id, libraryEntries.handId))
         .where(mine)
@@ -124,7 +130,7 @@ export class LibraryService {
       total,
       page: number,
       pageSize: size,
-      hands: rows.map(({ id, content }) => ({
+      hands: rows.map(({ id, result, content }) => ({
         id,
         site: content.site,
         siteHandId: content.siteHandId,
@@ -132,6 +138,7 @@ export class LibraryService {
         holeCards: content.hero.cards,
         playedAt: content.playedAt,
         stake: content.stake,
+        result,
         summary: summarise(content),
       })),
     };

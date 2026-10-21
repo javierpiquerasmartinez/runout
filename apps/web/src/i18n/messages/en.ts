@@ -685,6 +685,7 @@ export const en: Messages = {
   'library.column.hero': 'Hero',
   'library.column.stake': 'Stake',
   'library.column.pot': 'Final pot',
+  'library.column.result': 'Result',
   'library.column.street': 'Ends on',
   'library.column.date': 'Date',
   'library.open': 'Open {positions}, {hero}',

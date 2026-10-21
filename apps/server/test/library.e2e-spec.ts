@@ -22,6 +22,8 @@ interface LibraryPage {
     holeCards: string[];
     playedAt: string;
     stake: { bigBlind: number; currency: string };
+    /** The Hero's Result, as an Amount. */
+    result: number;
     summary: {
       positions: string[];
       finalPot: number;
@@ -104,8 +106,45 @@ describe('Importing into the Library and listing it (e2e)', () => {
       holeCards: expect.any(Array),
       playedAt: expect.any(String),
       stake: expect.objectContaining({ bigBlind: 10, currency: 'EUR' }),
+      result: expect.any(Number),
       summary: expect.objectContaining({ finalStreet: expect.any(String) }),
     });
+  });
+
+  it('lists each Hand with the Hero’s Result', async () => {
+    const account = await newAccount(running.httpServer);
+    await importText(account.token, freshHandHistory('pokerstars-session.txt'));
+
+    const page = (await list(account.token).expect(200)).body as LibraryPage;
+    // Newest first: a folded big blind, a fold, a fold on the turn after
+    // raising, and a won pot net of the uncalled bet handed back.
+    expect(page.hands.map((hand) => hand.result)).toEqual([-10, 0, -30, 31]);
+  });
+
+  it('lists the Result a Room import stored, for a Hand added to the Library later', async () => {
+    const account = await newAccount(running.httpServer);
+    const room = await request(running.httpServer)
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${account.token}`)
+      .send({ name: 'Martes NL10', displayName: 'Javier' })
+      .expect(201);
+    const code = room.body.code as string;
+    const socket = await RoomClient.connect(running.wsUrl, account.token);
+    clients.push(socket);
+    socket.send('room.join', { code, displayName: 'Javier' });
+    await socket.next('room.snapshot');
+    const text = freshHandHistory('pokerstars-showdown.txt');
+    await request(running.httpServer)
+      .post(`/api/rooms/${code}/hands`)
+      .set('Authorization', `Bearer ${account.token}`)
+      .send({ text })
+      .expect(201);
+    await socket.next('queue.entriesAdded');
+
+    await importText(account.token, text);
+
+    const page = (await list(account.token).expect(200)).body as LibraryPage;
+    expect(page.hands.map((hand) => hand.result)).toEqual([49]);
   });
 
   it('paginates on the server, with the total', async () => {
