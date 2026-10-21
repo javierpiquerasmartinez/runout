@@ -22,9 +22,9 @@ export class HandsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   /**
-   * The Hand with its Timeline, for someone who can see it: its Importer, its
-   * Author in a Room it was queued in, or a Participant of that Room. Anyone else gets
-   * `hand-not-found`, so a Hand's existence isn't revealed.
+   * The Hand with its Timeline, for someone who can see it: its Importer,
+   * its Author in a Room it was queued in, or a Participant of that Room.
+   * Anyone else gets `hand-not-found`, so a Hand's existence isn't revealed.
    */
   async withTimeline(viewer: Identity, id: string): Promise<HandWithTimeline> {
     const content = await this.visibleTo(viewer, id);

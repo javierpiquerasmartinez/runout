@@ -368,7 +368,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       await importText(master.token, first, text);
       const { queue: firstQueue } = await join(master.token, first, 'Javier');
 
-      // A week later, in a Room the Hero's player isn't in.
+      // A week later, in a Room Marta isn't in.
       const later = await createRoom(master.token);
       await join(master.token, later, 'Javier');
       const read = await importText(master.token, later, text);

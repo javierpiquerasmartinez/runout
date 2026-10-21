@@ -114,7 +114,7 @@ The ordered list of Hands a Room is going to review.
 _Avoid_: Playlist, cola (UI only)
 
 **Queue Entry**:
-A Hand placed in a Room's Queue, with its position. Removing it leaves the Hand intact.
+A Hand placed in a Room's Queue, with its position and its Author in that Room. Removing it leaves the Hand intact.
 
 **Playback**:
 The Room's shared replay state: which Hand is loaded, which Action it is on, and whether Hide Opponent Names is on. Only the Master changes it; there is no automatic play.

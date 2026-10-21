@@ -199,6 +199,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       await client.end();
     }
   });
+
   it('starts clean: every table is emptied, and the Author moves to the Queue Entry', async () => {
     await migrateUpTo(BEFORE_CLEAN_START);
     const client = new pg.Client(databaseUrl);
@@ -267,29 +268,20 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
 
       await migrateWith(MIGRATIONS_FOLDER);
 
-      const tables = [
-        'identities',
-        'screen_names',
-        'preferences',
-        'rooms',
-        'room_memberships',
-        'hands',
-        'queue_entries',
-        'playbacks',
-        'import_previews',
-        'notes',
-        'marks',
-      ];
+      // Every table Runout has, so one added later can't be left out.
+      const { rows: tables } = await client.query<{ table_name: string }>(
+        `select table_name from information_schema.tables
+         where table_schema = 'public' order by table_name`,
+      );
       const counts: Record<string, number> = {};
-      for (const table of tables) {
+      for (const { table_name: table } of tables) {
         const { rows } = await client.query<{ count: number }>(
-          `select count(*)::integer as count from ${table}`,
+          `select count(*)::integer as count from "${table}"`,
         );
         counts[table] = rows[0].count;
       }
-      expect(counts).toEqual(
-        Object.fromEntries(tables.map((table) => [table, 0])),
-      );
+      expect(Object.keys(counts)).toContain('queue_entries');
+      expect(Object.values(counts).every((count) => count === 0)).toBe(true);
       const { rows: authorColumns } = await client.query<{
         table_name: string;
       }>(
