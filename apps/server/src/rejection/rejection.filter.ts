@@ -9,6 +9,8 @@ import { Rejected, type RejectionReason } from './rejection.js';
 
 const statusFor: Record<RejectionReason, HttpStatus> = {
   unauthenticated: HttpStatus.UNAUTHORIZED,
+  'invalid-google-token': HttpStatus.UNAUTHORIZED,
+  'account-required': HttpStatus.FORBIDDEN,
   'invalid-display-name': HttpStatus.BAD_REQUEST,
   'invalid-screen-names': HttpStatus.BAD_REQUEST,
   'invalid-preferences': HttpStatus.BAD_REQUEST,

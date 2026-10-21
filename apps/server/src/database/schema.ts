@@ -15,14 +15,36 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { Hand } from '../hands/hand.js';
 
-/** An anonymous identity bound to one browser by an opaque token (ADR 0003). */
+/**
+ * A person as Runout knows them: an Account, signed in with Google and lasting
+ * (ADR 0005), or an anonymous identity, bound to one browser.
+ */
 export const identities = pgTable('identities', {
   id: uuid('id').primaryKey().defaultRandom(),
-  /** SHA-256 of the bearer token; the token itself is never stored. */
-  tokenHash: text('token_hash').notNull().unique(),
+  /** Google's id for the person; null for an anonymous identity. */
+  googleSubject: text('google_subject').unique(),
+  /** The Account's Google email, for display only. */
+  email: text('email'),
   displayName: text('display_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
+
+/**
+ * A browser holding a bearer token for an identity. An Account has one per
+ * device it signed in on; signing out ends that one.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    /** SHA-256 of the bearer token; the token itself is never stored. */
+    tokenHash: text('token_hash').primaryKey(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('sessions_identity_id_idx').on(table.identityId)],
+);
 
 /**
  * The names a person plays under on Poker Sites. A Hand's Hero is matched

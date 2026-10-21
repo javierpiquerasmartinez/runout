@@ -4,6 +4,8 @@
  */
 export type RejectionReason =
   | 'unauthenticated'
+  | 'invalid-google-token'
+  | 'account-required'
   | 'invalid-display-name'
   | 'invalid-screen-names'
   | 'invalid-preferences'

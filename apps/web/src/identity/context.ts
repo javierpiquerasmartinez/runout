@@ -12,6 +12,10 @@ export type SessionContextValue = Session & {
    * server refuses, they go back to what they were and the promise rejects.
    */
   changePreferences: (changes: Partial<Preferences>) => Promise<void>
+  /** Signs in with the ID token Google gave this browser; this browser becomes that Account. */
+  signIn: (idToken: string) => Promise<void>
+  /** Signs this browser out, on the server too; it goes on as an anonymous identity. */
+  signOut: () => Promise<void>
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null)

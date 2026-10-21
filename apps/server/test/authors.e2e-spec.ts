@@ -2,6 +2,7 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Author {
   identityId: string;
@@ -70,11 +71,6 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
       .post('/api/rooms')
@@ -131,7 +127,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
 
   describe('Screen Names', () => {
     it('are declared as a list, trimmed, without repeats, and kept with the identity', async () => {
-      const me = await issueIdentity();
+      const me = await newAccount(running.httpServer);
 
       const res = await setScreenNames(me.token, [
         ' iMapleAA ',
@@ -153,7 +149,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('refuses anything that is not a list of names', async () => {
-      const me = await issueIdentity();
+      const me = await newAccount(running.httpServer);
 
       const notAList = await setScreenNames(me.token, 'iMapleAA').expect(400);
       const tooLong = await setScreenNames(me.token, ['x'.repeat(51)]).expect(
@@ -167,8 +163,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
 
   describe('Author matching', () => {
     it('makes the Participant whose Screen Names include the Hero the Author, whoever imports it', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const { socket } = await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -196,8 +192,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('falls back to the Importer when no Screen Name matches, and says so in the preview', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const { socket } = await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -221,8 +217,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('makes the Importer the Author of a Hand whose Poker Site hides the Hero’s Screen Name, even if someone plays as "Hero"', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -240,8 +236,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('matches Hands pasted anywhere in the Room too', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const { socket } = await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -260,8 +256,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('never matches a Screen Name of someone outside the Room', async () => {
-      const master = await issueIdentity();
-      const stranger = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const stranger = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       await join(master.token, code, 'Javier');
       await setScreenNames(stranger.token, [HERO]).expect(200);
@@ -279,8 +275,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('does not reprocess Hands already imported when Screen Names change', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -301,7 +297,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
 
   describe('duplicates', () => {
     it('reports a Hand already imported as a duplicate in the preview and leaves it out', async () => {
-      const master = await issueIdentity();
+      const master = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const { socket } = await join(master.token, code, 'Javier');
       const text = freshHandHistory('pokerstars-showdown.txt');
@@ -320,7 +316,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('reports the same Hand twice in one text as one Hand and one duplicate', async () => {
-      const master = await issueIdentity();
+      const master = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       await join(master.token, code, 'Javier');
       const text = freshHandHistory('pokerstars-showdown.txt');
@@ -338,7 +334,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('skips a duplicate pasted anywhere in the Room and reports it', async () => {
-      const master = await issueIdentity();
+      const master = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       await join(master.token, code, 'Javier');
       const text = freshHandHistory('pokerstars-showdown.txt');
@@ -358,8 +354,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('puts a Hand imported in another Room in this Queue too, with an Author chosen in this Room', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const first = await createRoom(master.token);
       await join(master.token, first, 'Javier');
       await join(guest.token, first, 'Marta');
@@ -391,8 +387,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('skips a Hand another Importer queued between the preview and the confirm', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const { socket } = await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -412,8 +408,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('tells CoinPoker Hands apart by the Hero’s seat, all of them written `Hero`', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -441,8 +437,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
     });
 
     it('keeps the same hand ID from another Hero as a separate Hand, related to the first', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const { socket } = await join(master.token, code, 'Javier');
       await join(guest.token, code, 'Marta');
@@ -477,8 +473,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
 
   describe('reassigning the Author', () => {
     async function roomWithOneHand() {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
       const masterRoom = await join(master.token, code, 'Javier');
       const guestRoom = await join(guest.token, code, 'Marta');
@@ -555,7 +551,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
 
     it('refuses an Author who is not a Participant of the Room', async () => {
       const { masterSocket, handId } = await roomWithOneHand();
-      const stranger = await issueIdentity();
+      const stranger = await newAccount(running.httpServer);
 
       masterSocket.send('queue.reassignAuthor', {
         handId,

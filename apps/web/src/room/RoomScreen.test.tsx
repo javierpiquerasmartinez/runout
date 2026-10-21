@@ -64,10 +64,12 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
 function screenOf(view: InRoom, commands: RoomCommands) {
   const session = {
     token: 'token',
-    identity: { id: view.you, displayName: 'Javier', screenNames: [], preferences: DEFAULT_PREFERENCES },
+    identity: { id: view.you, displayName: 'Javier', screenNames: [], preferences: DEFAULT_PREFERENCES , account: null },
     rememberDisplayName: () => {},
     rememberScreenNames: () => {},
     changePreferences: async () => {},
+    signIn: async () => {},
+    signOut: async () => {},
   }
   return (
     <I18nProvider initialLocale="en">

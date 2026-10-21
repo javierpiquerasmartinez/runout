@@ -2,6 +2,7 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface QueueEntry {
   id: string;
@@ -22,11 +23,6 @@ describe('Queue management (e2e)', () => {
     await Promise.all(clients.splice(0).map((client) => client.close()));
     await running.close();
   });
-
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
 
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
@@ -59,8 +55,8 @@ describe('Queue management (e2e)', () => {
 
   /** A Room with two Participants and four Queue Entries, positions 1-4. */
   async function roomWithFourHands() {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const masterRoom = await join(master.token, code, 'Javier');
     const guestRoom = await join(guest.token, code, 'Marta');
@@ -215,8 +211,7 @@ describe('Queue management (e2e)', () => {
     });
 
     it('never leaves two active Entries sharing a position after a reorder happens while one is removed', async () => {
-      const { master, code, masterSocket, entries } =
-        await roomWithFourHands();
+      const { master, code, masterSocket, entries } = await roomWithFourHands();
       masterSocket.send('queue.remove', { id: entries[1].id });
       await masterSocket.next('queue.entryRemoved');
       masterSocket.send('queue.reorder', {
@@ -289,7 +284,9 @@ describe('Queue management (e2e)', () => {
       expect(again.body.imported).toBe(1);
       const { queue } = await join(master.token, code, 'Javier');
       expect(queue).toHaveLength(4);
-      const restored = queue.filter((entry) => entry.handId === entries[1].handId);
+      const restored = queue.filter(
+        (entry) => entry.handId === entries[1].handId,
+      );
       expect(restored).toHaveLength(1);
       expect(restored[0].id).not.toBe(entries[1].id);
     });

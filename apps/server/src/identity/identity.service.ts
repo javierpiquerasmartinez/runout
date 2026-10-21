@@ -3,8 +3,14 @@ import { and, asc, eq, isNull, ne, or } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import { identities, preferences, screenNames } from '../database/schema.js';
+import {
+  identities,
+  preferences,
+  screenNames,
+  sessions,
+} from '../database/schema.js';
 import { Rejected } from '../rejection/rejection.js';
+import { GOOGLE_VERIFIER, type GoogleVerifier } from './google-verifier.js';
 
 export interface Identity {
   id: string;
@@ -39,6 +45,14 @@ export const DEFAULT_PREFERENCES: Preferences = {
 export interface Profile extends Identity {
   screenNames: string[];
   preferences: Preferences;
+  /** The Google account behind it; null for an anonymous identity. */
+  account: { email: string | null } | null;
+}
+
+/** A browser just given a token for an identity. */
+export interface SignedIn {
+  token: string;
+  identity: Profile;
 }
 
 /** Told whenever someone's Display Name really changes. */
@@ -48,7 +62,10 @@ export const DISPLAY_NAME_MAX_LENGTH = 40;
 export const SCREEN_NAME_MAX_LENGTH = 50;
 export const SCREEN_NAMES_MAX_COUNT = 20;
 
-/** Issues anonymous identities and recognises them by their bearer token (ADR 0003). */
+/**
+ * Issues identities, Accounts through Google and anonymous ones, and
+ * recognises them by their bearer token (ADR 0005).
+ */
 @Injectable()
 export class IdentityService {
   private readonly renameListeners: RenameListener[] = [];
@@ -60,49 +77,123 @@ export class IdentityService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(GOOGLE_VERIFIER) private readonly google: GoogleVerifier,
   ) {}
 
-  async issue(): Promise<{ token: string; identity: Profile }> {
-    const token = randomBytes(32).toString('base64url');
+  /** A new anonymous identity and the token its browser keeps. */
+  async issue(): Promise<SignedIn> {
     const [row] = await this.db
       .insert(identities)
-      .values({ tokenHash: hashToken(token), createdAt: this.clock.now() })
+      .values({ createdAt: this.clock.now() })
       .returning();
     return {
-      token,
-      identity: {
-        ...toIdentity(row),
-        screenNames: [],
-        preferences: DEFAULT_PREFERENCES,
-      },
+      token: await this.startSession(row.id),
+      identity: await this.profile(toIdentity(row)),
     };
+  }
+
+  /**
+   * Signs in with a Google ID token: the Account of that Google account,
+   * created the first time, and a new token for this browser. A token Google
+   * didn't issue for this app is refused with `invalid-google-token`.
+   */
+  async signInWithGoogle(idToken: unknown): Promise<SignedIn> {
+    const google =
+      typeof idToken === 'string' && idToken.length > 0
+        ? await this.google.verify(idToken)
+        : null;
+    if (!google) throw new Rejected('invalid-google-token');
+    const [row] = await this.db
+      .insert(identities)
+      .values({
+        googleSubject: google.subject,
+        email: google.email,
+        createdAt: this.clock.now(),
+      })
+      .onConflictDoUpdate({
+        target: identities.googleSubject,
+        // The email may have changed on Google's side since last time.
+        set: { email: google.email },
+      })
+      .returning();
+    return {
+      token: await this.startSession(row.id),
+      identity: await this.profile(toIdentity(row)),
+    };
+  }
+
+  /** Ends the session holding `token`; the token stops authenticating at once. */
+  async signOut(token: string | undefined): Promise<void> {
+    if (!token) throw new Rejected('unauthenticated');
+    const ended = await this.db
+      .delete(sessions)
+      .where(eq(sessions.tokenHash, hashToken(token)))
+      .returning();
+    if (ended.length === 0) throw new Rejected('unauthenticated');
   }
 
   /** The identity holding `token`, or `unauthenticated`. */
   async authenticate(token: string | undefined): Promise<Identity> {
-    if (!token) throw new Rejected('unauthenticated');
-    const [row] = await this.db
-      .select()
-      .from(identities)
-      .where(eq(identities.tokenHash, hashToken(token)));
-    if (!row) throw new Rejected('unauthenticated');
+    return toIdentity(await this.holder(token));
+  }
+
+  /**
+   * The Account holding `token`: `unauthenticated` without a valid token,
+   * `account-required` when it belongs to an anonymous identity.
+   */
+  async authenticateAccount(token: string | undefined): Promise<Identity> {
+    const row = await this.holder(token);
+    if (row.googleSubject === null) throw new Rejected('account-required');
     return toIdentity(row);
   }
 
+  /** The stored identity holding `token`, or `unauthenticated`. */
+  private async holder(
+    token: string | undefined,
+  ): Promise<typeof identities.$inferSelect> {
+    if (!token) throw new Rejected('unauthenticated');
+    const [row] = await this.db
+      .select({ identity: identities })
+      .from(sessions)
+      .innerJoin(identities, eq(identities.id, sessions.identityId))
+      .where(eq(sessions.tokenHash, hashToken(token)));
+    if (!row) throw new Rejected('unauthenticated');
+    return row.identity;
+  }
+
   async profile(identity: Identity): Promise<Profile> {
-    const [rows, preferences] = await Promise.all([
+    const [rows, preferences, [stored]] = await Promise.all([
       this.db
         .select({ screenName: screenNames.screenName })
         .from(screenNames)
         .where(eq(screenNames.identityId, identity.id))
         .orderBy(asc(screenNames.position)),
       this.preferences(identity.id),
+      this.db
+        .select({
+          googleSubject: identities.googleSubject,
+          email: identities.email,
+        })
+        .from(identities)
+        .where(eq(identities.id, identity.id)),
     ]);
     return {
       ...identity,
       screenNames: rows.map((row) => row.screenName),
       preferences,
+      account:
+        stored?.googleSubject == null ? null : { email: stored.email ?? null },
     };
+  }
+
+  private async startSession(identityId: string): Promise<string> {
+    const token = randomBytes(32).toString('base64url');
+    await this.db.insert(sessions).values({
+      tokenHash: hashToken(token),
+      identityId,
+      createdAt: this.clock.now(),
+    });
+    return token;
   }
 
   async preferences(identityId: string): Promise<Preferences> {
@@ -167,11 +258,7 @@ export class IdentityService {
     for (const listener of this.screenNamesListeners) {
       listener(identity.id, names);
     }
-    return {
-      ...identity,
-      screenNames: names,
-      preferences: await this.preferences(identity.id),
-    };
+    return { ...(await this.profile(identity)), screenNames: names };
   }
 
   /**

@@ -3,6 +3,8 @@ import { backendUrl } from './backendUrl'
 /** Why the server refused a command. Mirrors the server's reasons (ADR 0001: no shared code). */
 export type RejectionReason =
   | 'unauthenticated'
+  | 'invalid-google-token'
+  | 'account-required'
   | 'invalid-display-name'
   | 'invalid-screen-names'
   | 'invalid-preferences'
@@ -47,7 +49,7 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown } = {},
+  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`

@@ -73,10 +73,12 @@ function renderDialog() {
   const onImported = vi.fn()
   const session = {
     token: 'token',
-    identity: { id: 'me', displayName: 'Javier', screenNames: ['Javier_PS'], preferences: DEFAULT_PREFERENCES },
+    identity: { id: 'me', displayName: 'Javier', screenNames: ['Javier_PS'], preferences: DEFAULT_PREFERENCES , account: null },
     rememberDisplayName: () => {},
     rememberScreenNames: vi.fn(),
     changePreferences: async () => {},
+    signIn: async () => {},
+    signOut: async () => {},
   }
   render(
     <I18nProvider initialLocale="en">

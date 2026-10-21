@@ -2,6 +2,7 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Participant {
   identityId: string;
@@ -32,11 +33,6 @@ describe('Master handover and failover (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
       .post('/api/rooms')
@@ -62,9 +58,9 @@ describe('Master handover and failover (e2e)', () => {
 
   /** A Room with the Master and two Guests, each joined a second apart. */
   async function roomOfThree() {
-    const master = await issueIdentity();
-    const marta = await issueIdentity();
-    const alberto = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const marta = await newAccount(running.httpServer);
+    const alberto = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const masterRoom = await join(master.token, code, 'Javier');
     await running.clock.advance(1_000);
@@ -198,7 +194,7 @@ describe('Master handover and failover (e2e)', () => {
 
     it('refuses someone who is not a Participant of the Room', async () => {
       const { masterSocket } = await roomOfThree();
-      const stranger = await issueIdentity();
+      const stranger = await newAccount(running.httpServer);
 
       masterSocket.send('room.handOver', { identityId: stranger.id });
 

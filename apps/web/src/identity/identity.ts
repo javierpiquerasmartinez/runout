@@ -8,6 +8,8 @@ export interface Identity {
   screenNames: string[]
   /** How this person reads the table; kept by the server, restored on every visit. */
   preferences: Preferences
+  /** The Google account signed in (ADR 0005); null for an anonymous identity. */
+  account: { email: string | null } | null
 }
 
 export interface Session {
@@ -23,8 +25,8 @@ const TOKEN_KEY = 'runout.identityToken'
 let loading: Promise<Session> | null = null
 
 /**
- * Recognises this browser's identity from its stored token, or issues a new one
- * on the first visit (ADR 0003). A token the server no longer knows is replaced.
+ * Recognises this browser's identity from its stored token, or issues a new
+ * anonymous one on the first visit. A token the server no longer knows is replaced.
  * Callers at the same time share one load, so a first visit issues one identity.
  */
 export function loadSession(storage: Storage = window.localStorage): Promise<Session> {
@@ -50,11 +52,48 @@ async function fetchSession(storage: Storage): Promise<Session> {
   return issued
 }
 
+/**
+ * Trades the ID token Google gave this browser for an Account's session, and
+ * keeps its token so the Account is recognised on later visits.
+ */
+export async function signInWithGoogle(idToken: string, storage: Storage = window.localStorage): Promise<Session> {
+  const session = await api<Session>('/sessions/google', { method: 'POST', body: { idToken } })
+  writeToken(storage, session.token)
+  loading = Promise.resolve(session)
+  return session
+}
+
+/**
+ * Ends this browser's session on the server and forgets its token; the
+ * browser goes on as a new anonymous identity.
+ */
+export async function endSession(token: string, storage: Storage = window.localStorage): Promise<Session> {
+  try {
+    await api<void>('/sessions/current', { token, method: 'DELETE' })
+  } catch (error) {
+    // Already over on the server: forgetting it here is all that's left.
+    if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error
+  }
+  removeToken(storage)
+  // So Google doesn't sign the same account straight back in.
+  window.google?.accounts.id.disableAutoSelect()
+  loading = null
+  return loadSession(storage)
+}
+
 function readToken(storage: Storage): string | null {
   try {
     return storage.getItem(TOKEN_KEY)
   } catch {
     return null
+  }
+}
+
+function removeToken(storage: Storage) {
+  try {
+    storage.removeItem(TOKEN_KEY)
+  } catch {
+    // Storage blocked: nothing was kept.
   }
 }
 

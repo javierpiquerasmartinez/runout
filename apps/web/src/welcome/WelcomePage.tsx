@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, reasonOf } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
-import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
+import { GoogleSignInButton } from '../identity/GoogleSignInButton'
+import { DISPLAY_NAME_MAX_LENGTH, type Identity } from '../identity/identity'
 import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
 import type { JoinIntent } from '../room/joinIntent'
@@ -42,7 +43,7 @@ export function WelcomePage() {
         </div>
 
         <div className="welcome__actions">
-          <CreateRoomCard />
+          <FirstCard />
           <div className="welcome__or" aria-hidden="true">
             <span />
             {t('welcome.or')}
@@ -126,6 +127,58 @@ function RecentRooms() {
   )
 }
 
+/** A first-time Account chooses its Display Name before anything else. */
+function FirstCard() {
+  const { identity } = useSession()
+  if (identity.account && identity.displayName === null) return <ChooseDisplayNameCard />
+  return <CreateRoomCard />
+}
+
+function ChooseDisplayNameCard() {
+  const { t } = useI18n()
+  const { token, rememberDisplayName } = useSession()
+  const [displayName, setDisplayName] = useState('')
+  const [error, setError] = useState<MessageKey | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const saved = await api<Identity>('/identities/me/display-name', { token, method: 'PUT', body: { displayName } })
+      rememberDisplayName(saved.displayName ?? displayName.trim())
+    } catch (caught) {
+      setError(`reason.${reasonOf(caught)}`)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="welcome-card" onSubmit={save} noValidate>
+      <div className="welcome-card__heading">
+        <h2 className="welcome-card__title">{t('welcome.name.title')}</h2>
+        <p className="welcome-card__body">{t('welcome.name.body')}</p>
+      </div>
+      <div className="welcome-card__fields">
+        <TextField
+          label={t('welcome.name.label')}
+          value={displayName}
+          maxLength={DISPLAY_NAME_MAX_LENGTH}
+          autoComplete="nickname"
+          autoFocus
+          onChange={(event) => setDisplayName(event.target.value)}
+          error={error ? t(error) : undefined}
+        />
+      </div>
+      <Button type="submit" variant="primary" size="prominent" aria-busy={busy}>
+        {t('welcome.name.submit')}
+      </Button>
+    </form>
+  )
+}
+
 function CreateRoomCard() {
   const { t } = useI18n()
   const { token, identity, rememberDisplayName } = useSession()
@@ -133,10 +186,12 @@ function CreateRoomCard() {
   const [displayName, setDisplayName] = useState(identity.displayName ?? '')
   const [error, setError] = useState<{ field: 'name' | 'displayName' | 'form'; message: MessageKey } | null>(null)
   const [busy, setBusy] = useState(false)
+  // Creating a Room needs an Account (ADR 0005): without one, sign in first.
+  const signedIn = identity.account !== null
 
   async function create(event: FormEvent) {
     event.preventDefault()
-    if (busy) return
+    if (busy || !signedIn) return
     setBusy(true)
     setError(null)
     try {
@@ -156,7 +211,7 @@ function CreateRoomCard() {
     <form className="welcome-card" onSubmit={create} noValidate>
       <div className="welcome-card__heading">
         <h2 className="welcome-card__title">{t('welcome.create.title')}</h2>
-        <p className="welcome-card__body">{t('welcome.create.body')}</p>
+        <p className="welcome-card__body">{t(signedIn ? 'welcome.create.body' : 'welcome.signIn.body')}</p>
       </div>
       <div className="welcome-card__fields">
         <TextField
@@ -176,10 +231,18 @@ function CreateRoomCard() {
           error={error?.field === 'displayName' ? t(error.message) : undefined}
         />
       </div>
-      <Button type="submit" variant="primary" size="prominent" aria-busy={busy}>
+      <Button
+        type="submit"
+        variant="primary"
+        size="prominent"
+        aria-busy={busy}
+        aria-label={t('welcome.create.submit')}
+        disabledReason={signedIn ? undefined : t('reason.account-required')}
+      >
         <Icon name="add" size={16} />
         {t('welcome.create.submit')}
       </Button>
+      {!signedIn && <GoogleSignInButton />}
       {error?.field === 'form' && (
         <p className="welcome-card__error" role="alert">
           {t(error.message)}

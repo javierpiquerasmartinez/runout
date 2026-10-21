@@ -3,6 +3,7 @@ import request from 'supertest';
 import { fixture, freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Preview {
   id: string;
@@ -46,11 +47,6 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     await Promise.all(clients.splice(0).map((client) => client.close()));
     await running.close();
   });
-
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
 
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
@@ -100,8 +96,8 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   }
 
   it('previews a multi-file batch with a bad Hand in it, then broadcasts only the good Hands on confirm', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const masterSocket = await join(master.token, code, 'Javier');
     const guestSocket = await join(guest.token, code, 'Marta');
@@ -183,7 +179,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('imports only the previews that are confirmed, so a file removed before confirming stays out', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const socket = await join(master.token, code, 'Javier');
     const kept = await upload(
@@ -208,7 +204,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('confirms a preview only once', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
     const preview = await upload(
@@ -227,8 +223,8 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('refuses to confirm someone else’s preview', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
     await join(guest.token, code, 'Marta');
@@ -247,7 +243,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('forgets a preview that was never confirmed after an hour', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
     const preview = await upload(
@@ -263,7 +259,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('says which formats it tried when it recognises nothing, and reads the file again in a format picked by hand', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
     const forum = fixture('pokertracker-forum.txt');
@@ -290,7 +286,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('previews pasted text the same way', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
 
@@ -304,7 +300,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('refuses a file over 20 MB', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
 
@@ -319,7 +315,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('refuses a zip it cannot open', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
 
@@ -334,7 +330,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('refuses a format it does not know', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
 
@@ -350,8 +346,8 @@ describe('Importing Hand History files through a preview (e2e)', () => {
   });
 
   it('refuses a preview from someone who is not a Participant of the Room', async () => {
-    const master = await issueIdentity();
-    const stranger = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const stranger = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
 
     const res = await upload(

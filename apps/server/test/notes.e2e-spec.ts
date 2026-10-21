@@ -2,6 +2,7 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface QueueEntry {
   id: string;
@@ -30,11 +31,6 @@ describe('Notes and Marks (e2e)', () => {
     await Promise.all(clients.splice(0).map((client) => client.close()));
     await running.close();
   });
-
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
 
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
@@ -67,8 +63,8 @@ describe('Notes and Marks (e2e)', () => {
 
   /** A Room with a Master, a Guest and two Hands in the Queue. */
   async function roomWithHands() {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const masterRoom = await join(master.token, code, 'Javier');
     const guestRoom = await join(guest.token, code, 'Marta');
@@ -151,7 +147,10 @@ describe('Notes and Marks (e2e)', () => {
         reason: 'hand-not-in-queue',
       });
 
-      guestSocket.send('notes.write', { handId: entries[0].handId, body: '  ' });
+      guestSocket.send('notes.write', {
+        handId: entries[0].handId,
+        body: '  ',
+      });
       expect(await guestSocket.next('rejected')).toEqual({
         command: 'notes.write',
         reason: 'invalid-note',
@@ -195,7 +194,10 @@ describe('Notes and Marks (e2e)', () => {
     it('refuses a Guest who tries to rewrite or delete a Note, and changes nothing', async () => {
       const { masterSocket, guestSocket, note } = await roomWithANote();
 
-      guestSocket.send('notes.edit', { id: note.id, body: 'Mia, la reescribo.' });
+      guestSocket.send('notes.edit', {
+        id: note.id,
+        body: 'Mia, la reescribo.',
+      });
       expect(await guestSocket.next('rejected')).toEqual({
         command: 'notes.edit',
         reason: 'not-master',
@@ -266,13 +268,15 @@ describe('Notes and Marks (e2e)', () => {
       await guestSocket.next('room.closed');
 
       for (const person of [master, guest]) {
-        const res = await readNotes(person.token, entries[0].handId).expect(200);
+        const res = await readNotes(person.token, entries[0].handId).expect(
+          200,
+        );
         expect(res.body.notes).toEqual([note]);
       }
     });
 
     it('hides the Notes of a Hand from someone who never saw it', async () => {
-      const stranger = await issueIdentity();
+      const stranger = await newAccount(running.httpServer);
       const { guestSocket, masterSocket, entries } = await roomWithHands();
       guestSocket.send('notes.write', {
         handId: entries[0].handId,
@@ -280,7 +284,9 @@ describe('Notes and Marks (e2e)', () => {
       });
       await masterSocket.next('notes.written');
 
-      const res = await readNotes(stranger.token, entries[0].handId).expect(404);
+      const res = await readNotes(stranger.token, entries[0].handId).expect(
+        404,
+      );
       expect(res.body.reason).toBe('hand-not-found');
     });
   });

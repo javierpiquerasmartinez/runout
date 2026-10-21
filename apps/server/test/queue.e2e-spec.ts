@@ -2,6 +2,7 @@ import request from 'supertest';
 import { fixture, freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface QueueEntry {
   id: string;
@@ -38,11 +39,6 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
       .post('/api/rooms')
@@ -73,8 +69,8 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   }
 
   it('broadcasts a pasted Hand to every Participant, Importer included, with its summary', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const { socket: masterSocket } = await join(master.token, code, 'Javier');
     const { socket: guestSocket } = await join(guest.token, code, 'Marta');
@@ -123,7 +119,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   });
 
   it('imports every Hand of one paste and appends later pastes at the end of the Queue', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const { socket } = await join(master.token, code, 'Javier');
 
@@ -149,8 +145,8 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   });
 
   it('gives a Participant who joins later the Queue in their snapshot', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const { socket } = await join(master.token, code, 'Javier');
     await paste(master.token, code, freshHandHistory('pokerstars-session.txt'));
@@ -168,7 +164,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   });
 
   it('reports what it discarded, and broadcasts nothing when no Hand was read', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const { socket } = await join(master.token, code, 'Javier');
     const forum = fixture('pokertracker-forum.txt');
@@ -192,7 +188,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   });
 
   it('takes a long session pasted at once, well past the default body size', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
     const session = Array.from({ length: 100 }, () =>
@@ -205,8 +201,8 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   });
 
   it('refuses a paste from someone who is not a Participant of the Room', async () => {
-    const master = await issueIdentity();
-    const stranger = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const stranger = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
 
     const res = await paste(
@@ -219,7 +215,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
   });
 
   it('refuses a paste without an identity', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
 
     const res = await paste(

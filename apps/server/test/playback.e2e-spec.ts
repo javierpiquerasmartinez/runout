@@ -2,6 +2,7 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Playback {
   handId: string;
@@ -22,11 +23,6 @@ describe('Playback (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function join(
     token: string,
     code: string,
@@ -46,8 +42,8 @@ describe('Playback (e2e)', () => {
    * Queue. Returns the Hand's id.
    */
   async function roomWithAHand() {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const created = await request(running.httpServer)
       .post('/api/rooms')
       .set('Authorization', `Bearer ${master.token}`)
@@ -173,7 +169,7 @@ describe('Playback (e2e)', () => {
       'playback.changed',
       (p: Playback) => p.actionIndex === 4,
     );
-    const late = await issueIdentity();
+    const late = await newAccount(running.httpServer);
 
     const { playback } = await join(late.token, code, 'Alberto');
 
@@ -186,7 +182,7 @@ describe('Playback (e2e)', () => {
 
   it('gives no Playback in the snapshot while nothing is loaded', async () => {
     const { code } = await roomWithAHand();
-    const late = await issueIdentity();
+    const late = await newAccount(running.httpServer);
 
     const { playback } = await join(late.token, code, 'Alberto');
 
@@ -238,7 +234,7 @@ describe('Playback (e2e)', () => {
       (p: Playback) => p.hideOpponentNames,
     );
 
-    const late = await issueIdentity();
+    const late = await newAccount(running.httpServer);
     const { playback } = await join(late.token, code, 'Alberto');
     expect(playback).toEqual({
       handId,
@@ -307,7 +303,7 @@ describe('Playback (e2e)', () => {
     expect(await masterSocket.next('room.participantChanged')).toEqual(changed);
     expect(await guestSocket.next('room.participantChanged')).toEqual(changed);
 
-    const late = await issueIdentity();
+    const late = await newAccount(running.httpServer);
     const socket = await RoomClient.connect(running.wsUrl, late.token);
     clients.push(socket);
     socket.send('room.join', { code, displayName: 'Alberto' });
@@ -325,7 +321,7 @@ describe('Playback (e2e)', () => {
 
   it('serves the Hand with its Timeline by id to a Participant, and to nobody else', async () => {
     const { guest, handId } = await roomWithAHand();
-    const stranger = await issueIdentity();
+    const stranger = await newAccount(running.httpServer);
 
     const res = await request(running.httpServer)
       .get(`/api/hands/${handId}`)
