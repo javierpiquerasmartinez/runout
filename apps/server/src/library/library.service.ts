@@ -306,7 +306,7 @@ function sortedUnique<T extends string>(values: T[]): T[] {
 }
 
 /** A whole number from a query string, within bounds, or the fallback. */
-function boundedInt(
+export function boundedInt(
   raw: unknown,
   fallback: number,
   min: number,

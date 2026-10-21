@@ -8,6 +8,7 @@ import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preference
 import { fakeSession } from '../test/fakeSession'
 import type { LibraryHand, LibraryPage as Page } from './library'
 import { LibraryPage } from './LibraryPage'
+import type { Results } from './results'
 
 const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryHand => ({
   id,
@@ -40,13 +41,24 @@ const libraryPage = (page: Omit<Page, 'options' | 'counts'>): Page => ({
 })
 
 let pages: Record<string, Page>
+/** List reads, as `/api/library/hands?page=1&pageSize=50`. */
 let requests: string[]
+let results: Results
+/** Results Graph reads, as `/api/library/results?site=pokerstars`. */
+let resultsRequests: string[]
 /** Mark changes, as `PUT /api/library/hands/h1/mark`. */
 let markRequests: string[]
 
 beforeEach(() => {
   requests = []
+  resultsRequests = []
   markRequests = []
+  results = {
+    hands: 3,
+    currency: 'EUR',
+    totals: { bigBlinds: { result: 3.9, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, showdown: 49, nonShowdown: -10 } },
+    points: [{ hand: 3, bigBlinds: { result: 3.9, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, showdown: 49, nonShowdown: -10 } }],
+  }
   pages = {
     '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),
     '2': libraryPage({ total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { summary: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] }),
@@ -63,6 +75,10 @@ beforeEach(() => {
           page.hands = page.hands.map((hand) => (hand.id === handId ? { ...hand, marked } : hand))
         }
         return Response.json({ handId, marked })
+      }
+      if (url.startsWith('/api/library/results')) {
+        resultsRequests.push(url)
+        return Response.json(results)
       }
       requests.push(url)
       const page = new URL(url, 'http://localhost').searchParams.get('page') ?? '1'
@@ -109,7 +125,7 @@ describe('LibraryPage', () => {
     expect(within(rows[0]).getByText('SHOWDOWN')).toBeTruthy()
     expect(within(rows[1]).getByText('Hero')).toBeTruthy()
     expect(within(rows[1]).getByText('CoinPoker')).toBeTruthy()
-    expect(screen.getByText('3 hands')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'All hands' }).nextElementSibling?.textContent).toBe('3 hands')
     expect(within(table).queryByText('Author')).toBeNull()
     expect(requests[0]).toBe('/api/library/hands?page=1&pageSize=50')
   })
@@ -251,6 +267,45 @@ describe('LibraryPage', () => {
       expect(screen.queryByText('Your library is empty. Import your hand histories to keep them here.')).toBeNull()
       expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
       expect(screen.getAllByRole('button', { name: 'Import hands' })).toHaveLength(2)
+    })
+  })
+
+  describe('Results Graph', () => {
+    it('draws the Results of the same Hands the list shows', async () => {
+      renderLibrary()
+      const graph = await screen.findByRole('region', { name: 'Results' })
+      expect(within(graph).getByText('3 hands')).toBeTruthy()
+      expect(within(graph).getByText('+3.9 BB')).toBeTruthy()
+      expect(resultsRequests).toEqual(['/api/library/results?'])
+
+      const filters = screen.getByRole('group', { name: 'Filters' })
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Poker site' }), 'PokerStars')
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Stake' }), 'NL10 EUR')
+
+      expect(resultsRequests.at(-1)).toBe(`/api/library/results?${lastFilterQuery()}`)
+      expect(lastFilterQuery()).toBe('site=pokerstars&stake=no-limit%3A5%3A10%3AEUR')
+    })
+
+    it('reads the Results again only when the Hands change, not the page', async () => {
+      renderLibrary()
+      await screen.findByRole('region', { name: 'Results' })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+      await screen.findByText('Showing 3–3 of 3')
+      expect(resultsRequests).toHaveLength(1)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Mark CO vs SB, iMapleAA' }))
+      await waitFor(() => expect(resultsRequests).toHaveLength(2))
+    })
+
+    it('draws nothing when no Hand matches, inviting to import instead', async () => {
+      pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
+      results = { hands: 0, currency: null, totals: { bigBlinds: { result: 0, showdown: 0, nonShowdown: 0 }, amounts: null }, points: [] }
+      renderLibrary()
+
+      expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()
+      await waitFor(() => expect(resultsRequests).toHaveLength(1))
+      expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
     })
   })
 

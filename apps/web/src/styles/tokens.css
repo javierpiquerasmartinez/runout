@@ -110,6 +110,14 @@
   --avatar-4-bg: #33191a;
   --avatar-4-ink: #e0645c;
 
+  /*
+   * Graph lines, a tracker's usual reading: green Result, blue Showdown, red
+   * Non-showdown. They borrow the avatar inks, so each Theme gets its own.
+   */
+  --chart-result: var(--avatar-2-ink);
+  --chart-showdown: var(--avatar-3-ink);
+  --chart-non-showdown: var(--avatar-4-ink);
+
   /* Elevation */
   --shadow-raised: 0 8px 22px rgb(0 0 0 / 50%);
   --shadow-modal: 0 32px 80px rgb(0 0 0 / 60%);

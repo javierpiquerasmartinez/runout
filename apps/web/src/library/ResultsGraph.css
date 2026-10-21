@@ -1,0 +1,164 @@
+/*
+ * The Results Graph has no board: it follows the Library's panels, a
+ * bordered panel above the list, the chart beside a legend of totals.
+ */
+
+.results {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 10px;
+  background: var(--color-panel);
+}
+.results__head {
+  min-height: 48px;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-panel-border);
+}
+.results__title {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.results__hands {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.results__spacer {
+  flex-grow: 1;
+}
+.results__body {
+  display: flex;
+  gap: 8px;
+  padding: 14px 14px 10px 4px;
+}
+.results__chart {
+  flex-grow: 1;
+  min-width: 0;
+  height: 220px;
+}
+/* Recharts' own text and focus outline give way to the app's. */
+.results__chart .recharts-surface {
+  font-family: var(--font-mono);
+}
+.results__chart .recharts-wrapper:focus,
+.results__chart .recharts-surface:focus {
+  outline: none;
+}
+
+.results__legend {
+  width: 190px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--color-divider);
+  list-style: none;
+}
+.results__entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.results__toggle {
+  height: 28px;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.results__toggle:hover {
+  background: var(--color-hover);
+}
+.results__toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.results__swatch {
+  width: 12px;
+  height: 3px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+.results__total {
+  /* Under the line's name, past its swatch. */
+  padding: 0 0 4px 29px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.results__total[data-sign='1'] {
+  color: var(--sync-ink);
+}
+.results__total[data-sign='-1'] {
+  color: var(--alert-ink);
+}
+/* A hidden line keeps its place in the legend, dimmed. */
+.results__entry[data-hidden] .results__toggle,
+.results__entry[data-hidden] .results__total {
+  color: var(--text-disabled-label);
+}
+.results__entry[data-hidden] .results__swatch {
+  opacity: 0.3;
+}
+
+.results__readout {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+.results__readout-hand {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.results__readout-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.results__readout-value {
+  margin-left: auto;
+  padding-left: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .results__body {
+    flex-direction: column;
+  }
+  .results__legend {
+    width: auto;
+    padding: 10px 0 0 10px;
+    border-left: 0;
+    border-top: 1px solid var(--color-divider);
+  }
+}
