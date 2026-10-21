@@ -684,6 +684,7 @@ export const es = {
   'library.column.hero': 'Héroe',
   'library.column.stake': 'Stake',
   'library.column.pot': 'Bote final',
+  'library.column.result': 'Resultado',
   'library.column.street': 'Acaba en',
   'library.column.date': 'Fecha',
   'library.open': 'Abrir {positions}, {hero}',

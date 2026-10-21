@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
+import { PreferencesContext } from '../preferences/context'
+import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 import { fakeSession } from '../test/fakeSession'
 import type { LibraryHand, LibraryPage as Page } from './library'
 import { LibraryPage } from './LibraryPage'
@@ -15,6 +17,7 @@ const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryH
   holeCards: ['Js', '8s'],
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+  result: 49,
   summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
   ...overrides,
 })
@@ -25,7 +28,7 @@ let requests: string[]
 beforeEach(() => {
   requests = []
   pages = {
-    '1': { total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker' })] },
+    '1': { total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] },
     '2': { total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { summary: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] },
   }
   vi.stubGlobal(
@@ -43,11 +46,13 @@ afterEach(() => {
   window.history.pushState(null, '', '/')
 })
 
-function renderLibrary() {
+function renderLibrary(preferences: Preferences = DEFAULT_PREFERENCES) {
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={fakeSession()}>
-        <LibraryPage />
+        <PreferencesContext.Provider value={preferences}>
+          <LibraryPage />
+        </PreferencesContext.Provider>
       </SessionContext.Provider>
     </I18nProvider>,
   )
@@ -69,6 +74,25 @@ describe('LibraryPage', () => {
     expect(screen.getByText('3 hands')).toBeTruthy()
     expect(within(table).queryByText('Author')).toBeNull()
     expect(requests[0]).toBe('/api/library/hands?page=1&pageSize=50')
+  })
+
+  it('shows each Hand’s Result in the Display Unit, signed', async () => {
+    renderLibrary()
+
+    const table = await screen.findByRole('table', { name: 'All hands' })
+    expect(within(table).getByRole('columnheader', { name: 'Result' })).toBeTruthy()
+    const [won, lost] = within(table).getAllByRole('row').slice(1)
+    expect(within(won).getByText('+4.9 BB')).toBeTruthy()
+    expect(within(lost).getByText('-1 BB')).toBeTruthy()
+  })
+
+  it('shows the Result as money when the Display Unit says so', async () => {
+    renderLibrary({ ...DEFAULT_PREFERENCES, displayUnit: 'amount' })
+
+    const table = await screen.findByRole('table', { name: 'All hands' })
+    const [won, lost] = within(table).getAllByRole('row').slice(1)
+    expect(within(won).getByText('+€0.49')).toBeTruthy()
+    expect(within(lost).getByText('-€0.10')).toBeTruthy()
   })
 
   it('moves between pages the server cuts', async () => {

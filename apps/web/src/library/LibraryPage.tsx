@@ -151,6 +151,7 @@ function HandTable({ hands }: { hands: LibraryHand[] }) {
             <th scope="col">{t('library.column.hero')}</th>
             <th scope="col">{t('library.column.stake')}</th>
             <th scope="col">{t('library.column.pot')}</th>
+            <th scope="col">{t('library.column.result')}</th>
             <th scope="col">{t('library.column.street')}</th>
             <th scope="col">{t('library.column.date')}</th>
           </tr>
@@ -159,6 +160,10 @@ function HandTable({ hands }: { hands: LibraryHand[] }) {
           {hands.map((hand) => {
             const positions = positionsLabel(hand, i18n)
             const pot = quantity(hand.summary.finalPot, hand.stake, displayUnit, i18n, { maximumFractionDigits: 2 })
+            const result = quantity(hand.result, hand.stake, displayUnit, i18n, {
+              maximumFractionDigits: 2,
+              signDisplay: 'exceptZero',
+            })
             return (
               <tr key={hand.id} className="library-row">
                 <td className="library-table__hand">
@@ -182,6 +187,9 @@ function HandTable({ hands }: { hands: LibraryHand[] }) {
                 </td>
                 <td className="library-row__stake ro-mono">{stakeLabel(hand)}</td>
                 <td className="library-row__pot ro-mono">{pot.primary}</td>
+                <td className="library-row__result ro-mono" data-sign={Math.sign(hand.result)}>
+                  {result.primary}
+                </td>
                 <td>
                   <span className="library-row__street ro-mono" data-showdown={hand.summary.showdown || undefined}>
                     {streetLabel(hand, i18n)}

@@ -25,6 +25,8 @@ export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 
   /** The Hero's Screen Name, from the Hand History. */
   hero: string
   holeCards: string[]
+  /** The Hero's Result, as an Amount: what they collected minus what they put in. */
+  result: number
 }
 
 /** One page of the Library, newest first, with how many Hands it holds. */

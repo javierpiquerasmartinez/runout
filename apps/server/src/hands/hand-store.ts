@@ -2,6 +2,7 @@ import { inArray } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
 import { hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
+import { heroResult } from './replay/hero-result.js';
 
 /*
  * Hands are stored once each (ADR 0002) and belong to no one (ADR 0004):
@@ -85,20 +86,25 @@ export async function storeHands(
     const stored = await tx
       .insert(hands)
       .values(
-        toStore.map((hand) => ({
-          site: hand.site,
-          siteHandId: hand.siteHandId,
-          heroScreenName: hand.hero.screenName,
-          heroSeat: heroSeat(hand),
-          importerId,
-          sourceFormat: hand.sourceFormat,
-          playedAt: new Date(hand.playedAt),
-          smallBlind: hand.stake.smallBlind,
-          bigBlind: hand.stake.bigBlind,
-          currency: hand.stake.currency,
-          content: hand,
-          importedAt: now,
-        })),
+        toStore.map((hand) => {
+          const { result, reachedShowdown } = heroResult(hand);
+          return {
+            site: hand.site,
+            siteHandId: hand.siteHandId,
+            heroScreenName: hand.hero.screenName,
+            heroSeat: heroSeat(hand),
+            importerId,
+            sourceFormat: hand.sourceFormat,
+            playedAt: new Date(hand.playedAt),
+            smallBlind: hand.stake.smallBlind,
+            bigBlind: hand.stake.bigBlind,
+            currency: hand.stake.currency,
+            heroResult: result,
+            heroReachedShowdown: reachedShowdown,
+            content: hand,
+            importedAt: now,
+          };
+        }),
       )
       .onConflictDoNothing({
         target: [
