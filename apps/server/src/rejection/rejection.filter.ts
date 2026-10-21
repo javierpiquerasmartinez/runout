@@ -40,6 +40,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'undo-expired': HttpStatus.CONFLICT,
   'invalid-note': HttpStatus.BAD_REQUEST,
   'note-not-found': HttpStatus.NOT_FOUND,
+  'invalid-library-filter': HttpStatus.BAD_REQUEST,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }`. */

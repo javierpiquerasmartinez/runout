@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -18,28 +18,66 @@ const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryH
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   result: 49,
+  marked: false,
   summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
   ...overrides,
 })
 
+const options: Page['options'] = {
+  sites: ['coinpoker', 'pokerstars'],
+  heroes: ['Hero', 'iMapleAA'],
+  stakes: [
+    { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+    { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'USDT' },
+    { limit: 'no-limit', smallBlind: 25, bigBlind: 50, currency: 'EUR' },
+  ],
+}
+
+const libraryPage = (page: Omit<Page, 'options' | 'counts'>): Page => ({
+  ...page,
+  options,
+  counts: { all: 3, marked: 1 },
+})
+
 let pages: Record<string, Page>
 let requests: string[]
+/** Mark changes, as `PUT /api/library/hands/h1/mark`. */
+let markRequests: string[]
 
 beforeEach(() => {
   requests = []
+  markRequests = []
   pages = {
-    '1': { total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] },
-    '2': { total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { summary: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] },
+    '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),
+    '2': libraryPage({ total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { summary: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] }),
   }
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (method !== 'GET') {
+        markRequests.push(`${method} ${url}`)
+        const handId = url.split('/').at(-2)!
+        const marked = method === 'PUT'
+        for (const page of Object.values(pages)) {
+          page.hands = page.hands.map((hand) => (hand.id === handId ? { ...hand, marked } : hand))
+        }
+        return Response.json({ handId, marked })
+      }
       requests.push(url)
       const page = new URL(url, 'http://localhost').searchParams.get('page') ?? '1'
       return Response.json(pages[page])
     }),
   )
 })
+
+/** The query of the last list read, without its paging. */
+function lastFilterQuery(): string {
+  const query = new URL(requests.at(-1)!, 'http://localhost').searchParams
+  query.delete('page')
+  query.delete('pageSize')
+  return query.toString()
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -118,12 +156,119 @@ describe('LibraryPage', () => {
   })
 
   it('invites to import when the Library is empty', async () => {
-    pages['1'] = { total: 0, page: 1, pageSize: 50, hands: [] }
+    pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
     renderLibrary()
 
     expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()
     await userEvent.click(screen.getAllByRole('button', { name: 'Import hands' })[0])
 
     expect(screen.getByRole('heading', { name: 'Import hands into your library' })).toBeTruthy()
+  })
+
+  describe('filters', () => {
+    it('offers only the Poker Sites, Heroes and Stakes the Library holds', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      const optionsOf = (name: string) =>
+        within(within(filters).getByRole('combobox', { name })).getAllByRole('option').map((option) => option.textContent)
+      expect(optionsOf('Poker site')).toEqual(['All sites', 'CoinPoker', 'PokerStars'])
+      expect(optionsOf('Hero')).toEqual(['All heroes', 'Hero', 'iMapleAA'])
+      // Two Stakes that read alike say their currency.
+      expect(optionsOf('Stake')).toEqual(['All stakes', 'NL10 EUR', 'NL10 USDT', 'NL50'])
+    })
+
+    it('combines the filters, going back to the first page, and one action clears them all', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+      await screen.findByText('Showing 3–3 of 3')
+      const filters = screen.getByRole('group', { name: 'Filters' })
+
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Poker site' }), 'PokerStars')
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'iMapleAA')
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Stake' }), 'NL10 EUR')
+
+      expect(lastFilterQuery()).toBe('site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR')
+      expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('page')).toBe('1')
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Clear filters' }))
+
+      expect(lastFilterQuery()).toBe('')
+      expect((within(filters).getByRole('combobox', { name: 'Poker site' }) as HTMLSelectElement).value).toBe('')
+      expect((within(filters).getByRole('combobox', { name: 'Hero' }) as HTMLSelectElement).value).toBe('')
+    })
+
+    it('narrows the period to a quick range of the viewer’s days', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 9, 21, 15, 30))
+      try {
+        renderLibrary()
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Period' }), 'Last 7 days')
+
+        expect((within(filters).getByLabelText('From') as HTMLInputElement).value).toBe('2026-10-15')
+        expect((within(filters).getByLabelText('To') as HTMLInputElement).value).toBe('2026-10-21')
+        const query = new URL(requests.at(-1)!, 'http://localhost').searchParams
+        expect(query.get('from')).toBe(new Date(2026, 9, 15).toISOString())
+        expect(query.get('to')).toBe(new Date(2026, 9, 22).toISOString())
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('takes any from and to dates, and calls them a custom period', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      fireEvent.change(within(filters).getByLabelText('From'), { target: { value: '2026-09-01' } })
+
+      expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('from')).toBe(new Date(2026, 8, 1).toISOString())
+      expect(lastFilterQuery()).not.toContain('to=')
+      expect((within(filters).getByRole('combobox', { name: 'Period' }) as HTMLSelectElement).value).toBe('custom')
+    })
+
+    it('shows only the Marked Hands from the collections', async () => {
+      renderLibrary()
+      const collections = await screen.findByRole('navigation', { name: 'Collections' })
+      expect(within(collections).getByRole('button', { name: /Marked/ }).textContent).toContain('1')
+
+      await userEvent.click(within(collections).getByRole('button', { name: /Marked/ }))
+
+      expect(lastFilterQuery()).toBe('marked=true')
+      expect(screen.getByRole('heading', { name: 'Marked hands' })).toBeTruthy()
+      expect(within(collections).getByRole('button', { name: /Marked/ }).getAttribute('aria-current')).toBe('page')
+    })
+
+    it('says when the filters match nothing, offering to clear them or import', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      pages['1'] = { ...pages['1'], total: 0, hands: [] }
+
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'Hero')
+
+      expect(await screen.findByText('No hands match these filters.')).toBeTruthy()
+      expect(screen.queryByText('Your library is empty. Import your hand histories to keep them here.')).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
+      expect(screen.getAllByRole('button', { name: 'Import hands' })).toHaveLength(2)
+    })
+  })
+
+  describe('Marks', () => {
+    it('Marks and unmarks a Hand from its row', async () => {
+      renderLibrary()
+      const mark = await screen.findByRole('button', { name: 'Mark BTN vs BB, iMapleAA' })
+      expect(mark.getAttribute('aria-pressed')).toBe('false')
+
+      await userEvent.click(mark)
+
+      expect(markRequests).toEqual(['PUT /api/library/hands/h1/mark'])
+      await waitFor(() => expect(mark.getAttribute('aria-pressed')).toBe('true'))
+
+      await userEvent.click(mark)
+
+      expect(markRequests.at(-1)).toBe('DELETE /api/library/hands/h1/mark')
+      await waitFor(() => expect(mark.getAttribute('aria-pressed')).toBe('false'))
+    })
   })
 })

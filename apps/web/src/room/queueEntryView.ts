@@ -27,7 +27,7 @@ export function streetLabel(entry: Described, { t }: Translator): string {
 const LIMIT_PREFIX = { 'no-limit': 'NL', 'pot-limit': 'PL', 'fixed-limit': 'FL' } as const
 
 /** The game named by its big blind, the online-poker way: "NL10". */
-export function stakeLabel(entry: Described): string {
+export function stakeLabel(entry: Pick<QueueEntry, 'stake'>): string {
   return `${LIMIT_PREFIX[entry.stake.limit]}${entry.stake.bigBlind}`
 }
 

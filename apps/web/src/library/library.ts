@@ -27,15 +27,25 @@ export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 
   holeCards: string[]
   /** The Hero's Result, as an Amount: what they collected minus what they put in. */
   result: number
+  /** Whether this person has Marked it. Nobody else is ever told. */
+  marked: boolean
 }
 
-/** One page of the Library, newest first, with how many Hands it holds. */
+/** One page of the Hands a Library filter keeps, newest first, with how many it keeps. */
 export interface LibraryPage {
   total: number
   /** From 1. */
   page: number
   pageSize: number
   hands: LibraryHand[]
+  /** What the whole Library holds to filter by, whatever the filter. */
+  options: {
+    sites: LibraryHand['site'][]
+    heroes: string[]
+    stakes: LibraryHand['stake'][]
+  }
+  /** The whole Library's Hands, and how many of them are Marked. */
+  counts: { all: number; marked: number }
 }
 
 /** How many Hands one Library page shows. */

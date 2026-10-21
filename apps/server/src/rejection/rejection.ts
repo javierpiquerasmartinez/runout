@@ -34,7 +34,8 @@ export type RejectionReason =
   | 'nothing-to-undo'
   | 'undo-expired'
   | 'invalid-note'
-  | 'note-not-found';
+  | 'note-not-found'
+  | 'invalid-library-filter';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {
