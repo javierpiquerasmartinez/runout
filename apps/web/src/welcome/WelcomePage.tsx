@@ -179,6 +179,8 @@ function CreateRoomCard() {
           error={error?.field === 'displayName' ? t(error.message) : undefined}
         />
       </div>
+      {/* Without an Account, signing in is what the card asks for first. */}
+      {!signedIn && <GoogleSignInButton />}
       <Button
         type="submit"
         variant="primary"
@@ -190,7 +192,6 @@ function CreateRoomCard() {
         <Icon name="add" size={16} />
         {t('welcome.create.submit')}
       </Button>
-      {!signedIn && <GoogleSignInButton />}
       {error?.field === 'form' && (
         <p className="welcome-card__error" role="alert">
           {t(error.message)}

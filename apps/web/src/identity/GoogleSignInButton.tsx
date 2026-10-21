@@ -8,6 +8,9 @@ import './GoogleSignInButton.css'
 
 type Failure = FailureReason | 'google-unavailable' | 'google-not-configured'
 
+/** The widest Google will draw its button. */
+const MAX_WIDTH = 400
+
 /**
  * Google's own "Sign in with Google" button. The ID token it hands back is
  * traded for an Account's session, and this browser becomes that Account.
@@ -33,11 +36,16 @@ export function GoogleSignInButton() {
             signIn(credential).catch((error: unknown) => setFailure(reasonOf(error)))
           },
         })
+        // As wide as the place it is given, as far as Google allows.
+        const width = slot.current.clientWidth
         google.renderButton(slot.current, {
           type: 'standard',
           theme: theme === 'light' ? 'outline' : 'filled_black',
           size: 'large',
           text: 'signin_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          ...(width > 0 && { width: Math.min(width, MAX_WIDTH) }),
           locale,
         })
       })
