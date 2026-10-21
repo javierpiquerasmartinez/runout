@@ -9,6 +9,7 @@ import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 
 const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
   hero,
+  heroNamed: true,
   author: heroMatched ? { identityId: 'id-marta', displayName: 'Marta' } : { identityId: 'me', displayName: 'Javier' },
   heroMatched,
   playedAt: '2026-09-18T12:34:30.000Z',

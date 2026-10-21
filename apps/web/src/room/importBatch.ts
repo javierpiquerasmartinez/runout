@@ -8,8 +8,8 @@ import type { QueueEntry } from './roomClient'
  */
 
 /** The formats the server reads. Mirrors the server's (ADR 0001: no shared code). */
-export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax'
-export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax']
+export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker'
+export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax', 'coinpoker']
 
 export type DiscardReason =
   | 'unrecognised-format'
@@ -17,12 +17,15 @@ export type DiscardReason =
   | 'too-many-seats'
   | 'no-hero'
   | 'malformed'
+  | 'run-it-twice'
   | 'duplicate'
 
 /** What the dialog shows of each Hand the server read. */
 export type HandPreview = Pick<QueueEntry, 'author' | 'playedAt' | 'stake' | 'summary'> & {
   /** The Hero's Screen Name, from the Hand History. */
   hero: string
+  /** False when the Poker Site writes every Hero alike (`Hero`): no Screen Name can match it. */
+  heroNamed: boolean
   /** False when nobody in the Room has the Hero among their Screen Names, so the Importer is the Author. */
   heroMatched: boolean
   board: string[]
@@ -140,11 +143,14 @@ export function batchHands(batch: ImportBatch): HandPreview[] {
 /**
  * The Heroes nobody in the Room is recognised as, once each: the Importer is
  * those Hands' Author, and is offered to add each one to their Screen Names.
+ * A Hero the Poker Site leaves unnamed is never offered.
  */
 export function unmatchedHeroes(batch: ImportBatch): string[] {
   const heroes = new Map<string, string>()
   for (const hand of batchHands(batch)) {
-    if (!hand.heroMatched && !heroes.has(hand.hero.toLowerCase())) heroes.set(hand.hero.toLowerCase(), hand.hero)
+    if (hand.heroNamed && !hand.heroMatched && !heroes.has(hand.hero.toLowerCase())) {
+      heroes.set(hand.hero.toLowerCase(), hand.hero)
+    }
   }
   return [...heroes.values()]
 }

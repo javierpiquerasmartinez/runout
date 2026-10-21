@@ -15,7 +15,13 @@ import {
   screenNames,
 } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
-import type { Hand, PokerSite, Stake } from '../hands/hand.js';
+import {
+  heroNamed,
+  heroSeat,
+  type Hand,
+  type PokerSite,
+  type Stake,
+} from '../hands/hand.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
@@ -120,7 +126,7 @@ export class QueueService {
     const duplicates: Discarded[] = [];
     const taken = new Set<string>();
     read.forEach((hand, index) => {
-      const key = handKey(hand.site, hand.siteHandId, hand.hero.screenName);
+      const key = keyOf(hand);
       const known = stored.get(key);
       if (known?.inQueue || taken.has(key)) {
         duplicates.push({ text: texts[index], reason: 'duplicate' });
@@ -154,6 +160,7 @@ export class QueueService {
         site: hands.site,
         siteHandId: hands.siteHandId,
         heroScreenName: hands.heroScreenName,
+        heroSeat: hands.heroSeat,
         authorId: hands.authorId,
         authorName: identities.displayName,
         queueEntryId: queueEntries.id,
@@ -176,7 +183,7 @@ export class QueueService {
       );
     return new Map(
       rows.map((row) => [
-        handKey(row.site, row.siteHandId, row.heroScreenName),
+        handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat),
         {
           id: row.id,
           author: {
@@ -242,7 +249,9 @@ export class QueueService {
       displayName: importer.displayName ?? '',
     };
     return read.map((hand) => {
-      const author = claimed.get(hand.hero.screenName.toLowerCase());
+      const author = heroNamed(hand)
+        ? claimed.get(hand.hero.screenName.toLowerCase())
+        : undefined;
       return author
         ? { author, heroMatched: true }
         : { author: importerAsAuthor, heroMatched: false };
@@ -315,6 +324,7 @@ export class QueueService {
             site: hand.site,
             siteHandId: hand.siteHandId,
             heroScreenName: hand.hero.screenName,
+            heroSeat: heroSeat(hand),
             authorId: author.identityId,
             importerId: importer.id,
             sourceFormat: hand.sourceFormat,
@@ -327,16 +337,25 @@ export class QueueService {
           })),
         )
         .onConflictDoNothing({
-          target: [hands.site, hands.siteHandId, hands.heroScreenName],
+          target: [
+            hands.site,
+            hands.siteHandId,
+            hands.heroScreenName,
+            hands.heroSeat,
+          ],
         })
         .returning({
           id: hands.id,
           site: hands.site,
           siteHandId: hands.siteHandId,
           heroScreenName: hands.heroScreenName,
+          heroSeat: hands.heroSeat,
         });
       for (const row of stored) {
-        ids.set(handKey(row.site, row.siteHandId, row.heroScreenName), row.id);
+        ids.set(
+          handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat),
+          row.id,
+        );
       }
       const missing = toStore.filter((each) => !ids.has(keyOf(each.hand)));
       if (missing.length > 0) {
@@ -346,6 +365,7 @@ export class QueueService {
             site: hands.site,
             siteHandId: hands.siteHandId,
             heroScreenName: hands.heroScreenName,
+            heroSeat: hands.heroSeat,
           })
           .from(hands)
           .where(
@@ -356,7 +376,7 @@ export class QueueService {
           );
         for (const row of rows) {
           ids.set(
-            handKey(row.site, row.siteHandId, row.heroScreenName),
+            handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat),
             row.id,
           );
         }
@@ -604,10 +624,20 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
 }
 
 /** What makes a Hand the same Hand (ADR 0002). */
-function handKey(site: string, siteHandId: string, hero: string): string {
-  return JSON.stringify([site, siteHandId, hero]);
+function handKey(
+  site: string,
+  siteHandId: string,
+  hero: string,
+  seat: number,
+): string {
+  return JSON.stringify([site, siteHandId, hero, seat]);
 }
 
 function keyOf(hand: Hand): string {
-  return handKey(hand.site, hand.siteHandId, hand.hero.screenName);
+  return handKey(
+    hand.site,
+    hand.siteHandId,
+    hand.hero.screenName,
+    heroSeat(hand),
+  );
 }

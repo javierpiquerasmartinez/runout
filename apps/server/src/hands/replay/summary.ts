@@ -4,7 +4,7 @@ import { positions, type Position } from './positions.js';
 export interface HandSummary {
   /** Who took part: the Hero first if they did, then in preflop acting order. */
   positions: Position[];
-  /** Everything put in the pot, before rake, as an Amount. */
+  /** Everything in the pot, before rake and with any Splash, as an Amount. */
   finalPot: number;
   finalStreet: Street;
   showdown: boolean;
@@ -45,7 +45,7 @@ function positionsInvolved(hand: Hand): Position[] {
 }
 
 function finalPot(hand: Hand): number {
-  let pot = 0;
+  let pot = hand.splash ?? 0;
   // What each player has bet on the current Street, so a raise "to" a total
   // only adds the difference.
   let street: Street = 'preflop';

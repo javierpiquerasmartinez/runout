@@ -125,7 +125,7 @@ const POST = new RegExp(
 const PREFLOP_MARKERS = new Set(['HOLE CARDS', 'ANTE/BLINDS', 'PRE-FLOP']);
 
 /** What the house takes, as the summary's `Total pot` line itemises it. */
-const FEES = /\| (?:Rake|Jackpot|Bingo|Fortune|Tax) (\S+)/g;
+const FEES = /\| (?:Rake|Jackpot|Bingo|Fortune|Tax|Splash Fee) (\S+)/g;
 
 /**
  * Everything after the seats: blinds, Actions Street by Street, the board,

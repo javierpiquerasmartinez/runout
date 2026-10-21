@@ -1,5 +1,6 @@
 import type { Hand, SourceFormat } from '../hand.js';
 import { Discard, type DiscardReason } from './discard.js';
+import { isCoinPokerHand, parseCoinPokerHand } from './coinpoker.js';
 import { isGGPokerHand, parseGGPokerHand } from './ggpoker.js';
 import { isPokerStarsHand, parsePokerStarsHand } from './pokerstars.js';
 import { isWinamaxHand, parseWinamaxHand } from './winamax.js';
@@ -18,6 +19,7 @@ const FORMATS: Record<SourceFormat, Format> = {
   pokerstars: { recognises: isPokerStarsHand, parse: parsePokerStarsHand },
   ggpoker: { recognises: isGGPokerHand, parse: parseGGPokerHand },
   winamax: { recognises: isWinamaxHand, parse: parseWinamaxHand },
+  coinpoker: { recognises: isCoinPokerHand, parse: parseCoinPokerHand },
 };
 
 export const SOURCE_FORMATS = Object.keys(FORMATS) as SourceFormat[];

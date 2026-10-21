@@ -28,14 +28,23 @@ describe('Test database (e2e)', () => {
   });
 });
 
-describe('Migrating a database with Hands imported more than once (e2e)', () => {
-  const name = `migrations_${randomUUID().replaceAll('-', '')}`;
+describe('Migrating a database with Hands already imported (e2e)', () => {
   const admin = new pg.Client(inject('databaseUrl'));
+  let name: string;
   let databaseUrl: string;
   let folder: string;
 
   beforeAll(async () => {
     await admin.connect();
+  });
+
+  afterAll(async () => {
+    await admin.end();
+  });
+
+  // Each test migrates a database of its own, from a point of its choosing.
+  beforeEach(async () => {
+    name = `migrations_${randomUUID().replaceAll('-', '')}`;
     await admin.query(`create database ${name}`);
     const url = new URL(inject('databaseUrl'));
     url.pathname = `/${name}`;
@@ -43,9 +52,8 @@ describe('Migrating a database with Hands imported more than once (e2e)', () => 
     folder = await mkdtemp(join(tmpdir(), 'runout-migrations-'));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await admin.query(`drop database if exists ${name} with (force)`);
-    await admin.end();
     await rm(folder, { recursive: true, force: true });
   });
 
@@ -88,14 +96,19 @@ describe('Migrating a database with Hands imported more than once (e2e)', () => 
          values ('ABCD2345', 'Martes', $1, now()) returning id`,
         [identity.id],
       );
+      // As much of a Hand as later migrations read from it.
+      const stored = {
+        seats: [{ seat: 5, screenName: 'iMapleAA' }],
+        hero: { screenName: 'iMapleAA', cards: ['Js', '8s'] },
+      };
       const insertHand = async (importedAt: string) =>
         (
           await client.query<{ id: string }>(
             `insert into hands (site, site_hand_id, hero_screen_name, author_id, importer_id,
                source_format, played_at, small_blind, big_blind, currency, content, imported_at)
              values ('pokerstars', '262120750636', 'iMapleAA', $1, $1, 'pokerstars', now(),
-               5, 10, 'EUR', '{}', $2) returning id`,
-            [identity.id, importedAt],
+               5, 10, 'EUR', $3, $2) returning id`,
+            [identity.id, importedAt, JSON.stringify(stored)],
           )
         ).rows[0].id;
       const first = await insertHand('2026-09-18T10:00:00Z');
@@ -128,6 +141,56 @@ describe('Migrating a database with Hands imported more than once (e2e)', () => 
       expect(hands.rows.map((row) => row.id)).toEqual([first]);
       expect(queue.rows.map((row) => row.hand_id)).toEqual([first, first]);
       expect(playback.rows.map((row) => row.hand_id)).toEqual([first]);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it('keys each stored Hand on its Hero’s seat, read from the Hand itself', async () => {
+    await migrateUpTo('0009_preferences');
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    try {
+      const {
+        rows: [identity],
+      } = await client.query<{ id: string }>(
+        `insert into identities (token_hash, created_at) values ('seat', now()) returning id`,
+      );
+      const insertHand = (hero: string) =>
+        client.query(
+          `insert into hands (site, site_hand_id, hero_screen_name, author_id, importer_id,
+             source_format, played_at, small_blind, big_blind, currency, content, imported_at)
+           values ('pokerstars', '262120799999', $2, $1, $1, 'pokerstars', now(),
+             5, 10, 'EUR', $3, now())`,
+          [
+            identity.id,
+            hero,
+            JSON.stringify({
+              seats: [
+                { seat: 2, screenName: 'Alder239' },
+                { seat: 5, screenName: hero },
+              ],
+              hero: { screenName: hero, cards: ['Js', '8s'] },
+            }),
+          ],
+        );
+      await insertHand('iMapleAA');
+      // The same Hand imported again with its Hero renamed: kept as it was.
+      await insertHand('iPholdeAA');
+
+      await migrateWith(MIGRATIONS_FOLDER);
+
+      const { rows } = await client.query<{
+        hero_screen_name: string;
+        hero_seat: number;
+      }>(
+        `select hero_screen_name, hero_seat from hands
+         where site_hand_id = '262120799999' order by hero_screen_name`,
+      );
+      expect(rows).toEqual([
+        { hero_screen_name: 'iMapleAA', hero_seat: 5 },
+        { hero_screen_name: 'iPholdeAA', hero_seat: 5 },
+      ]);
     } finally {
       await client.end();
     }

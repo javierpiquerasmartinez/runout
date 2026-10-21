@@ -5,6 +5,14 @@ export type MessageParams = Record<string, string | number>
 /** The Intl locale each UI language formats numbers and dates with. */
 const intlLocales: Record<Locale, string> = { es: 'es-ES', en: 'en-US' }
 
+/**
+ * Currencies with no ISO 4217 code, which Intl can't format: each is written
+ * like the ISO currency it tracks, with its own sign.
+ */
+const TICKERS: Record<string, { sign: string; writtenLike: string }> = {
+  USDT: { sign: '₮', writtenLike: 'USD' },
+}
+
 export type Translator = ReturnType<typeof createTranslator>
 
 export function createTranslator(locale: Locale) {
@@ -22,8 +30,19 @@ export function createTranslator(locale: Locale) {
       ),
     formatNumber: (value: number, options?: Intl.NumberFormatOptions) =>
       options ? new Intl.NumberFormat(intlLocale, options).format(value) : numberFormat.format(value),
-    formatCurrency: (amount: number, currency: string, options?: Intl.NumberFormatOptions) =>
-      new Intl.NumberFormat(intlLocale, { style: 'currency', currency, ...options }).format(amount),
+    formatCurrency: (amount: number, currency: string, options?: Intl.NumberFormatOptions) => {
+      const ticker = TICKERS[currency]
+      const format = new Intl.NumberFormat(intlLocale, {
+        style: 'currency',
+        currency: ticker?.writtenLike ?? currency,
+        ...options,
+      })
+      if (!ticker) return format.format(amount)
+      return format
+        .formatToParts(amount)
+        .map((part) => (part.type === 'currency' ? ticker.sign : part.value))
+        .join('')
+    },
     formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) =>
       date.toLocaleDateString(intlLocale, options),
     formatTime: (date: Date, options?: Intl.DateTimeFormatOptions) =>

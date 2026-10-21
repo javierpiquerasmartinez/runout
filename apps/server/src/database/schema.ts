@@ -98,6 +98,8 @@ export const hands = pgTable(
     site: text('site').notNull(),
     siteHandId: text('site_hand_id').notNull(),
     heroScreenName: text('hero_screen_name').notNull(),
+    /** The Hero's seat: with their Screen Name, what tells two views of one hand apart (ADR 0002). */
+    heroSeat: integer('hero_seat').notNull(),
     authorId: uuid('author_id')
       .notNull()
       .references(() => identities.id),
@@ -116,10 +118,12 @@ export const hands = pgTable(
   },
   (table) => [
     // The same Hand from the same Hero is only ever imported once (ADR 0002).
-    uniqueIndex('hands_site_hand_hero_idx').on(
+    // The seat tells Heroes apart on Poker Sites that write each as `Hero`.
+    uniqueIndex('hands_site_hand_hero_seat_idx').on(
       table.site,
       table.siteHandId,
       table.heroScreenName,
+      table.heroSeat,
     ),
   ],
 );

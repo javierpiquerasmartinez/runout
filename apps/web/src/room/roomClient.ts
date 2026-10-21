@@ -36,7 +36,7 @@ export interface QueueEntry {
   position: number
   author: Author
   /** With `siteHandId`, which real-world hand this is: two entries sharing both are it from two seats. */
-  site: 'pokerstars' | 'ggpoker' | 'winamax'
+  site: 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker'
   siteHandId: string
   playedAt: string
   stake: {

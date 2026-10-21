@@ -5,7 +5,9 @@ export type DiscardReason =
   | 'too-many-seats'
   | 'no-hero'
   | 'malformed'
-  /** Already imported: same Poker Site, hand ID and Hero (ADR 0002). */
+  /** The board was run more than once: one board is all a Hand holds. */
+  | 'run-it-twice'
+  /** Already imported: same Poker Site, hand ID, Hero and seat (ADR 0002). */
   | 'duplicate';
 
 /** Thrown by a format parser when a Hand can't be read. */

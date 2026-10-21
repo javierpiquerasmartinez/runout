@@ -18,13 +18,16 @@ export function freshHandHistory(name: string): string {
   return withFreshHandIds(fixture(name));
 }
 
-/** The same text, with each PokerStars hand ID replaced by a new one. */
+/** The same text, with each PokerStars or CoinPoker hand ID replaced by a new one. */
 export function withFreshHandIds(text: string): string {
   const renamed = new Map<string, string>();
-  return text.replace(/(PokerStars Hand #)(\d+)/g, (_, prefix, id) => {
-    if (!renamed.has(id)) {
-      renamed.set(id, `${randomInt(1e9, 1e10)}${randomInt(1e3, 1e4)}`);
-    }
-    return `${prefix}${renamed.get(id)}`;
-  });
+  return text.replace(
+    /((?:PokerStars|CoinPoker) Hand #)(\d+)/g,
+    (_, prefix, id) => {
+      if (!renamed.has(id)) {
+        renamed.set(id, `${randomInt(1e9, 1e10)}${randomInt(1e3, 1e4)}`);
+      }
+      return `${prefix}${renamed.get(id)}`;
+    },
+  );
 }

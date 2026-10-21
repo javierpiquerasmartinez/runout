@@ -158,6 +158,8 @@ export function timeline(hand: Hand): Timeline {
   // Uncalled bets, handed back once nobody acts again.
   let unreturned: Hand['returned'] = [];
 
+  // A Splash is in the middle from the start, gathered like any pot.
+  const splash = hand.splash ?? 0;
   const states: TableState[] = [];
   const push = (
     state: Pick<TableState, 'street' | 'toAct' | 'action' | 'result'>,
@@ -165,8 +167,8 @@ export function timeline(hand: Hand): Timeline {
     states.push({
       ...state,
       board,
-      pot: potOf(players),
-      pots: potsOf(players),
+      pot: potOf(players) + splash,
+      pots: potsOf(players, splash),
       players,
       effectiveStack,
       spr,
@@ -186,7 +188,10 @@ export function timeline(hand: Hand): Timeline {
     effectiveStack = secondDeepest(
       players.filter((p) => !p.folded).map((p) => p.stack),
     );
-    spr = effectiveStack === null ? null : effectiveStack / potOf(players);
+    spr =
+      effectiveStack === null
+        ? null
+        : effectiveStack / (potOf(players) + splash);
     push({ street, toAct, action: null, result: null });
   };
 
@@ -232,10 +237,12 @@ export function timeline(hand: Hand): Timeline {
   }
   gather();
   board = hand.board;
-  const result = resultOf(hand, players, board);
+  const result = resultOf(hand, players, board, splash);
   // Winnings come in last, so they don't count as a Stack to play with.
-  for (const { screenName, amount } of hand.collected) {
-    update(screenName, (p) => ({ ...p, stack: p.stack + amount }));
+  for (const { winners } of result.pots) {
+    for (const { screenName, amount } of winners) {
+      update(screenName, (p) => ({ ...p, stack: p.stack + amount }));
+    }
   }
   push({ street: finalStreet, toAct: null, action: null, result });
 
@@ -255,9 +262,10 @@ function potOf(players: PlayerState[]): number {
 /**
  * Splits what has been gathered into the middle into the main pot and side
  * pots. Each player all in for less than the rest caps a pot at what they
- * put in; above it, only those who put in more can win.
+ * put in; above it, only those who put in more can win. A Splash is in the
+ * main pot, for every player still in to win.
  */
-function potsOf(players: PlayerState[]): Pot[] {
+function potsOf(players: PlayerState[], splash: number): Pot[] {
   const gathered = players.map((p) => ({
     screenName: p.screenName,
     amount: p.committed - p.bet,
@@ -275,14 +283,16 @@ function potsOf(players: PlayerState[]): Pot[] {
   const pots: Pot[] = [];
   let floor = 0;
   for (const cap of [...caps, Infinity]) {
+    const main = pots.length === 0 && splash > 0;
     const amount = gathered.reduce(
       (sum, g) => sum + Math.max(0, Math.min(g.amount, cap) - floor),
-      0,
+      main ? splash : 0,
     );
     const contestants = gathered
       .filter(
         (g) =>
-          g.live && (cap === Infinity ? g.amount > floor : g.amount >= cap),
+          g.live &&
+          (main || (cap === Infinity ? g.amount > floor : g.amount >= cap)),
       )
       .map((g) => g.screenName);
     if (amount > 0) pots.push({ amount, contestants });
@@ -295,8 +305,9 @@ function resultOf(
   hand: Hand,
   players: PlayerState[],
   board: string[],
+  splash: number,
 ): HandResult {
-  const worked = potsOf(players);
+  const worked = potsOf(players, splash);
   // The Hand History numbers side pots from 1, the main pot being 0.
   const matches = hand.collected.every(
     ({ pot }) =>
@@ -318,6 +329,14 @@ function resultOf(
     if (winner) winner.amount += amount;
     else winners.push({ screenName, amount });
   }
+  // The Hand History leaves the Splash out of what was collected: it goes to
+  // whoever won the main pot, shared evenly, the odd hundredth to the first.
+  const mainWinners = pots[0]?.winners ?? [];
+  mainWinners.forEach((winner, index) => {
+    const share = Math.floor(splash / mainWinners.length);
+    winner.amount +=
+      share + (index === 0 ? splash - share * mainWinners.length : 0);
+  });
 
   const revealed: HandResult['revealed'] = [];
   if (hand.showdown) {

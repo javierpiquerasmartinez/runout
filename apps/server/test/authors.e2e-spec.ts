@@ -10,7 +10,12 @@ interface Author {
 
 interface Preview {
   id: string;
-  hands: { hero: string; author: Author; heroMatched: boolean }[];
+  hands: {
+    hero: string;
+    heroNamed: boolean;
+    author: Author;
+    heroMatched: boolean;
+  }[];
   discarded: { text: string; reason: string }[];
 }
 
@@ -32,6 +37,24 @@ function fromOpponentSeat(text: string): string {
     `Dealt to ${HERO} [Js 8s]`,
     `Dealt to ${OPPONENT} [As 7d]`,
   );
+}
+
+/** The first Hand of the CoinPoker fixture, where the Hero sits in seat 4. */
+function coinPokerHand(): string {
+  return freshHandHistory('coinpoker-session.txt').split(/\n\s*\n/)[0];
+}
+
+/**
+ * The same CoinPoker Hand as recorded from seat 1: that player is the one
+ * written `Hero`, and seat 4 gets a hashed name instead.
+ */
+function fromSeatOne(text: string): string {
+  return text
+    .replaceAll('Hero', 'SEAT4')
+    .replaceAll('ebe47eca', 'Hero')
+    .replaceAll('SEAT4', '5f1e9a2b')
+    .replace('Dealt to 5f1e9a2b [Kc 5d]', 'Dealt to 5f1e9a2b')
+    .replace('Dealt to Hero\n', 'Dealt to Hero [Ah Qd]\n');
 }
 
 describe('Authors, Screen Names and duplicates (e2e)', () => {
@@ -159,6 +182,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
 
       expect(read.hands[0]).toMatchObject({
         hero: HERO,
+        heroNamed: true,
         author: { identityId: guest.id, displayName: 'Marta' },
         heroMatched: true,
       });
@@ -194,6 +218,25 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
         'queue.entriesAdded',
       );
       expect(entries[0].author.identityId).toBe(guest.id);
+    });
+
+    it('makes the Importer the Author of a Hand whose Poker Site hides the Hero’s Screen Name, even if someone plays as "Hero"', async () => {
+      const master = await issueIdentity();
+      const guest = await issueIdentity();
+      const code = await createRoom(master.token);
+      await join(master.token, code, 'Javier');
+      await join(guest.token, code, 'Marta');
+      await setScreenNames(guest.token, ['Hero']).expect(200);
+
+      const read = await importText(master.token, code, coinPokerHand());
+
+      expect(read.hands[0]).toMatchObject({
+        hero: 'Hero',
+        // So the Importer isn't offered to add `Hero` to their Screen Names.
+        heroNamed: false,
+        author: { identityId: master.id, displayName: 'Javier' },
+        heroMatched: false,
+      });
     });
 
     it('matches Hands pasted anywhere in the Room too', async () => {
@@ -363,6 +406,35 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       await socket.next('queue.entriesAdded');
       const { queue } = await join(master.token, code, 'Javier');
       expect(queue).toHaveLength(1);
+    });
+
+    it('tells CoinPoker Hands apart by the Hero’s seat, all of them written `Hero`', async () => {
+      const master = await issueIdentity();
+      const guest = await issueIdentity();
+      const code = await createRoom(master.token);
+      await join(master.token, code, 'Javier');
+      await join(guest.token, code, 'Marta');
+      const text = coinPokerHand();
+      await importText(master.token, code, text);
+
+      const again = await preview(master.token, code, text).expect(201);
+      const fromAnotherSeat = await importText(
+        guest.token,
+        code,
+        fromSeatOne(text),
+      );
+
+      expect(again.body.discarded).toEqual([
+        { text: text.trim(), reason: 'duplicate' },
+      ]);
+      expect(fromAnotherSeat.discarded).toEqual([]);
+      const { queue } = await join(master.token, code, 'Javier');
+      expect(queue).toHaveLength(2);
+      expect(queue[0].handId).not.toBe(queue[1].handId);
+      expect(queue[1]).toMatchObject({
+        site: 'coinpoker',
+        siteHandId: queue[0].siteHandId,
+      });
     });
 
     it('keeps the same hand ID from another Hero as a separate Hand, related to the first', async () => {
