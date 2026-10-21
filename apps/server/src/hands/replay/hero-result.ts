@@ -12,7 +12,7 @@ export interface HeroResult {
 }
 
 /**
- * The Hero's Result, read off the end of Playback: their Stack once the pots
+ * The Hero's Result, read off the Hand's timeline: their Stack once the pots
  * are paid out, against the Stack they started with.
  */
 export function heroResult(hand: Hand): HeroResult {
