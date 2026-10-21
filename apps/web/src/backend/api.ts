@@ -32,6 +32,7 @@ export type RejectionReason =
   | 'entry-not-in-queue'
   | 'nothing-to-undo'
   | 'undo-expired'
+  | 'invalid-library-filter'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

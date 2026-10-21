@@ -14,19 +14,22 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { LIBRARY_PAGE_SIZE, libraryHandPath, libraryPath, type LibraryHand, type LibraryPage as Page } from './library'
+import { LIBRARY_PAGE_SIZE, libraryHandPath, type LibraryHand, type LibraryPage as Page } from './library'
+import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, type LibraryFilter } from './libraryFilter'
+import { LibraryFilters } from './LibraryFilters'
 import './LibraryPage.css'
 
 /**
  * The "Biblioteca" board: the Account's Hands, newest first, a page at a
- * time. It predates ADR 0004, so neither its "Compartidas" collection nor its
- * Author column is built: every Hand here is the Account's own, whatever its
- * Hero, so the Hero takes the Author's place.
+ * time, narrowed by the Library filter. It predates ADR 0004, so neither its
+ * "Compartidas" collection nor its Author column is built: every Hand here is
+ * the Account's own, whatever its Hero, so the Hero takes the Author's place.
  */
 export function LibraryPage() {
   const { t } = useI18n()
   const { token } = useIdentity()
   const [pageNumber, setPageNumber] = useState(1)
+  const [filter, setFilter] = useState<LibraryFilter>(EMPTY_LIBRARY_FILTER)
   // Bumped after an import, so the list is read again.
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
@@ -34,16 +37,30 @@ export function LibraryPage() {
 
   useEffect(() => {
     let cancelled = false
-    api<Page>(`/library/hands?page=${pageNumber}&pageSize=${LIBRARY_PAGE_SIZE}`, { token })
+    const query = new URLSearchParams({ page: String(pageNumber), pageSize: String(LIBRARY_PAGE_SIZE) })
+    libraryFilterQuery(filter).forEach((value, key) => query.append(key, value))
+    api<Page>(`/library/hands?${query}`, { token })
       .then((page) => !cancelled && setLoad({ state: 'loaded', page }))
       .catch((error: unknown) => !cancelled && setLoad({ state: 'failed', reason: reasonOf(error) }))
     return () => {
       cancelled = true
     }
-  }, [token, pageNumber, revision])
+  }, [token, pageNumber, filter, revision])
 
   const page = load?.state === 'loaded' ? load.page : null
   const openImport = () => setImporting(true)
+  // Any change of filter starts again from the first page.
+  const changeFilter = (next: LibraryFilter) => {
+    setFilter(next)
+    setPageNumber(1)
+  }
+  const setMark = (hand: LibraryHand, marked: boolean) => {
+    api(`/library/hands/${encodeURIComponent(hand.id)}/mark`, { token, method: marked ? 'PUT' : 'DELETE' })
+      // A refused change shows as the Mark staying as it was.
+      .catch(() => undefined)
+      // Read again: the counts change, and so does what the Marked collection holds.
+      .finally(() => setRevision((n) => n + 1))
+  }
 
   return (
     <LibraryFrame>
@@ -51,10 +68,25 @@ export function LibraryPage() {
         <nav className="library__side" aria-label={t('library.collections')}>
           <div className="library__group">
             <span className="library__group-title ro-mono">{t('library.collections')}</span>
-            <a href={libraryPath} className="library__collection" aria-current="page" onClick={followLink}>
+            <button
+              type="button"
+              className="library__collection"
+              aria-current={!filter.markedOnly ? 'page' : undefined}
+              onClick={() => changeFilter({ ...filter, markedOnly: false })}
+            >
               {t('library.all')}
-              {page && <span className="library__collection-count ro-mono">{page.total}</span>}
-            </a>
+              {page && <span className="library__collection-count ro-mono">{page.counts.all}</span>}
+            </button>
+            <button
+              type="button"
+              className="library__collection"
+              aria-current={filter.markedOnly ? 'page' : undefined}
+              onClick={() => changeFilter({ ...filter, markedOnly: true })}
+            >
+              <Icon name="mark" size={14} />
+              {t('library.marked')}
+              {page && <span className="library__collection-count ro-mono">{page.counts.marked}</span>}
+            </button>
           </div>
           <Button variant="secondary" className="library__import" onClick={openImport}>
             <Icon name="import" size={16} />
@@ -64,7 +96,7 @@ export function LibraryPage() {
 
         <main className="library__main">
           <div className="library__intro">
-            <h1 className="library__title ro-serif">{t('library.all')}</h1>
+            <h1 className="library__title ro-serif">{t(filter.markedOnly ? 'library.markedTitle' : 'library.all')}</h1>
             {page && (
               <span className="library__subtitle">
                 {t(page.total === 1 ? 'library.count.one' : 'library.count.other', { count: page.total })}
@@ -77,7 +109,16 @@ export function LibraryPage() {
               {t(`reason.${load.reason}`)}
             </p>
           )}
-          {page && page.total === 0 && (
+          {page && page.counts.all > 0 && <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />}
+          {page && page.total === 0 && page.counts.all > 0 && (
+            <div className="library__empty">
+              <p>{t('library.noMatches')}</p>
+              <Button variant="secondary" onClick={() => changeFilter(EMPTY_LIBRARY_FILTER)}>
+                {t('library.filter.clear')}
+              </Button>
+            </div>
+          )}
+          {page && page.counts.all === 0 && (
             <div className="library__empty">
               <p>{t('library.empty')}</p>
               <Button variant="primary" onClick={openImport}>
@@ -88,7 +129,7 @@ export function LibraryPage() {
           )}
           {page && page.hands.length > 0 && (
             <>
-              <HandTable hands={page.hands} />
+              <HandTable hands={page.hands} onSetMark={setMark} />
               <Pagination page={page} onGoTo={setPageNumber} />
             </>
           )}
@@ -136,7 +177,13 @@ export function LibraryFrame({ children }: { children: ReactNode }) {
   )
 }
 
-function HandTable({ hands }: { hands: LibraryHand[] }) {
+function HandTable({
+  hands,
+  onSetMark,
+}: {
+  hands: LibraryHand[]
+  onSetMark: (hand: LibraryHand, marked: boolean) => void
+}) {
   const i18n = useI18n()
   const { t } = i18n
   const { displayUnit } = usePreferences()
@@ -145,6 +192,9 @@ function HandTable({ hands }: { hands: LibraryHand[] }) {
       <table className="library-table" aria-label={t('library.all')}>
         <thead>
           <tr>
+            <th scope="col" className="library-table__mark">
+              <span className="library-table__hidden">{t('library.marked')}</span>
+            </th>
             <th scope="col" className="library-table__hand">
               {t('library.column.hand')}
             </th>
@@ -166,6 +216,17 @@ function HandTable({ hands }: { hands: LibraryHand[] }) {
             })
             return (
               <tr key={hand.id} className="library-row">
+                <td className="library-table__mark">
+                  <IconButton
+                    icon="mark"
+                    size="compact"
+                    className="library-row__mark"
+                    label={t('library.mark', { positions, hero: hand.hero })}
+                    aria-pressed={hand.marked}
+                    data-marked={hand.marked || undefined}
+                    onClick={() => onSetMark(hand, !hand.marked)}
+                  />
+                </td>
                 <td className="library-table__hand">
                   <a
                     href={libraryHandPath(hand.id)}
