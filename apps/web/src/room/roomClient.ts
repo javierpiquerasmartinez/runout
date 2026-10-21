@@ -80,10 +80,13 @@ export interface Playback {
   hideOpponentNames: boolean
 }
 
-/** The Master role moving, and why: handed over, or passed on after a drop. */
+/**
+ * The Master role moving, and why: handed over, passed on after a drop, or
+ * taken by the Account an anonymous Master signed in as.
+ */
 export interface MasterChange {
   masterId: string
-  reason: 'handover' | 'failover'
+  reason: 'handover' | 'failover' | 'sign-in'
 }
 
 /** How well a Participant is keeping up, as the server reads their heartbeats. */
@@ -470,7 +473,7 @@ function parseChange(event: unknown, data: any): RoomChange | null {
       return {
         type: 'masterChanged',
         masterId: String(data.masterId),
-        reason: data.reason === 'failover' ? 'failover' : 'handover',
+        reason: data.reason === 'failover' || data.reason === 'sign-in' ? data.reason : 'handover',
       }
     case 'queue.entriesAdded':
       return { type: 'entriesAdded', entries: data.entries as QueueEntry[], notes: (data.notes ?? []) as Note[] }

@@ -10,8 +10,11 @@ import { RoomsService } from './rooms.service.js';
 /** The role has moved, and why. Sent to the whole Room as `room.masterChanged`. */
 export interface MasterChanged {
   masterId: string;
-  /** `handover` when the Master gave it away, `failover` when they dropped. */
-  reason: 'handover' | 'failover';
+  /**
+   * `handover` when the Master gave it away, `failover` when they dropped,
+   * `sign-in` when an anonymous Master signed in and their Account took it.
+   */
+  reason: 'handover' | 'failover' | 'sign-in';
 }
 
 /**

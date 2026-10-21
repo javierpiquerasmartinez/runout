@@ -18,6 +18,7 @@ export type RejectionReason =
   | 'master-must-choose'
   | 'cannot-kick-yourself'
   | 'kicked-from-room'
+  | 'identity-of-another-room'
   | 'hand-not-found'
   | 'hand-not-in-queue'
   | 'no-hand-loaded'

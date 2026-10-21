@@ -36,19 +36,22 @@ export interface RoomCommands {
 }
 
 /**
- * Joins the Room over the WebSocket once `displayName` is known, and leaves it
- * when the screen goes away. Pass null to wait (e.g. while the name is confirmed).
+ * Joins the Room over the WebSocket once `displayName` and the identity's
+ * `token` are known, and leaves it when the screen goes away. Pass null for
+ * either to wait (e.g. while the name is confirmed).
+ *
+ * A new token (signing in from inside the Room) joins again as its identity.
  *
  * The connection manager keeps the socket up and the reducer holds the Room;
  * this only carries what one says to the other. A revision nobody saw arrive,
  * or a reconnection, leaves the view owed a snapshot, which is asked for here.
  */
-export function useRoom(code: string, token: string, displayName: string | null): [RoomView, RoomCommands] {
+export function useRoom(code: string, token: string | null, displayName: string | null): [RoomView, RoomCommands] {
   const [view, dispatch] = useReducer(reduceRoom, initialRoomView)
   const connectionRef = useRef<RoomConnection | null>(null)
 
   useEffect(() => {
-    if (displayName === null) return
+    if (token === null || displayName === null) return
     const connection = new RoomConnection({ code, token, displayName, onEvent: dispatch })
     connectionRef.current = connection
     return () => {

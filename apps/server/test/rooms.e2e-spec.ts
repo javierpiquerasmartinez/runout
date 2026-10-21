@@ -97,7 +97,14 @@ describe('Rooms over HTTP (e2e)', () => {
   });
 
   it('rejects creating a Room as an anonymous identity: it needs an Account', async () => {
-    const anonymous = await request(running.httpServer).post('/api/identities');
+    const master = await newAccount(running.httpServer);
+    const open = await createRoom(master.token, {
+      name: 'NL10',
+      displayName: 'Javier',
+    }).expect(201);
+    const anonymous = await request(running.httpServer)
+      .post(`/api/rooms/${open.body.code}/guests`)
+      .send({ displayName: 'Marta' });
 
     const res = await createRoom(anonymous.body.token, {
       name: 'NL50',

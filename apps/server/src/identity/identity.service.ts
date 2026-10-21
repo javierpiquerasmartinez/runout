@@ -1,11 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
-import { DATABASE, type Database } from '../database/database.js';
+import {
+  DATABASE,
+  type Database,
+  type Transaction,
+} from '../database/database.js';
 import {
   identities,
+  marks,
   preferences,
+  rooms,
   screenNames,
   sessions,
 } from '../database/schema.js';
@@ -47,6 +53,8 @@ export interface Profile extends Identity {
   preferences: Preferences;
   /** The Google account behind it; null for an anonymous identity. */
   account: { email: string | null } | null;
+  /** The one Room an anonymous identity exists for; null for an Account. */
+  room: { code: string } | null;
 }
 
 /** A browser just given a token for an identity. */
@@ -57,6 +65,17 @@ export interface SignedIn {
 
 /** Told whenever someone's Display Name really changes. */
 export type RenameListener = (identity: Identity) => void;
+
+/**
+ * Told when someone signs in from inside a Room as anonymous: the Account
+ * takes the anonymous identity's place there, in the same transaction that
+ * ends that identity. What it answers runs once that has committed.
+ */
+export type TakeOverListener = (
+  tx: Transaction,
+  anonymous: { id: string; roomId: string },
+  account: Identity,
+) => Promise<() => void>;
 
 export const DISPLAY_NAME_MAX_LENGTH = 40;
 export const SCREEN_NAME_MAX_LENGTH = 50;
@@ -69,6 +88,7 @@ export const SCREEN_NAMES_MAX_COUNT = 20;
 @Injectable()
 export class IdentityService {
   private readonly renameListeners: RenameListener[] = [];
+  private readonly takeOverListeners: TakeOverListener[] = [];
   private readonly screenNamesListeners: ((
     identityId: string,
     screenNames: string[],
@@ -80,11 +100,21 @@ export class IdentityService {
     @Inject(GOOGLE_VERIFIER) private readonly google: GoogleVerifier,
   ) {}
 
-  /** A new anonymous identity and the token its browser keeps. */
-  async issue(): Promise<SignedIn> {
+  /**
+   * A new anonymous identity for one Room, under the Display Name chosen to
+   * join it, and the token its browser keeps. It ends when the Room closes.
+   */
+  async issueAnonymous(
+    roomId: string,
+    displayName: unknown,
+  ): Promise<SignedIn> {
     const [row] = await this.db
       .insert(identities)
-      .values({ createdAt: this.clock.now() })
+      .values({
+        displayName: validDisplayName(displayName),
+        roomId,
+        createdAt: this.clock.now(),
+      })
       .returning();
     return {
       token: await this.startSession(row.id),
@@ -96,8 +126,15 @@ export class IdentityService {
    * Signs in with a Google ID token: the Account of that Google account,
    * created the first time, and a new token for this browser. A token Google
    * didn't issue for this app is refused with `invalid-google-token`.
+   *
+   * Signed in from inside a Room as anonymous (`fromToken` is that identity's),
+   * the Account takes its place in the Room, keeps its Display Name if it has
+   * none yet, and the anonymous identity ends.
    */
-  async signInWithGoogle(idToken: unknown): Promise<SignedIn> {
+  async signInWithGoogle(
+    idToken: unknown,
+    fromToken?: string,
+  ): Promise<SignedIn> {
     const google =
       typeof idToken === 'string' && idToken.length > 0
         ? await this.google.verify(idToken)
@@ -116,10 +153,67 @@ export class IdentityService {
         set: { email: google.email },
       })
       .returning();
+    const account = await this.takeOver(fromToken, toIdentity(row));
     return {
-      token: await this.startSession(row.id),
-      identity: await this.profile(toIdentity(row)),
+      token: await this.startSession(account.id),
+      identity: await this.profile(account),
     };
+  }
+
+  /** The Account in the place of the anonymous identity holding `token`, if one does. */
+  private async takeOver(
+    token: string | undefined,
+    account: Identity,
+  ): Promise<Identity> {
+    const anonymous = token ? await this.anonymousHolder(token) : null;
+    if (anonymous?.roomId == null) return account;
+    const { roomId } = anonymous;
+    const committed = await this.db.transaction(async (tx) => {
+      const afterwards: (() => void)[] = [];
+      for (const listener of this.takeOverListeners) {
+        afterwards.push(
+          await listener(tx, { id: anonymous.id, roomId }, account),
+        );
+      }
+      await this.endAnonymous(tx, [anonymous.id]);
+      return afterwards;
+    });
+    for (const then of committed) then();
+    if (account.displayName !== null || anonymous.displayName === null) {
+      return account;
+    }
+    return this.setDisplayName(account.id, anonymous.displayName);
+  }
+
+  /**
+   * Ends the anonymous identities of a Room that has just closed: they stop
+   * authenticating and lose their Screen Names, Preferences and Marks. The
+   * identities themselves stay, so Notes keep their writer's Display Name.
+   */
+  async endAnonymousOf(tx: Transaction, roomId: string): Promise<void> {
+    const ending = await tx
+      .select({ id: identities.id })
+      .from(identities)
+      .where(eq(identities.roomId, roomId));
+    await this.endAnonymous(
+      tx,
+      ending.map((row) => row.id),
+    );
+  }
+
+  private async endAnonymous(
+    tx: Transaction,
+    identityIds: string[],
+  ): Promise<void> {
+    if (identityIds.length === 0) return;
+    await tx.delete(sessions).where(inArray(sessions.identityId, identityIds));
+    await tx
+      .delete(screenNames)
+      .where(inArray(screenNames.identityId, identityIds));
+    await tx
+      .delete(preferences)
+      .where(inArray(preferences.identityId, identityIds));
+    await tx.delete(marks).where(inArray(marks.identityId, identityIds));
   }
 
   /** Ends the session holding `token`; the token stops authenticating at once. */
@@ -145,6 +239,36 @@ export class IdentityService {
     const row = await this.holder(token);
     if (row.googleSubject === null) throw new Rejected('account-required');
     return toIdentity(row);
+  }
+
+  /**
+   * The stored identity holding `token`, when there is one: a token that no
+   * longer works just means there is nothing to take over.
+   */
+  private async anonymousHolder(
+    token: string,
+  ): Promise<typeof identities.$inferSelect | null> {
+    try {
+      return await this.holder(token);
+    } catch (error) {
+      if (error instanceof Rejected && error.reason === 'unauthenticated') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The one Room an anonymous identity exists for; null for an Account, which
+   * may enter any. `unauthenticated` for an identity that isn't there.
+   */
+  async roomOf(identityId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ roomId: identities.roomId })
+      .from(identities)
+      .where(eq(identities.id, identityId));
+    if (!row) throw new Rejected('unauthenticated');
+    return row.roomId;
   }
 
   /** The stored identity holding `token`, or `unauthenticated`. */
@@ -173,8 +297,10 @@ export class IdentityService {
         .select({
           googleSubject: identities.googleSubject,
           email: identities.email,
+          roomCode: rooms.code,
         })
         .from(identities)
+        .leftJoin(rooms, eq(rooms.id, identities.roomId))
         .where(eq(identities.id, identity.id)),
     ]);
     return {
@@ -183,6 +309,7 @@ export class IdentityService {
       preferences,
       account:
         stored?.googleSubject == null ? null : { email: stored.email ?? null },
+      room: stored?.roomCode == null ? null : { code: stored.roomCode },
     };
   }
 
@@ -222,6 +349,11 @@ export class IdentityService {
       .values({ identityId: identity.id, ...next })
       .onConflictDoUpdate({ target: preferences.identityId, set: next });
     return next;
+  }
+
+  /** Hears every Account taking an anonymous identity's place in its Room. */
+  onTakeOver(listener: TakeOverListener): void {
+    this.takeOverListeners.push(listener);
   }
 
   /** Hears every real change of a Display Name, wherever it was made. */

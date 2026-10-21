@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState, type ClipboardEvent, type Drag
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
-import { useSession } from '../identity/context'
+import { useIdentity } from '../identity/context'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Icon, type IconName } from '../ui/Icon'
@@ -51,7 +51,7 @@ export function ImportDialog({
 }) {
   const i18n = useI18n()
   const { t } = i18n
-  const { token } = useSession()
+  const { token } = useIdentity()
   const dialog = useRef<HTMLDialogElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const sources = useRef(new Map<string, Source>())
@@ -482,7 +482,7 @@ function HandPreviewPanel({
  */
 function ClaimHeroes({ heroes, onClaimed }: { heroes: string[]; onClaimed: (screenName: string) => void }) {
   const { t } = useI18n()
-  const { token, identity, rememberScreenNames } = useSession()
+  const { token, identity, rememberScreenNames } = useIdentity()
   const [claiming, setClaiming] = useState<string | null>(null)
   const [claimed, setClaimed] = useState<string | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)

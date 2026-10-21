@@ -1,7 +1,8 @@
 import request from 'supertest';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
-describe('Anonymous identity (e2e)', () => {
+describe('Bearer tokens (e2e)', () => {
   let running: RunningApp;
 
   beforeEach(async () => {
@@ -12,24 +13,15 @@ describe('Anonymous identity (e2e)', () => {
     await running.close();
   });
 
-  it('issues an identity with a token on the first visit, with no registration', async () => {
-    const res = await request(running.httpServer)
-      .post('/api/identities')
-      .expect(201);
-
-    expect(res.body.token).toEqual(expect.any(String));
-    expect(res.body.token.length).toBeGreaterThanOrEqual(32);
-    expect(res.body.identity).toEqual({
-      id: expect.any(String),
-      displayName: null,
-      screenNames: [],
-      preferences: expect.any(Object),
-      account: null,
-    });
-  });
-
-  it('recognises a later visit that presents the token', async () => {
-    const issued = await request(running.httpServer).post('/api/identities');
+  it('recognises an anonymous identity by the token joining its Room gave it', async () => {
+    const master = await newAccount(running.httpServer);
+    const room = await request(running.httpServer)
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${master.token}`)
+      .send({ name: 'Martes NL50', displayName: 'Javier' });
+    const issued = await request(running.httpServer)
+      .post(`/api/rooms/${room.body.code}/guests`)
+      .send({ displayName: 'Marta' });
 
     const res = await request(running.httpServer)
       .get('/api/identities/me')

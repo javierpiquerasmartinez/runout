@@ -23,6 +23,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'master-must-choose': HttpStatus.CONFLICT,
   'cannot-kick-yourself': HttpStatus.BAD_REQUEST,
   'kicked-from-room': HttpStatus.FORBIDDEN,
+  'identity-of-another-room': HttpStatus.FORBIDDEN,
   'hand-not-found': HttpStatus.NOT_FOUND,
   'hand-not-in-queue': HttpStatus.NOT_FOUND,
   'no-hand-loaded': HttpStatus.CONFLICT,

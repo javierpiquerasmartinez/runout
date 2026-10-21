@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { locales, useI18n, type MessageKey } from '../i18n'
-import { useSession } from '../identity/context'
+import { useIdentity } from '../identity/context'
 import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
@@ -31,7 +31,7 @@ export const settingsPath = '/settings'
  */
 export function SettingsPage() {
   const { t } = useI18n()
-  const { identity } = useSession()
+  const { identity } = useIdentity()
   const name = identity.displayName ?? ''
   return (
     <div className="settings">
@@ -107,7 +107,7 @@ type Saving =
 /** Display Name and Screen Names, saved together. A new Display Name shows in the Room at once. */
 function ProfileCard() {
   const { t } = useI18n()
-  const { token, identity, rememberDisplayName, rememberScreenNames } = useSession()
+  const { token, identity, rememberDisplayName, rememberScreenNames } = useIdentity()
   const [name, setName] = useState(identity.displayName ?? '')
   const [names, setNames] = useState(formatScreenNames(identity.screenNames))
   const [saving, setSaving] = useState<Saving>({ state: 'editing' })
@@ -210,7 +210,7 @@ function ProfileCard() {
  */
 function AccountCard() {
   const { t } = useI18n()
-  const { identity, signOut } = useSession()
+  const { identity, signOut } = useIdentity()
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<FailureReason | null>(null)
 
@@ -267,7 +267,7 @@ function AccountCard() {
  */
 function usePreferenceChange(): [(changes: Partial<Preferences>) => void, string | null] {
   const { t } = useI18n()
-  const { changePreferences } = useSession()
+  const { changePreferences } = useIdentity()
   const [failure, setFailure] = useState<FailureReason | null>(null)
   const change = (changes: Partial<Preferences>) => {
     setFailure(null)
@@ -289,7 +289,7 @@ const PREVIEW_CARDS = ['As', 'Kh', '7d', '4c']
 
 function TableReadingCard() {
   const { t } = useI18n()
-  const { identity } = useSession()
+  const { identity } = useIdentity()
   const { deckStyle, fourColour, displayUnit, potPercentage } = identity.preferences
   const [change, failure] = usePreferenceChange()
   const units: DisplayUnit[] = ['big-blinds', 'amount', 'both']
@@ -383,7 +383,7 @@ function BetPreview({ unit, potPercentage }: { unit: DisplayUnit; potPercentage:
 
 function DeckCard() {
   const { t } = useI18n()
-  const { identity } = useSession()
+  const { identity } = useIdentity()
   const { deckStyle, fourColour } = identity.preferences
   const [change, failure] = usePreferenceChange()
   const styles: DeckStyle[] = ['classic', 'full-suit']
@@ -426,7 +426,7 @@ function DeckCard() {
 
 function ThemeCard() {
   const { t } = useI18n()
-  const { identity } = useSession()
+  const { identity } = useIdentity()
   const [change, failure] = usePreferenceChange()
   const themes: Theme[] = ['dark', 'light', 'system']
   return (
@@ -456,7 +456,7 @@ function ThemeCard() {
 
 function LanguageCard() {
   const { t } = useI18n()
-  const { identity } = useSession()
+  const { identity } = useIdentity()
   const [change, failure] = usePreferenceChange()
   return (
     <section className="settings-card settings-card--side" aria-labelledby="settings-language-title">

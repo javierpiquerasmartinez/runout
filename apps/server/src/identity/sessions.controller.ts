@@ -17,13 +17,18 @@ export class SessionsController {
 
   /**
    * Trades the ID token Google Identity Services gave the browser for the
-   * bearer token the rest of the app uses.
+   * bearer token the rest of the app uses. A browser inside a Room as
+   * anonymous presents that identity's token: the Account takes its place.
    */
   @Post('google')
   signInWithGoogle(
+    @Headers('authorization') authorization: string | undefined,
     @Body() body: { idToken?: unknown } = {},
   ): Promise<SignedIn> {
-    return this.identities.signInWithGoogle(body.idToken);
+    return this.identities.signInWithGoogle(
+      body.idToken,
+      bearerToken(authorization),
+    );
   }
 
   /** Signs this browser out: its token stops working. */

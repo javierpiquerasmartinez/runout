@@ -92,6 +92,13 @@
       "when": 1792593467720,
       "tag": "0012_accounts_and_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792596273687,
+      "tag": "0013_anonymous_identities_room",
+      "breakpoints": true
     }
   ]
 }

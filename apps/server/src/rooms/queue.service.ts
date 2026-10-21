@@ -584,12 +584,14 @@ export class QueueService {
           and(eq(queueEntries.roomId, roomId), isNull(queueEntries.removedAt)),
         )
         .orderBy(asc(queueEntries.position), asc(queueEntries.addedAt));
-      await this.renumber(tx, active.map((each) => each.id));
+      await this.renumber(
+        tx,
+        active.map((each) => each.id),
+      );
       return (await this.entryById(tx, id))!;
     });
   }
 }
-
 
 interface QueueEntryRow {
   id: string;

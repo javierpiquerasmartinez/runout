@@ -6,7 +6,8 @@ import { SessionContext } from '../identity/context'
 import { WelcomePage } from './WelcomePage'
 import type { Identity } from '../identity/identity'
 import { fakeGoogleIdentity } from '../test/fakeGoogle'
-import { fakeSession } from '../test/fakeSession'
+import { fakeSession, fakeVisitor } from '../test/fakeSession'
+import type { SessionContextValue } from '../identity/context'
 
 interface OpenRoom {
   code: string
@@ -34,7 +35,10 @@ afterEach(() => {
 })
 
 function renderWelcome(identity: Partial<Identity> = {}) {
-  const session = fakeSession(identity)
+  return renderWelcomeAs(fakeSession(identity))
+}
+
+function renderWelcomeAs<T extends SessionContextValue>(session: T): T {
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -65,6 +69,17 @@ describe('WelcomePage · the Rooms you can go back to', () => {
     expect(quiet.textContent).toContain('21 days ago')
   })
 
+  it('keeps the list for Accounts: a visitor or an anonymous identity sees none', async () => {
+    openRooms = [{ code: 'RNT4K9PX', name: 'Martes NL50', live: true, joinedAt: new Date().toISOString() }]
+    fakeGoogleIdentity()
+    renderWelcomeAs(fakeVisitor())
+    renderWelcome({ account: null, room: { code: 'RNT4K9PX' } })
+
+    expect(await screen.findAllByRole('heading', { name: 'Create a room' })).toHaveLength(2)
+    expect(screen.queryByText('Your recent rooms')).toBeNull()
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringMatching(/\/api\/rooms$/), expect.anything())
+  })
+
   it('says nothing at all when there is no open Room to go back to', async () => {
     renderWelcome()
 
@@ -83,14 +98,18 @@ describe('WelcomePage · signing in', () => {
     expect(screen.getByText('Sign in with Google to create rooms and keep your hands.')).toBeTruthy()
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
-    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google')
+    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google', false)
   })
 
-  it('still lets a visitor without an Account join a Room by code', () => {
+  it('still lets a visitor without an Account join a Room by code', async () => {
     fakeGoogleIdentity()
-    renderWelcome({ account: null })
+    vi.mocked(fetch).mockImplementation(async () => Response.json({ code: 'RNT4K9PX', name: 'Martes NL50' }))
+    renderWelcomeAs(fakeVisitor())
 
-    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy()
+    await userEvent.type(screen.getByLabelText('Room code'), 'RNT4-K9PX')
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }))
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/room/RNT4K9PX'))
   })
 
   it('lets an Account create a Room', () => {

@@ -4,9 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
+import { HeldRoomContext } from './heldRoomContext'
 import { RoomScreen } from './RoomScreen'
 import type { Note, Participant, QueueEntry, RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
+import type { Identity } from '../identity/identity'
+import { fakeGoogleIdentity } from '../test/fakeGoogle'
 import { fakeSession } from '../test/fakeSession'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
@@ -61,8 +64,8 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
   }
 }
 
-function screenOf(view: InRoom, commands: RoomCommands) {
-  const session = fakeSession({ id: view.you })
+function screenOf(view: InRoom, commands: RoomCommands, identity: Partial<Identity> = {}) {
+  const session = fakeSession({ id: view.you, ...identity })
   return (
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -74,7 +77,7 @@ function screenOf(view: InRoom, commands: RoomCommands) {
 
 let showAgain: ((ui: ReactElement) => void) | undefined
 
-function renderRoom(view: InRoom) {
+function renderRoom(view: InRoom, identity: Partial<Identity> = {}) {
   const commands = {
     handOverMaster: vi.fn(),
     kick: vi.fn(),
@@ -93,7 +96,7 @@ function renderRoom(view: InRoom) {
     setMark: vi.fn(),
     rejoinAs: vi.fn(),
   } satisfies RoomCommands
-  showAgain = render(screenOf(view, commands)).rerender
+  showAgain = render(screenOf(view, commands, identity)).rerender
   return commands
 }
 
@@ -392,5 +395,48 @@ describe('RoomScreen \u00b7 Marks', () => {
     rerenderRoom({ ...view, marks: ['hand-1'] }, commands)
     await userEvent.click(screen.getByRole('button', { name: 'Marked' }))
     expect(commands.setMark).toHaveBeenCalledWith('hand-1', false)
+  })
+})
+
+describe('RoomScreen · without an Account', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  it('tells an anonymous Participant that what they do is lost when the Room closes, and offers to sign in', async () => {
+    fakeGoogleIdentity()
+    renderRoom(roomView({ you: 'id-marta' }), { account: null, room: { code: 'RNT4K9PX' } })
+
+    const notice = screen.getByRole('region', { name: 'Without an account' })
+    expect(notice.textContent).toContain('what you do in this room is lost when it closes')
+    expect(await within(notice).findByRole('button', { name: 'Sign in with Google' })).toBeTruthy()
+  })
+
+  it('signs them in as an Account that takes their place in this Room', async () => {
+    fakeGoogleIdentity('id-token-from-google')
+    const view = roomView({ you: 'id-marta' })
+    const session = fakeSession({ id: 'id-marta', account: null, room: { code: 'RNT4K9PX' } })
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionContext.Provider value={session}>
+          <HeldRoomContext
+            value={{ code: 'RNT4K9PX', view, commands: {} as RoomCommands, displayName: 'Marta', confirmDisplayName: vi.fn() }}
+          >
+            <RoomScreen view={view} commands={{} as RoomCommands} />
+          </HeldRoomContext>
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
+
+    expect(session.signIn).toHaveBeenCalledWith('id-token-from-google', true)
+  })
+
+  it('says nothing of the kind to an Account', () => {
+    renderRoom(roomView())
+
+    expect(screen.queryByRole('region', { name: 'Without an account' })).toBeNull()
   })
 })

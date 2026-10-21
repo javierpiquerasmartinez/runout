@@ -4,7 +4,7 @@ import { useI18n, type MessageKey } from '../i18n'
 import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { TextField } from '../ui/TextField'
-import { useSession } from './context'
+import { useIdentity, useSession } from './context'
 import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName } from './identity'
 import './ChooseDisplayName.css'
 
@@ -14,13 +14,13 @@ import './ChooseDisplayName.css'
  */
 export function FirstDisplayName({ children }: { children: ReactNode }) {
   const { identity } = useSession()
-  if (identity.account && identity.displayName === null) return <ChooseDisplayName />
+  if (identity?.account && identity.displayName === null) return <ChooseDisplayName />
   return children
 }
 
 function ChooseDisplayName() {
   const { t } = useI18n()
-  const { token, rememberDisplayName } = useSession()
+  const { token, rememberDisplayName } = useIdentity()
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<MessageKey | null>(null)
   const [busy, setBusy] = useState(false)
