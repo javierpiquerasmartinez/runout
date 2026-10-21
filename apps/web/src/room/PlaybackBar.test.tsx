@@ -59,12 +59,8 @@ function renderBar(
     <I18nProvider initialLocale="en">
       <PlaybackBar
         view={view}
-        isMaster={isMaster}
-        sync={sync}
-        guests={guests}
+        room={{ isMaster, sync, guests, hideOpponentNames, onHideOpponentNames }}
         onGoTo={onGoTo}
-        hideOpponentNames={hideOpponentNames}
-        onHideOpponentNames={onHideOpponentNames}
       />
     </I18nProvider>,
   )

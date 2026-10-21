@@ -4,6 +4,7 @@ import {
   type AnyPgColumn,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -14,6 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { Hand } from '../hands/hand.js';
 
 /**
@@ -197,24 +199,52 @@ export const playbacks = pgTable('playbacks', {
 });
 
 /**
+ * A Hand in an Account's Library: theirs to keep, whoever else has it too
+ * (ADR 0004). Removing it deletes only this row, never the Hand.
+ */
+export const libraryEntries = pgTable(
+  'library_entries',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    handId: uuid('hand_id')
+      .notNull()
+      .references(() => hands.id),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.identityId, table.handId] }),
+    index('library_entries_hand_id_idx').on(table.handId),
+  ],
+);
+
+/**
  * Hands read from one uploaded file or paste, waiting for their Importer to
- * confirm them into the Room's Queue. Deleted once confirmed; unconfirmed
- * ones are forgotten after a while.
+ * confirm them into their destination: a Room's Queue or their own Library.
+ * Deleted once confirmed; unconfirmed ones are forgotten after a while.
  */
 export const importPreviews = pgTable(
   'import_previews',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    roomId: uuid('room_id')
-      .notNull()
-      .references(() => rooms.id),
+    destination: text('destination', { enum: ['room', 'library'] }).notNull(),
+    /** The Room whose Queue it is for; null when it is for the Library. */
+    roomId: uuid('room_id').references(() => rooms.id),
     importerId: uuid('importer_id')
       .notNull()
       .references(() => identities.id),
     hands: jsonb('hands').$type<Hand[]>().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   },
-  (table) => [index('import_previews_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('import_previews_created_at_idx').on(table.createdAt),
+    // A Room preview names its Room; a Library preview names none.
+    check(
+      'import_previews_destination_room_check',
+      sql`(${table.destination} = 'room') = (${table.roomId} is not null)`,
+    ),
+  ],
 );
 
 /**

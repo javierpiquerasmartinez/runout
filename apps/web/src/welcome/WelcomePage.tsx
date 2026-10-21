@@ -8,6 +8,7 @@ import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
 import type { JoinIntent } from '../room/joinIntent'
 import { roomPath } from '../room/roomCode'
+import { libraryPath } from '../library/library'
 import { Button } from '../ui/Button'
 import { BrandMark } from '../ui/BrandMark'
 import { Icon } from '../ui/Icon'
@@ -36,6 +37,13 @@ export function WelcomePage() {
           <BrandMark />
           <span className="welcome__wordmark ro-serif">{t('brand.wordmark')}</span>
           <span className="welcome__beta ro-mono">{t('brand.beta')}</span>
+          {/* Only an Account has a Library (ADR 0005). */}
+          {identity?.account && (
+            <a href={libraryPath} className="welcome__library" onClick={followLink}>
+              <Icon name="library" size={16} />
+              {t('welcome.library')}
+            </a>
+          )}
         </div>
 
         <div className="welcome__intro">

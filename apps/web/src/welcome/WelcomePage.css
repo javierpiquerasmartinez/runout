@@ -438,3 +438,14 @@
     grid-template-columns: 1fr;
   }
 }
+
+.welcome__library {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--brass-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}

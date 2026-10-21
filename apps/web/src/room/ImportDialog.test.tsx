@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { ImportDialog } from './ImportDialog'
-import type { ImportPreview } from './importBatch'
+import type { ImportDestination, ImportPreview } from './importBatch'
 import { fakeSession } from '../test/fakeSession'
 
 const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
@@ -40,6 +40,13 @@ const previews: Record<string, ImportPreview> = {
     hands: [hand([], 'iMapleAA', false)],
     discarded: [],
   },
+  'mine.txt': {
+    id: 'p-mine',
+    format: 'pokerstars',
+    tried: ['pokerstars'],
+    hands: [{ ...hand([], 'iMapleAA'), author: undefined, heroMatched: undefined }],
+    discarded: [{ text: 'a hand already kept', reason: 'duplicate' }],
+  },
   'forum.txt': { id: 'p-forum', format: null, tried: ['pokerstars'], hands: [], discarded: [] },
 }
 
@@ -68,14 +75,14 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderDialog() {
+function renderDialog(destination: ImportDestination = { kind: 'room', code: 'ABCD2345', name: 'Martes NL10' }) {
   const onClose = vi.fn()
   const onImported = vi.fn()
   const session = fakeSession({ screenNames: ['Javier_PS'] })
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
-        <ImportDialog room={{ code: 'ABCD2345', name: 'Martes NL10' }} onClose={onClose} onImported={onImported} />
+        <ImportDialog destination={destination} onClose={onClose} onImported={onImported} />
       </SessionContext.Provider>
     </I18nProvider>,
   )
@@ -183,5 +190,35 @@ describe('ImportDialog', () => {
 
     expect(await screen.findByText('The file is over 20 MB.')).toBeTruthy()
     expect(requests).toEqual([])
+  })
+
+  describe('into the Library', () => {
+    const library: ImportDestination = { kind: 'library' }
+
+    it('reads into a Library preview and confirms into the Library', async () => {
+      const { onImported } = renderDialog(library)
+
+      expect(screen.getByRole('heading', { name: 'Import hands into your library' })).toBeTruthy()
+      await choose('mine.txt')
+
+      expect(await screen.findByText('PokerStars · 1 hand · 1 already in your library')).toBeTruthy()
+      expect(requests[0].url).toBe('/api/library/imports/previews')
+      await userEvent.click(screen.getByRole('button', { name: 'Add 1 hand to your library' }))
+
+      expect(requests.at(-1)!.url).toBe('/api/library/imports')
+      expect(JSON.parse(requests.at(-1)!.body as string)).toEqual({ previews: ['p-mine'] })
+      expect(onImported).toHaveBeenCalledWith(3, 1)
+    })
+
+    it('names the Hero, with no Author and no Screen Name offer', async () => {
+      renderDialog(library)
+
+      await choose('mine.txt')
+
+      const preview = await screen.findByRole('region', { name: 'Preview · hand 1 of 1' })
+      expect(within(preview).getByText('iMapleAA')).toBeTruthy()
+      expect(within(preview).queryByText('Author')).toBeNull()
+      expect(screen.queryByText('Hero detected')).toBeNull()
+    })
   })
 })

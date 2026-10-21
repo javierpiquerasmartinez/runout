@@ -89,6 +89,20 @@ describe('Notes and Marks (e2e)', () => {
     };
   }
 
+  /** Puts the Hands of `text` in `token`'s Library, so they outlive the Room. */
+  async function keepInLibrary(token: string, text: string) {
+    const preview = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text })
+      .expect(201);
+    await request(running.httpServer)
+      .post('/api/library/imports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ previews: [preview.body.id as string] })
+      .expect(201);
+  }
+
   describe('writing', () => {
     it('shows a Note to everyone in the Room, with its writer and date', async () => {
       const { guest, masterSocket, guestSocket, entries } =
@@ -255,9 +269,11 @@ describe('Notes and Marks (e2e)', () => {
         .set('Authorization', `Bearer ${token}`);
     }
 
-    it('keeps the Notes on the Hand once the Room is closed, for everyone who was in it', async () => {
-      const { master, guest, masterSocket, guestSocket, entries } =
+    it('keeps the Notes on the Hand once the Room is closed, for everyone who has it in their Library', async () => {
+      const { master, guest, masterSocket, guestSocket, entries, text } =
         await roomWithHands();
+      await keepInLibrary(master.token, text);
+      await keepInLibrary(guest.token, text);
       guestSocket.send('notes.write', {
         handId: entries[0].handId,
         body: 'La conclusion del grupo.',
@@ -336,9 +352,10 @@ describe('Notes and Marks (e2e)', () => {
       expect((await join(guest.token, code, 'Marta')).marks).toEqual([]);
     });
 
-    it('keeps a Mark once the Room is closed', async () => {
-      const { guest, masterSocket, guestSocket, entries } =
+    it('keeps a Mark once the Room is closed, on a Hand in their Library', async () => {
+      const { guest, masterSocket, guestSocket, entries, text } =
         await roomWithHands();
+      await keepInLibrary(guest.token, text);
       guestSocket.send('hand.setMark', {
         handId: entries[0].handId,
         marked: true,
