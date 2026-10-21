@@ -13,9 +13,10 @@ import {
 
 const me = { identityId: 'id-marta', displayName: 'Marta' }
 
-function hand(playedAt: string, hero = 'iMapleAA', heroMatched = false): HandPreview {
+function hand(playedAt: string, hero = 'iMapleAA', heroMatched = false, heroNamed = true): HandPreview {
   return {
     hero,
+    heroNamed,
     author: me,
     heroMatched,
     playedAt,
@@ -117,6 +118,15 @@ describe('The Screen Names an import could add', () => {
     )
 
     expect(unmatchedHeroes(batch)).toEqual(['Javier_PS', 'JaviPQ'])
+  })
+
+  it('offers no Hero a Poker Site leaves unnamed: no Screen Name could ever match it', () => {
+    const batch = withHands(
+      hand('2026-10-19T16:00:19.000Z', 'Hero', false, false),
+      hand('2026-09-18T12:00:00.000Z', 'Javier_PS'),
+    )
+
+    expect(unmatchedHeroes(batch)).toEqual(['Javier_PS'])
   })
 
   it('stops offering a Screen Name once the Importer adds it, and marks its Hands matched', () => {

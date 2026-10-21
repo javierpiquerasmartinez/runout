@@ -38,21 +38,46 @@ export interface Hand {
   collected: { screenName: string; amount: number; pot?: number }[];
   /** Everything the house took: rake, plus any jackpot or other fee. */
   rake: number;
+  /**
+   * Money the Poker Site added to the pot that no player put in (a Splash),
+   * in the pot from the Initial State. Absent when there was none.
+   */
+  splash?: number;
 }
 
-export type PokerSite = 'pokerstars' | 'ggpoker' | 'winamax';
+export type PokerSite = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker';
+
+/**
+ * Poker Sites whose Hand Histories never name the Hero: CoinPoker writes
+ * every Hero as `Hero`.
+ */
+const HERO_UNNAMED: ReadonlySet<PokerSite> = new Set(['coinpoker']);
+
+/** Whether the Hand names its Hero, so a Screen Name can match it (ADR 0002). */
+export function heroNamed(hand: Hand): boolean {
+  return !HERO_UNNAMED.has(hand.site);
+}
+
+/**
+ * The seat the Hand was recorded from, which tells apart Heroes all written
+ * `Hero`. Every Hand has one: a Hand without a Hero is never imported.
+ */
+export function heroSeat(hand: Hand): number {
+  return hand.seats.find((seat) => seat.screenName === hand.hero.screenName)!
+    .seat;
+}
 
 /**
  * The layout the Hand History was written in. The Trackers export each Hand
  * in its Poker Site's own layout, so there is one per Poker Site.
  */
-export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax';
+export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker';
 
 export interface Stake {
   limit: 'no-limit' | 'pot-limit' | 'fixed-limit';
   smallBlind: number;
   bigBlind: number;
-  /** ISO 4217 code, e.g. "EUR". */
+  /** ISO 4217 code, e.g. "EUR", or the ticker of one without ("USDT"). */
   currency: string;
 }
 

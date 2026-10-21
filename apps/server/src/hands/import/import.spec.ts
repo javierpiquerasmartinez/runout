@@ -262,7 +262,12 @@ describe('Hand History import: detecting the format', () => {
     const result = importHandHistory(fixture('pokertracker-forum.txt'));
 
     expect(result.format).toBeNull();
-    expect(result.tried).toEqual(['pokerstars', 'ggpoker', 'winamax']);
+    expect(result.tried).toEqual([
+      'pokerstars',
+      'ggpoker',
+      'winamax',
+      'coinpoker',
+    ]);
   });
 
   it('reads every piece of the text in a format picked by hand, discarding what it cannot read', () => {

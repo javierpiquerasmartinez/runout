@@ -4,7 +4,7 @@ import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { importPreviews } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
-import type { SourceFormat, Stake } from '../hands/hand.js';
+import { heroNamed, type SourceFormat, type Stake } from '../hands/hand.js';
 import {
   importHandHistory,
   SOURCE_FORMATS,
@@ -26,6 +26,8 @@ import { RoomsService, type Room } from './rooms.service.js';
 export interface HandPreview extends Attribution {
   /** The Hero's Screen Name, as the Hand History states it. */
   hero: string;
+  /** False when the Poker Site writes every Hero alike (`Hero`): no Screen Name can match it. */
+  heroNamed: boolean;
   playedAt: string;
   stake: Stake;
   board: string[];
@@ -194,6 +196,7 @@ function handPreview({ hand, author, heroMatched }: Queued): HandPreview {
     author,
     heroMatched,
     hero: hand.hero.screenName,
+    heroNamed: heroNamed(hand),
     playedAt: hand.playedAt,
     stake: hand.stake,
     board: hand.board,

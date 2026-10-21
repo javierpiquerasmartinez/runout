@@ -18,9 +18,11 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   '€': 'EUR',
   $: 'USD',
   '£': 'GBP',
+  // USDT has no ISO 4217 code; its ticker stands in for one.
+  '₮': 'USDT',
 };
 
-/** The ISO 4217 code of the symbol before or after an Amount. */
+/** The currency code of the symbol before or after an Amount. */
 export function currencyOf(text: string): string {
   const code =
     CURRENCY_SYMBOLS[text.charAt(0)] ??

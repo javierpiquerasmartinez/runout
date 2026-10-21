@@ -10,6 +10,7 @@ interface Preview {
   tried: string[];
   hands: {
     hero: string;
+    heroNamed: boolean;
     author: { identityId: string; displayName: string };
     heroMatched: boolean;
     playedAt: string;
@@ -127,7 +128,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     expect(sessionPreview.body).toEqual({
       id: expect.any(String),
       format: 'pokerstars',
-      tried: ['pokerstars', 'ggpoker', 'winamax'],
+      tried: ['pokerstars', 'ggpoker', 'winamax', 'coinpoker'],
       hands: [
         expect.objectContaining({ board: [] }),
         expect.objectContaining({ board: expect.any(Array) }),
@@ -139,6 +140,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     expect((zipped.body as Preview).hands).toEqual([
       {
         hero: 'iMapleAA',
+        heroNamed: true,
         author: { identityId: guest.id, displayName: 'Marta' },
         heroMatched: false,
         playedAt: '2026-09-18T12:34:30.000Z',
@@ -277,7 +279,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
 
     expect(detected.body).toMatchObject({
       format: null,
-      tried: ['pokerstars', 'ggpoker', 'winamax'],
+      tried: ['pokerstars', 'ggpoker', 'winamax', 'coinpoker'],
       hands: [],
       discarded: [{ reason: 'unrecognised-format' }],
     });

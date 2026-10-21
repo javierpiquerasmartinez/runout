@@ -71,6 +71,13 @@
       "when": 1790233631129,
       "tag": "0009_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792587847903,
+      "tag": "0010_hero_seat",
+      "breakpoints": true
     }
   ]
 }

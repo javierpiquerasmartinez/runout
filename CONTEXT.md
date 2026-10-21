@@ -142,6 +142,10 @@ The blind level a Hand was played at, as stated in its Hand History. A property 
 **Position**:
 A seat's name relative to the button (UTG, UTG+1, MP, LJ, HJ, CO, BTN, SB, BB), derived from how many players were dealt in. Tables of 2 to 9 seats.
 
+**Splash**:
+Money the Poker Site adds to a pot that no player put in. It is in the pot from the Initial State and is won like any other chip.
+_Avoid_: Bonus, house money
+
 **Initial State**:
 The table as the Hand begins: Starting Stacks, blinds and antes already posted, hole cards dealt. Playback's position before the first Action.
 

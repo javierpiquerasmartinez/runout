@@ -8,5 +8,11 @@ A Room's Queue holds Queue Entries that reference Hands rather than copies of th
 
 ## Consequences
 
-- Deduplication on import keys on (Poker Site, hand ID, Hero Screen Name), not on hand ID alone.
+- Deduplication on import keys on (Poker Site, hand ID, Hero Screen Name), not on hand ID alone; the Hero's seat joined the key on 2026-10-21 (see below).
 - The Queue may show that two Hands are the same real-world hand, but they are never merged.
+
+## Amendment, 2026-10-21: Poker Sites that hide the Hero's Screen Name
+
+CoinPoker writes the Hero as `Hero` and gives every opponent a different hashed name in each Hand, so the Hero's Screen Name is never in the Hand History. The Hero's **seat** now tells them apart: deduplication keys on (Poker Site, hand ID, Hero Screen Name, Hero's seat), which still keeps one Hand per point of view. Asking the Importer for their Screen Name on import was rejected as friction for a value the file can't confirm; keying on `Hero` alone was rejected because two people at the same table would collide. The Screen Name stays in the key so that Hands already stored twice from one seat under two names (a fixture imported before and after anonymising) are kept as they are rather than folded together.
+
+No Screen Name can match, so the Author of these Hands is always the Importer until the Master reassigns it.

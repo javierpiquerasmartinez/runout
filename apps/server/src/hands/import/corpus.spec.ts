@@ -27,6 +27,8 @@ const USD_05_10 = {
 } as const;
 const USD_10_25 = { ...USD_05_10, smallBlind: 10, bigBlind: 25 };
 const EUR_05_10 = { ...USD_05_10, currency: 'EUR' };
+// USDT has no ISO 4217 code: its ticker stands in for one.
+const USDT_05_10 = { ...USD_05_10, currency: 'USDT' };
 
 const CORPUS: CorpusEntry[] = [
   {
@@ -195,6 +197,101 @@ const CORPUS: CorpusEntry[] = [
     discarded: ['not-cash-holdem', 'not-cash-holdem'],
   },
   {
+    // A real export from CoinPoker's client, opponents hashed by the site.
+    file: 'coinpoker-session.txt',
+    format: 'coinpoker',
+    hands: [
+      {
+        site: 'coinpoker',
+        siteHandId: '160064400025',
+        sourceFormat: 'coinpoker',
+        // CEST is two hours ahead of UTC.
+        playedAt: '2026-10-19T15:55:42.000Z',
+        tableName: '202099',
+        tableSize: 6,
+        buttonSeat: 2,
+        stake: USDT_05_10,
+        hero: { screenName: 'Hero', cards: ['Kc', '5d'] },
+        board: [],
+        returned: [{ screenName: 'ebe47eca', amount: 15 }],
+        // CoinPoker prints a Showdown marker even when nobody is left to show.
+        showdown: false,
+        collected: [{ screenName: 'ebe47eca', amount: 24, pot: 0 }],
+        // The house takes the Splash Fee too.
+        rake: 1,
+      },
+      {
+        siteHandId: '159855200579',
+        hero: { screenName: 'Hero', cards: ['10h', '7h'] },
+        board: ['Jc', '10d', '4c', '10s', '7s'],
+        showdown: true,
+        collected: [
+          { screenName: 'f8fd19a3', amount: 9, pot: 0 },
+          { screenName: '15bc32e9', amount: 9, pot: 0 },
+        ],
+        rake: 2,
+      },
+      {
+        siteHandId: '159855200581',
+        splash: 40,
+        showdown: true,
+        // The Splash goes to the winner without being in what they collected.
+        collected: [{ screenName: '24dfed21', amount: 325, pot: 0 }],
+        rake: 18,
+      },
+      {
+        siteHandId: '159855200582',
+        posts: [
+          { screenName: 'f66f4b74', kind: 'small-blind', amount: 5 },
+          { screenName: 'fed88a1d', kind: 'big-blind', amount: 10 },
+          // A new player's blind, posted out of turn.
+          { screenName: '572c791a', kind: 'big-blind', amount: 10 },
+        ],
+        showdown: true,
+        shown: [
+          { screenName: 'fed88a1d', cards: ['2c', 'Ah'] },
+          { screenName: 'f66f4b74', cards: ['8s', '9c'] },
+        ],
+        rake: 3,
+      },
+      {
+        siteHandId: '160054200061',
+        actions: expect.arrayContaining([
+          // `ALLIN ₮2.41` facing a ₮0.90 bet: the chips added, raising to 2.41.
+          {
+            street: 'turn',
+            screenName: '8b0b5f9d',
+            type: 'raise',
+            amount: 151,
+            to: 241,
+            allIn: true,
+          },
+          {
+            street: 'turn',
+            screenName: 'Hero',
+            type: 'call',
+            amount: 151,
+            allIn: false,
+          },
+        ]) as Hand['actions'],
+        collected: [{ screenName: 'Hero', amount: 769, pot: 0 }],
+        rake: 41,
+      },
+      {
+        siteHandId: '159950300403',
+        // The straddle comes after the hole cards, in turn.
+        posts: [
+          { screenName: 'ad8da529', kind: 'small-blind', amount: 5 },
+          { screenName: 'Hero', kind: 'big-blind', amount: 10 },
+          { screenName: '4e097d34', kind: 'straddle', amount: 20 },
+        ],
+        returned: [{ screenName: '4e097d34', amount: 10 }],
+        showdown: false,
+      },
+    ],
+    discarded: ['run-it-twice'],
+  },
+  {
     // PokerTracker 4's forum layout has no exact Amounts to replay.
     file: 'pokertracker-forum.txt',
     format: null,
@@ -238,10 +335,13 @@ describe('Hand History import: the fixture corpus', () => {
   );
 
   it.each(everyHand)(
-    '$file #$id pays out exactly what was put in',
+    '$file #$id pays out exactly what was in the pot',
     ({ hand }) => {
+      // A Splash goes to the winner, but no Hand History counts it as collected.
       const paid =
-        hand.collected.reduce((sum, { amount }) => sum + amount, 0) + hand.rake;
+        hand.collected.reduce((sum, { amount }) => sum + amount, 0) +
+        hand.rake +
+        (hand.splash ?? 0);
 
       expect(paid).toBe(summarise(hand).finalPot);
     },

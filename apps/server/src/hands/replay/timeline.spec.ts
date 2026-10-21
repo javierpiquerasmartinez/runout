@@ -643,6 +643,42 @@ describe('Replay: pots, side pots and results across edge cases', () => {
   });
 });
 
+describe('Replay: a Splash', () => {
+  // CoinPoker adds ₮0.40 to the pot before the blinds.
+  const splashed = hands('coinpoker-session.txt').find(
+    (hand) => hand.siteHandId === '159855200581',
+  )!;
+
+  it('is in the pot from the Initial State, for every player dealt in to win', () => {
+    const [initial] = timeline(splashed).states;
+
+    expect(initial.pot).toBe(40 + 5 + 10);
+    expect(initial.pots).toEqual([
+      {
+        amount: 40,
+        contestants: ['c2a50ac4', 'Hero', 'fbfabc70', 'e7bfb797', '24dfed21'],
+      },
+    ]);
+  });
+
+  it('goes to whoever wins the main pot', () => {
+    const end = timeline(splashed).states.at(-1)!;
+
+    expect(end.result?.pots).toEqual([
+      {
+        amount: 383,
+        contestants: ['fbfabc70', '24dfed21'],
+        winners: [{ screenName: '24dfed21', amount: 365 }],
+      },
+    ]);
+    // ₮10 at the start, ₮1.69 put in, ₮3.25 collected and the ₮0.40 Splash:
+    // the ₮11.96 the same player sits down with in the next Hand.
+    expect(end.players.find((p) => p.screenName === '24dfed21')?.stack).toBe(
+      1196,
+    );
+  });
+});
+
 describe('Replay: made hands at Showdown', () => {
   const [showdown] = hands('pokerstars-showdown.txt');
 

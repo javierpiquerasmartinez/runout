@@ -16,7 +16,7 @@ export interface Quantity {
 /** The part of a Stake a quantity is read against. */
 export interface Scale {
   bigBlind: number
-  /** ISO 4217, e.g. "EUR". */
+  /** ISO 4217, e.g. "EUR", or the ticker of a currency without one ("USDT"). */
   currency: string
 }
 
