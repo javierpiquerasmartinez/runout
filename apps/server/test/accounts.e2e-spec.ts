@@ -32,6 +32,7 @@ describe('Accounts with Google (e2e)', () => {
       screenNames: [],
       preferences: expect.any(Object),
       account: { email: 'ana@example.com' },
+      room: null,
     });
   });
 

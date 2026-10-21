@@ -175,6 +175,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.closeAbandoned(roomId),
     );
     identities.onRenamed((identity) => this.renamed(identity));
+    identities.onTakeOver((anonymous, account) =>
+      this.takenOver(anonymous.roomId, anonymous.id, account.id),
+    );
     identities.onScreenNamesChanged((identityId, screenNames) =>
       this.screenNamesChanged(identityId, screenNames),
     );
@@ -662,6 +665,32 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         participant: this.presence.participant(roomId, identityId),
       });
     }
+  }
+
+  /**
+   * An anonymous Participant signed in: their Account takes their place in
+   * the Room, the Master role too if they held it. The anonymous identity
+   * leaves the Room at once; the Account arrives when its browser rejoins.
+   */
+  private async takenOver(
+    roomId: string,
+    anonymousId: string,
+    accountId: string,
+  ): Promise<void> {
+    const { masterMoved } = await this.rooms.takeOver(
+      roomId,
+      anonymousId,
+      accountId,
+    );
+    if (this.presence.evict(roomId, anonymousId).length > 0) {
+      this.publish(roomId, 'room.participantLeft', {
+        identityId: anonymousId,
+      });
+    }
+    if (masterMoved) {
+      this.masterChanged(roomId, { masterId: accountId, reason: 'sign-in' });
+    }
+    this.watchIfEmpty(roomId);
   }
 
   /** A Room nobody is connected to any more starts its abandonment period. */

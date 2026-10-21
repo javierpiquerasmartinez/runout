@@ -28,6 +28,7 @@ interface OpenRoom extends RoomSummary {
 
 export function WelcomePage() {
   const { t } = useI18n()
+  const { token, identity } = useSession()
   return (
     <main className="welcome">
       <div className="welcome__entry">
@@ -52,7 +53,8 @@ export function WelcomePage() {
           <JoinRoomCard />
         </div>
 
-        <RecentRooms />
+        {/* An anonymous identity only ever has its own Room: the list is for Accounts. */}
+        {identity?.account && <RecentRooms token={token} />}
       </div>
 
       <WelcomePreview />
@@ -65,9 +67,8 @@ export function WelcomePage() {
  * has been in, the live ones marked. A closed Room never reopens, so it is
  * not listed; neither is one they were removed from.
  */
-function RecentRooms() {
+function RecentRooms({ token }: { token: string }) {
   const { t, formatRelative } = useI18n()
-  const { token } = useSession()
   // The moment the list arrived, so every "how long ago" is read from one clock.
   const [listed, setListed] = useState<{ rooms: OpenRoom[]; at: Date } | null>(null)
 
@@ -131,11 +132,11 @@ function CreateRoomCard() {
   const { t } = useI18n()
   const { token, identity, rememberDisplayName } = useSession()
   const [name, setName] = useState('')
-  const [displayName, setDisplayName] = useState(identity.displayName ?? '')
+  const [displayName, setDisplayName] = useState(identity?.displayName ?? '')
   const [error, setError] = useState<{ field: 'name' | 'displayName' | 'form'; message: MessageKey } | null>(null)
   const [busy, setBusy] = useState(false)
   // Creating a Room needs an Account (ADR 0005): without one, sign in first.
-  const signedIn = identity.account !== null
+  const signedIn = Boolean(identity?.account)
 
   async function create(event: FormEvent) {
     event.preventDefault()
@@ -143,7 +144,7 @@ function CreateRoomCard() {
     setBusy(true)
     setError(null)
     try {
-      const room = await api<RoomSummary>('/rooms', { token, method: 'POST', body: { name, displayName } })
+      const room = await api<RoomSummary>('/rooms', { token: token ?? undefined, method: 'POST', body: { name, displayName } })
       const trimmed = displayName.trim()
       rememberDisplayName(trimmed)
       navigate(roomPath(room.code), { displayName: trimmed } satisfies JoinIntent)
@@ -219,7 +220,7 @@ function JoinRoomCard() {
     setBusy(true)
     setError(null)
     try {
-      const room = await api<RoomSummary>(`/rooms/${encodeURIComponent(typed)}`, { token })
+      const room = await api<RoomSummary>(`/rooms/${encodeURIComponent(typed)}`, { token: token ?? undefined })
       navigate(roomPath(room.code))
     } catch (caught) {
       setError(`reason.${reasonOf(caught)}`)

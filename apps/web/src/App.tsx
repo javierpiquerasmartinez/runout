@@ -3,6 +3,7 @@ import { useHealth, usePing } from './backend/useBackendStatus'
 import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
 import { FirstDisplayName } from './identity/ChooseDisplayName'
+import { useSession } from './identity/context'
 import { SessionProvider } from './identity/SessionProvider'
 import { RoomPage } from './room/RoomPage'
 import { RoomHolder } from './room/RoomHolder'
@@ -46,7 +47,9 @@ function KeepRoom({ path, children }: { path: string; children: ReactNode }) {
 }
 
 function Screen({ path }: { path: string }) {
-  return path === settingsPath ? <SettingsPage /> : <WelcomePage />
+  // Settings are an identity's: without one there is nothing to set yet.
+  const { identity } = useSession()
+  return path === settingsPath && identity ? <SettingsPage /> : <WelcomePage />
 }
 
 function ConnectionStatus() {

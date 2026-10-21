@@ -1,6 +1,7 @@
 // Drizzle schema. Tables are added here as features need them; run
 // `pnpm db:generate` after changing this file to write a migration.
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
   index,
@@ -17,7 +18,8 @@ import type { Hand } from '../hands/hand.js';
 
 /**
  * A person as Runout knows them: an Account, signed in with Google and lasting
- * (ADR 0005), or an anonymous identity, bound to one browser.
+ * (ADR 0005), or an anonymous identity, bound to one Room and ended with it.
+ * An ended one stays, without sessions, so Notes keep their writer's name.
  */
 export const identities = pgTable('identities', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -26,6 +28,8 @@ export const identities = pgTable('identities', {
   /** The Account's Google email, for display only. */
   email: text('email'),
   displayName: text('display_name'),
+  /** The one Room an anonymous identity exists for; null for an Account. */
+  roomId: uuid('room_id').references((): AnyPgColumn => rooms.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 

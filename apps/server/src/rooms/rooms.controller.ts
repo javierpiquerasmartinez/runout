@@ -11,7 +11,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { bearerToken } from '../identity/bearer-token.js';
-import { IdentityService } from '../identity/identity.service.js';
+import {
+  IdentityService,
+  type SignedIn,
+} from '../identity/identity.service.js';
 import type { Discarded } from '../hands/import/import.js';
 import { FileTooLargeFilter } from '../rejection/file-too-large.filter.js';
 import { ImportsService, type ImportPreview } from './imports.service.js';
@@ -65,15 +68,15 @@ export class RoomsController {
   }
 
   /**
-   * The open Rooms this identity has been in, the most recently joined first,
+   * The open Rooms this Account has been in, the most recently joined first,
    * for the welcome screen. Closed Rooms and Rooms they were kicked from are
-   * left out.
+   * left out. An anonymous identity has only its own Room: `account-required`.
    */
   @Get()
   async mine(
     @Headers('authorization') authorization: string | undefined,
   ): Promise<OpenRoomView[]> {
-    const identity = await this.identities.authenticate(
+    const identity = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
     const open = await this.rooms.openRoomsOf(identity.id);
@@ -85,17 +88,37 @@ export class RoomsController {
     }));
   }
 
-  /** Lets the web check a typed code, and name the Room, before joining. */
+  /**
+   * Lets the web check a typed code, and name the Room, before joining. Who
+   * has no identity yet may look too: joining is what issues one.
+   */
   @Get(':code')
   async find(
     @Headers('authorization') authorization: string | undefined,
     @Param('code') code: string,
   ): Promise<RoomSummary> {
-    const identity = await this.identities.authenticate(
-      bearerToken(authorization),
-    );
-    const room = await this.rooms.findOpenFor(identity, code);
+    const token = bearerToken(authorization);
+    const room = token
+      ? await this.rooms.findOpenFor(
+          await this.identities.authenticate(token),
+          code,
+        )
+      : await this.rooms.findOpen(code);
     return { code: room.code, name: room.name };
+  }
+
+  /**
+   * Someone without an Account joins the Room: a new anonymous identity for
+   * this Room only, under the Display Name they chose (ADR 0005). Joining a
+   * second Room this way issues another.
+   */
+  @Post(':code/guests')
+  async joinAnonymously(
+    @Param('code') code: string,
+    @Body() body: { displayName?: unknown } = {},
+  ): Promise<SignedIn> {
+    const room = await this.rooms.findOpen(code);
+    return this.identities.issueAnonymous(room.id, body.displayName);
   }
 
   /**

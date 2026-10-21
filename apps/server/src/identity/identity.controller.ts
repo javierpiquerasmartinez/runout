@@ -1,29 +1,14 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Patch,
-  Post,
-  Put,
-} from '@nestjs/common';
+import { Body, Controller, Get, Headers, Patch, Put } from '@nestjs/common';
 import { bearerToken } from './bearer-token.js';
 import {
   IdentityService,
   type Preferences,
   type Profile,
-  type SignedIn,
 } from './identity.service.js';
 
 @Controller('identities')
 export class IdentityController {
   constructor(private readonly identities: IdentityService) {}
-
-  /** First visit: a new anonymous identity and the token the browser keeps. */
-  @Post()
-  issue(): Promise<SignedIn> {
-    return this.identities.issue();
-  }
 
   @Get('me')
   async me(@Headers('authorization') authorization?: string): Promise<Profile> {

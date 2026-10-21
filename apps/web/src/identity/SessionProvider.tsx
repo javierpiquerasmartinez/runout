@@ -6,14 +6,14 @@ import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preference
 import { useTheme } from '../preferences/theme'
 import { Button } from '../ui/Button'
 import { SessionContext } from './context'
-import { loadSession, endSession, signInWithGoogle, type Session } from './identity'
+import { joinAnonymously, loadSession, endSession, signInWithGoogle, type Identity, type Session } from './identity'
 import './SessionProvider.css'
 
-type Loading = { state: 'loading' } | { state: 'ready'; session: Session } | { state: 'error' }
+type Loading = { state: 'loading' } | { state: 'ready'; session: Session | null } | { state: 'error' }
 
 /**
- * Renders its children once this browser's identity is known, read the way
- * that identity prefers: theme, language, deck and units.
+ * Renders its children once this browser's identity is known, or known to be
+ * none, read the way that identity prefers: theme, language, deck and units.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { t, setLocale } = useI18n()
@@ -30,9 +30,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [attempt])
 
-  const remember = useCallback((changes: Partial<Session['identity']>) => {
+  const remember = useCallback((changes: Partial<Identity>) => {
     setLoading((current) =>
-      current.state === 'ready'
+      current.state === 'ready' && current.session
         ? { state: 'ready', session: { ...current.session, identity: { ...current.session.identity, ...changes } } }
         : current,
     )
@@ -40,8 +40,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const rememberDisplayName = useCallback((displayName: string) => remember({ displayName }), [remember])
   const rememberScreenNames = useCallback((screenNames: string[]) => remember({ screenNames }), [remember])
 
-  const token = loading.state === 'ready' ? loading.session.token : null
-  const preferences = loading.state === 'ready' ? loading.session.identity.preferences : DEFAULT_PREFERENCES
+  const session = loading.state === 'ready' ? loading.session : null
+  const token = session?.token ?? null
+  const preferences = session?.identity.preferences ?? DEFAULT_PREFERENCES
   // Changes go to the server one after another, in the order they were made,
   // so a quick second change is never overwritten by the first arriving late.
   const [inOrder] = useState(oneAfterAnother)
@@ -50,7 +51,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (token === null) return
       const updatePreferences = (update: (current: Preferences) => Preferences) =>
         setLoading((current) =>
-          current.state === 'ready'
+          current.state === 'ready' && current.session
             ? {
                 state: 'ready',
                 session: {
@@ -82,15 +83,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [token, inOrder],
   )
 
-  const signIn = useCallback(async (idToken: string) => {
-    const session = await signInWithGoogle(idToken)
-    setLoading({ state: 'ready', session })
-  }, [])
+  const signIn = useCallback(
+    async (idToken: string) => {
+      const session = await signInWithGoogle(idToken, token)
+      setLoading({ state: 'ready', session })
+    },
+    [token],
+  )
   const signOut = useCallback(async () => {
     if (token === null) return
-    const session = await endSession(token)
-    setLoading({ state: 'ready', session })
+    await endSession(token)
+    setLoading({ state: 'ready', session: null })
   }, [token])
+  const joinRoom = useCallback(async (code: string, displayName: string) => {
+    const session = await joinAnonymously(code, displayName)
+    setLoading({ state: 'ready', session })
+  }, [])
 
   useTheme(preferences.theme)
   useEffect(() => setLocale(preferences.language), [preferences.language, setLocale])
@@ -98,9 +106,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () =>
       loading.state === 'ready'
-        ? { ...loading.session, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut }
+        ? {
+            ...(loading.session ?? { token: null, identity: null }),
+            rememberDisplayName,
+            rememberScreenNames,
+            changePreferences,
+            signIn,
+            signOut,
+            joinAnonymously: joinRoom,
+          }
         : null,
-    [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut],
+    [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut, joinRoom],
   )
 
   if (loading.state === 'loading') {

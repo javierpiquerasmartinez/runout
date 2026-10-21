@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
-import { newAccount } from './support/google.js';
+import { googleIdToken, newAccount } from './support/google.js';
 
 interface Participant {
   identityId: string;
@@ -52,7 +52,9 @@ describe('Profile and preferences (e2e)', () => {
 
   describe('preferences', () => {
     it('starts every identity on the defaults: classic four-colour deck, big blinds with pot percentages, dark, Spanish', async () => {
-      const res = await request(running.httpServer).post('/api/identities');
+      const res = await request(running.httpServer)
+        .post('/api/sessions/google')
+        .send({ idToken: googleIdToken('new-subject') });
 
       expect(res.body.identity.preferences).toEqual({
         deckStyle: 'classic',

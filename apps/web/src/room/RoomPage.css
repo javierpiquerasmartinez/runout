@@ -1189,6 +1189,13 @@
   border-bottom: 1px solid var(--color-divider);
 }
 
+.room-anonymous__body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 .room-side__title {
   display: flex;
   align-items: center;

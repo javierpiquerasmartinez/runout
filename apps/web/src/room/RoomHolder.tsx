@@ -13,13 +13,15 @@ import { useRoom } from './useRoom'
 export function RoomHolder({ code, children }: { code: string; children: ReactNode }) {
   const { token, identity } = useSession()
   const [displayName, setDisplayName] = useState<string | null>(() => readJoinIntent()?.displayName ?? null)
+  // Without an identity yet, the Room waits for one: joining issues it.
   const [view, commands] = useRoom(code, token, displayName)
+  const currentName = identity?.displayName
 
   // A new Display Name from Settings reaches the Room over HTTP; coming back
   // after a drop must not put the old one back.
   useEffect(() => {
-    if (identity.displayName) commands.rejoinAs(identity.displayName)
-  }, [identity.displayName, commands])
+    if (currentName) commands.rejoinAs(currentName)
+  }, [currentName, commands])
 
   const held = useMemo(
     () => ({ code, view, commands, displayName, confirmDisplayName: setDisplayName }),

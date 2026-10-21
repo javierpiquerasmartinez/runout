@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { useSession } from '../identity/context'
-import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
+import { canEnter, DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
 import { followLink, navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { BrandMark } from '../ui/BrandMark'
@@ -20,8 +20,9 @@ type Lookup =
 
 /**
  * `/room/<code>`. Arriving from a link asks only to confirm the Display Name;
- * arriving from "Create" already has it and goes straight in. The Room itself
- * is held by the `RoomHolder` around it.
+ * arriving from "Create" already has it and goes straight in. Without an
+ * Account, confirming it issues an identity for this Room (ADR 0005). The
+ * Room itself is held by the `RoomHolder` around it.
  */
 export function RoomPage({ code }: { code: string }) {
   const { token } = useSession()
@@ -33,7 +34,7 @@ export function RoomPage({ code }: { code: string }) {
   // Also run when arriving from "Create": a refused name falls back to the name form.
   useEffect(() => {
     let cancelled = false
-    api<RoomSummary>(`/rooms/${encodeURIComponent(code)}`, { token })
+    api<RoomSummary>(`/rooms/${encodeURIComponent(code)}`, { token: token ?? undefined })
       .then((room) => !cancelled && setLookup({ state: 'found', room }))
       .catch((error: unknown) => {
         if (!cancelled) setLookup({ state: 'failed', reason: reasonOf(error) })
@@ -68,18 +69,31 @@ function ConfirmName({
   onConfirm: (displayName: string) => void
 }) {
   const { t } = useI18n()
-  const { identity, rememberDisplayName } = useSession()
-  const [name, setName] = useState(identity.displayName ?? '')
-  const [invalid, setInvalid] = useState(rejected)
+  const { identity, rememberDisplayName, joinAnonymously } = useSession()
+  const [name, setName] = useState(identity?.displayName ?? '')
+  const [failure, setFailure] = useState<FailureReason | null>(rejected ? 'invalid-display-name' : null)
+  const [busy, setBusy] = useState(false)
 
-  function confirm(event: FormEvent) {
+  async function confirm(event: FormEvent) {
     event.preventDefault()
+    if (busy) return
     const trimmed = name.trim()
     if (trimmed.length === 0) {
-      setInvalid(true)
+      setFailure('invalid-display-name')
       return
     }
-    rememberDisplayName(trimmed)
+    if (!canEnter(identity, room.code)) {
+      setBusy(true)
+      try {
+        await joinAnonymously(room.code, trimmed)
+      } catch (error) {
+        setFailure(reasonOf(error))
+        setBusy(false)
+        return
+      }
+    } else {
+      rememberDisplayName(trimmed)
+    }
     onConfirm(trimmed)
   }
 
@@ -100,11 +114,11 @@ function ConfirmName({
           autoFocus
           onChange={(event) => {
             setName(event.target.value)
-            setInvalid(false)
+            setFailure(null)
           }}
-          error={invalid ? t('reason.invalid-display-name') : undefined}
+          error={failure ? t(`reason.${failure}`) : undefined}
         />
-        <Button type="submit" variant="primary" size="prominent">
+        <Button type="submit" variant="primary" size="prominent" aria-busy={busy}>
           {t('room.confirm.submit')}
         </Button>
       </form>

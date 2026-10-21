@@ -657,5 +657,8 @@ export const es = {
   'settings.account.signedInNoEmail': 'Sesión iniciada con Google',
   'settings.account.signOut': 'Cerrar sesión',
   'settings.account.signOutFailed': 'No se pudo cerrar la sesión. {reason}',
-  'settings.account.anonymous': 'No has iniciado sesión: tu identidad vive solo en este navegador. Inicia sesión con Google para crear salas y que te reconozcan en cualquier dispositivo.',
+  'settings.account.anonymous': 'Estás en esta sala sin cuenta: tu nombre, tus nicks y tus ajustes duran hasta que se cierre. Inicia sesión con Google para conservarlos, crear salas y que te reconozcan en cualquier dispositivo.',
+  'room.anonymous.title': 'Sin cuenta',
+  'room.anonymous.body': 'Estás sin cuenta: lo que hagas en esta sala se pierde cuando se cierre. Inicia sesión con Google para guardar tus manos.',
+  'reason.identity-of-another-room': 'Tu identidad aquí es de otra sala. Recarga la página para entrar en esta.',
 }

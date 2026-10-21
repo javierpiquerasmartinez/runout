@@ -658,5 +658,8 @@ export const en: Messages = {
   'settings.account.signedInNoEmail': 'Signed in with Google',
   'settings.account.signOut': 'Sign out',
   'settings.account.signOutFailed': "Couldn't sign out. {reason}",
-  'settings.account.anonymous': "You're not signed in: your identity lives in this browser only. Sign in with Google to create rooms and be recognised on any device.",
+  'settings.account.anonymous': "You're in this room without an account: your name, screen names and settings last until it closes. Sign in with Google to keep them, create rooms and be recognised on any device.",
+  'room.anonymous.title': 'Without an account',
+  'room.anonymous.body': "You're here without an account: what you do in this room is lost when it closes. Sign in with Google to keep your hands.",
+  'reason.identity-of-another-room': 'Your identity here belongs to another room. Reload the page to join this one.',
 }

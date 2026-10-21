@@ -10,7 +10,7 @@ import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 export function fakeSession(
   identity: Partial<Identity> = {},
   actions: Partial<Omit<SessionContextValue, 'token' | 'identity'>> = {},
-) {
+): SessionContextValue & { token: string; identity: Identity } {
   return {
     token: 'token',
     identity: {
@@ -19,6 +19,7 @@ export function fakeSession(
       screenNames: [],
       preferences: DEFAULT_PREFERENCES,
       account: { email: 'javier@example.com' },
+      room: null,
       ...identity,
     },
     rememberDisplayName: vi.fn(),
@@ -26,6 +27,14 @@ export function fakeSession(
     changePreferences: vi.fn(async () => {}),
     signIn: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
+    joinAnonymously: vi.fn(async () => {}),
     ...actions,
   }
+}
+
+/** Someone with no identity yet: they haven't signed in nor joined a Room. */
+export function fakeVisitor(
+  actions: Partial<Omit<SessionContextValue, 'token' | 'identity'>> = {},
+): SessionContextValue & { token: null; identity: null } {
+  return { ...fakeSession({}, actions), token: null, identity: null }
 }

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
-import { useSession } from '../identity/context'
+import { useIdentity } from '../identity/context'
+import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { Avatar } from '../ui/Avatar'
 import { copyText } from '../ui/clipboard'
 import { BrandMark } from '../ui/BrandMark'
@@ -87,7 +88,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
   usePasteToImport(view.room.code, !importing, reportImport)
-  const { token } = useSession()
+  const { token } = useIdentity()
   const preferences = usePreferences()
   const load = useHand(view.playback?.handId ?? null, token)
   const table =
@@ -181,6 +182,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               {t('room.details.title')}
             </h2>
           </div>
+          <AnonymousNotice />
           {detailsEntry && (
             <CurrentHand
               entry={detailsEntry}
@@ -1230,7 +1232,7 @@ function useImportOutcome(): [string | null, (outcome: ImportOutcome) => void] {
  * as issue 04 asks. Pastes into a field (e.g. a Display Name) are left alone.
  */
 function usePasteToImport(code: string, enabled: boolean, report: (outcome: ImportOutcome) => void) {
-  const { token } = useSession()
+  const { token } = useIdentity()
 
   useEffect(() => {
     if (!enabled) return
@@ -1377,4 +1379,20 @@ function useCopied(): [Copyable | null, (what: Copyable, text: string) => void] 
     })
   }
   return [copied, copy]
+}
+
+/**
+ * Tells someone in the Room without an Account that what they do here is
+ * lost when it closes (ADR 0005), and lets them sign in to stay as an Account.
+ */
+function AnonymousNotice() {
+  const { t } = useI18n()
+  const { identity } = useIdentity()
+  if (identity.account) return null
+  return (
+    <section className="room-side__section room-anonymous" aria-label={t('room.anonymous.title')}>
+      <p className="room-anonymous__body">{t('room.anonymous.body')}</p>
+      <GoogleSignInButton />
+    </section>
+  )
 }
