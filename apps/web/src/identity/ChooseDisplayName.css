@@ -1,0 +1,37 @@
+.choose-name {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.choose-name__card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.choose-name__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.choose-name__title {
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.choose-name__body {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}

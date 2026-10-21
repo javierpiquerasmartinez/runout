@@ -2,6 +2,7 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Participant {
   identityId: string;
@@ -33,11 +34,6 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function createRoom(token: string): Promise<string> {
     const res = await request(running.httpServer)
       .post('/api/rooms')
@@ -59,8 +55,8 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
 
   /** A Room with its Master and one Guest, both connected. */
   async function roomOfTwo() {
-    const master = await issueIdentity();
-    const marta = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const marta = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     const masterRoom = await join(master.token, code, 'Javier');
     const martaRoom = await join(marta.token, code, 'Marta');
@@ -198,7 +194,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       masterSocket.send('room.kick', { identityId: marta.id });
       await masterSocket.next('room.participantKicked');
 
-      const alberto = await issueIdentity();
+      const alberto = await newAccount(running.httpServer);
       const { snapshot } = await join(alberto.token, code, 'Alberto');
       expect(snapshot.queue.map((entry) => entry.id)).toEqual(
         before.map((entry) => entry.id),
@@ -233,7 +229,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
 
     it('refuses kicking someone who is not a Participant', async () => {
       const { masterSocket } = await roomOfTwo();
-      const stranger = await issueIdentity();
+      const stranger = await newAccount(running.httpServer);
 
       masterSocket.send('room.kick', { identityId: stranger.id });
 
@@ -345,7 +341,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
     });
 
     it('closes a Room that was created and never joined', async () => {
-      const master = await issueIdentity();
+      const master = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
 
       await running.clock.advance(ABANDONED_MS);
@@ -359,7 +355,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
 
   describe('the Rooms someone can go back to', () => {
     it('lists only the open Rooms they have been in, newest first', async () => {
-      const marta = await issueIdentity();
+      const marta = await newAccount(running.httpServer);
       const first = await roomOfTwo();
       await join(marta.token, first.code, 'Marta');
       await running.clock.advance(1_000);

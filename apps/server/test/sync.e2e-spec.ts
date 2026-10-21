@@ -7,6 +7,7 @@ import {
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface ParticipantPresence {
   identityId: string;
@@ -40,11 +41,6 @@ describe('Sync robustness and presence (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function join(token: string, code: string, displayName: string) {
     const socket = await RoomClient.connect(running.wsUrl, token);
     clients.push(socket);
@@ -55,8 +51,8 @@ describe('Sync robustness and presence (e2e)', () => {
 
   /** A Room with the Master and one Guest in it, and one Hand in its Queue. */
   async function roomWithAHand() {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const created = await request(running.httpServer)
       .post('/api/rooms')
       .set('Authorization', `Bearer ${master.token}`)
@@ -143,7 +139,7 @@ describe('Sync robustness and presence (e2e)', () => {
   });
 
   it('refuses a resync from a socket that is in no Room', async () => {
-    const stranger = await issueIdentity();
+    const stranger = await newAccount(running.httpServer);
     const socket = await RoomClient.connect(running.wsUrl, stranger.token);
     clients.push(socket);
 

@@ -2,7 +2,8 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { locales, useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
-import { DISPLAY_NAME_MAX_LENGTH, type Identity } from '../identity/identity'
+import { GoogleSignInButton } from '../identity/GoogleSignInButton'
+import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
 import type { DeckStyle, DisplayUnit, Preferences, Theme } from '../preferences/preferences'
 import { quantity } from '../room/quantity'
@@ -62,6 +63,7 @@ export function SettingsPage() {
             <TableReadingCard />
           </div>
           <div className="settings__column settings__column--side">
+            <AccountCard />
             <DeckCard />
             <ThemeCard />
             <LanguageCard />
@@ -118,13 +120,9 @@ function ProfileCard() {
     let field: ProfileField = 'displayName'
     try {
       if (nameChanged) {
-        const saved = await api<Identity>('/identities/me/display-name', {
-          token,
-          method: 'PUT',
-          body: { displayName: name },
-        })
-        rememberDisplayName(saved.displayName ?? '')
-        setName(saved.displayName ?? '')
+        const saved = await saveDisplayName(token, name)
+        rememberDisplayName(saved)
+        setName(saved)
       }
       field = 'screenNames'
       if (namesChanged) {
@@ -203,6 +201,63 @@ function ProfileCard() {
         </Button>
       </div>
     </form>
+  )
+}
+
+/**
+ * The Google account this browser is signed in with, and a way out of it; or,
+ * without one, a way in.
+ */
+function AccountCard() {
+  const { t } = useI18n()
+  const { identity, signOut } = useSession()
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+
+  async function leave() {
+    setBusy(true)
+    setFailure(null)
+    try {
+      await signOut()
+      // A Room held behind this page belonged to the identity just signed out.
+      navigate('/')
+    } catch (error) {
+      setFailure(reasonOf(error))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="settings-card settings-card--side" aria-labelledby="settings-account-title">
+      <h2 id="settings-account-title" className="settings-card__eyebrow">
+        {t('settings.account.title')}
+      </h2>
+      {identity.account ? (
+        <>
+          <p className="settings-account__who">
+            {identity.account.email
+              ? t('settings.account.signedIn', { email: identity.account.email })
+              : t('settings.account.signedInNoEmail')}
+          </p>
+          <Button
+            variant="secondary"
+            size="compact"
+            disabledReason={busy ? t('settings.saving') : undefined}
+            onClick={() => void leave()}
+          >
+            {t('settings.account.signOut')}
+          </Button>
+          <Failure
+            message={failure && t('settings.account.signOutFailed', { reason: t(`reason.${failure}`) })}
+          />
+        </>
+      ) : (
+        <>
+          <p className="settings-card__hint settings-card__hint--flat">{t('settings.account.anonymous')}</p>
+          <GoogleSignInButton />
+        </>
+      )}
+    </section>
   )
 }
 

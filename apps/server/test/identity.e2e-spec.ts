@@ -24,6 +24,7 @@ describe('Anonymous identity (e2e)', () => {
       displayName: null,
       screenNames: [],
       preferences: expect.any(Object),
+      account: null,
     });
   });
 

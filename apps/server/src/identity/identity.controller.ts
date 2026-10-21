@@ -12,6 +12,7 @@ import {
   IdentityService,
   type Preferences,
   type Profile,
+  type SignedIn,
 } from './identity.service.js';
 
 @Controller('identities')
@@ -20,7 +21,7 @@ export class IdentityController {
 
   /** First visit: a new anonymous identity and the token the browser keeps. */
   @Post()
-  issue(): Promise<{ token: string; identity: Profile }> {
+  issue(): Promise<SignedIn> {
     return this.identities.issue();
   }
 

@@ -51,7 +51,8 @@ export class RoomsController {
     @Headers('authorization') authorization: string | undefined,
     @Body() body: { name?: unknown; displayName?: unknown } = {},
   ): Promise<RoomSummary> {
-    const creator = await this.identities.authenticate(
+    // Every Room starts with a lasting Master (ADR 0005).
+    const creator = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
     const room = await this.rooms.create(creator, {

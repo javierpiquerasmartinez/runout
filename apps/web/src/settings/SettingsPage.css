@@ -463,3 +463,12 @@
     flex-wrap: wrap;
   }
 }
+
+/* ---------- "Cuenta": who is signed in ---------- */
+
+.settings-account__who {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}

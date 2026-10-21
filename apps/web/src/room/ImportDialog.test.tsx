@@ -5,7 +5,7 @@ import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPreview } from './importBatch'
-import { DEFAULT_PREFERENCES } from '../preferences/preferences'
+import { fakeSession } from '../test/fakeSession'
 
 const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
   hero,
@@ -71,13 +71,7 @@ afterEach(() => {
 function renderDialog() {
   const onClose = vi.fn()
   const onImported = vi.fn()
-  const session = {
-    token: 'token',
-    identity: { id: 'me', displayName: 'Javier', screenNames: ['Javier_PS'], preferences: DEFAULT_PREFERENCES },
-    rememberDisplayName: () => {},
-    rememberScreenNames: vi.fn(),
-    changePreferences: async () => {},
-  }
+  const session = fakeSession({ screenNames: ['Javier_PS'] })
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>

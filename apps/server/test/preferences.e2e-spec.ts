@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Participant {
   identityId: string;
@@ -19,11 +20,6 @@ describe('Profile and preferences (e2e)', () => {
     await Promise.all(clients.splice(0).map((client) => client.close()));
     await running.close();
   });
-
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
 
   function me(token: string) {
     return request(running.httpServer)
@@ -69,7 +65,7 @@ describe('Profile and preferences (e2e)', () => {
     });
 
     it('stores a change with the identity and gives it back on the next visit', async () => {
-      const { token } = await issueIdentity();
+      const { token } = await newAccount(running.httpServer);
 
       const res = await changePreferences(token, {
         deckStyle: 'full-suit',
@@ -99,8 +95,8 @@ describe('Profile and preferences (e2e)', () => {
     });
 
     it('keeps one identity’s preferences to itself', async () => {
-      const javier = await issueIdentity();
-      const marta = await issueIdentity();
+      const javier = await newAccount(running.httpServer);
+      const marta = await newAccount(running.httpServer);
 
       await changePreferences(javier.token, { theme: 'light' }).expect(200);
 
@@ -115,7 +111,7 @@ describe('Profile and preferences (e2e)', () => {
       { language: 'fr' },
       { speed: 2 },
     ])('refuses %o with a reason, changing nothing', async (changes) => {
-      const { token } = await issueIdentity();
+      const { token } = await newAccount(running.httpServer);
 
       const res = await changePreferences(token, {
         theme: 'light',
@@ -138,7 +134,7 @@ describe('Profile and preferences (e2e)', () => {
 
   describe('Display Name', () => {
     it('can be changed at any time and is kept with the identity', async () => {
-      const { token } = await issueIdentity();
+      const { token } = await newAccount(running.httpServer);
 
       const res = await rename(token, '  Javi  ').expect(200);
 
@@ -149,7 +145,7 @@ describe('Profile and preferences (e2e)', () => {
     it.each(['', '   ', 'x'.repeat(41), 42])(
       'refuses %j with a reason',
       async (displayName) => {
-        const { token } = await issueIdentity();
+        const { token } = await newAccount(running.httpServer);
 
         const res = await rename(token, displayName).expect(400);
 
@@ -158,8 +154,8 @@ describe('Profile and preferences (e2e)', () => {
     );
 
     it('changes at once for everyone in the Room the Participant is in', async () => {
-      const master = await issueIdentity();
-      const guest = await issueIdentity();
+      const master = await newAccount(running.httpServer);
+      const guest = await newAccount(running.httpServer);
       const created = await request(running.httpServer)
         .post('/api/rooms')
         .set('Authorization', `Bearer ${master.token}`)
@@ -195,7 +191,7 @@ describe('Profile and preferences (e2e)', () => {
     });
 
     it('says nothing to a Room when the name is the one it already had', async () => {
-      const master = await issueIdentity();
+      const master = await newAccount(running.httpServer);
       const created = await request(running.httpServer)
         .post('/api/rooms')
         .set('Authorization', `Bearer ${master.token}`)

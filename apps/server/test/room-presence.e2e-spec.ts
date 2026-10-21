@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 interface Participant {
   identityId: string;
@@ -39,11 +40,6 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
     await running.close();
   });
 
-  async function issueIdentity(): Promise<{ token: string; id: string }> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return { token: res.body.token, id: res.body.identity.id };
-  }
-
   async function createRoom(token: string, displayName: string) {
     const res = await request(running.httpServer)
       .post('/api/rooms')
@@ -59,7 +55,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   }
 
   it('gives the creator a snapshot of their Room: Master, alone, with an empty Queue', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const room = await createRoom(master.token, 'Javier');
     const socket = await connect(master.token);
 
@@ -95,8 +91,8 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('lets two clients join the same Room and see each other appear and leave', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const room = await createRoom(master.token, 'Javier');
     const masterSocket = await connect(master.token);
     masterSocket.send('room.join', { code: room.code, displayName: 'Javier' });
@@ -148,8 +144,8 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('keeps a Participant present while any of their tabs is still in the Room', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const room = await createRoom(master.token, 'Javier');
     const masterSocket = await connect(master.token);
     masterSocket.send('room.join', { code: room.code, displayName: 'Javier' });
@@ -172,8 +168,8 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('remembers the Display Name a Guest joined with, for next time', async () => {
-    const master = await issueIdentity();
-    const guest = await issueIdentity();
+    const master = await newAccount(running.httpServer);
+    const guest = await newAccount(running.httpServer);
     const room = await createRoom(master.token, 'Javier');
     const guestSocket = await connect(guest.token);
 
@@ -187,7 +183,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('rejects joining an unknown Room with a typed reason', async () => {
-    const guest = await issueIdentity();
+    const guest = await newAccount(running.httpServer);
     const socket = await connect(guest.token);
 
     socket.send('room.join', { code: 'ZZZZ-ZZZZ', displayName: 'Marta' });
@@ -199,7 +195,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('rejects joining with a blank Display Name', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const room = await createRoom(master.token, 'Javier');
     const socket = await connect(master.token);
 
@@ -212,7 +208,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('rejects a malformed join with a typed reason instead of failing silently', async () => {
-    const guest = await issueIdentity();
+    const guest = await newAccount(running.httpServer);
     const socket = await connect(guest.token);
 
     socket.send('room.join', null);
@@ -224,7 +220,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('rejects commands from a socket without a valid identity', async () => {
-    const master = await issueIdentity();
+    const master = await newAccount(running.httpServer);
     const room = await createRoom(master.token, 'Javier');
 
     for (const socket of [await connect(), await connect('forged-token')]) {
@@ -237,7 +233,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
   });
 
   it('rejects leaving when not in a Room', async () => {
-    const guest = await issueIdentity();
+    const guest = await newAccount(running.httpServer);
     const socket = await connect(guest.token);
 
     socket.send('room.leave');

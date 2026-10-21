@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { useHealth, usePing } from './backend/useBackendStatus'
 import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
+import { FirstDisplayName } from './identity/ChooseDisplayName'
 import { SessionProvider } from './identity/SessionProvider'
 import { RoomPage } from './room/RoomPage'
 import { RoomHolder } from './room/RoomHolder'
@@ -20,7 +21,9 @@ function App() {
   const code = roomCodeFromPath(path)
   return (
     <SessionProvider>
-      <KeepRoom path={path}>{code ? <RoomPage code={code} /> : <Screen path={path} />}</KeepRoom>
+      <FirstDisplayName>
+        <KeepRoom path={path}>{code ? <RoomPage code={code} /> : <Screen path={path} />}</KeepRoom>
+      </FirstDisplayName>
     </SessionProvider>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, reasonOf } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
+import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
 import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
@@ -133,10 +134,12 @@ function CreateRoomCard() {
   const [displayName, setDisplayName] = useState(identity.displayName ?? '')
   const [error, setError] = useState<{ field: 'name' | 'displayName' | 'form'; message: MessageKey } | null>(null)
   const [busy, setBusy] = useState(false)
+  // Creating a Room needs an Account (ADR 0005): without one, sign in first.
+  const signedIn = identity.account !== null
 
   async function create(event: FormEvent) {
     event.preventDefault()
-    if (busy) return
+    if (busy || !signedIn) return
     setBusy(true)
     setError(null)
     try {
@@ -156,7 +159,7 @@ function CreateRoomCard() {
     <form className="welcome-card" onSubmit={create} noValidate>
       <div className="welcome-card__heading">
         <h2 className="welcome-card__title">{t('welcome.create.title')}</h2>
-        <p className="welcome-card__body">{t('welcome.create.body')}</p>
+        <p className="welcome-card__body">{t(signedIn ? 'welcome.create.body' : 'welcome.signIn.body')}</p>
       </div>
       <div className="welcome-card__fields">
         <TextField
@@ -176,10 +179,18 @@ function CreateRoomCard() {
           error={error?.field === 'displayName' ? t(error.message) : undefined}
         />
       </div>
-      <Button type="submit" variant="primary" size="prominent" aria-busy={busy}>
+      <Button
+        type="submit"
+        variant="primary"
+        size="prominent"
+        aria-busy={busy}
+        aria-label={t('welcome.create.submit')}
+        disabledReason={signedIn ? undefined : t('reason.account-required')}
+      >
         <Icon name="add" size={16} />
         {t('welcome.create.submit')}
       </Button>
+      {!signedIn && <GoogleSignInButton />}
       {error?.field === 'form' && (
         <p className="welcome-card__error" role="alert">
           {t(error.message)}

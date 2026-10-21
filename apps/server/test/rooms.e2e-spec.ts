@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 
 const ROOM_CODE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/;
 
@@ -15,8 +16,7 @@ describe('Rooms over HTTP (e2e)', () => {
   });
 
   async function issueToken(): Promise<string> {
-    const res = await request(running.httpServer).post('/api/identities');
-    return res.body.token as string;
+    return (await newAccount(running.httpServer)).token;
   }
 
   function createRoom(token: string | undefined, body: object) {
@@ -94,6 +94,17 @@ describe('Rooms over HTTP (e2e)', () => {
     }).expect(401);
 
     expect(res.body).toEqual({ reason: 'unauthenticated' });
+  });
+
+  it('rejects creating a Room as an anonymous identity: it needs an Account', async () => {
+    const anonymous = await request(running.httpServer).post('/api/identities');
+
+    const res = await createRoom(anonymous.body.token, {
+      name: 'NL50',
+      displayName: 'J',
+    }).expect(403);
+
+    expect(res.body).toEqual({ reason: 'account-required' });
   });
 
   it('finds an open Room by code, with or without the dash and in any case', async () => {

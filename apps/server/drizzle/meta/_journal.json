@@ -85,6 +85,13 @@
       "when": 1792592809388,
       "tag": "0011_clean_start_queue_entry_author",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792593467720,
+      "tag": "0012_accounts_and_sessions",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,10 @@ A web room where a small study group replays the same poker hand together, in re
 A person's lasting identity in Runout, signed in with Google. Everything that outlives a Room belongs to one: their Library, Screen Names, Display Name, Preferences, Marks and Tags.
 _Avoid_: User, profile, login
 
+**Sign-in**:
+One browser holding a bearer token for an identity. An Account has one per browser it signed in with; signing out ends that one only. The code calls it a session (the `sessions` table, `/api/sessions`), and the UI says "iniciar/cerrar sesión"; anywhere else, "session" on its own means neither this nor a Room.
+_Avoid_: Session (outside the code and those UI phrases), login
+
 **Participant**:
 A person present in a Room: either with their Account, or anonymously, with an identity that exists for that one Room and is lost when it closes.
 _Avoid_: User, player, member, anonymous user

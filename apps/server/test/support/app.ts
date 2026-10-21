@@ -7,6 +7,8 @@ import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { CLOCK } from '../../src/clock/clock.js';
 import { DATABASE_URL } from '../../src/database/database.js';
+import { GOOGLE_VERIFIER } from '../../src/identity/google-verifier.js';
+import { FakeGoogleVerifier } from './google.js';
 import { TestClock } from './test-clock.js';
 
 export interface RunningApp {
@@ -35,6 +37,8 @@ export async function startApp(
     .useValue(options.databaseUrl ?? inject('databaseUrl'))
     .overrideProvider(CLOCK)
     .useValue(clock)
+    .overrideProvider(GOOGLE_VERIFIER)
+    .useValue(new FakeGoogleVerifier())
     .compile();
 
   const app = moduleRef.createNestApplication();

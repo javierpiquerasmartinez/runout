@@ -6,7 +6,7 @@ import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preference
 import { useTheme } from '../preferences/theme'
 import { Button } from '../ui/Button'
 import { SessionContext } from './context'
-import { loadSession, type Session } from './identity'
+import { loadSession, endSession, signInWithGoogle, type Session } from './identity'
 import './SessionProvider.css'
 
 type Loading = { state: 'loading' } | { state: 'ready'; session: Session } | { state: 'error' }
@@ -82,15 +82,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [token, inOrder],
   )
 
+  const signIn = useCallback(async (idToken: string) => {
+    const session = await signInWithGoogle(idToken)
+    setLoading({ state: 'ready', session })
+  }, [])
+  const signOut = useCallback(async () => {
+    if (token === null) return
+    const session = await endSession(token)
+    setLoading({ state: 'ready', session })
+  }, [token])
+
   useTheme(preferences.theme)
   useEffect(() => setLocale(preferences.language), [preferences.language, setLocale])
 
   const value = useMemo(
     () =>
       loading.state === 'ready'
-        ? { ...loading.session, rememberDisplayName, rememberScreenNames, changePreferences }
+        ? { ...loading.session, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut }
         : null,
-    [loading, rememberDisplayName, rememberScreenNames, changePreferences],
+    [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut],
   )
 
   if (loading.state === 'loading') {
