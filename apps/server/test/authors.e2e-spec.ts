@@ -357,7 +357,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       });
     });
 
-    it('puts a Hand imported in another Room in this Queue too, with the Author it already had', async () => {
+    it('puts a Hand imported in another Room in this Queue too, with an Author chosen in this Room', async () => {
       const master = await issueIdentity();
       const guest = await issueIdentity();
       const first = await createRoom(master.token);
@@ -368,15 +368,15 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       await importText(master.token, first, text);
       const { queue: firstQueue } = await join(master.token, first, 'Javier');
 
-      // A week later, in a Room the Author isn't even in.
+      // A week later, in a Room the Hero's player isn't in.
       const later = await createRoom(master.token);
       await join(master.token, later, 'Javier');
       const read = await importText(master.token, later, text);
 
       expect(read.discarded).toEqual([]);
-      expect(read.hands[0].author).toEqual({
-        identityId: guest.id,
-        displayName: 'Marta',
+      expect(read.hands[0]).toMatchObject({
+        author: { identityId: master.id, displayName: 'Javier' },
+        heroMatched: false,
       });
       const { queue } = await join(master.token, later, 'Javier');
       // The same Hand (ADR 0002), referenced by a Queue Entry of its own.
@@ -384,7 +384,10 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
         firstQueue[0].handId,
       ]);
       expect(queue[0].id).not.toBe(firstQueue[0].id);
-      expect(queue[0].author.identityId).toBe(guest.id);
+      expect(queue[0].author.identityId).toBe(master.id);
+      // The first Room keeps the Author it chose.
+      const { queue: firstAgain } = await join(master.token, first, 'Javier');
+      expect(firstAgain[0].author.identityId).toBe(guest.id);
     });
 
     it('skips a Hand another Importer queued between the preview and the confirm', async () => {
@@ -479,11 +482,8 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       const code = await createRoom(master.token);
       const masterRoom = await join(master.token, code, 'Javier');
       const guestRoom = await join(guest.token, code, 'Marta');
-      await importText(
-        master.token,
-        code,
-        freshHandHistory('pokerstars-showdown.txt'),
-      );
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      await importText(master.token, code, text);
       const { entries } = await masterRoom.socket.next<{
         entries: QueueEntry[];
       }>('queue.entriesAdded');
@@ -494,6 +494,7 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
         masterSocket: masterRoom.socket,
         guestSocket: guestRoom.socket,
         handId: entries[0].handId,
+        text,
       };
     }
 
@@ -514,6 +515,26 @@ describe('Authors, Screen Names and duplicates (e2e)', () => {
       }
       const { queue } = await join(master.token, code, 'Javier');
       expect(queue[0].author.identityId).toBe(guest.id);
+    });
+
+    it('changes the Author in this Room only, when the Hand is queued in another one too', async () => {
+      const { master, guest, code, masterSocket, handId, text } =
+        await roomWithOneHand();
+      const other = await createRoom(master.token);
+      await join(master.token, other, 'Javier');
+      await importText(master.token, other, text);
+
+      masterSocket.send('queue.reassignAuthor', {
+        handId,
+        authorId: guest.id,
+      });
+      await masterSocket.next('queue.authorChanged');
+
+      const { queue } = await join(master.token, code, 'Javier');
+      const { queue: otherQueue } = await join(master.token, other, 'Javier');
+      expect(queue[0].author.identityId).toBe(guest.id);
+      expect(otherQueue.map((entry) => entry.handId)).toEqual([handId]);
+      expect(otherQueue[0].author.identityId).toBe(master.id);
     });
 
     it('refuses a Guest who tries to reassign, and changes nothing', async () => {

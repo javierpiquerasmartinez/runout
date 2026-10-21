@@ -22,8 +22,8 @@ export class HandsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   /**
-   * The Hand with its Timeline, for someone who can see it: its Author or
-   * Importer, or a Participant of a Room it was queued in. Anyone else gets
+   * The Hand with its Timeline, for someone who can see it: its Importer, its
+   * Author in a Room it was queued in, or a Participant of that Room. Anyone else gets
    * `hand-not-found`, so a Hand's existence isn't revealed.
    */
   async withTimeline(viewer: Identity, id: string): Promise<HandWithTimeline> {
@@ -63,7 +63,7 @@ export class HandsService {
         and(
           eq(hands.id, id),
           or(
-            eq(hands.authorId, viewer.id),
+            eq(queueEntries.authorId, viewer.id),
             eq(hands.importerId, viewer.id),
             eq(roomMemberships.identityId, viewer.id),
           ),

@@ -100,9 +100,6 @@ export const hands = pgTable(
     heroScreenName: text('hero_screen_name').notNull(),
     /** The Hero's seat: with their Screen Name, what tells two views of one hand apart (ADR 0002). */
     heroSeat: integer('hero_seat').notNull(),
-    authorId: uuid('author_id')
-      .notNull()
-      .references(() => identities.id),
     /** Who brought the Hand in. Audit only; carries no meaning for attribution. */
     importerId: uuid('importer_id')
       .notNull()
@@ -128,7 +125,10 @@ export const hands = pgTable(
   ],
 );
 
-/** A Hand placed in a Room's Queue. Removing it never deletes the Hand (ADR 0002). */
+/**
+ * A Hand placed in a Room's Queue, with its Author in that Room. Removing it
+ * never deletes the Hand (ADR 0002).
+ */
 export const queueEntries = pgTable(
   'queue_entries',
   {
@@ -139,6 +139,10 @@ export const queueEntries = pgTable(
     handId: uuid('hand_id')
       .notNull()
       .references(() => hands.id),
+    /** Whose spot the Hand is in this Room; another Room may give it another. */
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => identities.id),
     /** 1 for the first Hand; new entries go after the last one. */
     position: integer('position').notNull(),
     addedAt: timestamp('added_at', { withTimezone: true }).notNull(),
