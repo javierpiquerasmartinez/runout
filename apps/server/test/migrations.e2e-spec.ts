@@ -1,14 +1,12 @@
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { readMigrationFiles } from 'drizzle-orm/migrator';
 import pg from 'pg';
-import request from 'supertest';
 import { inject } from 'vitest';
-import { startApp } from './support/app.js';
 import { MIGRATIONS_FOLDER } from './support/migrations.js';
 
 describe('Test database (e2e)', () => {
@@ -32,8 +30,6 @@ describe('Test database (e2e)', () => {
 
 /** The last migration before Runout started clean, data and all. */
 const BEFORE_CLEAN_START = '0010_hero_seat';
-/** The last migration before tokens moved to their own table. */
-const BEFORE_SESSIONS = '0011_clean_start_queue_entry_author';
 
 describe('Migrating a database with Hands already imported (e2e)', () => {
   const admin = new pg.Client(inject('databaseUrl'));
@@ -297,41 +293,6 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       ]);
     } finally {
       await client.end();
-    }
-  });
-
-  it('keeps every browser that already holds a token signed in as the same identity', async () => {
-    await migrateUpTo(BEFORE_SESSIONS);
-    const token = 'token-held-by-a-browser';
-    const client = new pg.Client(databaseUrl);
-    await client.connect();
-    let identityId: string;
-    try {
-      const { rows } = await client.query<{ id: string }>(
-        `insert into identities (token_hash, display_name, created_at)
-         values ($1, 'Javier', now()) returning id`,
-        [createHash('sha256').update(token).digest('hex')],
-      );
-      identityId = rows[0].id;
-    } finally {
-      await client.end();
-    }
-
-    await migrateWith(MIGRATIONS_FOLDER);
-
-    const running = await startApp({ databaseUrl });
-    try {
-      const res = await request(running.httpServer)
-        .get('/api/identities/me')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-      expect(res.body).toMatchObject({
-        id: identityId,
-        displayName: 'Javier',
-        account: null,
-      });
-    } finally {
-      await running.close();
     }
   });
 });

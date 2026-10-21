@@ -5,7 +5,7 @@ import { ApiError } from '../backend/api'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import type { Identity } from '../identity/identity'
-import { DEFAULT_PREFERENCES } from '../preferences/preferences'
+import { fakeSession } from '../test/fakeSession'
 import { fakeGoogleIdentity } from '../test/fakeGoogle'
 import { SettingsPage } from './SettingsPage'
 
@@ -15,22 +15,7 @@ afterEach(() => {
 })
 
 function renderSettings(identity: Partial<Identity> = {}, signOut: () => Promise<void> = async () => {}) {
-  const session = {
-    token: 'token',
-    identity: {
-      id: 'me',
-      displayName: 'Javier',
-      screenNames: [],
-      preferences: DEFAULT_PREFERENCES,
-      account: { email: 'javier@example.com' },
-      ...identity,
-    },
-    rememberDisplayName: () => {},
-    rememberScreenNames: () => {},
-    changePreferences: async () => {},
-    signIn: vi.fn(async () => {}),
-    signOut: vi.fn(signOut),
-  }
+  const session = fakeSession(identity, { signOut: vi.fn(signOut) })
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>

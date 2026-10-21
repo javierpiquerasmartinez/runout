@@ -3,7 +3,7 @@ import { api, reasonOf } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
 import { GoogleSignInButton } from '../identity/GoogleSignInButton'
-import { DISPLAY_NAME_MAX_LENGTH, type Identity } from '../identity/identity'
+import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
 import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
 import type { JoinIntent } from '../room/joinIntent'
@@ -43,7 +43,7 @@ export function WelcomePage() {
         </div>
 
         <div className="welcome__actions">
-          <FirstCard />
+          <CreateRoomCard />
           <div className="welcome__or" aria-hidden="true">
             <span />
             {t('welcome.or')}
@@ -124,58 +124,6 @@ function RecentRooms() {
         ))}
       </ul>
     </section>
-  )
-}
-
-/** A first-time Account chooses its Display Name before anything else. */
-function FirstCard() {
-  const { identity } = useSession()
-  if (identity.account && identity.displayName === null) return <ChooseDisplayNameCard />
-  return <CreateRoomCard />
-}
-
-function ChooseDisplayNameCard() {
-  const { t } = useI18n()
-  const { token, rememberDisplayName } = useSession()
-  const [displayName, setDisplayName] = useState('')
-  const [error, setError] = useState<MessageKey | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function save(event: FormEvent) {
-    event.preventDefault()
-    if (busy) return
-    setBusy(true)
-    setError(null)
-    try {
-      const saved = await api<Identity>('/identities/me/display-name', { token, method: 'PUT', body: { displayName } })
-      rememberDisplayName(saved.displayName ?? displayName.trim())
-    } catch (caught) {
-      setError(`reason.${reasonOf(caught)}`)
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form className="welcome-card" onSubmit={save} noValidate>
-      <div className="welcome-card__heading">
-        <h2 className="welcome-card__title">{t('welcome.name.title')}</h2>
-        <p className="welcome-card__body">{t('welcome.name.body')}</p>
-      </div>
-      <div className="welcome-card__fields">
-        <TextField
-          label={t('welcome.name.label')}
-          value={displayName}
-          maxLength={DISPLAY_NAME_MAX_LENGTH}
-          autoComplete="nickname"
-          autoFocus
-          onChange={(event) => setDisplayName(event.target.value)}
-          error={error ? t(error) : undefined}
-        />
-      </div>
-      <Button type="submit" variant="primary" size="prominent" aria-busy={busy}>
-        {t('welcome.name.submit')}
-      </Button>
-    </form>
   )
 }
 

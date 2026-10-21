@@ -1,12 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { WelcomePage } from './WelcomePage'
 import type { Identity } from '../identity/identity'
-import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 import { fakeGoogleIdentity } from '../test/fakeGoogle'
+import { fakeSession } from '../test/fakeSession'
 
 interface OpenRoom {
   code: string
@@ -33,25 +33,8 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-const ACCOUNT = { email: 'javier@example.com' }
-
 function renderWelcome(identity: Partial<Identity> = {}) {
-  const session = {
-    token: 'token',
-    identity: {
-      id: 'me',
-      displayName: 'Javier',
-      screenNames: [],
-      preferences: DEFAULT_PREFERENCES,
-      account: ACCOUNT,
-      ...identity,
-    },
-    rememberDisplayName: vi.fn(),
-    rememberScreenNames: () => {},
-    changePreferences: async () => {},
-    signIn: vi.fn(async () => {}),
-    signOut: async () => {},
-  }
+  const session = fakeSession(identity)
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -114,25 +97,5 @@ describe('WelcomePage · signing in', () => {
     renderWelcome()
 
     expect(screen.getByRole('button', { name: 'Create a new room' })).toBeTruthy()
-  })
-
-  it('asks a first-time Account for its Display Name, and keeps it', async () => {
-    const saved = vi.fn(async (_url: string, init?: RequestInit) =>
-      Response.json({ id: 'me', displayName: JSON.parse(String(init?.body)).displayName }),
-    )
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, init?: RequestInit) =>
-        url.endsWith('/api/identities/me/display-name') ? saved(url, init) : Response.json([]),
-      ),
-    )
-    const session = renderWelcome({ displayName: null })
-
-    expect(screen.queryByRole('button', { name: 'Create a new room' })).toBeNull()
-    await userEvent.type(screen.getByLabelText('What should the group call you?'), 'Javi')
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
-
-    await waitFor(() => expect(session.rememberDisplayName).toHaveBeenCalledWith('Javi'))
-    expect(saved).toHaveBeenCalledOnce()
   })
 })

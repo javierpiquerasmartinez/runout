@@ -3,7 +3,7 @@ import { api, reasonOf, type FailureReason } from '../backend/api'
 import { locales, useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
 import { GoogleSignInButton } from '../identity/GoogleSignInButton'
-import { DISPLAY_NAME_MAX_LENGTH, type Identity } from '../identity/identity'
+import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
 import type { DeckStyle, DisplayUnit, Preferences, Theme } from '../preferences/preferences'
 import { quantity } from '../room/quantity'
@@ -120,13 +120,9 @@ function ProfileCard() {
     let field: ProfileField = 'displayName'
     try {
       if (nameChanged) {
-        const saved = await api<Identity>('/identities/me/display-name', {
-          token,
-          method: 'PUT',
-          body: { displayName: name },
-        })
-        rememberDisplayName(saved.displayName ?? '')
-        setName(saved.displayName ?? '')
+        const saved = await saveDisplayName(token, name)
+        rememberDisplayName(saved)
+        setName(saved)
       }
       field = 'screenNames'
       if (namesChanged) {

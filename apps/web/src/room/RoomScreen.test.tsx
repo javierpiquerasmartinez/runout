@@ -7,7 +7,7 @@ import { SessionContext } from '../identity/context'
 import { RoomScreen } from './RoomScreen'
 import type { Note, Participant, QueueEntry, RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
-import { DEFAULT_PREFERENCES } from '../preferences/preferences'
+import { fakeSession } from '../test/fakeSession'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
@@ -62,15 +62,7 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
 }
 
 function screenOf(view: InRoom, commands: RoomCommands) {
-  const session = {
-    token: 'token',
-    identity: { id: view.you, displayName: 'Javier', screenNames: [], preferences: DEFAULT_PREFERENCES , account: null },
-    rememberDisplayName: () => {},
-    rememberScreenNames: () => {},
-    changePreferences: async () => {},
-    signIn: async () => {},
-    signOut: async () => {},
-  }
+  const session = fakeSession({ id: view.you })
   return (
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>

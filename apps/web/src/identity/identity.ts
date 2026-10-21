@@ -52,6 +52,12 @@ async function fetchSession(storage: Storage): Promise<Session> {
   return issued
 }
 
+/** Stores the Display Name on the server; it answers with it as kept (trimmed). */
+export async function saveDisplayName(token: string, displayName: string): Promise<string> {
+  const saved = await api<Identity>('/identities/me/display-name', { token, method: 'PUT', body: { displayName } })
+  return saved.displayName ?? ''
+}
+
 /**
  * Trades the ID token Google gave this browser for an Account's session, and
  * keeps its token so the Account is recognised on later visits.
