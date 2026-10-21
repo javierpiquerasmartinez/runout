@@ -69,7 +69,7 @@ export function ImportDialog({
   const totals = batchTotals(batch)
   const hands = batchHands(batch)
   const showingDiscarded = batch.items.find((item) => item.key === discardedOf && item.state === 'read')
-  const into = destination.kind
+  const destinationKind = destination.kind
 
   useEffect(() => {
     const element = dialog.current
@@ -155,7 +155,7 @@ export function ImportDialog({
   }
 
   const lockedReason = confirming
-    ? t(`import.${into}.confirming`)
+    ? t(`import.${destinationKind}.confirming`)
     : totals.reading
       ? t('import.confirm.reading')
       : totals.ready === 0
@@ -176,7 +176,7 @@ export function ImportDialog({
       <header className="import-dialog__header">
         <div className="import-dialog__heading">
           <h2 id="import-title" className="import-dialog__title">
-            {t(`import.${into}.title`)}
+            {t(`import.${destinationKind}.title`)}
           </h2>
           <span className="import-dialog__subtitle">
             {destination.kind === 'room' ? t('import.room.subtitle', { room: destination.name }) : t('import.library.subtitle')}
@@ -262,7 +262,7 @@ export function ImportDialog({
                   <FileRow
                     key={item.key}
                     item={item}
-                    into={into}
+                    destinationKind={destinationKind}
                     i18n={i18n}
                     onRemove={() => remove(item.key)}
                     onPickFormat={(format) => reread(item.key, format)}
@@ -275,14 +275,14 @@ export function ImportDialog({
         </div>
 
         <aside className="import-dialog__side">
-          {into === 'room' && (
+          {destinationKind === 'room' && (
             <ClaimHeroes heroes={unmatchedHeroes(batch)} onClaimed={(screenName) => dispatch({ type: 'screenNameAdded', screenName })} />
           )}
           {showingDiscarded?.state === 'read' ? (
             <DiscardedPanel
               item={showingDiscarded}
               preview={showingDiscarded.preview}
-              into={into}
+              destinationKind={destinationKind}
               onBack={() => setDiscardedOf(null)}
             />
           ) : (
@@ -316,8 +316,8 @@ export function ImportDialog({
         <Button variant="primary" disabledReason={lockedReason} onClick={confirm}>
           <Icon name="add" size={16} />
           {totals.ready > 0
-            ? t(totals.ready === 1 ? `import.${into}.confirm.one` : `import.${into}.confirm.other`, { count: totals.ready })
-            : t(`import.${into}.confirm.empty`)}
+            ? t(totals.ready === 1 ? `import.${destinationKind}.confirm.one` : `import.${destinationKind}.confirm.other`, { count: totals.ready })
+            : t(`import.${destinationKind}.confirm.empty`)}
         </Button>
       </footer>
     </dialog>
@@ -326,14 +326,14 @@ export function ImportDialog({
 
 function FileRow({
   item,
-  into,
+  destinationKind,
   i18n,
   onRemove,
   onPickFormat,
   onShowDiscarded,
 }: {
   item: ImportItem
-  into: ImportDestination['kind']
+  destinationKind: ImportDestination['kind']
   i18n: Translator
   onRemove: () => void
   onPickFormat: (format: SourceFormat) => void
@@ -347,7 +347,7 @@ function FileRow({
       <div className="import-file__text">
         <span className="import-file__name">{item.name}</span>
         <span className="import-file__meta ro-mono" aria-busy={item.state === 'reading' || undefined}>
-          {fileMeta(item, into, i18n)}
+          {fileMeta(item, destinationKind, i18n)}
         </span>
       </div>
       {item.state === 'read' && item.preview.format === null && (
@@ -395,7 +395,7 @@ function rowStatus(item: ImportItem): RowStatus {
 }
 
 /** "PokerStars · 42 manos · 1 ya en la cola · 3 descartadas", or why it gave nothing. */
-function fileMeta(item: ImportItem, into: ImportDestination['kind'], { t }: Translator): string {
+function fileMeta(item: ImportItem, destinationKind: ImportDestination['kind'], { t }: Translator): string {
   if (item.state === 'reading') return t('import.file.reading')
   if (item.state === 'failed') return t(`reason.${item.reason}`)
   const { format, tried, hands, discarded } = item.preview
@@ -411,7 +411,7 @@ function fileMeta(item: ImportItem, into: ImportDestination['kind'], { t }: Tran
   ]
   if (duplicates > 0) {
     parts.push(
-      t(duplicates === 1 ? `import.${into}.duplicates.one` : `import.${into}.duplicates.other`, { count: duplicates }),
+      t(duplicates === 1 ? `import.${destinationKind}.duplicates.one` : `import.${destinationKind}.duplicates.other`, { count: duplicates }),
     )
   }
   if (left > 0) {
@@ -557,12 +557,12 @@ function ClaimHeroes({ heroes, onClaimed }: { heroes: string[]; onClaimed: (scre
 function DiscardedPanel({
   item,
   preview,
-  into,
+  destinationKind,
   onBack,
 }: {
   item: ImportItem
   preview: ImportPreview
-  into: ImportDestination['kind']
+  destinationKind: ImportDestination['kind']
   onBack: () => void
 }) {
   const { t } = useI18n()
@@ -574,7 +574,7 @@ function DiscardedPanel({
       <ol className="import-discarded__list">
         {preview.discarded.map((entry, index) => (
           <li key={index} className="import-discarded__entry">
-            <span className="import-discarded__reason">{entry.reason === 'duplicate' ? t(`import.${into}.duplicate`) : t(`import.discarded.reason.${entry.reason}`)}</span>
+            <span className="import-discarded__reason">{entry.reason === 'duplicate' ? t(`import.${destinationKind}.duplicate`) : t(`import.discarded.reason.${entry.reason}`)}</span>
             <pre className="import-discarded__text ro-mono" tabIndex={0}>
               {entry.text}
             </pre>

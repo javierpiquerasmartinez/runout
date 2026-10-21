@@ -55,12 +55,12 @@ export class LibraryService {
    * The others, and any read twice from the same text, are duplicates.
    */
   async planImport(
-    owner: Identity,
+    account: Identity,
     read: Hand[],
     texts: string[],
     db: Database | Transaction = this.db,
   ): Promise<{ kept: Hand[]; duplicates: Discarded[] }> {
-    const inLibrary = await this.inLibrary(owner, read, db);
+    const inLibrary = await this.inLibrary(account, read, db);
     const kept: Hand[] = [];
     const duplicates: Discarded[] = [];
     const taken = new Set<string>();
@@ -81,16 +81,16 @@ export class LibraryService {
    * those nobody has imported before. Returns how many were added: one
    * added since it was previewed is skipped.
    */
-  async add(tx: Transaction, owner: Identity, read: Hand[]): Promise<number> {
-    const { kept } = await this.planImport(owner, read, [], tx);
+  async add(tx: Transaction, account: Identity, read: Hand[]): Promise<number> {
+    const { kept } = await this.planImport(account, read, [], tx);
     if (kept.length === 0) return 0;
     const now = this.clock.now();
-    const handIds = await storeHands(tx, owner.id, kept, now);
+    const handIds = await storeHands(tx, account.id, kept, now);
     const added = await tx
       .insert(libraryEntries)
       .values(
         handIds.map((handId) => ({
-          identityId: owner.id,
+          identityId: account.id,
           handId,
           addedAt: now,
         })),
@@ -102,13 +102,13 @@ export class LibraryService {
 
   /** One page of the Library, newest first by when each Hand was played. */
   async page(
-    owner: Identity,
+    account: Identity,
     page: unknown,
     pageSize: unknown,
   ): Promise<LibraryPage> {
     const size = boundedInt(pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
     const number = boundedInt(page, 1, 1, Number.MAX_SAFE_INTEGER);
-    const mine = eq(libraryEntries.identityId, owner.id);
+    const mine = eq(libraryEntries.identityId, account.id);
     const [[{ total }], rows] = await Promise.all([
       this.db.select({ total: count() }).from(libraryEntries).where(mine),
       this.db
@@ -139,7 +139,7 @@ export class LibraryService {
 
   /** The keys of the Hands among `read` this Library already has. */
   private async inLibrary(
-    owner: Identity,
+    account: Identity,
     read: Hand[],
     db: Database | Transaction,
   ): Promise<Set<string>> {
@@ -150,7 +150,7 @@ export class LibraryService {
       .from(libraryEntries)
       .where(
         and(
-          eq(libraryEntries.identityId, owner.id),
+          eq(libraryEntries.identityId, account.id),
           inArray(libraryEntries.handId, [...stored.values()]),
         ),
       );

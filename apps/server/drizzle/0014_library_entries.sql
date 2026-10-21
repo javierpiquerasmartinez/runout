@@ -12,4 +12,5 @@ ALTER TABLE "import_previews" ALTER COLUMN "room_id" DROP NOT NULL;--> statement
 ALTER TABLE "import_previews" ADD COLUMN "destination" text NOT NULL;--> statement-breakpoint
 ALTER TABLE "library_entries" ADD CONSTRAINT "library_entries_identity_id_identities_id_fk" FOREIGN KEY ("identity_id") REFERENCES "public"."identities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "library_entries" ADD CONSTRAINT "library_entries_hand_id_hands_id_fk" FOREIGN KEY ("hand_id") REFERENCES "public"."hands"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "library_entries_hand_id_idx" ON "library_entries" USING btree ("hand_id");
+CREATE INDEX "library_entries_hand_id_idx" ON "library_entries" USING btree ("hand_id");--> statement-breakpoint
+ALTER TABLE "import_previews" ADD CONSTRAINT "import_previews_destination_room_check" CHECK (("import_previews"."destination" = 'room') = ("import_previews"."room_id" is not null));

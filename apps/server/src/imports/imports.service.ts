@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
-import { DATABASE, type Database } from '../database/database.js';
+import {
+  DATABASE,
+  type Database,
+  type Transaction,
+} from '../database/database.js';
 import { importPreviews } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import {
@@ -56,11 +60,6 @@ export interface ImportPreview {
   discarded: Discarded[];
 }
 
-/** What confirming did. */
-export type Confirmed =
-  | { kind: 'room'; room: Room; entries: QueueEntry[] }
-  | { kind: 'library'; added: number };
-
 /** An uploaded file, or text pasted into the dialog. */
 export type ImportSource =
   { name: string; bytes: Uint8Array } | { text: unknown };
@@ -95,7 +94,7 @@ export class ImportsService {
     source: ImportSource,
     format: unknown,
   ): Promise<ImportPreview> {
-    const roomId = await this.roomIdOf(importer, destination);
+    const roomId = (await this.roomOf(importer, destination))?.id ?? null;
     const picked = pickedFormat(format);
     const result = importHandHistory(textOf(source), { format: picked });
     let kept: Hand[];
@@ -145,66 +144,86 @@ export class ImportsService {
   }
 
   /**
-   * Adds the Hands of the Importer's previews to the destination, in the
-   * order given, and forgets the previews. Into a Room they join the end of
-   * the Queue, with Authors matched again against the Screen Names as they
-   * are now. A Hand that reached the destination since it was previewed is
-   * skipped. Refuses with `preview-not-found` if any of them is not theirs,
-   * not for this destination, already confirmed or forgotten.
+   * Appends the Hands of the Importer's previews for this Room to the end of
+   * its Queue, in the order given, and forgets the previews. Authors are
+   * matched again, against the Screen Names as they are now, and a Hand
+   * queued since it was previewed is skipped. Returns the new Queue Entries.
    */
-  async confirm(
+  async confirmIntoRoom(
     importer: Identity,
-    destination: Destination,
+    code: string,
     previewIds: unknown,
-  ): Promise<Confirmed> {
-    const room =
-      destination.kind === 'room'
-        ? await this.rooms.findOpen(destination.code)
-        : null;
-    if (room) await this.rooms.requireParticipant(room.id, importer.id);
+  ): Promise<{ room: Room; entries: QueueEntry[] }> {
+    const room = (await this.roomOf(importer, { kind: 'room', code }))!;
     const ids = validIds(previewIds);
-
-    return this.db.transaction(async (tx) => {
-      const taken = await tx
-        .delete(importPreviews)
-        .where(
-          and(
-            inArray(importPreviews.id, ids),
-            eq(importPreviews.destination, destination.kind),
-            room
-              ? eq(importPreviews.roomId, room.id)
-              : isNull(importPreviews.roomId),
-            eq(importPreviews.importerId, importer.id),
-            gte(importPreviews.createdAt, this.oldestKept()),
-          ),
-        )
-        .returning({ id: importPreviews.id, hands: importPreviews.hands });
-      if (taken.length !== ids.length) throw new Rejected('preview-not-found');
-      const handsOf = new Map(taken.map((row) => [row.id, row.hands]));
-      const read = ids.flatMap((id) => handsOf.get(id)!);
-      if (!room) {
-        return {
-          kind: 'library',
-          added: await this.library.add(tx, importer, read),
-        };
-      }
-      return {
-        kind: 'room',
+    const entries = await this.db.transaction(async (tx) =>
+      this.queue.append(
+        tx,
         room,
-        entries: await this.queue.append(tx, room, importer, read),
-      };
-    });
+        importer,
+        await this.take(tx, importer, room, ids),
+      ),
+    );
+    return { room, entries };
   }
 
-  /** The Room an import goes into, once the Importer is known to be in it; null for the Library. */
-  private async roomIdOf(
+  /**
+   * Adds the Hands of the Importer's Library previews to their Library and
+   * forgets the previews. A Hand added since it was previewed is skipped.
+   * Returns how many were added.
+   */
+  async confirmIntoLibrary(
+    importer: Identity,
+    previewIds: unknown,
+  ): Promise<number> {
+    const ids = validIds(previewIds);
+    return this.db.transaction(async (tx) =>
+      this.library.add(tx, importer, await this.take(tx, importer, null, ids)),
+    );
+  }
+
+  /**
+   * Deletes the previews and returns their Hands, in the order of `ids`.
+   * Refuses with `preview-not-found` if any of them is not the Importer's,
+   * not for this destination (`null` for their Library), already confirmed
+   * or forgotten.
+   */
+  private async take(
+    tx: Transaction,
+    importer: Identity,
+    room: Room | null,
+    ids: string[],
+  ): Promise<Hand[]> {
+    const taken = await tx
+      .delete(importPreviews)
+      .where(
+        and(
+          inArray(importPreviews.id, ids),
+          room
+            ? and(
+                eq(importPreviews.destination, 'room'),
+                eq(importPreviews.roomId, room.id),
+              )
+            : eq(importPreviews.destination, 'library'),
+          eq(importPreviews.importerId, importer.id),
+          gte(importPreviews.createdAt, this.oldestKept()),
+        ),
+      )
+      .returning({ id: importPreviews.id, hands: importPreviews.hands });
+    if (taken.length !== ids.length) throw new Rejected('preview-not-found');
+    const handsOf = new Map(taken.map((row) => [row.id, row.hands]));
+    return ids.flatMap((id) => handsOf.get(id)!);
+  }
+
+  /** The open Room an import goes into, once the Importer is known to be in it; null for the Library. */
+  private async roomOf(
     importer: Identity,
     destination: Destination,
-  ): Promise<string | null> {
+  ): Promise<Room | null> {
     if (destination.kind === 'library') return null;
     const room = await this.rooms.findOpen(destination.code);
     await this.rooms.requireParticipant(room.id, importer.id);
-    return room.id;
+    return room;
   }
 
   private oldestKept(): Date {

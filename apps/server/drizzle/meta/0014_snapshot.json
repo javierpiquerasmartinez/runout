@@ -1,5 +1,5 @@
 {
-  "id": "6a64a07d-39e1-4024-b531-feb800f0615f",
+  "id": "9b7ddfd0-26bc-429b-8a9a-39fd57a5ee68",
   "prevId": "a61dc699-ec64-4a4c-8fc4-66918e68c0c1",
   "version": "7",
   "dialect": "postgresql",
@@ -306,7 +306,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "import_previews_destination_room_check": {
+          "name": "import_previews_destination_room_check",
+          "value": "(\"import_previews\".\"destination\" = 'room') = (\"import_previews\".\"room_id\" is not null)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.library_entries": {

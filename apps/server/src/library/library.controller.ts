@@ -21,9 +21,9 @@ export class LibraryController {
     @Query('page') page: unknown,
     @Query('pageSize') pageSize: unknown,
   ): Promise<LibraryPage> {
-    const owner = await this.identities.authenticateAccount(
+    const account = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
-    return this.library.page(owner, page, pageSize);
+    return this.library.page(account, page, pageSize);
   }
 }

@@ -4,6 +4,7 @@ import {
   type AnyPgColumn,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -14,6 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { Hand } from '../hands/hand.js';
 
 /**
@@ -235,7 +237,14 @@ export const importPreviews = pgTable(
     hands: jsonb('hands').$type<Hand[]>().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   },
-  (table) => [index('import_previews_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('import_previews_created_at_idx').on(table.createdAt),
+    // A Room preview names its Room; a Library preview names none.
+    check(
+      'import_previews_destination_room_check',
+      sql`(${table.destination} = 'room') = (${table.roomId} is not null)`,
+    ),
+  ],
 );
 
 /**

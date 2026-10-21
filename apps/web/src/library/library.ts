@@ -14,8 +14,9 @@ export function libraryHandPath(handId: string): string {
 
 /** The Hand id in a Library Hand's path, or null for any other path. */
 export function libraryHandIdFromPath(path: string): string | null {
-  const match = /^\/library\/hands\/([^/]+)$/.exec(path)
-  return match ? decodeURIComponent(match[1]) : null
+  const prefix = libraryHandPath('')
+  const id = path.startsWith(prefix) ? path.slice(prefix.length) : ''
+  return id && !id.includes('/') ? decodeURIComponent(id) : null
 }
 
 /** One Library row: what tells the spot apart at a glance. */

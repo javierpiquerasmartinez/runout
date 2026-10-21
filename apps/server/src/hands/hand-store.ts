@@ -4,8 +4,9 @@ import { hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 
 /*
- * Hands are stored once each, owned by nobody (ADR 0002): every import, into
- * a Room or a Library, references the stored Hand when it is already there.
+ * Hands are stored once each (ADR 0002) and belong to no one (ADR 0004):
+ * every import, into a Room or a Library, references the stored Hand when it
+ * is already there.
  */
 
 /** What makes a Hand the same Hand (ADR 0002). */

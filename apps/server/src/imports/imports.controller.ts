@@ -81,13 +81,11 @@ export class ImportsController {
     const importer = await this.identities.authenticate(
       bearerToken(authorization),
     );
-    const confirmed = await this.imports.confirm(
+    const { room, entries } = await this.imports.confirmIntoRoom(
       importer,
-      { kind: 'room', code },
+      code,
       body.previews,
     );
-    if (confirmed.kind !== 'room') return { imported: 0 };
-    const { room, entries } = confirmed;
     if (entries.length > 0) await this.gateway.entriesAdded(room.id, entries);
     return { imported: entries.length };
   }
@@ -120,11 +118,8 @@ export class ImportsController {
     const importer = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
-    const confirmed = await this.imports.confirm(
-      importer,
-      { kind: 'library' },
-      body.previews,
-    );
-    return { imported: confirmed.kind === 'library' ? confirmed.added : 0 };
+    return {
+      imported: await this.imports.confirmIntoLibrary(importer, body.previews),
+    };
   }
 }

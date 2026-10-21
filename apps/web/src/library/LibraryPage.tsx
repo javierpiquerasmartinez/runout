@@ -14,7 +14,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { LIBRARY_PAGE_SIZE, libraryHandPath, type LibraryHand, type LibraryPage as Page } from './library'
+import { LIBRARY_PAGE_SIZE, libraryHandPath, libraryPath, type LibraryHand, type LibraryPage as Page } from './library'
 import './LibraryPage.css'
 
 /**
@@ -51,7 +51,7 @@ export function LibraryPage() {
         <nav className="library__side" aria-label={t('library.collections')}>
           <div className="library__group">
             <span className="library__group-title ro-mono">{t('library.collections')}</span>
-            <a href="/library" className="library__collection" aria-current="page" onClick={followLink}>
+            <a href={libraryPath} className="library__collection" aria-current="page" onClick={followLink}>
               {t('library.all')}
               {page && <span className="library__collection-count ro-mono">{page.total}</span>}
             </a>
@@ -101,7 +101,7 @@ export function LibraryPage() {
           onClose={() => setImporting(false)}
           onImported={(imported) => {
             if (imported === 0) return
-            // The new Hands are the newest ones, at the head of the first page.
+            // Back to the first page: the list is newest first by when each Hand was played.
             setPageNumber(1)
             setRevision((n) => n + 1)
           }}
