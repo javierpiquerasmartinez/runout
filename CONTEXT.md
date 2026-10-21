@@ -6,8 +6,12 @@ A web room where a small study group replays the same poker hand together, in re
 
 ### People and roles
 
+**Account**:
+A person's lasting identity in Runout, signed in with Google. Everything that outlives a Room belongs to one: their Library, Screen Names, Display Name, Preferences, Marks and Tags.
+_Avoid_: User, profile, login
+
 **Participant**:
-A person present in a Room. Always has an identity bound to their browser, even without an account; an account only carries that identity to other devices.
+A person present in a Room: either with their Account, or anonymously, with an identity that exists for that one Room and is lost when it closes.
 _Avoid_: User, player, member, anonymous user
 
 **Master**:
@@ -19,7 +23,7 @@ Any Participant who is not the Master.
 _Avoid_: Invitado (UI only), spectator, viewer
 
 **Display Name**:
-The name a person is shown under inside Runout. One per person, reused across Rooms, editable at any time.
+The name a person is shown under inside Runout. One per Account, reused across Rooms, editable at any time; an anonymous Participant picks one for their Room only.
 _Avoid_: Alias, nickname, username
 
 **Screen Name**:
@@ -47,7 +51,7 @@ _Avoid_: Game, spot, deal
 The seat from whose point of view a Hand was recorded, as stated by the Hand History itself.
 
 **Author**:
-The person whose Screen Name is the Hero's; when none matches, the Importer. The Master can reassign it.
+The person whose spot a Hand is, as a Room shows it: the Participant whose Screen Name is the Hero's, or else whoever brought the Hand into the Room. The Master can reassign it. It means nothing outside a Room and never decides what is in anyone's Library.
 _Avoid_: Owner, uploader
 
 **Importer**:
@@ -55,11 +59,11 @@ The Participant who brought a Hand into Runout. Recorded for audit only; carries
 _Avoid_: Author
 
 **Note**:
-A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen, but only the Master of a Room the Hand is in can edit or delete it; outside a Room it is read-only.
+A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room only the Master edits or deletes it; outside a Room, anyone who has the Hand in their Library can.
 _Avoid_: Comment, annotation
 
 **Tag**:
-A label attached to a Hand, visible to everyone who can see that Hand.
+A label a person puts on a Hand in their own Library to classify it. Only they see it.
 _Avoid_: Category, group tag
 
 **Mark**:
@@ -67,8 +71,29 @@ A private flag a person puts on a Hand to find it again. Only they see it.
 _Avoid_: Favourite, bookmark, star
 
 **Library**:
-The Hands a person can reach outside a Room: those they are Author of, plus those that were in the Queue of any Room they were in.
-_Avoid_: Shared with me, collection, archive
+A person's own repository: the Hands they imported into it, whatever their Hero, and nothing else. Several Libraries can hold the same Hand. Hands seen in other people's Rooms are not in it.
+_Avoid_: Shared with me, collection, archive, database
+
+**Room Hand**:
+A Hand in a Room's Queue that is in nobody's Library. It is discarded, with its Notes, when the Room closes.
+
+### Results
+
+**Result**:
+What the Hero won or lost in a Hand, after rake.
+_Avoid_: Profit, winnings, net
+
+**All-in EV**:
+The Hero's Result with luck taken out: when the Hero is all-in before the river and the opponents' cards are shown, their share of each pot by equity instead of what they actually won. Otherwise it equals the Result.
+_Avoid_: EV (alone), expected value, adjusted
+
+**Showdown Result**:
+The Hero's Result in Hands where the Hero reached Showdown. The rest is their **Non-showdown Result**, even when the Hand itself went to Showdown without them.
+_Avoid_: Red line, blue line
+
+**Results Graph**:
+The running total over a person's Library, Hand by Hand: Result, All-in EV, Showdown Result and Non-showdown Result. Filtered the same way as the Library's list of Hands (period, Poker Site, Hero, Stake, Marks, Tags), and shown in big blinds unless every Hand in the period shares one currency.
+_Avoid_: Chart, winrate graph
 
 ### Room and queue
 
