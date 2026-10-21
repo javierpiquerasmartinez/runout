@@ -28,6 +28,9 @@ describe('Test database (e2e)', () => {
   });
 });
 
+/** The last migration before Runout started clean, data and all. */
+const BEFORE_CLEAN_START = '0010_hero_seat';
+
 describe('Migrating a database with Hands already imported (e2e)', () => {
   const admin = new pg.Client(inject('databaseUrl'));
   let name: string;
@@ -59,6 +62,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
 
   /** Applies the migrations up to and including `lastTag`. */
   async function migrateUpTo(lastTag: string) {
+    await rm(folder, { recursive: true, force: true });
     await cp(MIGRATIONS_FOLDER, folder, { recursive: true });
     const journalPath = join(folder, 'meta/_journal.json');
     const journal = JSON.parse(await readFile(journalPath, 'utf8'));
@@ -129,7 +133,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
         [room.id, again],
       );
 
-      await migrateWith(MIGRATIONS_FOLDER);
+      await migrateUpTo(BEFORE_CLEAN_START);
 
       const hands = await client.query<{ id: string }>('select id from hands');
       const queue = await client.query<{ hand_id: string }>(
@@ -178,7 +182,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       // The same Hand imported again with its Hero renamed: kept as it was.
       await insertHand('iPholdeAA');
 
-      await migrateWith(MIGRATIONS_FOLDER);
+      await migrateUpTo(BEFORE_CLEAN_START);
 
       const { rows } = await client.query<{
         hero_screen_name: string;
@@ -190,6 +194,102 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       expect(rows).toEqual([
         { hero_screen_name: 'iMapleAA', hero_seat: 5 },
         { hero_screen_name: 'iPholdeAA', hero_seat: 5 },
+      ]);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it('starts clean: every table is emptied, and the Author moves to the Queue Entry', async () => {
+    await migrateUpTo(BEFORE_CLEAN_START);
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    try {
+      const {
+        rows: [identity],
+      } = await client.query<{ id: string }>(
+        `insert into identities (token_hash, display_name, created_at)
+         values ('clean', 'Javier', now()) returning id`,
+      );
+      await client.query(
+        `insert into screen_names (identity_id, screen_name, position) values ($1, 'iMapleAA', 0)`,
+        [identity.id],
+      );
+      await client.query(
+        `insert into preferences (identity_id, deck_style, four_colour, pot_percentage,
+           display_unit, theme, language)
+         values ($1, 'classic', true, false, 'both', 'dark', 'es')`,
+        [identity.id],
+      );
+      const {
+        rows: [room],
+      } = await client.query<{ id: string }>(
+        `insert into rooms (code, name, master_id, created_at)
+         values ('CLEAN234', 'Martes', $1, now()) returning id`,
+        [identity.id],
+      );
+      await client.query(
+        `insert into room_memberships (room_id, identity_id, joined_at) values ($1, $2, now())`,
+        [room.id, identity.id],
+      );
+      const {
+        rows: [hand],
+      } = await client.query<{ id: string }>(
+        `insert into hands (site, site_hand_id, hero_screen_name, hero_seat, author_id,
+           importer_id, source_format, played_at, small_blind, big_blind, currency,
+           content, imported_at)
+         values ('pokerstars', '262120700000', 'iMapleAA', 5, $1, $1, 'pokerstars', now(),
+           5, 10, 'EUR', '{}', now()) returning id`,
+        [identity.id],
+      );
+      await client.query(
+        `insert into queue_entries (room_id, hand_id, position, added_at)
+         values ($1, $2, 1, now())`,
+        [room.id, hand.id],
+      );
+      await client.query(
+        `insert into playbacks (room_id, hand_id, action_index, updated_at)
+         values ($1, $2, 0, now())`,
+        [room.id, hand.id],
+      );
+      await client.query(
+        `insert into import_previews (room_id, importer_id, hands, created_at)
+         values ($1, $2, '[]', now())`,
+        [room.id, identity.id],
+      );
+      await client.query(
+        `insert into notes (hand_id, writer_id, body, written_at) values ($1, $2, 'Fold', now())`,
+        [hand.id, identity.id],
+      );
+      await client.query(
+        `insert into marks (identity_id, hand_id, marked_at) values ($1, $2, now())`,
+        [identity.id, hand.id],
+      );
+
+      await migrateWith(MIGRATIONS_FOLDER);
+
+      // Every table Runout has, so one added later can't be left out.
+      const { rows: tables } = await client.query<{ table_name: string }>(
+        `select table_name from information_schema.tables
+         where table_schema = 'public' order by table_name`,
+      );
+      const counts: Record<string, number> = {};
+      for (const { table_name: table } of tables) {
+        const { rows } = await client.query<{ count: number }>(
+          `select count(*)::integer as count from "${table}"`,
+        );
+        counts[table] = rows[0].count;
+      }
+      expect(Object.keys(counts)).toContain('queue_entries');
+      expect(Object.values(counts).every((count) => count === 0)).toBe(true);
+      const { rows: authorColumns } = await client.query<{
+        table_name: string;
+      }>(
+        `select table_name from information_schema.columns
+         where table_schema = 'public' and column_name = 'author_id'`,
+      );
+      expect(authorColumns.map((row) => row.table_name)).toEqual([
+        'queue_entries',
       ]);
     } finally {
       await client.end();

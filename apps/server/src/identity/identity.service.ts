@@ -146,7 +146,7 @@ export class IdentityService {
   }
 
   /**
-   * Replaces the identity's Screen Names. Hands already imported keep the
+   * Replaces the identity's Screen Names. Hands already queued keep the
    * Author they were given.
    */
   async setScreenNames(identity: Identity, raw: unknown): Promise<Profile> {

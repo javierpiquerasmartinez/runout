@@ -111,7 +111,7 @@ export class QueueService {
    * Queue and under which Author, and which are duplicates — already in this
    * Room's Queue, or read twice from the same text. A Hand stored from an
    * earlier Room is not imported again: the Queue Entry references it, with
-   * the Author it already has (ADR 0002).
+   * an Author chosen in this Room (ADR 0002).
    */
   async planImport(
     roomId: string,
@@ -136,23 +136,21 @@ export class QueueService {
       queued.push({
         hand,
         storedId: known?.id,
-        // A stored Hand keeps the Author it was given when it was imported.
-        author: known?.author ?? matched[index].author,
-        heroMatched: matched[index].heroMatched,
+        ...matched[index],
       });
     });
     return { queued, duplicates };
   }
 
   /**
-   * The Hands among `read` that are already stored: their id, their Author,
-   * and whether they are in this Room's Queue already.
+   * The Hands among `read` that are already stored: their id, and whether
+   * they are in this Room's Queue already.
    */
   private async storedHands(
     roomId: string,
     read: Hand[],
     db: Database | Transaction,
-  ): Promise<Map<string, { id: string; author: Author; inQueue: boolean }>> {
+  ): Promise<Map<string, { id: string; inQueue: boolean }>> {
     if (read.length === 0) return new Map();
     const rows = await db
       .select({
@@ -161,12 +159,9 @@ export class QueueService {
         siteHandId: hands.siteHandId,
         heroScreenName: hands.heroScreenName,
         heroSeat: hands.heroSeat,
-        authorId: hands.authorId,
-        authorName: identities.displayName,
         queueEntryId: queueEntries.id,
       })
       .from(hands)
-      .innerJoin(identities, eq(identities.id, hands.authorId))
       .leftJoin(
         queueEntries,
         and(
@@ -186,10 +181,6 @@ export class QueueService {
         handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat),
         {
           id: row.id,
-          author: {
-            identityId: row.authorId,
-            displayName: row.authorName ?? '',
-          },
           inQueue: row.queueEntryId !== null,
         },
       ]),
@@ -259,8 +250,8 @@ export class QueueService {
   }
 
   /**
-   * Stores the Hands this Room hasn't got yet, attributed to their Authors,
-   * and appends a Queue Entry for each Hand that isn't in the Queue, inside
+   * Stores the Hands that aren't stored yet, and appends a Queue Entry for
+   * each Hand that isn't in the Queue, under the Author chosen for it, inside
    * the caller's transaction. Returns the new Queue Entries, in Queue order.
    */
   async append(
@@ -289,6 +280,7 @@ export class QueueService {
         handIds.map((handId, index) => ({
           roomId: room.id,
           handId,
+          authorId: queued[index].author.identityId,
           position: (last ?? 0) + index + 1,
           addedAt: now,
         })),
@@ -320,12 +312,11 @@ export class QueueService {
       const stored = await tx
         .insert(hands)
         .values(
-          toStore.map(({ hand, author }) => ({
+          toStore.map(({ hand }) => ({
             site: hand.site,
             siteHandId: hand.siteHandId,
             heroScreenName: hand.hero.screenName,
             heroSeat: heroSeat(hand),
-            authorId: author.identityId,
             importerId: importer.id,
             sourceFormat: hand.sourceFormat,
             playedAt: new Date(hand.playedAt),
@@ -387,7 +378,7 @@ export class QueueService {
 
   /**
    * The Master gives a Hand in the Queue another Author: any Participant of
-   * the Room who hasn't been kicked.
+   * the Room who hasn't been kicked. Only this Room's Queue Entry changes.
    */
   async reassignAuthor(
     master: Identity,
@@ -427,9 +418,9 @@ export class QueueService {
     if (!author) throw new Rejected('author-not-in-room');
 
     await this.db
-      .update(hands)
+      .update(queueEntries)
       .set({ authorId: author.identityId })
-      .where(eq(hands.id, handId));
+      .where(eq(queueEntries.id, queued.id));
     return {
       handId,
       author: {
@@ -466,13 +457,13 @@ export class QueueService {
         id: queueEntries.id,
         handId: hands.id,
         position: queueEntries.position,
-        authorId: hands.authorId,
+        authorId: queueEntries.authorId,
         authorName: identities.displayName,
         content: hands.content,
       })
       .from(queueEntries)
       .innerJoin(hands, eq(hands.id, queueEntries.handId))
-      .innerJoin(identities, eq(identities.id, hands.authorId))
+      .innerJoin(identities, eq(identities.id, queueEntries.authorId))
       .where(where);
   }
 
