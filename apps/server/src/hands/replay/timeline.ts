@@ -98,7 +98,8 @@ export interface PaidPot extends Pot {
 
 const STREETS: Street[] = ['preflop', 'flop', 'turn', 'river'];
 
-const BOARD_SIZE: Record<Street, number> = {
+/** How many community cards are out on each Street. */
+export const BOARD_SIZE: Record<Street, number> = {
   preflop: 0,
   flop: 3,
   turn: 4,

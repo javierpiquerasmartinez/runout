@@ -4,7 +4,7 @@
  */
 
 /** The Results Graph's lines, in the order the legend lists them. */
-export const RESULT_LINES = ['result', 'showdown', 'nonShowdown'] as const
+export const RESULT_LINES = ['result', 'allInEv', 'showdown', 'nonShowdown'] as const
 
 export type ResultLine = (typeof RESULT_LINES)[number]
 

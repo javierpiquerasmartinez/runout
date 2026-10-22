@@ -116,6 +116,7 @@
    * never says "losing".
    */
   --graph-result: var(--avatar-2-ink);
+  --graph-all-in-ev: var(--avatar-1-ink);
   --graph-showdown: var(--avatar-3-ink);
   --graph-non-showdown: var(--avatar-4-ink);
 

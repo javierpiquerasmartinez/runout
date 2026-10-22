@@ -60,6 +60,12 @@ const CORPUS: CorpusEntry[] = [
     discarded: [],
   },
   {
+    file: 'pokerstars-all-ins.txt',
+    format: 'pokerstars',
+    hands: [{ siteHandId: '262140000101' }, { siteHandId: '262140000102' }],
+    discarded: [],
+  },
+  {
     file: 'pokerstars-ten-max.txt',
     format: 'pokerstars',
     hands: [],

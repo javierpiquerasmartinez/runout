@@ -5,6 +5,7 @@ import { newAccount } from './support/google.js';
 
 interface Lines {
   result: number;
+  allInEv: number;
   showdown: number;
   nonShowdown: number;
 }
@@ -21,7 +22,8 @@ interface Results {
  * order they were played: pokerstars-session.txt is +€0.31 (no Showdown),
  * -€0.30, €0 and -€0.10 (the big blind folded); pokerstars-showdown.txt,
  * played later that day, is +€0.49 at Showdown. coinpoker-session.txt is
- * `Hero` at ₮0.05/₮0.10, played in October.
+ * `Hero` at ₮0.05/₮0.10, played in October. None of these Hands was
+ * decided by an all-in before the river, so their All-in EV is their Result.
  */
 describe('The Library’s Results (e2e)', () => {
   let running: RunningApp;
@@ -75,8 +77,8 @@ describe('The Library’s Results (e2e)', () => {
     expect(stars.hands).toBe(5);
     expect(stars.currency).toBe('EUR');
     expect(stars.totals).toEqual({
-      bigBlinds: { result: 4, showdown: 4.9, nonShowdown: -0.9 },
-      amounts: { result: 40, showdown: 49, nonShowdown: -9 },
+      bigBlinds: { result: 4, allInEv: 4, showdown: 4.9, nonShowdown: -0.9 },
+      amounts: { result: 40, allInEv: 40, showdown: 49, nonShowdown: -9 },
     });
     expect(stars.points.map((point) => point.hand)).toEqual([1, 2, 3, 4, 5]);
     expect(stars.points.map((point) => point.amounts?.result)).toEqual([
@@ -86,6 +88,24 @@ describe('The Library’s Results (e2e)', () => {
       0, 0, 0, 0, 4.9,
     ]);
     expect(stars.points.at(-1)).toEqual({ hand: 5, ...stars.totals });
+  });
+
+  it('runs the All-in EV beside the Result', async () => {
+    const account = await newAccount(running.httpServer);
+    // At $0.25/$0.50: KdKc wins a preflop all-in against AhAs (+$47.50,
+    // All-in EV -$31.72), then 7c7d loses a flop all-in against AsAh (-$50,
+    // All-in EV -$41.83).
+    await importText(account.token, freshHandHistory('pokerstars-all-ins.txt'));
+
+    const allIns = await results(account.token);
+
+    expect(allIns.totals).toEqual({
+      bigBlinds: { result: -5, allInEv: -147.1, showdown: -5, nonShowdown: 0 },
+      amounts: { result: -250, allInEv: -7355, showdown: -250, nonShowdown: 0 },
+    });
+    expect(allIns.points.map((point) => point.amounts?.allInEv)).toEqual([
+      -3172, -7355,
+    ]);
   });
 
   it('adds mixed currencies up in big blinds only', async () => {
@@ -124,6 +144,7 @@ describe('The Library’s Results (e2e)', () => {
     expect(filtered.hands).toBe(list.body.total);
     expect(filtered.totals.amounts).toEqual({
       result: 1,
+      allInEv: 1,
       showdown: 0,
       nonShowdown: 1,
     });
@@ -154,7 +175,7 @@ describe('The Library’s Results (e2e)', () => {
       hands: 0,
       currency: null,
       totals: {
-        bigBlinds: { result: 0, showdown: 0, nonShowdown: 0 },
+        bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
         amounts: null,
       },
       points: [],

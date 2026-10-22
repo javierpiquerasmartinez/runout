@@ -20,13 +20,14 @@ type Point = { hand: number } & ResultLines
  */
 const STROKE: Record<ResultLine, string> = {
   result: 'var(--graph-result)',
+  allInEv: 'var(--graph-all-in-ev)',
   showdown: 'var(--graph-showdown)',
   nonShowdown: 'var(--graph-non-showdown)',
 }
 const AXIS_TICK = { fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }
 
 /**
- * The Results Graph: the running Result, Showdown and Non-showdown Results
+ * The Results Graph: the running Result, All-in EV, Showdown and Non-showdown Results
  * over the filtered Hands, with a legend that shows each line's total and
  * hides or shows it. Draws only Results that hold Hands.
  */
@@ -44,7 +45,7 @@ export function ResultsGraph({ results }: { results: Results }) {
 
   // Every line starts from nothing before the first Hand.
   const data: Point[] = [
-    { hand: 0, result: 0, showdown: 0, nonShowdown: 0 },
+    { hand: 0, result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
     ...results.points.map((point) => ({ hand: point.hand, ...linesOf(point) })),
   ]
   const totals = linesOf(results.totals)
