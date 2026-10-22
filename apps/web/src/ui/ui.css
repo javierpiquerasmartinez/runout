@@ -564,6 +564,20 @@
   flex-shrink: 0;
 }
 
+/* The lockup every header draws: the "Biblioteca" board's 19 px, 0.09em apart. */
+.ro-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-primary);
+  font-size: 19px;
+  letter-spacing: 0.09em;
+  text-decoration: none;
+}
+.ro-brand:hover {
+  color: var(--text-primary);
+}
+
 /* ---------- The Amount beside big blinds, when a reader shows both units ---------- */
 
 .ro-secondary {

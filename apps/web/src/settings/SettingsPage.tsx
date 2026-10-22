@@ -1,17 +1,17 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
+import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { locales, useI18n, type MessageKey } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
+import { useSignOut } from '../identity/useSignOut'
 import type { DeckStyle, DisplayUnit, Preferences, Theme } from '../preferences/preferences'
 import { quantity } from '../room/quantity'
 import { useHeldRoom } from '../room/heldRoomContext'
-import { roomPath } from '../room/roomCode'
 import { followLink, navigate } from '../routing'
 import { Avatar } from '../ui/Avatar'
-import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { Card, type Deck } from '../ui/Card'
 import { Icon } from '../ui/Icon'
@@ -31,21 +31,9 @@ export const settingsPath = '/settings'
  */
 export function SettingsPage() {
   const { t } = useI18n()
-  const { identity } = useIdentity()
-  const name = identity.displayName ?? ''
   return (
     <div className="settings">
-      <header className="settings__header">
-        <a href="/" className="settings__brand" aria-label={t('room.home')} onClick={followLink}>
-          <BrandMark size={22} />
-          <span className="ro-serif">{t('brand.wordmark')}</span>
-        </a>
-        <span className="settings__divider" aria-hidden="true" />
-        <span className="settings__where">{t('room.settings')}</span>
-        <span className="settings__spacer" />
-        <BackLink />
-        {name && <Avatar name={name} seed={identity.id} size={28} />}
-      </header>
+      <AppHeader where={t('room.settings')} back={<BackLink />} />
       <div className="settings__body">
         <nav className="settings__nav" aria-label={t('settings.nav')}>
           <a href={settingsPath} className="settings__nav-item" aria-current="page" onClick={followLink}>
@@ -79,14 +67,7 @@ export function SettingsPage() {
 function BackLink() {
   const { t } = useI18n()
   const room = useHeldRoom()
-  if (room?.view.phase === 'in-room') {
-    return (
-      <a href={roomPath(room.code)} className="settings__back-to-room" onClick={followLink}>
-        <span className="settings__live-dot" aria-hidden="true" />
-        {t('settings.backTo', { name: room.view.room.name })}
-      </a>
-    )
-  }
+  if (room?.view.phase === 'in-room') return <BackToRoom code={room.code} name={room.view.room.name} />
   return (
     <Button variant="ghost" size="compact" onClick={() => (history.length > 1 ? history.back() : navigate('/'))}>
       <Icon name="chevron" size={14} className="settings__back-icon" />
@@ -210,22 +191,8 @@ function ProfileCard() {
  */
 function AccountCard() {
   const { t } = useI18n()
-  const { identity, signOut } = useIdentity()
-  const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<FailureReason | null>(null)
-
-  async function leave() {
-    setBusy(true)
-    setFailure(null)
-    try {
-      await signOut()
-      // A Room held behind this page belonged to the identity just signed out.
-      navigate('/')
-    } catch (error) {
-      setFailure(reasonOf(error))
-      setBusy(false)
-    }
-  }
+  const { identity } = useIdentity()
+  const { signOut, busy, failure } = useSignOut()
 
   return (
     <section className="settings-card settings-card--side" aria-labelledby="settings-account-title">
@@ -243,7 +210,7 @@ function AccountCard() {
             variant="secondary"
             size="compact"
             disabledReason={busy ? t('settings.saving') : undefined}
-            onClick={() => void leave()}
+            onClick={signOut}
           >
             {t('settings.account.signOut')}
           </Button>

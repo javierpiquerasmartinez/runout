@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
+import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { usePreferences } from '../preferences/context'
@@ -10,9 +11,6 @@ import { roomPath } from '../room/roomCode'
 import { quantity } from '../room/quantity'
 import { playedAtLabel, positionsLabel, siteLabel, stakeLabel, streetLabel } from '../room/queueEntryView'
 import { followLink, navigate } from '../routing'
-import { settingsPath } from '../settings/SettingsPage'
-import { Avatar } from '../ui/Avatar'
-import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
@@ -300,29 +298,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
  */
 export function LibraryFrame({ room, children }: { room?: RoomSummary; children: ReactNode }) {
   const { t } = useI18n()
-  const { identity } = useIdentity()
-  const name = identity.displayName ?? ''
   return (
     <div className="library">
-      <header className="library__header">
-        <a href="/" className="library__brand" aria-label={t('room.home')} onClick={followLink}>
-          <BrandMark size={22} />
-          <span className="ro-serif">{t('brand.wordmark')}</span>
-        </a>
-        <span className="library__divider" aria-hidden="true" />
-        <span className="library__where">{t('library.title')}</span>
-        <span className="library__spacer" />
-        {room && (
-          <a href={roomPath(room.code)} className="library__back" onClick={followLink}>
-            <Icon name="chevron" size={14} className="library__back-icon" />
-            {t('library.backToRoom', { room: room.name })}
-          </a>
-        )}
-        <a href={settingsPath} className="library__nav" aria-label={t('room.settings')} onClick={followLink}>
-          <Icon name="settings" size={17} />
-        </a>
-        {name && <Avatar name={name} seed={identity.id} size={28} />}
-      </header>
+      <AppHeader where={t('library.title')} back={room && <BackToRoom code={room.code} name={room.name} />} />
       {children}
     </div>
   )

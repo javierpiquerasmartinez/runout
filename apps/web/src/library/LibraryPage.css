@@ -10,50 +10,10 @@
   background: var(--color-canvas);
 }
 
-.library__header {
-  height: 56px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--color-panel-border);
-  background: var(--color-panel);
-}
-.library__brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--text-primary);
-  font-size: 19px;
-  letter-spacing: 0.09em;
-  text-decoration: none;
-}
-.library__divider {
-  width: 1px;
-  height: 20px;
-  background: var(--color-rule-strong);
-}
-.library__where {
-  font-size: 14px;
-  font-weight: 600;
-}
 .library__spacer {
   flex-grow: 1;
 }
-.library__nav {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--text-secondary);
-}
-.library__nav:hover {
-  background: var(--color-hover);
-  color: var(--text-primary);
-}
+/* Back from a Library Hand to the list. */
 .library__back {
   height: var(--control-compact);
   box-sizing: border-box;

@@ -1,0 +1,137 @@
+/*
+ * The header of the "Biblioteca" board, shared by the Library, a Library Hand
+ * and Settings: 56 px, the brand, where the person is, and the avatar's menu.
+ */
+
+.app-header {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--color-panel-border);
+  background: var(--color-panel);
+}
+.app-header__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-rule-strong);
+}
+.app-header__where {
+  font-size: 14px;
+  font-weight: 600;
+}
+.app-header__spacer {
+  flex-grow: 1;
+}
+
+.app-header__back-to-room {
+  height: var(--control-compact);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--sync-soft-border);
+  border-radius: var(--radius-sm);
+  background: var(--sync-hover-bg);
+  color: var(--sync-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.app-header__back-to-room:hover {
+  color: var(--sync-hover-ink);
+}
+.app-header__back-to-room:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.app-header__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sync);
+}
+
+.app-header__account {
+  position: relative;
+  display: flex;
+}
+.app-header__avatar {
+  display: flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.app-header__avatar:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.app-header__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 3;
+  min-width: 200px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+}
+.app-header__menu-name {
+  padding: 6px 10px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.app-header__menu-rule {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+.app-header__menu-item {
+  height: 34px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.app-header__menu-item:hover {
+  background: var(--color-hover);
+  color: var(--text-primary);
+}
+.app-header__menu-item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+.app-header__menu-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.app-header__menu-failure {
+  max-width: 240px;
+  margin: 4px 10px 6px;
+  font-size: 12.5px;
+  color: var(--alert-ink);
+}

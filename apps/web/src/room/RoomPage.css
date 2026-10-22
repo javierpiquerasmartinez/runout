@@ -22,20 +22,6 @@
   --avatar-ring: var(--color-panel);
 }
 
-.room-header__brand,
-.room-gate__brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--text-primary);
-  font-size: 19px;
-  letter-spacing: 0.09em;
-}
-.room-header__brand:hover,
-.room-gate__brand:hover {
-  color: var(--text-primary);
-}
-
 .room-header__divider {
   width: 1px;
   height: 20px;

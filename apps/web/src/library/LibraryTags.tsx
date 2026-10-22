@@ -70,7 +70,7 @@ export function LibraryTags({
             </button>
           ) : (
             <IconButton
-              icon="settings"
+              icon="edit"
               size="compact"
               className="library__group-edit"
               label={t('library.tag.edit')}

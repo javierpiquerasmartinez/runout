@@ -3,9 +3,9 @@ import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { useSession } from '../identity/context'
 import { canEnter, DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
-import { followLink, navigate } from '../routing'
+import { navigate } from '../routing'
 import { Button } from '../ui/Button'
-import { BrandMark } from '../ui/BrandMark'
+import { Brand } from '../ui/Brand'
 import { TextField } from '../ui/TextField'
 import type { RoomSummary } from './roomClient'
 import { formatRoomCode } from './roomCode'
@@ -186,13 +186,9 @@ function Status() {
 }
 
 function RoomGate({ children }: { children: ReactNode }) {
-  const { t } = useI18n()
   return (
     <main className="room-gate">
-      <a href="/" className="room-gate__brand" aria-label={t('room.home')} onClick={followLink}>
-        <BrandMark size={22} />
-        <span className="ro-serif">{t('brand.wordmark')}</span>
-      </a>
+      <Brand />
       {children}
     </main>
   )

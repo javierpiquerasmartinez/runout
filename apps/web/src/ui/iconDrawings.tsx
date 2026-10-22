@@ -38,11 +38,11 @@ export const drawings = {
   ),
   settings: (
     <>
-      <circle {...stroke} cx="12" cy="12" r="3" />
       <path
         {...stroke}
-        d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2 5.6 5.6"
+        d="M10.36 4.89 10.66 2.49H13.34L13.64 4.89A7.3 7.3 0 0 1 15.87 5.81L17.78 4.33 19.67 6.22 18.19 8.13A7.3 7.3 0 0 1 19.11 10.36L21.51 10.66V13.34L19.11 13.64A7.3 7.3 0 0 1 18.19 15.87L19.67 17.78 17.78 19.67 15.87 18.19A7.3 7.3 0 0 1 13.64 19.11L13.34 21.51H10.66L10.36 19.11A7.3 7.3 0 0 1 8.13 18.19L6.22 19.67 4.33 17.78 5.81 15.87A7.3 7.3 0 0 1 4.89 13.64L2.49 13.34V10.66L4.89 10.36A7.3 7.3 0 0 1 5.81 8.13L4.33 6.22 6.22 4.33 8.13 5.81A7.3 7.3 0 0 1 10.36 4.89z"
       />
+      <circle {...stroke} cx="12" cy="12" r="3" />
     </>
   ),
   chevron: <path {...stroke} d="M9.5 5.5 16 12l-6.5 6.5" />,
@@ -165,6 +165,12 @@ export const drawings = {
       <path {...stroke} d="M12 7.5v5l3 2" />
     </>
   ),
+  edit: (
+    <>
+      <path {...stroke} d="M4.5 19.5 5.6 15 15.8 4.8a2.1 2.1 0 0 1 3 3L8.6 18l-4.1 1.5z" />
+      <path {...stroke} d="m14 6.6 3 3" />
+    </>
+  ),
   delete: <path {...stroke} d="M5 7h14M9.5 7V5h5v2M6.5 7l1 13h9l1-13" />,
 
   // System and validation
@@ -204,6 +210,6 @@ export const iconGroups = {
   navigation: ['home', 'library', 'room', 'search', 'profile', 'settings', 'chevron', 'expand', 'menu'],
   player: ['play', 'pause', 'previous', 'next', 'street-back', 'street-forward', 'speed', 'repeat', 'in-progress', 'history'],
   room: ['master', 'live', 'link', 'copy', 'participants', 'locked', 'share', 'note', 'notifications'],
-  hands: ['import', 'file', 'tag', 'filter', 'sort', 'mark', 'stats', 'pot', 'delete'],
+  hands: ['import', 'file', 'tag', 'filter', 'sort', 'mark', 'stats', 'pot', 'edit', 'delete'],
   system: ['success', 'warning', 'error', 'close', 'add', 'help'],
 } as const satisfies Record<string, readonly IconName[]>
