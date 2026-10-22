@@ -2,15 +2,17 @@
 
 2026-09-19 · @Someone
 
-Domain terms (Room, Master, Guest, Hand, Hero, Author, Queue, Playback, Action, Street…) are defined in [CONTEXT.md](CONTEXT.md) and used here with exactly that meaning. Decisions that shape the model are in [docs/adr/](docs/adr/).
+Domain terms (Account, Room, Master, Guest, Hand, Hero, Author, Library, Room Hand, Queue, Playback, Action, Street, Result…) are defined in [CONTEXT.md](CONTEXT.md) and used here with exactly that meaning. Decisions that shape the model are in [docs/adr/](docs/adr/).
 
 ## Product summary
 
 Runout is a web Room where several players review the same poker Hand at once, synchronised in real time. The Master steps through the Hand Action by Action and everyone else sees exactly the same table on their own screen.
 
+It is also where each player keeps their own Hands. Their Library holds the Hands they import into it, and the Results Graph above it shows whether they are winning. The aim is that the Tracker stops being the only place their history lives (ADR 0004).
+
 It solves the problem of a group that already meets every week and today shares a screen over Discord or Zoom. That format turns one person into the operator and everyone else into spectators: nobody else can point, go back or bring their own Hands without breaking the session. The picture also arrives compressed, and reading a stack in big blinds off a rescaled video is harder than it looks.
 
-The target user is a study group of three to eight online cash players who already use a Tracker (PokerTracker 4, Hold'em Manager 3 or Hand2Note) and export text Hand Histories. It is not a solo training tool nor a solver: it computes no strategy, it organises the conversation the group already has.
+The target user is a study group of three to eight online cash players who already use a Tracker (PokerTracker 4, Hold'em Manager 3 or Hand2Note) and export text Hand Histories. It is not a solver: it computes no strategy. In a Room it organises the conversation the group already has, and in the Library it keeps and measures each player's Hands.
 
 The difference from screen sharing is that the Hand History is data, not pixels: each Participant sees it rendered on their own screen, with their own deck and Display Unit, and the Queue is built by the whole group instead of one person.
 
@@ -18,21 +20,22 @@ The study group itself lives outside Runout. There are no groups or teams inside
 
 ## Participants, roles and identity
 
-There are two roles, and the difference between them is a single thing: who controls Playback. In everything else — bringing Hands, writing Notes, configuring their own view — Master and Guest are equal.
+There are two roles, and the difference between them is a single thing: who controls Playback. In everything else — bringing Hands, writing Notes, configuring their own view — Master and Guest are equal. Separately, a Participant is either signed in with their Account or anonymous. That decides what outlives the Room, and whether they can create a Room or add Hands from a Library.
 
 | Capability | Master | Guest |
 | --- | --- | --- |
-| Create the Room and name it | Yes (as its creator) | — |
+| Create the Room and name it | Yes (as its creator, with an Account) | — |
 | Share the Room Code and link | Yes | Yes |
 | Import Hands into the Queue | Yes | Yes |
+| Add Hands from their own Library to the Queue | Yes, with an Account | Yes, with an Account |
 | Choose which Hand is loaded | Yes | No |
 | Step Actions and jump Streets | Yes | No |
 | Toggle Hide Opponent Names | Yes | No |
 | See the synchronised table live | Yes | Yes |
 | Write Notes on a Hand | Yes | Yes |
-| Edit or delete Notes | Yes | No |
+| Edit or delete Notes in the Room | Yes | No |
 | Reorder and remove Queue Entries | Yes | No |
-| Reassign a Hand's Author | Yes | No |
+| Reassign the Author of a Queue Entry | Yes | No |
 | Choose their own deck, Display Unit and language | Yes | Yes |
 | Hand the Master role to another Participant | Yes | No |
 | Kick a Participant and close the Room | Yes | No |
@@ -41,7 +44,9 @@ The Master role is born with the Room: whoever creates it holds it. It is never 
 
 If the Master loses connection for more than two minutes, the role passes automatically to the Participant who has been present the longest, so the session never gets stuck. When the former Master comes back they join as a Guest; if they want the role back they ask for it out loud.
 
-Nobody needs an account. Every Participant has an identity bound to their browser from the first visit, which owns their Hands, Marks, Screen Names and preferences. An optional account only carries that identity to other devices (ADR 0003).
+What lasts belongs to an Account, signed in with Google: the Library, Screen Names, Display Name, Preferences, Marks and Tags. The Account is recognised on any device where that person signs in (ADR 0005). Creating a Room needs an Account, so every Room starts with a lasting Master.
+
+Joining a Room needs none. A person who doesn't sign in gets an anonymous identity that exists for that one Room. They can import Hands, write Notes and even become Master, but their identity, Screen Names, Preferences and Marks are lost when the Room closes. Notes they wrote keep their Display Name. If they sign in while inside the Room, their Account takes the anonymous identity's place, keeping the Master role if they held it.
 
 ## End-to-end flow
 
@@ -61,10 +66,10 @@ flowchart LR
 
 The loop between stepping and discussing is where most of the session goes: stop, discuss, go back, step forward again, dozens of times per Hand. Playback only moves when the Master moves it; there is no automatic play, because the conversation sets the pace.
 
-1. **The Master creates the Room.** They give the session a name. The Room exists from that moment, even while empty.
+1. **The Master creates the Room.** Signed in with their Account, they give the Room a name. The Room exists from that moment, even while empty.
 2. **They share access.** The system generates an eight-character Room Code and a copyable link. The Master pastes it into the group's chat.
-3. **Guests join.** With the link they go straight in; with the code they type it. Either way they only confirm their Display Name. No registration.
-4. **Everyone brings Hands.** Each person uploads their Tracker export or pastes Hand History text. Each Hand gets its Author.
+3. **Guests join.** With the link they go straight in; with the code they type it. Either way they only confirm their Display Name: signed in, or anonymously for that Room. No registration.
+4. **Everyone brings Hands.** Each person uploads their Tracker export, pastes Hand History text, or adds Hands from their own Library. Each Queue Entry gets its Author.
 5. **The Master drives Playback.** They load a Hand from the Queue and step through it Action by Action or jump between Streets.
 6. **The group discusses.** Everyone sees the same state at the same moment; they stop at the decision point, talk over voice, and the conclusion is left as a Note on the Hand.
 
@@ -72,26 +77,28 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Seven epics cover the product. Five are essential for a session to work end to end; the other two can land partially and grow later.
+Eight epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |
 | E1 · Rooms | Create a Room, share it, join it with a code or a link, and run its lifecycle | MVP |
-| E2 · Hand import | Turn Hand Histories into playable Hands with their Hero and Author | MVP |
+| E2 · Hand import | Turn Hand Histories into playable Hands with their Hero, into a Room or a Library | MVP |
 | E3 · Shared Queue | One list of Hands with their metadata, built by everyone | MVP |
 | E4 · Player | Step through a Hand on a readable table | MVP |
 | E5 · Synchronisation | Everyone sees the same Playback at the same instant | MVP |
-| E6 · Library and Notes | Keep, find and annotate Hands across Rooms | Partial in MVP |
-| E7 · Preferences and profile | Read the table your own way and be recognised in Hand Histories | Partial in MVP |
+| E6 · Notes and Marks | Record the group's conclusion on a Hand and flag Hands to find again | Partial in MVP |
+| E7 · Library and Results | Keep, find, classify and measure your own Hands, and bring them to a Room | Second release |
+| E8 · Accounts and preferences | Sign in, read the table your own way, and be recognised in Hand Histories | Partial in MVP |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
 
 ## E1 · Rooms
 
-A Room holds exactly one study session: its Participants, a Queue and the Playback. It closes when its Master closes it, or on its own after 30 minutes with nobody connected. A closed Room never reopens.
+A Room holds exactly one study session: its Participants, a Queue and the Playback. It closes when its Master closes it, or on its own after 30 minutes with nobody connected. A closed Room never reopens, and closing it either way discards its Room Hands and its anonymous identities.
 
 **H1.1 — Create a Room.** As the player organising the session, I want to create a Room with a name, so I have somewhere to call the group to.
 
+- Creating a Room needs an Account; without one I am asked to sign in first.
 - On creation I become the Master automatically.
 - The name allows up to 60 characters.
 - The Room exists and is reachable even with no Hands yet.
@@ -111,7 +118,9 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 **H1.4 — Join by direct link.** As a Guest, I want to open the link and be in, with no intermediate step.
 
 - The link leads to the Room and only asks me to confirm my Display Name.
-- The Display Name is prefilled with the one I used last, in any Room.
+- Signed in, the Display Name is prefilled with my Account's.
+- Without an Account I join anonymously, choosing a Display Name for this Room only. The Room tells me that what I do there is lost when it closes, and that I can sign in to keep my Hands.
+- If I sign in while inside the Room, I continue in it as my Account, keeping the Master role if I had it.
 
 **H1.5 — See who is in the Room.** As a Participant, I want to see who is present and who is Master, so I know whether someone is missing before we start.
 
@@ -128,27 +137,32 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 
 - A Master who tries to leave must choose between handing the role over and closing the Room.
 - If the Master is disconnected for more than two minutes, the role passes to the Participant present the longest, and the Room is told.
+- An anonymous Participant can become Master by handover or failover like anyone else.
 - A former Master who comes back joins as a Guest.
 
 **H1.8 — Kick a Participant.** As Master, I want to remove someone from the Room.
 
-- The kicked Participant leaves immediately and cannot rejoin this Room.
+- The kicked Participant leaves immediately and cannot rejoin this Room with that identity. An anonymous one could rejoin from a fresh browser, which is acceptable for small groups who trust each other.
 - Their Queue Entries stay in the Queue.
 - Kicking asks for confirmation.
 
 **H1.9 — Close the Room.** As Master, I want to end the session for everyone.
 
-- Closing asks for confirmation, since a closed Room cannot be reopened.
+- Closing asks for confirmation, since a closed Room cannot be reopened. The confirmation warns how many Hands in the Queue are in nobody's Library and will be lost with their Notes, so people can import them first.
 - Every Participant sees that the Room has closed, not a blank or broken screen.
-- The Hands that were in the Queue remain in the Libraries of everyone who was in the Room.
+- Room Hands are discarded with their Notes and Marks, unless the Queue of another open Room still holds them; then they go when the last of those closes. The same happens when the Room closes after 30 minutes with nobody connected.
+- Library Hands stay in their Libraries, with the Notes written on them in the Room.
+- The Room's anonymous identities stop working.
 
 ## E2 · Hand import
 
 This epic turns Tracker text into Hands the player understands. It hides the most risk: formats vary across Poker Sites and versions, and one badly parsed Hand breaks trust in the whole tool.
 
+Import has two destinations sharing one flow: a Room's Queue, or the importing person's own Library (H7.1). Hands imported into a Room go to nobody's Library; they are Room Hands. The stories below hold for both destinations unless they say otherwise.
+
 **H2.1 — Upload files.** As a Participant, I want to drag in my Tracker exports, so I don't copy and paste Hand by Hand.
 
-- Accepts .txt and .zip, up to 20 MB per file and several files at once.
+- Accepts .txt and .zip, up to 20 MB per file and several files at once. A file over the limit is refused with a message suggesting I split the export.
 - Each file shows its status: detected format, Hands read and Hands discarded.
 - I can remove a file from the list before confirming the import.
 
@@ -171,16 +185,18 @@ This epic turns Tracker text into Hands the player understands. It hides the mos
 
 **H2.5 — Handle duplicates.** As a Participant, I want importing the same Hand twice not to clutter the Queue.
 
-- A Hand with the same Poker Site, hand ID and Hero as an existing Hand is a duplicate: it is skipped and reported (ADR 0002).
+- A Hand is the same Hand when its Poker Site, hand ID, Hero and Hero's seat match (ADR 0002). Hands belong to no one: Queues and Libraries reference them, so a Hand is stored once however many people import it.
+- In a Room, a Hand already in the Queue is a duplicate: it is skipped and reported.
+- In a Room, a Hand already in my Library is marked as such in the preview, and confirming queues that Library Hand, so the Notes written in the review stay in my Library.
 - The same hand ID from a different Hero is a separate Hand, with its own hole cards. The Queue shows that the two are the same real-world hand, but never merges them.
 
-**H2.6 — Assign the Hero and the Author.** As a Participant, I want each Hand attributed to whoever played it, so the group knows whose spot it is.
+**H2.6 — Assign the Hero and the Author.** As a Participant, I want each Hand in the Queue attributed to whoever played it, so the group knows whose spot it is.
 
 - The Hero is taken from the Hand History itself.
-- The Author is the Participant of the Room whose Screen Names include the Hero's name.
-- If nobody matches, the Importer becomes the Author and is offered to add that Screen Name to their own.
-- The Master can reassign the Author of any Hand after import.
-- The Author travels with the Hand to the Library. The Importer is kept for audit only.
+- The Author belongs to the Queue Entry, not to the Hand. When a Hand enters the Queue, its Author is the Participant of the Room whose Screen Names include the Hero's name.
+- If nobody matches, whoever brought the Hand into the Room becomes the Author and is offered to add that Screen Name to their own. Hands added from a Library have the person who added them as Author.
+- The Master can reassign the Author of any Queue Entry. That changes nothing in anyone's Library or Results, nor the Author of the same Hand in another Room.
+- The Author means nothing outside a Room and never decides what is in anyone's Library (ADR 0004). The Importer is kept for audit only.
 
 ## E3 · Shared Queue
 
@@ -189,6 +205,7 @@ The Queue is the Room's ordered list of Hands, shared by everyone. It is what tu
 **H3.1 — See the Queue.** As a Participant, I want to see every Hand of the session in a side panel, so I know what is left to review.
 
 - Each row shows Author, date, the Positions involved, Stake, final pot, Final Street and whether it went to Showdown.
+- Each row tells me whether that Hand is in my Library, so I know what I am going to keep.
 - The loaded Hand is highlighted unambiguously.
 - The panel can collapse to leave the table full screen.
 
@@ -215,7 +232,7 @@ The Queue is the Room's ordered list of Hands, shared by everyone. It is what tu
 
 **H3.6 — Remove a Hand from the Queue.** As Master, I want to take a Hand out of the Queue, to drop duplicates or irrelevant Hands.
 
-- Removing the Queue Entry never deletes the Hand.
+- Removing the Queue Entry never deletes the Hand. A Hand that is in nobody's Library is still discarded when the Room closes, as H1.9 describes.
 - Removing the loaded Hand's entry does not interrupt Playback; it stays loaded until the Master loads another.
 - The removal can be undone for ten seconds, restoring the entry to its position.
 
@@ -306,119 +323,172 @@ This epic is the product's promise: what the Master does, everyone sees instantl
 - Each Participant shows connected, unstable or away.
 - A disconnection longer than thirty seconds is clearly marked in the list.
 
-## E6 · Library and Notes
+## E6 · Notes and Marks
 
-What makes the tool outlive the session. Notes are in the MVP because without them the group's conclusion is lost; the full Library can wait until there are enough Hands worth searching.
+What makes a session outlive itself. Notes are in the MVP because without them the group's conclusion is lost.
 
 **H6.1 — Write a Note.** As a Participant, I want to write the group's conclusion on a Hand, so we don't repeat the discussion three weeks later.
 
-- Notes are written inside a Room, on any Hand in its Queue.
+- Notes are written inside a Room, on any Hand in its Queue, or from my Library (H7.8).
 - The Note is attached to the Hand, with its writer and date.
 - Several people can write Notes on the same Hand.
-- Notes are visible wherever the Hand is seen: in any Room and in the Library.
+- Notes are visible wherever the Hand is seen: in any Room and in every Library that holds it.
+- A Note written by an anonymous Participant keeps showing their Display Name after their Room closes.
 
-**H6.2 — Edit or delete a Note.** As Master, I want to correct or remove a Note, so the record the group keeps is accurate.
+**H6.2 — Edit or delete a Note in a Room.** As Master, I want to correct or remove a Note, so the record the group keeps is accurate.
 
-- Only the Master of a Room can edit or delete Notes, on Hands in that Room's Queue.
-- Outside a Room, Notes are read-only. To fix one, bring the Hand into a Room.
+- Inside a Room only its Master can edit or delete Notes, on Hands in that Room's Queue.
+- Outside a Room, anyone who has the Hand in their Library can edit or delete its Notes (H7.8).
 - Deleting a Note can be undone for ten seconds.
 
 **H6.3 — Mark a Hand.** As a Participant, I want to Mark a Hand, so I can come back to it without searching.
 
 - A Mark is personal and nobody else sees it.
+- I can Mark and unmark a Hand in a Room or from my Library.
 - Marked Hands can be filtered in one click from the Library.
+- Marks on a Room Hand go with it when the Room closes, as do an anonymous Participant's Marks.
 
-**H6.4 — See my Library.** As a Participant, I want a Library of the Hands I can reach outside a Room, to prepare the next session.
+## E7 · Library and Results
 
-- My Library holds the Hands I am Author of, plus every Hand that was in the Queue of a Room I was in.
-- The list shows Hand, Author, Stake, final pot, Final Street, Showdown, date and Tags.
-- It sorts by any of those columns, by default by final pot descending.
-- There are a list view and a card view.
+The Library is a person's own repository: the Hands they imported into it, whatever their Hero, and nothing else (ADR 0004). Hands seen in other people's Rooms are not in it. Above it, the Results Graph shows how they are doing over time. The Library needs an Account.
 
-**H6.5 — Filter the Library.** As a Participant, I want to filter by Author, Stake, Position, Final Street, Showdown or minimum pot, to find a specific kind of spot.
+**H7.1 — Import into my Library.** As a player, I want to import Hand History files or pasted text into my Library, so my Hands are kept in Runout.
 
+- The flow, preview and 20 MB limit are those of Room import (E2). I can import several files one after the other to bring in more than 20 MB.
+- The preview marks each Hand as new, already in my Library, or discarded with its reason. Hands already in my Library are not added twice, so my Results are not inflated.
+- Hands whose Hero is not me (a friend's export, a forum Hand) are accepted, as are CoinPoker Hands whose Hero is written `Hero`.
+- If someone else already imported the same Hand from the same seat, my import still succeeds: we share the Hand, and I see the Notes already written on it.
+
+**H7.2 — See my Library.** As a player, I want a Library screen reachable from the welcome screen, so I can go to my Hands without being in a Room.
+
+- It lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands.
+- Each row shows the hole cards, the Positions involved, Hero, Poker Site, Stake, final pot, Final Street, Showdown, my Result, the date and my Tags.
+- The header says how many Hands match the current filters.
+- An empty Library, or filters that match nothing, show an empty state that invites me to import.
+- Anonymous Participants cannot reach a Library.
+
+**H7.3 — Filter my Library.** As a player, I want to narrow my Library, to find a specific kind of spot or stretch of play.
+
+- Filters are period (from–to dates in my time zone, plus quick ranges: last 7 days, last 30 days, this year, all time), Poker Site, Hero, Stake, Marked only and Tags (any of the chosen ones).
+- Poker Site, Hero, Stake and Tag options are those present in my Library.
 - Filters combine and clear in one go.
-- The header says how many Hands match out of the total.
+- The same filters apply to the list and the Results Graph, so both always describe the same Hands.
 
-**H6.6 — Tag Hands.** As a Participant, I want to put Tags on Hands, to group them by topic instead of by date.
+**H7.4 — Replay a Hand from my Library.** As a player, I want to open a Hand and step through it on my own, to prepare a session or look back at a spot.
 
-- I can create new Tags from the Hand itself.
+- The Hand opens on the same table as in a Room, stepped Action by Action, with nobody else watching.
+- Its Notes are shown alongside it.
+
+**H7.5 — See my Results Graph.** As a player, I want a graph of my running results above my Library, so I see whether I am winning.
+
+- It draws four running totals Hand by Hand over the filtered Hands: Result, All-in EV, Showdown Result and Non-showdown Result.
+- Each line can be shown or hidden.
+- It is in big blinds by default, so Hands at different Stakes and currencies add up.
+- When every filtered Hand shares one currency, I can see it in Amounts, following my Display Unit. When currencies mix, that option is locked with its reason.
+- The total of each line and the number of Hands are shown next to the graph; hovering shows the Hand number and each line's value.
+- It follows my Theme and the app's visual style.
+
+**H7.6 — Tag Hands.** As a player, I want to put my own Tags on Hands in my Library, to group them by topic instead of by date.
+
+- I can create, rename and delete Tags, and attach or detach them on Hands in my Library.
 - A Hand can have several Tags.
-- Tags belong to the Hand: everyone who can see the Hand sees them.
+- Tags are mine alone: nobody else sees them, even someone who has the same Hand in their Library.
 
-**H6.7 — Delete a Hand.** As Author, I want to withdraw a Hand I shared.
+**H7.7 — Remove Hands from my Library.** As a player, I want to clean out Hands I don't want.
 
-- Only the Author can delete a Hand.
-- It disappears for everyone, from every Library and Queue, together with its Notes and Tags.
-- Deletion asks for confirmation, since it cannot be undone.
+- I can remove one Hand or select several and remove them at once, after confirming.
+- Removing only takes the Hand out of my Library, with my Tags on it. It stays intact in anyone else's Library, together with its Notes.
+- If the Hand is in an open Room's Queue, the Room is not disrupted: the Hand stays there. If it is then in nobody's Library, it is a Room Hand and goes as H1.9 describes.
 
-**H6.8 — Bring Library Hands into a Room.** As Master, I want to select several saved Hands and add them to the Queue, so I can prepare the agenda before anyone arrives.
+**H7.8 — Write and edit Notes from my Library.** As a player, I want to record and correct conclusions I reach on my own.
 
-- I can select several at once and add them in a single action.
-- The Hands keep their original Author; they do not become mine.
+- I can write a Note on any Hand in my Library.
+- I can edit or delete any Note on a Hand in my Library, with the same ten-second undo as in a Room.
 
-## E7 · Preferences and profile
+**H7.9 — Bring Library Hands into a Room.** As a signed-in Participant, I want to add Hands from my Library to the Queue of the Room I'm in, so I bring my prepared spots to the session.
 
-Almost everything here is personal reading: how each person wants to see the table. The exception is Screen Names, which are not cosmetic: without them import cannot tell who the Author of a Hand is.
+- I can filter my Library while choosing, select several Hands and add them in a single action, at the end of the Queue.
+- Only Hands in my own Library can be added.
+- I become the Author of those Queue Entries until the Master reassigns them.
+- They are the same Hands, not copies: Notes the group writes on them in the Room stay with them in my Library after the Room closes.
 
-All preferences belong to the Participant's identity: they persist across Rooms, and across devices once there is an account.
+## E8 · Accounts and preferences
 
-**H7.1 — Declare my Screen Names.** As a Participant, I want to store the names I play under, so I am recognised automatically as Author in every Hand History.
+Almost everything here is personal reading: how each person wants to see the table. The exception is Screen Names, which are not cosmetic: without them a Room cannot tell who the Author of a Queue Entry is, nor which seats Hide Opponent Names keeps.
+
+Screen Names, Display Name and Preferences belong to the Participant's identity. With an Account they persist across Rooms and devices; for an anonymous Participant they last only their Room.
+
+**H8.1 — Declare my Screen Names.** As a Participant, I want to store the names I play under, so I am recognised automatically as the Author of my Hands in every Room.
 
 - Accepts several Screen Names separated by commas.
-- They are used at import to match the Hero to a Participant.
-- Changing them does not reprocess Hands already imported.
+- They are used to match a Hand's Hero to a Participant when it enters a Room's Queue, and by Hide Opponent Names.
+- They never decide what is in my Library or my Results.
+- Changing them does not reassign Queue Entries already in a Queue.
 
-**H7.2 — Change my Display Name.** As a Participant, I want to choose how others see me in Runout.
+**H8.2 — Change my Display Name.** As a Participant, I want to choose how others see me in Runout.
 
-- One Display Name per person, reused across Rooms.
+- One Display Name per Account, reused across Rooms. An anonymous Participant picks one for their Room only.
 - It can be changed at any time, and the change shows in the current Room immediately.
 
-**H7.3 — Choose the deck style.** As a Participant, I want to choose between the classic deck and the full-suit deck, to read the cards the way that comes naturally.
+**H8.3 — Choose the deck style.** As a Participant, I want to choose between the classic deck and the full-suit deck, to read the cards the way that comes naturally.
 
 - The choice is personal and does not change what others see.
 - The change applies instantly, without reloading.
 
-**H7.4 — Choose the Display Unit.** As a Participant, I want to see quantities in big blinds, as Amounts, or both, to think in the unit I reason in.
+**H8.4 — Choose the Display Unit.** As a Participant, I want to see quantities in big blinds, as Amounts, or both, to think in the unit I reason in.
 
-- The chosen Display Unit applies to the table, the Queue and the Library at once.
+- The chosen Display Unit applies to the table, the Queue, the Library and the Results Graph at once.
 - With both on, big blinds are primary and the Amount is secondary and dimmed.
 
-**H7.5 — Tune table reading.** As a Participant, I want to decide whether I see the pot percentage and whether I use a four-colour deck, to remove from the screen what I don't look at.
+**H8.5 — Tune table reading.** As a Participant, I want to decide whether I see the pot percentage and whether I use a four-colour deck, to remove from the screen what I don't look at.
 
 - Each option applies immediately and is previewed within the setting itself.
 - The full-suit deck is always four-colour.
 
-**H7.6 — Choose the language.** As a Participant, I want the interface in my language.
+**H8.6 — Choose the language.** As a Participant, I want the interface in my language.
 
 - Spanish and English are available; Spanish is the default.
 - Poker terms are the ones the group uses out loud in that language.
 
-**H7.7 — Create an account.** As a Participant, I want an account, to use my Library, Screen Names and preferences on another device.
+**H8.7 — Sign in with Google.** As a player, I want to sign in with my Google account, so my Hands and results are not tied to one browser.
 
-- Creating an account keeps everything my anonymous identity already owns.
-- An account is never required to create or join a Room.
+- Signing in for the first time creates my Account on the spot and asks for my Display Name, with no separate sign-up form.
+- I am recognised on any device where I sign in, with everything my Account holds: Library, Screen Names, Display Name, Preferences, Marks and Tags.
+- My sign-in survives closing the tab or the browser.
+- An Account is needed to create a Room or reach a Library, never to join a Room.
+
+**H8.8 — Sign out.** As a signed-in player, I want to sign out, so I can leave a shared computer safely.
+
+- Settings shows the signed-in Account and a sign-out action.
+- Signing out ends the sign-in on this browser only.
 
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.
 
-In the first version: create a Room and join by code or link, the Room lifecycle and the Master role, import from the three main Trackers, the shared Queue with its metadata, the full player stepping Action by Action and Street by Street, synchronisation with its indicator, Notes, the table-reading preferences and the interface in Spanish and English. Participants are anonymous browser identities; the full Library and accounts (H6.4–H6.8, H7.7) come after.
+In the first version: create a Room and join by code or link, the Room lifecycle and the Master role, import from the three main Trackers, the shared Queue with its metadata, the full player stepping Action by Action and Street by Street, synchronisation with its indicator, Notes, the table-reading preferences and the interface in Spanish and English. The MVP had no Library and no Accounts.
+
+The second release adds what lets Runout replace the Tracker as the place each person keeps their Hands: Accounts with Google and anonymous identities that last one Room (H8.7, H8.8), the Library with its import, filters, Tags, Notes and removal, the Results Graph, and Library Hands in Rooms (E7). Room Hands are discarded when their Room closes. All data from the MVP is wiped rather than migrated.
 
 Deliberately out, with the reason:
 
-| Out of the MVP | Why |
+| Out of scope | Why |
 | --- | --- |
 | Audio and video in the Room | The group already has Discord, and doing it well is a whole product |
 | Drawing or pointing on the table | Adds less than voice and multiplies the state to synchronise |
 | Automatic playback | The conversation sets the pace; the Master steps every Action |
 | Guests navigating on their own | Everyone must see the same Playback; that is the product |
 | Requesting the Master role in the app | The group asks out loud and the Master hands it over |
-| Equity or range calculation | Turns the tool into a solver, which is not what is missing |
+| Equity or range calculation as a study tool | Turns the tool into a solver, which is not what is missing. All-in EV computes equity only to take luck out of the Results Graph |
 | Text chat in the Room | Conversation goes over voice; Notes cover what must be kept |
 | Automatic import from the Tracker | Requires installing something on each desktop |
+| Background import of whole Tracker databases beyond 20 MB per upload | A separate component; several uploads cover it for now |
 | Tournaments and tables of more than nine seats | The group plays cash; widening it without need complicates the table |
 | Aggregate group statistics | Not enough data until sessions accumulate |
+| Statistics such as VPIP, PFR or winrate by Position, and currency conversion | The Results Graph answers the first question, whether you are winning; the rest can follow |
+| Keeping Room Hands after their Room closes | A Hand that should last is imported into a Library before the Room closes |
+| Sharing a Library or Tags with other people | A Library is one person's repository; the group shares Hands through Rooms |
+| Sign-in methods other than Google, Account deletion and data export | Every member of a small group already has a Google account |
 | Study groups or teams inside the app, and billing | The group lives outside Runout, and there is no business model to validate yet |
 
 Two assumptions carry all of this and should be tested early: that Hand Histories from the three Trackers parse reliably enough, and that sync latency stays below what the eye notices while someone is talking.
