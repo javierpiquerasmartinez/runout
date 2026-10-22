@@ -39,7 +39,8 @@ export type RejectionReason =
   | 'invalid-tag-name'
   | 'tag-name-taken'
   | 'tag-not-found'
-  | 'invalid-tag-hands';
+  | 'invalid-tag-hands'
+  | 'invalid-hand-selection';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

@@ -57,6 +57,10 @@ let markRequests: string[]
 let tagRequests: string[]
 /** What the server answers a Tag change with, unless the test says otherwise. */
 let tagReply: () => Response
+/** Removals, as `DELETE /api/library/hands {"handIds":["h1"]}`. */
+let removeRequests: string[]
+/** What the server answers a removal with, unless the test says otherwise. */
+let removeReply: () => Response
 
 beforeEach(() => {
   requests = []
@@ -64,6 +68,8 @@ beforeEach(() => {
   markRequests = []
   tagRequests = []
   tagReply = () => Response.json({})
+  removeRequests = []
+  removeReply = () => Response.json({})
   results = {
     hands: 3,
     currency: 'EUR',
@@ -81,6 +87,10 @@ beforeEach(() => {
       if (url.startsWith('/api/library/tags')) {
         tagRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
         return tagReply()
+      }
+      if (method === 'DELETE' && url === '/api/library/hands') {
+        removeRequests.push(`${method} ${url} ${String(init?.body)}`)
+        return removeReply()
       }
       if (method !== 'GET') {
         markRequests.push(`${method} ${url}`)
@@ -464,6 +474,96 @@ describe('LibraryPage', () => {
       await screen.findByText('Showing 3–3 of 3')
       expect(screen.queryByRole('button', { name: 'Tag the selected hands' })).toBeNull()
       expect(screen.getByRole('heading', { name: 'All hands' }).nextElementSibling?.textContent).toBe('3 hands')
+    })
+  })
+
+  describe('removing Hands', () => {
+    it('removes the selected Hands of a filtered list once confirmed, and reads the Library again', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('button', { name: /Marked/ }))
+      await waitFor(() => expect(lastFilterQuery()).toBe('marked=true'))
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select BTN vs BB, Hero' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      const dialog = screen.getByRole('dialog', { name: 'Remove 2 hands from your library?' })
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+      expect(removeRequests).toEqual([])
+      expect(screen.queryByRole('dialog')).toBeNull()
+
+      const reads = requests.length
+      await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      await userEvent.click(
+        within(screen.getByRole('dialog', { name: 'Remove 2 hands from your library?' })).getByRole('button', {
+          name: 'Remove 2 hands',
+        }),
+      )
+
+      expect(removeRequests).toEqual(['DELETE /api/library/hands {"handIds":["h1","h2"]}'])
+      await waitFor(() => expect(requests.length).toBe(reads + 1))
+      expect(lastFilterQuery()).toBe('marked=true')
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    })
+
+    it('stays on the page it emptied while later Hands move up into it', async () => {
+      pages['1'] = { ...pages['1'], total: 5 }
+      pages['2'] = { ...pages['2'], total: 5, hands: [libraryHand('h3'), libraryHand('h4', { hero: 'Hero' })] }
+      pages['3'] = libraryPage({ total: 5, page: 3, pageSize: 2, hands: [libraryHand('h5')] })
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+      await screen.findByText('Showing 3–4 of 5')
+      const pageOf = (url: string | undefined) => new URL(url!, 'http://localhost').searchParams.get('page')
+      const removeEveryHand = async (count: number) => {
+        await userEvent.click(screen.getByRole('checkbox', { name: 'Select every hand on this page' }))
+        await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+        await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: `Remove ${count} hands` }))
+      }
+
+      // Page 3's Hand moves up into page 2.
+      pages['2'] = { ...pages['3'], total: 3, page: 2 }
+      const reads = requests.length
+      await removeEveryHand(2)
+      await waitFor(() => expect(requests.length).toBe(reads + 1))
+      expect(pageOf(requests.at(-1))).toBe('2')
+    })
+
+    it('steps back a page when the one shown no longer exists', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+      await screen.findByText('Showing 3–3 of 3')
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select CO vs SB, iMapleAA' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove 1 hand' }))
+
+      await waitFor(() => expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('page')).toBe('1'))
+    })
+
+    it('says that only this Library loses the Hand', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, Hero' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+      const dialog = screen.getByRole('dialog', { name: 'Remove 1 hand from your library?' })
+      expect(within(dialog).getByText(/stays in other players’ libraries/)).toBeTruthy()
+    })
+
+    it('says why when the server refuses, reading the Library again and keeping the selection', async () => {
+      removeReply = () => Response.json({ reason: 'hand-not-found' }, { status: 404 })
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, Hero' }))
+      const reads = requests.length
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove 1 hand' }))
+
+      expect(await within(screen.getByRole('dialog')).findByRole('alert')).toBeTruthy()
+      // Read again, in case a selected Hand already left the Library elsewhere.
+      await waitFor(() => expect(requests.length).toBe(reads + 1))
+      expect(screen.getByRole('checkbox', { name: 'Select BTN vs BB, Hero' })).toHaveProperty('checked', true)
     })
   })
 })

@@ -256,6 +256,11 @@
 .library__tag-selection {
   position: relative;
 }
+.library__remove-failure {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--alert-ink);
+}
 .library__tag-menu {
   position: absolute;
   top: calc(100% + 6px);
