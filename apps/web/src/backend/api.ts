@@ -33,6 +33,10 @@ export type RejectionReason =
   | 'nothing-to-undo'
   | 'undo-expired'
   | 'invalid-library-filter'
+  | 'invalid-tag-name'
+  | 'tag-name-taken'
+  | 'tag-not-found'
+  | 'invalid-tag-hands'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

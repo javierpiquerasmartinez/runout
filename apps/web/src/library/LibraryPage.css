@@ -136,6 +136,168 @@
   font-weight: 400;
   color: var(--text-secondary);
 }
+/* A Tag in the sidebar: chosen ones narrow the Library, as a collection does. */
+.library__tag[aria-pressed='true'] {
+  background: var(--color-selected);
+  color: var(--brass-ink);
+  font-weight: 600;
+}
+.library__tag-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library__tag-swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+.library__tag-swatch[data-colour='1'] {
+  background: var(--avatar-1-ink);
+}
+.library__tag-swatch[data-colour='2'] {
+  background: var(--avatar-2-ink);
+}
+.library__tag-swatch[data-colour='3'] {
+  background: var(--avatar-3-ink);
+}
+.library__tag-swatch[data-colour='4'] {
+  background: var(--avatar-4-ink);
+}
+.library__group-head {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.library__group-edit {
+  width: 24px;
+  height: 24px;
+  color: var(--text-muted);
+}
+.library__group-action {
+  border: 0;
+  background: transparent;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.library__group-action:hover {
+  color: var(--text-primary);
+}
+.library__tag-new {
+  height: 32px;
+  color: var(--text-muted);
+}
+.library__tag {
+  height: 32px;
+}
+.library__tag-edit {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 0 0 10px;
+  color: var(--text-muted);
+}
+.library__tag-form {
+  flex-grow: 1;
+  min-width: 0;
+}
+.library__tag-input {
+  width: 100%;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-elevated);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.library__tag-input:focus {
+  outline: none;
+  border-color: var(--brass-soft-border);
+}
+.library__tag-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 4px 0;
+}
+.library__tag-delete {
+  border: 1px solid var(--alert-border);
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--alert-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.library__tag-delete:hover {
+  background: var(--alert-hover-bg);
+}
+.library__tag-failure {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--alert-ink);
+}
+
+/* Tagging the selected Hands, beside the title. */
+.library__tag-selection {
+  position: relative;
+}
+.library__tag-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 2;
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+}
+.library__tag-option {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.library__tag-option:hover {
+  background: var(--color-hover);
+}
+.library__tag-option input {
+  margin: 0;
+  accent-color: var(--brass);
+}
+.library__tag-menu-empty {
+  margin: 0;
+  padding: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
 .library__import {
   margin-top: auto;
 }
@@ -149,7 +311,13 @@
   gap: 16px;
   padding: 22px 28px;
 }
+.library__heading {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
 .library__intro {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -214,8 +382,22 @@
 .library-table tbody tr:last-child td {
   border-bottom: 0;
 }
-.library-table__hand {
-  padding-left: 14px;
+.library-table .library-table__select {
+  width: 24px;
+  padding: 0 0 0 14px;
+}
+/* Above the link that makes the whole row open the Hand. */
+.library-row__select,
+.library-row__mark {
+  position: relative;
+  z-index: 1;
+}
+.library-row__select {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brass);
+  cursor: pointer;
 }
 .library-table .library-table__mark {
   width: 34px;
@@ -309,6 +491,18 @@
 .library-row__street[data-showdown] {
   border-color: var(--sync-soft-border);
   color: var(--sync-ink);
+}
+
+.library-row__tags {
+  display: flex;
+  gap: 4px;
+}
+/* As the board draws a row's Tags: smaller and plainer than the filter chips. */
+.library-row__tags .ro-chip--tag {
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10.5px;
 }
 
 .library__pages {

@@ -5,6 +5,7 @@ import {
   bigserial,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -293,4 +294,53 @@ export const marks = pgTable(
     markedAt: timestamp('marked_at', { withTimezone: true }).notNull(),
   },
   (table) => [primaryKey({ columns: [table.identityId, table.handId] })],
+);
+
+/**
+ * A label an Account puts on Hands of its own Library to classify them. Only
+ * its owner sees it. Its name is unique within the Account, ignoring case.
+ */
+export const tags = pgTable(
+  'tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('tags_identity_id_name_idx').on(
+      table.identityId,
+      sql`lower(${table.name})`,
+    ),
+  ],
+);
+
+/**
+ * A Tag on a Hand of its owner's Library. It hangs off the Library entry, so
+ * removing the Hand from the Library, or deleting the Tag, removes it.
+ */
+export const tagLinks = pgTable(
+  'tag_links',
+  {
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+    identityId: uuid('identity_id').notNull(),
+    handId: uuid('hand_id').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tagId, table.handId] }),
+    foreignKey({
+      name: 'tag_links_library_entry_fk',
+      columns: [table.identityId, table.handId],
+      foreignColumns: [libraryEntries.identityId, libraryEntries.handId],
+    }).onDelete('cascade'),
+    index('tag_links_identity_id_hand_id_idx').on(
+      table.identityId,
+      table.handId,
+    ),
+  ],
 );

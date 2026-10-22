@@ -12,11 +12,13 @@ import { Avatar } from '../ui/Avatar'
 import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { Chip } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { LIBRARY_PAGE_SIZE, libraryHandPath, type LibraryHand, type LibraryPage as Page } from './library'
 import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, type LibraryFilter } from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
+import { LibraryTags, TagSelection } from './LibraryTags'
 import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import './LibraryPage.css'
@@ -37,6 +39,8 @@ export function LibraryPage() {
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [results, setResults] = useState<Results | null>(null)
   const [importing, setImporting] = useState(false)
+  // The Hands of this page chosen for a Tag; another page or filter starts with none.
+  const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -63,11 +67,17 @@ export function LibraryPage() {
   }, [token, filter, revision])
 
   const page = load?.state === 'loaded' ? load.page : null
+  const goToPage = (number: number) => {
+    setPageNumber(number)
+    setSelected([])
+  }
+  // Only what this page still shows counts as selected.
+  const selectedHands = page ? page.hands.filter((hand) => selected.includes(hand.id)) : []
   const openImport = () => setImporting(true)
   // Any change of filter starts again from the first page.
   const changeFilter = (next: LibraryFilter) => {
     setFilter(next)
-    setPageNumber(1)
+    goToPage(1)
     // The graph of other Hands mustn't stay beside the new list.
     setResults(null)
   }
@@ -78,6 +88,23 @@ export function LibraryPage() {
       // Read again: the counts change, and so does what the Marked collection holds.
       .finally(() => setRevision((n) => n + 1))
   }
+
+  // Every Tag change reads the Library again: the counts, the rows and what the filter keeps all follow.
+  const changeTags = (change: Promise<unknown>) => change.then(() => setRevision((n) => n + 1))
+  const tagsPath = '/library/tags'
+  const createTag = (name: string) => changeTags(api(tagsPath, { token, method: 'POST', body: { name } }))
+  const renameTag = (tagId: string, name: string) =>
+    changeTags(api(`${tagsPath}/${encodeURIComponent(tagId)}`, { token, method: 'PATCH', body: { name } }))
+  const setTag = (tagId: string, handIds: string[], attached: boolean) =>
+    changeTags(
+      api(`${tagsPath}/${encodeURIComponent(tagId)}/hands`, { token, method: attached ? 'PUT' : 'DELETE', body: { handIds } }),
+    )
+  const deleteTag = (tagId: string) =>
+    api(`${tagsPath}/${encodeURIComponent(tagId)}`, { token, method: 'DELETE' }).then(() => {
+      // A deleted Tag can't narrow the Library any more.
+      if (filter.tags.includes(tagId)) changeFilter({ ...filter, tags: filter.tags.filter((id) => id !== tagId) })
+      setRevision((n) => n + 1)
+    })
 
   return (
     <LibraryFrame>
@@ -105,6 +132,21 @@ export function LibraryPage() {
               {page && <span className="library__collection-count ro-mono">{page.counts.marked}</span>}
             </button>
           </div>
+          {page && (
+            <LibraryTags
+              tags={page.options.tags}
+              chosen={filter.tags}
+              onToggle={(tagId) =>
+                changeFilter({
+                  ...filter,
+                  tags: filter.tags.includes(tagId) ? filter.tags.filter((id) => id !== tagId) : [...filter.tags, tagId],
+                })
+              }
+              onCreate={createTag}
+              onRename={renameTag}
+              onDelete={deleteTag}
+            />
+          )}
           <Button variant="secondary" className="library__import" onClick={openImport}>
             <Icon name="import" size={16} />
             {t('library.import')}
@@ -112,13 +154,22 @@ export function LibraryPage() {
         </nav>
 
         <main className="library__main">
-          <div className="library__intro">
-            <h1 className="library__title ro-serif">{t(filter.markedOnly ? 'library.markedTitle' : 'library.all')}</h1>
-            {page && (
-              <span className="library__subtitle">
-                {t(page.total === 1 ? 'library.count.one' : 'library.count.other', { count: page.total })}
-              </span>
-            )}
+          <div className="library__heading">
+            <div className="library__intro">
+              <h1 className="library__title ro-serif">{t(filter.markedOnly ? 'library.markedTitle' : 'library.all')}</h1>
+              {page && (
+                <span className="library__subtitle">
+                  {[
+                    t(page.total === 1 ? 'library.count.one' : 'library.count.other', { count: page.total }),
+                    selectedHands.length > 0 &&
+                      t(selectedHands.length === 1 ? 'library.selected.one' : 'library.selected.other', { count: selectedHands.length }),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              )}
+            </div>
+            {page && selectedHands.length > 0 && <TagSelection tags={page.options.tags} selected={selectedHands} onSet={setTag} />}
           </div>
 
           {load?.state === 'failed' && (
@@ -153,8 +204,8 @@ export function LibraryPage() {
           )}
           {page && page.hands.length > 0 && (
             <>
-              <HandTable hands={page.hands} onSetMark={setMark} />
-              <Pagination page={page} onGoTo={setPageNumber} />
+              <HandTable hands={page.hands} selected={selected} onSelect={setSelected} onSetMark={setMark} />
+              <Pagination page={page} onGoTo={goToPage} />
             </>
           )}
         </main>
@@ -203,9 +254,14 @@ export function LibraryFrame({ children }: { children: ReactNode }) {
 
 function HandTable({
   hands,
+  selected,
+  onSelect,
   onSetMark,
 }: {
   hands: LibraryHand[]
+  /** The ids of the selected Hands. */
+  selected: string[]
+  onSelect: (selected: string[]) => void
   onSetMark: (hand: LibraryHand, marked: boolean) => void
 }) {
   const i18n = useI18n()
@@ -216,6 +272,15 @@ function HandTable({
       <table className="library-table" aria-label={t('library.all')}>
         <thead>
           <tr>
+            <th scope="col" className="library-table__select">
+              <input
+                type="checkbox"
+                className="library-row__select"
+                aria-label={t('library.selectPage')}
+                checked={hands.every((hand) => selected.includes(hand.id))}
+                onChange={(event) => onSelect(event.target.checked ? hands.map((hand) => hand.id) : [])}
+              />
+            </th>
             <th scope="col" className="library-table__hand">
               {t('library.column.hand')}
             </th>
@@ -225,6 +290,7 @@ function HandTable({
             <th scope="col">{t('library.column.result')}</th>
             <th scope="col">{t('library.column.street')}</th>
             <th scope="col">{t('library.column.date')}</th>
+            <th scope="col">{t('library.column.tags')}</th>
             <th scope="col" className="library-table__mark">
               <span className="library-table__hidden">{t('library.marked')}</span>
             </th>
@@ -240,6 +306,17 @@ function HandTable({
             })
             return (
               <tr key={hand.id} className="library-row">
+                <td className="library-table__select">
+                  <input
+                    type="checkbox"
+                    className="library-row__select"
+                    aria-label={t('library.select', { positions, hero: hand.hero })}
+                    checked={selected.includes(hand.id)}
+                    onChange={(event) =>
+                      onSelect(event.target.checked ? [...selected, hand.id] : selected.filter((id) => id !== hand.id))
+                    }
+                  />
+                </td>
                 <td className="library-table__hand">
                   <a
                     href={libraryHandPath(hand.id)}
@@ -270,6 +347,15 @@ function HandTable({
                   </span>
                 </td>
                 <td className="library-row__date ro-mono">{playedAtLabel(hand, i18n)}</td>
+                <td>
+                  <span className="library-row__tags">
+                    {hand.tags.map((tag) => (
+                      <Chip key={tag.id} variant="tag">
+                        {tag.name}
+                      </Chip>
+                    ))}
+                  </span>
+                </td>
                 <td className="library-table__mark">
                   <IconButton
                     icon="mark"

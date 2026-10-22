@@ -22,7 +22,12 @@ interface LibraryPage {
     stake: Stake;
     marked: boolean;
   }[];
-  options: { sites: string[]; heroes: string[]; stakes: Stake[] };
+  options: {
+    sites: string[];
+    heroes: string[];
+    stakes: Stake[];
+    tags: unknown[];
+  };
   counts: { all: number; marked: number };
 }
 
@@ -89,6 +94,7 @@ describe('Filtering the Library and Marking from it (e2e)', () => {
         { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
         { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'USDT' },
       ],
+      tags: [],
     });
     expect((await list(other.token)).options).toEqual({
       sites: ['pokerstars'],
@@ -96,6 +102,7 @@ describe('Filtering the Library and Marking from it (e2e)', () => {
       stakes: [
         { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
       ],
+      tags: [],
     });
   });
 

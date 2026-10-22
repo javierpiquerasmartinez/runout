@@ -108,6 +108,7 @@ describe('Importing into the Library and listing it (e2e)', () => {
       stake: expect.objectContaining({ bigBlind: 10, currency: 'EUR' }),
       result: expect.any(Number),
       marked: false,
+      tags: [],
       summary: expect.objectContaining({ finalStreet: expect.any(String) }),
     });
   });

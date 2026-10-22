@@ -58,6 +58,12 @@ describe('libraryFilterQuery', () => {
     expect(query.toString()).toBe('site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&marked=true')
     expect(libraryFilterQuery(EMPTY_LIBRARY_FILTER).toString()).toBe('')
   })
+
+  it('writes every chosen Tag, any of which keeps a Hand', () => {
+    const query = libraryFilterQuery({ ...EMPTY_LIBRARY_FILTER, tags: ['t1', 't2'] })
+
+    expect(query.toString()).toBe('tag=t1&tag=t2')
+  })
 })
 
 describe('isFiltering', () => {
@@ -65,5 +71,7 @@ describe('isFiltering', () => {
     expect(isFiltering(EMPTY_LIBRARY_FILTER)).toBe(false)
     expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, to: '2026-10-21' })).toBe(true)
     expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, markedOnly: true })).toBe(true)
+    expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, tags: [] })).toBe(false)
+    expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, tags: ['t1'] })).toBe(true)
   })
 })
