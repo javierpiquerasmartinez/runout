@@ -1,13 +1,20 @@
 import { useSyncExternalStore, type MouseEvent } from 'react'
 
 /*
- * Three screens don't need a router: the path is read from the location and
- * `navigate` pushes a new entry and tells subscribers.
+ * A handful of screens don't need a router: the path is read from the location,
+ * `navigate` pushes a new entry, `redirect` replaces the current one, and both
+ * tell subscribers. `routes/Routes` decides what each path shows.
  */
 const NAVIGATE_EVENT = 'runout:navigate'
 
 export function navigate(path: string, state?: unknown) {
   window.history.pushState(state ?? null, '', path)
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/** Like `navigate`, but replaces the current entry: going back skips the path left. */
+export function redirect(path: string) {
+  window.history.replaceState(null, '', path)
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
