@@ -15,7 +15,7 @@ One browser holding a bearer token for an identity. An Account has one per brows
 _Avoid_: Session (outside the code and those UI phrases), login
 
 **Participant**:
-A person present in a Room: either with their Account, or anonymously, with an identity that exists for that one Room and is lost when it closes.
+A person present in a Room: either with their Account, or anonymously, with an identity that exists for that one Room and is lost when it closes. Being anonymous says nothing about being Master or Guest; the UI offers it as entering "sin cuenta", never "como invitado".
 _Avoid_: User, player, member, anonymous user
 
 **Master**:
@@ -63,7 +63,7 @@ The Participant who brought a Hand into Runout. Recorded for audit only; carries
 _Avoid_: Author
 
 **Note**:
-A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room only the Master edits or deletes it; outside a Room, anyone who has the Hand in their Library can.
+A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room any Participant writes one, but only the Master edits or deletes it; outside a Room, anyone who has the Hand in their Library can write, edit or delete.
 _Avoid_: Comment, annotation
 
 **Tag**:
