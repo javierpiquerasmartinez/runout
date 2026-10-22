@@ -1,12 +1,22 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, exists, inArray, ne, not, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
   type Database,
   type Transaction,
 } from '../database/database.js';
-import { queueEntries, roomMemberships, rooms } from '../database/schema.js';
+import {
+  hands,
+  libraryEntries,
+  marks,
+  notes,
+  playbacks,
+  queueEntries,
+  roomMemberships,
+  rooms,
+  tagLinks,
+} from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import {
   IdentityService,
@@ -325,8 +335,18 @@ export class RoomsService {
   }
 
   /**
+   * How many Room Hands closing the Room now would discard with their Notes,
+   * so the Master can be warned first. Only the Master may ask.
+   */
+  async roomHandsCount(master: Identity, typedCode: string): Promise<number> {
+    const room = await this.findOpen(typedCode);
+    await this.requireMaster(room.id, master.id);
+    return (await this.roomHandsOf(this.db, room.id)).length;
+  }
+
+  /**
    * The Master closes the Room for everyone. A closed Room never reopens and
-   * its Room Code stops working; the Hands it reviewed are untouched.
+   * its Room Code stops working; its Room Hands are discarded with it.
    */
   async close(master: Identity, roomId: string): Promise<void> {
     await this.requireMaster(roomId, master.id);
@@ -361,8 +381,8 @@ export class RoomsService {
   }
 
   /**
-   * Closes the Room if it is still open, ending its anonymous identities with
-   * it. False when it already was.
+   * Closes the Room if it is still open, discarding its Room Hands and ending
+   * its anonymous identities with it. False when it already was.
    */
   private async markClosed(roomId: string): Promise<boolean> {
     return this.db.transaction(async (tx) => {
@@ -372,9 +392,75 @@ export class RoomsService {
         .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open')))
         .returning({ id: rooms.id });
       if (closed.length === 0) return false;
+      await this.discardRoomHands(tx, roomId);
       await this.identities.endAnonymousOf(tx, roomId);
       return true;
     });
+  }
+
+  /**
+   * Deletes the Room Hands of a Room that is closing, with everything that
+   * hangs off them: Notes, Marks, Tag links, Queue Entries and Playbacks,
+   * whichever Room (closed by now) they were in.
+   */
+  private async discardRoomHands(
+    tx: Transaction,
+    roomId: string,
+  ): Promise<void> {
+    // Locked first: a Library import or another Room's Queue that already
+    // holds one of these Hands lands before the close looks, and keeps it.
+    // One that comes after the lock fails, as the Hand is gone by then.
+    await tx
+      .select({ id: hands.id })
+      .from(hands)
+      .where(inArray(hands.id, queuedIn(tx, roomId)))
+      .for('update');
+    const discarded = await this.roomHandsOf(tx, roomId);
+    if (discarded.length === 0) return;
+    await tx.delete(tagLinks).where(inArray(tagLinks.handId, discarded));
+    await tx.delete(marks).where(inArray(marks.handId, discarded));
+    await tx.delete(notes).where(inArray(notes.handId, discarded));
+    await tx.delete(playbacks).where(inArray(playbacks.handId, discarded));
+    await tx
+      .delete(queueEntries)
+      .where(inArray(queueEntries.handId, discarded));
+    await tx.delete(hands).where(inArray(hands.id, discarded));
+  }
+
+  /**
+   * The Room Hands of a Room: the Hands its Queue references, removed Entries
+   * included, that are in no Library and in no other open Room's Queue.
+   */
+  private async roomHandsOf(
+    db: Database | Transaction,
+    roomId: string,
+  ): Promise<string[]> {
+    const inALibrary = db
+      .select({ handId: libraryEntries.handId })
+      .from(libraryEntries)
+      .where(eq(libraryEntries.handId, hands.id));
+    const inAnotherOpenRoom = db
+      .select({ handId: queueEntries.handId })
+      .from(queueEntries)
+      .innerJoin(rooms, eq(rooms.id, queueEntries.roomId))
+      .where(
+        and(
+          eq(queueEntries.handId, hands.id),
+          ne(queueEntries.roomId, roomId),
+          eq(rooms.status, 'open'),
+        ),
+      );
+    const rows = await db
+      .select({ id: hands.id })
+      .from(hands)
+      .where(
+        and(
+          inArray(hands.id, queuedIn(db, roomId)),
+          not(exists(inALibrary)),
+          not(exists(inAnotherOpenRoom)),
+        ),
+      );
+    return rows.map((row) => row.id);
   }
 
   private async unusedCode(): Promise<string> {
@@ -387,6 +473,14 @@ export class RoomsService {
       if (!taken) return code;
     }
   }
+}
+
+/** The Hands a Room's Queue references, removed Entries included. */
+function queuedIn(db: Database | Transaction, roomId: string) {
+  return db
+    .selectDistinct({ handId: queueEntries.handId })
+    .from(queueEntries)
+    .where(eq(queueEntries.roomId, roomId));
 }
 
 function validRoomName(raw: unknown): string {

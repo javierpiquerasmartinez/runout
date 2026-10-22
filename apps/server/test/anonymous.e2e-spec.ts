@@ -306,6 +306,17 @@ describe('Anonymous identities last one Room (e2e)', () => {
         body: 'Fold al river.',
       });
       await room.masterSocket.next('notes.written');
+      // Saved into the Master's Library, so it outlives the Room as no Room Hand does.
+      const preview = await request(running.httpServer)
+        .post('/api/library/imports/previews')
+        .set('Authorization', `Bearer ${room.master.token}`)
+        .send({ text })
+        .expect(201);
+      await request(running.httpServer)
+        .post('/api/library/imports')
+        .set('Authorization', `Bearer ${room.master.token}`)
+        .send({ previews: [preview.body.id as string] })
+        .expect(201);
       room.masterSocket.send('room.close');
       await room.masterSocket.next('room.closed');
 
