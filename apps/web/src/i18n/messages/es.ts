@@ -628,6 +628,8 @@ export const es = {
   'reason.entry-not-in-queue': 'Esa mano ya no está en la cola.',
   'reason.nothing-to-undo': 'No hay nada que deshacer.',
   'reason.undo-expired': 'Han pasado más de 10 s: ya no se puede deshacer.',
+  'reason.invalid-note': 'Una nota no puede estar vacía ni pasar de 2.000 caracteres.',
+  'reason.note-not-found': 'Esa nota ya no existe.',
 
   // The end of a Room: leaving, kicking and closing (issue 13).
   'room.leave': 'Salir',
@@ -751,6 +753,7 @@ export const es = {
   'library.results.hand': 'Mano {hand}',
   'library.notes.title': 'Notas',
   'library.notes.none': 'Nadie ha escrito todavía una nota sobre esta mano.',
-  'library.notes.readOnly': 'Por ahora las notas se escriben en una sala.',
+  'library.notes.write': 'Añadir una nota sobre esta mano',
+  'library.notes.placeholder': 'Anota tu conclusión. Se guarda con la mano, para todos los que la tienen.',
   'welcome.library': 'Mi biblioteca',
 }

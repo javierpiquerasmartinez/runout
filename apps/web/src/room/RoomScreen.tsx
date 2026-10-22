@@ -28,6 +28,8 @@ import {
   stakeLabel,
   streetLabel,
 } from './queueEntryView'
+import { NoteEditor } from './NoteEditor'
+import { usePendingUndo } from './pendingUndo'
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
 import { SyncIndicator } from './SyncIndicator'
@@ -357,48 +359,8 @@ function RoomDecisionDialog({
   )
 }
 
-const UNDO_WINDOW_MS = 10_000
-
 /** The Note field the loaded Hand's "Nota" button takes you to. */
 const NOTE_FIELD_ID = 'room-note-field'
-
-/**
- * What was just removed and can still be taken back, for as long as the undo
- * window lasts. The server is the one that decides: this only says how long
- * the offer is worth making. `forget` drops the offer when what it refers to
- * is no longer on screen.
- */
-function usePendingUndo(undoCommand: (id: string) => void): {
-  pendingId: string | null
-  remove(id: string, removeCommand: (id: string) => void): void
-  undo(): void
-  forget(): void
-} {
-  const [pendingId, setPendingId] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(timer.current), [])
-
-  function forget() {
-    clearTimeout(timer.current)
-    setPendingId(null)
-  }
-
-  return {
-    pendingId,
-    remove(id, removeCommand) {
-      removeCommand(id)
-      setPendingId(id)
-      clearTimeout(timer.current)
-      timer.current = setTimeout(() => setPendingId(null), UNDO_WINDOW_MS)
-    },
-    undo() {
-      if (!pendingId) return
-      undoCommand(pendingId)
-      forget()
-    },
-    forget,
-  }
-}
 
 /**
  * The Queue panel, from the "Sala" boards: Author, date, Positions, Stake,
@@ -1031,45 +993,6 @@ function HandNotes({
         {t(isMaster ? 'room.notes.save' : 'room.notes.post')}
       </Button>
     </section>
-  )
-}
-
-/** One Note being rewritten in place by the Master, from its current wording. */
-function NoteEditor({
-  note,
-  onSave,
-  onCancel,
-}: {
-  note: Note
-  onSave: (body: string) => void
-  onCancel: () => void
-}) {
-  const { t } = useI18n()
-  const [body, setBody] = useState(note.body)
-
-  return (
-    <>
-      <textarea
-        className="room-notes__field"
-        aria-label={t('room.notes.edit', { name: note.writer.displayName })}
-        value={body}
-        autoFocus
-        onChange={(event) => setBody(event.target.value)}
-      />
-      <div className="room-notes__controls">
-        <Button
-          variant="secondary"
-          size="compact"
-          disabledReason={body.trim() === '' ? t('room.notes.empty') : undefined}
-          onClick={() => onSave(body.trim())}
-        >
-          {t('room.notes.confirmEdit')}
-        </Button>
-        <Button variant="ghost" size="compact" onClick={onCancel}>
-          {t('room.notes.cancelEdit')}
-        </Button>
-      </div>
-    </>
   )
 }
 

@@ -629,6 +629,8 @@ export const en: Messages = {
   'reason.entry-not-in-queue': 'That hand is no longer in the queue.',
   'reason.nothing-to-undo': 'There is nothing to undo.',
   'reason.undo-expired': "More than 10 s have passed: this can no longer be undone.",
+  'reason.invalid-note': 'A note cannot be empty, nor longer than 2,000 characters.',
+  'reason.note-not-found': 'That note no longer exists.',
 
   // The end of a Room: leaving, kicking and closing (issue 13).
   'room.leave': 'Leave',
@@ -752,6 +754,7 @@ export const en: Messages = {
   'library.results.hand': 'Hand {hand}',
   'library.notes.title': 'Notes',
   'library.notes.none': 'Nobody has written a note on this hand yet.',
-  'library.notes.readOnly': 'Notes are written in a room for now.',
+  'library.notes.write': 'Add a note about this hand',
+  'library.notes.placeholder': 'Write down what you concluded. It is kept with the hand, for everyone who has it.',
   'welcome.library': 'My library',
 }

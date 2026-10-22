@@ -7,7 +7,7 @@ import { HandsService, type HandWithTimeline } from './hands.service.js';
 
 /** A Hand's Notes as they are read outside a Room, with this viewer's own Mark. */
 interface HandNotesView {
-  /** Read-only here: Notes are only ever written, rewritten or deleted inside a Room. */
+  /** Written, rewritten and deleted from the Library (see `LibraryNotesController`) or in a Room. */
   notes: Note[];
   /** Whether this viewer has Marked the Hand. Nobody else is ever told. */
   marked: boolean;
@@ -41,8 +41,8 @@ export class HandsController {
 
   /**
    * A Hand's Notes, and whether the viewer has Marked it, for the Hand seen
-   * outside a Room: both outlive the Room they were made in. Read-only —
-   * writing a Note, or Marking, happens over the WebSocket, in a Room.
+   * outside a Room: both outlive the Room they were made in. Changing them
+   * happens under `/library`, or over the WebSocket in a Room.
    */
   @Get(':id/notes')
   @Header('Cache-Control', 'private, no-cache')

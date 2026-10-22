@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module.js';
+import { RoomsModule } from '../rooms/rooms.module.js';
+import { LibraryNotesController } from './library-notes.controller.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
 import { ResultsService } from './results.service.js';
@@ -7,8 +9,8 @@ import { TagsController } from './tags.controller.js';
 import { TagsService } from './tags.service.js';
 
 @Module({
-  imports: [IdentityModule],
-  controllers: [LibraryController, TagsController],
+  imports: [IdentityModule, RoomsModule],
+  controllers: [LibraryController, LibraryNotesController, TagsController],
   providers: [LibraryService, ResultsService, TagsService],
   exports: [LibraryService],
 })
