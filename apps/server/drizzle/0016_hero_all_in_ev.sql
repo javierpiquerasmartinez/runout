@@ -1,4 +1,3 @@
--- Each Hand now stores its Hero's All-in EV, worked out at import. SQL can't work it out for Hands stored before, so they start from their Result, which is what it is for every Hand not decided by an all-in before the river.
-ALTER TABLE "hands" ADD COLUMN "hero_all_in_ev" integer;--> statement-breakpoint
-UPDATE "hands" SET "hero_all_in_ev" = "hero_result";--> statement-breakpoint
-ALTER TABLE "hands" ALTER COLUMN "hero_all_in_ev" SET NOT NULL;
+-- Each Hand now stores its Hero's All-in EV, worked out at import. Hands stored before can't be worked out in SQL, so they go, with everything that hangs off them.
+TRUNCATE TABLE "hands", "queue_entries", "playbacks", "library_entries", "notes", "marks";--> statement-breakpoint
+ALTER TABLE "hands" ADD COLUMN "hero_all_in_ev" integer NOT NULL;
