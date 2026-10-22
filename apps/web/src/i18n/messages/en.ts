@@ -721,6 +721,7 @@ export const en: Messages = {
   'library.results.title': 'Results',
   'library.results.lines': 'Lines',
   'library.results.line.result': 'Result',
+  'library.results.line.allInEv': 'All-in EV',
   'library.results.line.showdown': 'Showdown',
   'library.results.line.nonShowdown': 'Non-showdown',
   'library.results.unit': 'Unit',

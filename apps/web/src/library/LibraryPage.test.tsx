@@ -56,8 +56,8 @@ beforeEach(() => {
   results = {
     hands: 3,
     currency: 'EUR',
-    totals: { bigBlinds: { result: 3.9, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, showdown: 49, nonShowdown: -10 } },
-    points: [{ hand: 3, bigBlinds: { result: 3.9, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, showdown: 49, nonShowdown: -10 } }],
+    totals: { bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } },
+    points: [{ hand: 3, bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } }],
   }
   pages = {
     '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),
@@ -301,7 +301,7 @@ describe('LibraryPage', () => {
 
     it('draws nothing when no Hand matches, inviting to import instead', async () => {
       pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
-      results = { hands: 0, currency: null, totals: { bigBlinds: { result: 0, showdown: 0, nonShowdown: 0 }, amounts: null }, points: [] }
+      results = { hands: 0, currency: null, totals: { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: null }, points: [] }
       renderLibrary()
 
       expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()

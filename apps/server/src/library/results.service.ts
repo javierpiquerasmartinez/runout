@@ -11,11 +11,13 @@ const DEFAULT_POINTS = 500;
 const MAX_POINTS = 2000;
 
 /**
- * The Results Graph's lines: the Hero's Result, and its share from Hands
- * where the Hero reached Showdown and from every other Hand.
+ * The Results Graph's lines: the Hero's Result, their All-in EV, and the
+ * Result's share from Hands where the Hero reached Showdown and from every
+ * other Hand.
  */
 export interface ResultLines {
   result: number;
+  allInEv: number;
   showdown: number;
   nonShowdown: number;
 }
@@ -45,8 +47,10 @@ export interface Results {
 /** Running sums as the database reads them, as text: Amounts, then big blinds. */
 type Sums = {
   result: string;
+  all_in_ev: string;
   showdown: string;
   result_bb: string;
+  all_in_ev_bb: string;
   showdown_bb: string;
 };
 
@@ -124,33 +128,49 @@ export class ResultsService {
 }
 
 /**
- * The Result and Showdown Result, as Amounts and in big blinds, summed over
- * the whole set or, with a window, as running sums.
+ * The Result, All-in EV and Showdown Result, as Amounts and in big blinds,
+ * summed over the whole set or, with a window, as running sums.
  */
 function sums(over: SQL) {
   const result = sql`${hands.heroResult}`;
+  const allInEv = sql`${hands.heroAllInEv}`;
   const showdown = sql`case when ${hands.heroReachedShowdown} then ${hands.heroResult} else 0 end`;
   const bigBlinds = (amount: SQL) =>
     sql`${amount}::numeric / ${hands.bigBlind}`;
   return sql`
     coalesce(sum(${result}) ${over}, 0) as result,
+    coalesce(sum(${allInEv}) ${over}, 0) as all_in_ev,
     coalesce(sum(${showdown}) ${over}, 0) as showdown,
     round(coalesce(sum(${bigBlinds(result)}) ${over}, 0), 2) as result_bb,
+    round(coalesce(sum(${bigBlinds(allInEv)}) ${over}, 0), 2) as all_in_ev_bb,
     round(coalesce(sum(${bigBlinds(showdown)}) ${over}, 0), 2) as showdown_bb`;
 }
 
 /** The lines from their sums: the Non-showdown Result is whatever the Showdown Result leaves of the Result. */
 function linesOf(sums: Sums, oneCurrency: boolean): Omit<ResultsPoint, 'hand'> {
-  const lines = (result: number, showdown: number): ResultLines => ({
+  const lines = (
+    result: number,
+    allInEv: number,
+    showdown: number,
+  ): ResultLines => ({
     result,
+    allInEv,
     showdown,
     // To the hundredth, as both of the others are.
     nonShowdown: Math.round((result - showdown) * 100) / 100,
   });
   return {
-    bigBlinds: lines(Number(sums.result_bb), Number(sums.showdown_bb)),
+    bigBlinds: lines(
+      Number(sums.result_bb),
+      Number(sums.all_in_ev_bb),
+      Number(sums.showdown_bb),
+    ),
     amounts: oneCurrency
-      ? lines(Number(sums.result), Number(sums.showdown))
+      ? lines(
+          Number(sums.result),
+          Number(sums.all_in_ev),
+          Number(sums.showdown),
+        )
       : null,
   };
 }

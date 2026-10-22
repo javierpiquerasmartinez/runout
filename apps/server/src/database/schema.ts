@@ -140,6 +140,8 @@ export const hands = pgTable(
     currency: text('currency').notNull(),
     /** The Hero's Result as an Amount, worked out from `content` at import. */
     heroResult: integer('hero_result').notNull(),
+    /** The Hero's All-in EV as an Amount, worked out from `content` at import. */
+    heroAllInEv: integer('hero_all_in_ev').notNull(),
     /** Whether the Hero reached Showdown, worked out from `content` at import. */
     heroReachedShowdown: boolean('hero_reached_showdown').notNull(),
     content: jsonb('content').$type<Hand>().notNull(),

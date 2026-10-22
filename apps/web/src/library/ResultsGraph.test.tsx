@@ -7,17 +7,28 @@ import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preference
 import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 
-/** Five Hands at €0.05/€0.10: +€0.31, -€0.30, €0, -€0.10, then +€0.49 at Showdown. */
+/**
+ * Five Hands at €0.05/€0.10: +€0.31, -€0.30, €0, -€0.10, then +€0.49 at
+ * Showdown, an all-in whose All-in EV was +€0.20.
+ */
 const euros: Results = {
   hands: 5,
   currency: 'EUR',
   totals: {
-    bigBlinds: { result: 4, showdown: 4.9, nonShowdown: -0.9 },
-    amounts: { result: 40, showdown: 49, nonShowdown: -9 },
+    bigBlinds: { result: 4, allInEv: 1, showdown: 4.9, nonShowdown: -0.9 },
+    amounts: { result: 40, allInEv: 10, showdown: 49, nonShowdown: -9 },
   },
   points: [
-    { hand: 3, bigBlinds: { result: 0.1, showdown: 0, nonShowdown: 0.1 }, amounts: { result: 1, showdown: 0, nonShowdown: 1 } },
-    { hand: 5, bigBlinds: { result: 4, showdown: 4.9, nonShowdown: -0.9 }, amounts: { result: 40, showdown: 49, nonShowdown: -9 } },
+    {
+      hand: 3,
+      bigBlinds: { result: 0.1, allInEv: 0.1, showdown: 0, nonShowdown: 0.1 },
+      amounts: { result: 1, allInEv: 1, showdown: 0, nonShowdown: 1 },
+    },
+    {
+      hand: 5,
+      bigBlinds: { result: 4, allInEv: 1, showdown: 4.9, nonShowdown: -0.9 },
+      amounts: { result: 40, allInEv: 10, showdown: 49, nonShowdown: -9 },
+    },
   ],
 }
 
@@ -44,6 +55,7 @@ describe('ResultsGraph', () => {
     expect(screen.getByRole('region', { name: 'Results' })).toBeTruthy()
     expect(screen.getByText('5 hands')).toBeTruthy()
     expect(within(legendEntry('Result')).getByText('+4 BB')).toBeTruthy()
+    expect(within(legendEntry('All-in EV')).getByText('+1 BB')).toBeTruthy()
     expect(within(legendEntry('Showdown')).getByText('+4.9 BB')).toBeTruthy()
     expect(within(legendEntry('Non-showdown')).getByText('-0.9 BB')).toBeTruthy()
   })
@@ -51,12 +63,12 @@ describe('ResultsGraph', () => {
   it('hides and shows each line from the legend', async () => {
     const { container } = renderGraph(euros)
     const drawn = () => [...container.querySelectorAll('.recharts-line')].map((line) => line.getAttribute('class'))
-    expect(drawn()).toHaveLength(3)
+    expect(drawn()).toHaveLength(4)
 
     await userEvent.click(screen.getByRole('button', { name: 'Showdown' }))
 
     expect(screen.getByRole('button', { name: 'Showdown' }).getAttribute('aria-pressed')).toBe('false')
-    expect(drawn()).toHaveLength(2)
+    expect(drawn()).toHaveLength(3)
     expect(drawn().some((name) => name?.includes('results__line--showdown'))).toBe(false)
     // Its total stays readable.
     expect(within(legendEntry('Showdown')).getByText('+4.9 BB')).toBeTruthy()
@@ -64,7 +76,12 @@ describe('ResultsGraph', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Showdown' }))
 
     expect(screen.getByRole('button', { name: 'Showdown' }).getAttribute('aria-pressed')).toBe('true')
+    expect(drawn()).toHaveLength(4)
+
+    await userEvent.click(screen.getByRole('button', { name: 'All-in EV' }))
+
     expect(drawn()).toHaveLength(3)
+    expect(drawn().some((name) => name?.includes('results__line--allInEv'))).toBe(false)
   })
 
   describe('unit', () => {
@@ -77,6 +94,7 @@ describe('ResultsGraph', () => {
       await userEvent.click(within(unitSwitch()).getByRole('radio', { name: 'Amount' }))
 
       expect(within(legendEntry('Result')).getByText('+€0.40')).toBeTruthy()
+      expect(within(legendEntry('All-in EV')).getByText('+€0.10')).toBeTruthy()
       expect(within(legendEntry('Showdown')).getByText('+€0.49')).toBeTruthy()
       expect(within(legendEntry('Non-showdown')).getByText('-€0.09')).toBeTruthy()
 

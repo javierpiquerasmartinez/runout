@@ -87,7 +87,7 @@ export async function storeHands(
       .insert(hands)
       .values(
         toStore.map((hand) => {
-          const { result, reachedShowdown } = heroResult(hand);
+          const { result, allInEv, reachedShowdown } = heroResult(hand);
           return {
             site: hand.site,
             siteHandId: hand.siteHandId,
@@ -100,6 +100,7 @@ export async function storeHands(
             bigBlind: hand.stake.bigBlind,
             currency: hand.stake.currency,
             heroResult: result,
+            heroAllInEv: allInEv,
             heroReachedShowdown: reachedShowdown,
             content: hand,
             importedAt: now,

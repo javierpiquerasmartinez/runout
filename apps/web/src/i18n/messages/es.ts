@@ -720,6 +720,7 @@ export const es = {
   'library.results.title': 'Resultados',
   'library.results.lines': 'Líneas',
   'library.results.line.result': 'Resultado',
+  'library.results.line.allInEv': 'EV all-in',
   'library.results.line.showdown': 'Showdown',
   'library.results.line.nonShowdown': 'Sin showdown',
   'library.results.unit': 'Unidad',

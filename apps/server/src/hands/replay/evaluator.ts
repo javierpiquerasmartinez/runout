@@ -189,3 +189,125 @@ function* combinations<T>(items: T[], size: number): Generator<T[]> {
     }
   }
 }
+
+/*
+ * The same ordering as `bestHand`, as one number and built for speed: All-in
+ * EV scores every player on every board left to deal.
+ */
+
+/** A card as a number: its rank (2 to ace as 0 to 12) times four, plus its suit. */
+export function cardCode(card: string): number {
+  return (
+    (RANKS.indexOf(card.slice(0, -1)) << 2) | 'cdhs'.indexOf(card.slice(-1))
+  );
+}
+
+// Reused by every call to spare an allocation per board; `strength` runs to
+// the end without yielding, so no two calls ever share it.
+const rankCounts = new Uint8Array(13);
+
+/**
+ * How strong the best five-card hand among `codes` (five to seven cards) is:
+ * a bigger number beats a smaller one, and equal numbers tie.
+ */
+export function strength(codes: readonly number[]): number {
+  rankCounts.fill(0);
+  let ranks = 0;
+  let clubs = 0;
+  let diamonds = 0;
+  let hearts = 0;
+  let spades = 0;
+  for (const code of codes) {
+    const rank = code >> 2;
+    const bit = 1 << rank;
+    rankCounts[rank]++;
+    ranks |= bit;
+    switch (code & 3) {
+      case 0:
+        clubs |= bit;
+        break;
+      case 1:
+        diamonds |= bit;
+        break;
+      case 2:
+        hearts |= bit;
+        break;
+      default:
+        spades |= bit;
+    }
+  }
+  const flush = [clubs, diamonds, hearts, spades].find(
+    (suit) => bitCount(suit) >= 5,
+  );
+  if (flush !== undefined) {
+    const top = straightTopOf(flush);
+    if (top >= 0) return scoreOf('straight-flush', [top]);
+  }
+
+  let quads = -1;
+  const trips: number[] = [];
+  const pairs: number[] = [];
+  for (let rank = 12; rank >= 0; rank--) {
+    const count = rankCounts[rank];
+    if (count === 4) quads = rank;
+    else if (count === 3) trips.push(rank);
+    else if (count === 2) pairs.push(rank);
+  }
+  if (quads >= 0)
+    return scoreOf('four-of-a-kind', [quads, ...highest(ranks, 1, [quads])]);
+  if (trips.length > 0 && trips.length + pairs.length > 1) {
+    // A second set of trips makes the full house's pair, if it beats any pair.
+    const pair = Math.max(trips[1] ?? -1, pairs[0] ?? -1);
+    return scoreOf('full-house', [trips[0], pair]);
+  }
+  if (flush !== undefined) return scoreOf('flush', highest(flush, 5, []));
+  const top = straightTopOf(ranks);
+  if (top >= 0) return scoreOf('straight', [top]);
+  if (trips.length > 0) {
+    return scoreOf('three-of-a-kind', [
+      trips[0],
+      ...highest(ranks, 2, [trips[0]]),
+    ]);
+  }
+  if (pairs.length > 1) {
+    const [high, low] = pairs;
+    return scoreOf('two-pair', [high, low, ...highest(ranks, 1, [high, low])]);
+  }
+  if (pairs.length === 1) {
+    return scoreOf('pair', [pairs[0], ...highest(ranks, 3, [pairs[0]])]);
+  }
+  return scoreOf('high-card', highest(ranks, 5, []));
+}
+
+/** The category, then each rank that breaks a tie, four bits apiece. */
+function scoreOf(category: HandCategory, tiebreak: number[]): number {
+  let score = CATEGORIES.indexOf(category);
+  for (let i = 0; i < 5; i++) score = (score << 4) | ((tiebreak[i] ?? -1) + 1);
+  return score;
+}
+
+/** The `count` highest ranks set in `mask`, leaving out those in `except`. */
+function highest(mask: number, count: number, except: number[]): number[] {
+  const found: number[] = [];
+  for (let rank = 12; rank >= 0 && found.length < count; rank--) {
+    if (mask & (1 << rank) && !except.includes(rank)) found.push(rank);
+  }
+  return found;
+}
+
+/** The top rank of the highest straight in `mask`, or -1 without one. */
+function straightTopOf(mask: number): number {
+  // An ace also plays low, below the 2.
+  const withLowAce = (mask << 1) | ((mask >> 12) & 1);
+  for (let top = 12; top >= 3; top--) {
+    const run = 0b11111 << (top - 3);
+    if ((withLowAce & run) === run) return top;
+  }
+  return -1;
+}
+
+function bitCount(mask: number): number {
+  let count = 0;
+  for (let rest = mask; rest; rest &= rest - 1) count++;
+  return count;
+}

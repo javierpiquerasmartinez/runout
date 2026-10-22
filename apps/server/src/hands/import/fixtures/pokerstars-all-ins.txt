@@ -1,0 +1,50 @@
+PokerStars Hand #262140000101:  Hold'em No Limit ($0.25/$0.50 USD) - 2026/09/14 21:00:00 CET [2026/09/14 15:00:00 ET]
+Table 'Electra' 2-max Seat #1 is the button
+Seat 1: HeroAI ($50 in chips)
+Seat 2: Aces2 ($50 in chips)
+HeroAI: posts small blind $0.25
+Aces2: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to HeroAI [Kd Kc]
+HeroAI: raises $1 to $1.50
+Aces2: raises $48.50 to $50 and is all-in
+HeroAI: calls $48.50 and is all-in
+*** FLOP *** [Ks 7d 4h]
+*** TURN *** [Ks 7d 4h] [9c]
+*** RIVER *** [Ks 7d 4h 9c] [2s]
+*** SHOW DOWN ***
+Aces2: shows [Ah As] (a pair of Aces)
+HeroAI: shows [Kd Kc] (three of a kind, Kings)
+HeroAI collected $97.50 from pot
+*** SUMMARY ***
+Total pot $100 | Rake $2.50
+Board [Ks 7d 4h 9c 2s]
+Seat 1: HeroAI (button) (small blind) showed [Kd Kc] and won ($97.50) with three of a kind, Kings
+Seat 2: Aces2 (big blind) showed [Ah As] and lost with a pair of Aces
+
+
+PokerStars Hand #262140000102:  Hold'em No Limit ($0.25/$0.50 USD) - 2026/09/14 21:05:00 CET [2026/09/14 15:05:00 ET]
+Table 'Electra' 2-max Seat #2 is the button
+Seat 1: HeroAI ($50 in chips)
+Seat 2: Aces2 ($50 in chips)
+Aces2: posts small blind $0.25
+HeroAI: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to HeroAI [7c 7d]
+Aces2: raises $1 to $1.50
+HeroAI: calls $1
+*** FLOP *** [Kd 8c 2s]
+HeroAI: checks
+Aces2: bets $48.50 and is all-in
+HeroAI: calls $48.50 and is all-in
+*** TURN *** [Kd 8c 2s] [5h]
+*** RIVER *** [Kd 8c 2s 5h] [Jc]
+*** SHOW DOWN ***
+HeroAI: shows [7c 7d] (a pair of Sevens)
+Aces2: shows [As Ah] (a pair of Aces)
+Aces2 collected $97.50 from pot
+*** SUMMARY ***
+Total pot $100 | Rake $2.50
+Board [Kd 8c 2s 5h Jc]
+Seat 1: HeroAI (big blind) showed [7c 7d] and lost with a pair of Sevens
+Seat 2: Aces2 (button) (small blind) showed [As Ah] and won ($97.50) with a pair of Aces
