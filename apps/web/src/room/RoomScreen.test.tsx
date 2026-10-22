@@ -233,6 +233,30 @@ describe('RoomScreen · the end of a Room', () => {
     expect(commands.closeRoom).toHaveBeenCalled()
   })
 
+  it('warns how many Hands in nobody’s Library closing will lose', async () => {
+    const asked: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        asked.push(url)
+        return Response.json({ count: 2 })
+      }),
+    )
+    try {
+      renderRoom(roomView())
+
+      await userEvent.click(screen.getByRole('button', { name: 'Leave' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Close the room' }))
+
+      expect(
+        await screen.findByText("2 hands in the queue are in nobody's library: they will be lost with their notes."),
+      ).toBeTruthy()
+      expect(asked).toEqual(['/api/rooms/RNT4K9PX/room-hands'])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('tells a Master alone in the Room there is nobody to hand the role to', async () => {
     renderRoom(roomView({ participants: [javier] }))
 

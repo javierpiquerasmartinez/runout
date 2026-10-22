@@ -79,7 +79,7 @@ A person's own repository: the Hands they imported into it, whatever their Hero,
 _Avoid_: Shared with me, collection, archive, database
 
 **Room Hand**:
-A Hand in a Room's Queue that is in nobody's Library. It is discarded, with its Notes, when the Room closes.
+A Hand in a Room's Queue that is in nobody's Library. It is discarded, with its Notes, when the Room closes, unless the Queue of another open Room still holds it: then it goes when the last of those closes.
 
 ### Results
 

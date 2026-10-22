@@ -283,7 +283,9 @@ function RoomDecisionDialog({
   onClose: () => void
   onCloseRoom: () => void
 }) {
-  const { t } = useI18n()
+  const i18n = useI18n()
+  const { t } = i18n
+  const roomHandsCount = useRoomHandsCount(view.room.code, decision.kind === 'close')
 
   // Kicking and closing ask the same thing: one red act, or nothing.
   if (decision.kind !== 'leave') {
@@ -318,7 +320,11 @@ function RoomDecisionDialog({
             {asked.label}
           </Button>
         }
-      />
+      >
+        {decision.kind === 'close' && roomHandsCount !== 0 && (
+          <p className="room-dialog__warning">{roomHandsWarning(i18n, roomHandsCount)}</p>
+        )}
+      </RoomDialog>
     )
   }
 
@@ -1160,6 +1166,35 @@ function useImportOutcome(): [string | null, (outcome: ImportOutcome) => void] {
     parts.push(t(outcome.discarded === 1 ? 'room.queue.discarded.one' : 'room.queue.discarded.other', { count: outcome.discarded }))
   }
   return [parts.length > 0 ? parts.join(' · ') : t('room.queue.imported.none'), report]
+}
+
+/**
+ * How many Hands in the Queue are in nobody's Library, asked of the Room as
+ * the Master is about to close it: closing loses them with their Notes.
+ * Undefined while it is asked, null when the Room could not say.
+ */
+function useRoomHandsCount(code: string, enabled: boolean): number | null | undefined {
+  const { token } = useIdentity()
+  const [count, setCount] = useState<number | null | undefined>(undefined)
+
+  useEffect(() => {
+    if (!enabled) return
+    let current = true
+    api<{ count: number }>(`/rooms/${encodeURIComponent(code)}/room-hands`, { token })
+      .then((answer) => current && setCount(answer.count))
+      .catch(() => current && setCount(null))
+    return () => {
+      current = false
+    }
+  }, [code, token, enabled])
+
+  return count
+}
+
+function roomHandsWarning({ t }: Translator, count: number | null | undefined): string {
+  if (count === undefined) return t('room.close.lost.counting')
+  if (count === null) return t('room.close.lost.unknown')
+  return t(count === 1 ? 'room.close.lost.one' : 'room.close.lost.other', { count })
 }
 
 /**

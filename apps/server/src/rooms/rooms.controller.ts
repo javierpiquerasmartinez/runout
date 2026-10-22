@@ -85,6 +85,21 @@ export class RoomsController {
   }
 
   /**
+   * How many Hands in the Queue are in nobody's Library, and would be lost
+   * with their Notes if the Room closed now. The Master's alone to ask.
+   */
+  @Get(':code/room-hands')
+  async roomHandsCount(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('code') code: string,
+  ): Promise<{ count: number }> {
+    const master = await this.identities.authenticate(
+      bearerToken(authorization),
+    );
+    return { count: await this.rooms.roomHandsCount(master, code) };
+  }
+
+  /**
    * Someone without an Account joins the Room: a new anonymous identity for
    * this Room only, under the Display Name they chose (ADR 0005). Joining a
    * second Room this way issues another.
