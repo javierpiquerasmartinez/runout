@@ -550,6 +550,7 @@ function QueuePanel({
                     key={entry.id}
                     entry={entry}
                     sameHand={sameHandLabel(entry, view.queue, i18n)}
+                    inLibrary={view.inLibrary.includes(entry.handId)}
                     i18n={i18n}
                     loaded={entry.handId === view.playback?.handId}
                     onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
@@ -1027,6 +1028,7 @@ function Payout({ payout }: { payout: PayoutView }) {
 function QueueRow({
   entry,
   sameHand,
+  inLibrary,
   i18n,
   loaded,
   onLoad,
@@ -1037,6 +1039,8 @@ function QueueRow({
   entry: QueueEntry
   /** Names the other Heroes' Hands of the same real-world hand in the Queue, if any. */
   sameHand: string | null
+  /** Whether the Hand is in the viewer's Library: theirs to keep once the Room closes. */
+  inLibrary: boolean
   i18n: Translator
   loaded: boolean
   /** Only the Master loads Hands; for Guests a row is information, not a control. */
@@ -1098,6 +1102,12 @@ function QueueRow({
           <span className="queue-entry__chip queue-entry__chip--same-hand">
             <Icon name="link" size={11} />
             {sameHand}
+          </span>
+        )}
+        {inLibrary && (
+          <span className="queue-entry__chip queue-entry__chip--in-library">
+            <Icon name="library" size={11} />
+            {t('room.queue.inLibrary')}
           </span>
         )}
       </div>

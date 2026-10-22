@@ -9,6 +9,7 @@ import {
 import {
   hands,
   identities,
+  libraryEntries,
   queueEntries,
   roomMemberships,
   rooms,
@@ -25,6 +26,7 @@ import { handKey, keyOf, storeHands } from '../hands/hand-store.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
+import { handSelection } from '../library/library-hand.js';
 import { Rejected } from '../rejection/rejection.js';
 import { RoomsService, type Room } from './rooms.service.js';
 import { requireUndoable } from './undo-window.js';
@@ -258,10 +260,6 @@ export class QueueService {
     const now = this.clock.now();
     // Serialises appends to one Room, so two imports never share a position.
     await this.lockRoom(tx, room.id);
-    const [{ last }] = await tx
-      .select({ last: max(queueEntries.position) })
-      .from(queueEntries)
-      .where(eq(queueEntries.roomId, room.id));
     // Read again inside the transaction: Screen Names, and the Queue itself,
     // may have moved on since the import was previewed.
     const { queued } = await this.planImport(room.id, importer, read, [], tx);
@@ -273,13 +271,69 @@ export class QueueService {
       queued.map(({ hand }) => hand),
       now,
     );
+    return this.insertEntries(
+      tx,
+      room.id,
+      handIds.map((handId, index) => ({
+        handId,
+        authorId: queued[index].author.identityId,
+      })),
+    );
+  }
+
+  /**
+   * A Participant with an Account adds Hands of their own Library to the end
+   * of the Queue, in the order given, as themselves: they are the Author,
+   * whoever's Screen Names the Hero is. They are the same Hands, so Notes
+   * written on them here stay with them (ADR 0004). Hands already in the
+   * Queue are left out; one outside the sender's Library and none is added.
+   */
+  async addFromLibrary(
+    sender: Identity,
+    code: string,
+    handIds: unknown,
+  ): Promise<{ room: Room; entries: QueueEntry[] }> {
+    const room = await this.rooms.findOpen(code);
+    await this.rooms.requireParticipant(room.id, sender.id);
+    const ids = handSelection(handIds, 'invalid-hand-selection');
+    const entries = await this.db.transaction(async (tx) => {
+      const held = await this.inLibraryOf(sender.id, ids, tx);
+      if (held.length !== ids.length) throw new Rejected('hand-not-found');
+      await this.lockRoom(tx, room.id);
+      const queued = new Set(await this.queuedAmong(room.id, ids, tx));
+      return this.insertEntries(
+        tx,
+        room.id,
+        ids
+          .filter((handId) => !queued.has(handId))
+          .map((handId) => ({ handId, authorId: sender.id })),
+      );
+    });
+    return { room, entries };
+  }
+
+  /**
+   * Appends Queue Entries after the last position, inside the caller's
+   * transaction, which must hold the Room's lock. Returns them, in Queue order.
+   */
+  private async insertEntries(
+    tx: Transaction,
+    roomId: string,
+    toAdd: { handId: string; authorId: string }[],
+  ): Promise<QueueEntry[]> {
+    if (toAdd.length === 0) return [];
+    const [{ last }] = await tx
+      .select({ last: max(queueEntries.position) })
+      .from(queueEntries)
+      .where(eq(queueEntries.roomId, roomId));
+    const now = this.clock.now();
     const added = await tx
       .insert(queueEntries)
       .values(
-        handIds.map((handId, index) => ({
-          roomId: room.id,
+        toAdd.map(({ handId, authorId }, index) => ({
+          roomId,
           handId,
-          authorId: queued[index].author.identityId,
+          authorId,
           position: (last ?? 0) + index + 1,
           addedAt: now,
         })),
@@ -287,9 +341,97 @@ export class QueueService {
       .returning({ id: queueEntries.id });
 
     const addedIds = new Set(added.map(({ id }) => id));
-    return (await this.entries(room.id, tx)).filter((entry) =>
+    return (await this.entries(roomId, tx)).filter((entry) =>
       addedIds.has(entry.id),
     );
+  }
+
+  /** Which of the Hands are in this person's Library, in the order given. */
+  async inLibraryOf(
+    identityId: string,
+    handIds: string[],
+    db: Database | Transaction = this.db,
+  ): Promise<string[]> {
+    if (handIds.length === 0) return [];
+    const rows = await db
+      .select({ handId: libraryEntries.handId })
+      .from(libraryEntries)
+      .where(
+        and(
+          eq(libraryEntries.identityId, identityId),
+          inArray(libraryEntries.handId, handIds),
+        ),
+      );
+    const held = new Set(rows.map((row) => row.handId));
+    return handIds.filter((handId) => held.has(handId));
+  }
+
+  /**
+   * Who among these people has which of the Hands in their Library, for
+   * telling each of them alone. People holding none are left out.
+   */
+  async holders(
+    identityIds: string[],
+    handIds: string[],
+  ): Promise<Map<string, string[]>> {
+    if (identityIds.length === 0 || handIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        identityId: libraryEntries.identityId,
+        handId: libraryEntries.handId,
+      })
+      .from(libraryEntries)
+      .where(
+        and(
+          inArray(libraryEntries.identityId, identityIds),
+          inArray(libraryEntries.handId, handIds),
+        ),
+      );
+    const held = new Map<string, string[]>();
+    for (const { identityId, handId } of rows) {
+      held.set(identityId, [...(held.get(identityId) ?? []), handId]);
+    }
+    return held;
+  }
+
+  /** The Hands in the Room's Queue that are in this person's Library. */
+  async inLibraryInRoom(identityId: string, roomId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ handId: queueEntries.handId })
+      .from(queueEntries)
+      .innerJoin(
+        libraryEntries,
+        and(
+          eq(libraryEntries.handId, queueEntries.handId),
+          eq(libraryEntries.identityId, identityId),
+        ),
+      )
+      .where(
+        and(eq(queueEntries.roomId, roomId), isNull(queueEntries.removedAt)),
+      )
+      .orderBy(asc(queueEntries.position));
+    return rows.map((row) => row.handId);
+  }
+
+  /** Which of the Hands are in the Room's Queue right now. */
+  async queuedAmong(
+    roomId: string,
+    handIds: string[],
+    db: Database | Transaction = this.db,
+  ): Promise<string[]> {
+    if (handIds.length === 0) return [];
+    const rows = await db
+      .selectDistinct({ handId: queueEntries.handId })
+      .from(queueEntries)
+      .where(
+        and(
+          eq(queueEntries.roomId, roomId),
+          inArray(queueEntries.handId, handIds),
+          isNull(queueEntries.removedAt),
+        ),
+      );
+    const queued = new Set(rows.map((row) => row.handId));
+    return handIds.filter((handId) => queued.has(handId));
   }
 
   /**

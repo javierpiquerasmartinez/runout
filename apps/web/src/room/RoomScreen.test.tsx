@@ -56,6 +56,7 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
     playback: null,
     notes: [],
     marks: [],
+    inLibrary: [],
     revision: 1,
     presence: [],
     sync: { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 1 },
@@ -395,6 +396,16 @@ describe('RoomScreen \u00b7 Marks', () => {
     rerenderRoom({ ...view, marks: ['hand-1'] }, commands)
     await userEvent.click(screen.getByRole('button', { name: 'Marked' }))
     expect(commands.setMark).toHaveBeenCalledWith('hand-1', false)
+  })
+})
+
+describe('RoomScreen \u00b7 Hands in your Library', () => {
+  it('says on each Queue Entry whether its Hand is in the viewer\u2019s Library', () => {
+    renderRoom(roomView({ queue: [firstHand, secondHand], inLibrary: ['hand-2'] }))
+
+    const [first, second] = within(screen.getByRole('complementary', { name: 'Hand queue' })).getAllByRole('listitem')
+    expect(within(first).queryByText('In your library')).toBeNull()
+    expect(within(second).getByText('In your library')).toBeTruthy()
   })
 })
 

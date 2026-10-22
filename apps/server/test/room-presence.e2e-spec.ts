@@ -77,6 +77,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
       playback: null,
       notes: [],
       marks: [],
+      inLibrary: [],
       // Their own arrival is the Room's first change.
       revision: 1,
       presence: [

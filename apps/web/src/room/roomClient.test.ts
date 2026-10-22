@@ -48,6 +48,7 @@ const snapshot: RoomEvent = {
     playback: null,
     notes: [],
     marks: [],
+    inLibrary: [],
     revision: 4,
     presence: [],
   },
@@ -107,6 +108,7 @@ describe('reduceRoom', () => {
       playback: null,
       notes: [],
       marks: [],
+      inLibrary: [],
       revision: 4,
       presence: [],
       sync: { state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 4 },
@@ -549,6 +551,27 @@ describe('reduceRoom · Notes and Marks', () => {
   })
 })
 
+describe('reduceRoom · the Hands in this person’s Library', () => {
+  it('lands with the Queue’s Hands the snapshot says are in their Library', () => {
+    const view = apply({ type: 'snapshot', snapshot: { ...snapshot.snapshot, inLibrary: ['hand-1'] } })
+    expect(inRoom(view)?.inLibrary).toEqual(['hand-1'])
+  })
+
+  it('follows their Library as Hands come into it and leave it, without touching the revision', () => {
+    const held = apply(
+      snapshot,
+      { type: 'inLibraryChanged', handIds: ['hand-1', 'hand-2'], inLibrary: true },
+      // Told twice, held once.
+      { type: 'inLibraryChanged', handIds: ['hand-1'], inLibrary: true },
+    )
+    expect(inRoom(held)?.inLibrary).toEqual(['hand-1', 'hand-2'])
+    expect(inRoom(held)?.revision).toBe(4)
+
+    const removed = reduceRoom(held, { type: 'inLibraryChanged', handIds: ['hand-1'], inLibrary: false })
+    expect(inRoom(removed)?.inLibrary).toEqual(['hand-2'])
+  })
+})
+
 describe('parseServerMessage', () => {
   const changed = (event: string, data: unknown, revision = 3) =>
     parseServerMessage(JSON.stringify({ event, data, revision }))
@@ -623,6 +646,12 @@ describe('parseServerMessage', () => {
     expect(parseServerMessage(JSON.stringify({ event: 'hand.markChanged', data: { handId: 'hand-1', marked: true } }))).toEqual(
       { type: 'markChanged', handId: 'hand-1', marked: true },
     )
+  })
+
+  it('reads which Queue Hands are in this person’s Library, theirs alone and without a revision', () => {
+    expect(
+      parseServerMessage(JSON.stringify({ event: 'queue.inLibrary', data: { handIds: ['hand-1'], inLibrary: false } })),
+    ).toEqual({ type: 'inLibraryChanged', handIds: ['hand-1'], inLibrary: false })
   })
 
   it('reads a snapshot, a presence report and a refusal, none of which carry one', () => {

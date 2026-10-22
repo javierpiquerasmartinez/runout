@@ -50,6 +50,8 @@ export interface RoomSnapshot {
   notes: Note[];
   /** The Hands in the Queue this Participant has Marked. Nobody else is told. */
   marks: string[];
+  /** The Hands in the Queue that are in this Participant's Library. Nobody else is told. */
+  inLibrary: string[];
   /** The revision this snapshot is at. Every later change carries a higher one. */
   revision: number;
   /** How everyone in the Room is following it right now. */
@@ -309,11 +311,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     room: Room,
   ): Promise<WsResponse<RoomSnapshot>> {
     const revision = this.revisions.current(room.id);
-    const [queue, playback, notes, marks] = await Promise.all([
+    const [queue, playback, notes, marks, inLibrary] = await Promise.all([
       this.queue.entries(room.id),
       this.playback.current(room.id),
       this.notes.inRoom(room.id),
       this.marks.inRoom(identityId, room.id),
+      this.queue.inLibraryInRoom(identityId, room.id),
     ]);
     // A snapshot says as much as a heartbeat: they are at this revision now.
     this.presence.applied(socket, revision, this.clock.now());
@@ -327,6 +330,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         playback,
         notes,
         marks,
+        inLibrary,
         revision,
         presence: this.following(room.id),
       },
@@ -820,6 +824,36 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       entries.map((entry) => entry.handId),
     );
     this.publish(roomId, 'queue.entriesAdded', { entries, notes });
+    const holders = await this.queue.holders(
+      this.presence.participants(roomId).map((each) => each.identityId),
+      entries.map((entry) => entry.handId),
+    );
+    for (const [identityId, handIds] of holders) {
+      this.sendTo(roomId, identityId, 'queue.inLibrary', {
+        handIds,
+        inLibrary: true,
+      });
+    }
+  }
+
+  /**
+   * Someone's Library gained or lost Hands: each Room they are in that is
+   * reviewing any of them tells them alone, as whether a Queue Entry is in
+   * their Library is theirs to know.
+   */
+  async libraryChanged(
+    identityId: string,
+    handIds: string[],
+    inLibrary: boolean,
+  ): Promise<void> {
+    for (const roomId of this.presence.roomsOf(identityId)) {
+      const queued = await this.queue.queuedAmong(roomId, handIds);
+      if (queued.length === 0) continue;
+      this.sendTo(roomId, identityId, 'queue.inLibrary', {
+        handIds: queued,
+        inLibrary,
+      });
+    }
   }
 
   /**

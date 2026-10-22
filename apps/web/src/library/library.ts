@@ -1,4 +1,5 @@
 import type { QueueEntry } from '../room/roomClient'
+import { roomPath } from '../room/roomCode'
 
 /*
  * An Account's Library as the server's `GET /library/hands` sends it, one
@@ -17,6 +18,16 @@ export function libraryHandIdFromPath(path: string): string | null {
   const prefix = libraryHandPath('')
   const id = path.startsWith(prefix) ? path.slice(prefix.length) : ''
   return id && !id.includes('/') ? decodeURIComponent(id) : null
+}
+
+/** Where a Participant picks Hands of their Library to add to the Room's Queue, still in the Room. */
+export function roomLibraryPath(code: string): string {
+  return `${roomPath(code)}${libraryPath}`
+}
+
+/** The Room Code in a Room's Library path, or null for any other path. */
+export function roomCodeFromLibraryPath(path: string): string | null {
+  return path.match(/^\/room\/([^/]+)\/library\/?$/)?.[1] ?? null
 }
 
 /** One Library row: what tells the spot apart at a glance. */

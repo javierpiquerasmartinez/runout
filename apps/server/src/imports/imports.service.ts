@@ -170,12 +170,12 @@ export class ImportsService {
   /**
    * Adds the Hands of the Importer's Library previews to their Library and
    * forgets the previews. A Hand added since it was previewed is skipped.
-   * Returns how many were added.
+   * Returns the ids of the Hands added.
    */
   async confirmIntoLibrary(
     importer: Identity,
     previewIds: unknown,
-  ): Promise<number> {
+  ): Promise<string[]> {
     const ids = validIds(previewIds);
     return this.db.transaction(async (tx) =>
       this.library.add(tx, importer, await this.take(tx, importer, null, ids)),

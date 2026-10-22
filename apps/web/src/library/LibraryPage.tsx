@@ -5,9 +5,11 @@ import { useIdentity } from '../identity/context'
 import { usePreferences } from '../preferences/context'
 import { ImportDialog } from '../room/ImportDialog'
 import { RoomDialog } from '../room/RoomDialog'
+import type { RoomSummary } from '../room/roomClient'
+import { roomPath } from '../room/roomCode'
 import { quantity } from '../room/quantity'
 import { playedAtLabel, positionsLabel, siteLabel, stakeLabel, streetLabel } from '../room/queueEntryView'
-import { followLink } from '../routing'
+import { followLink, navigate } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
 import { Avatar } from '../ui/Avatar'
 import { BrandMark } from '../ui/BrandMark'
@@ -29,8 +31,10 @@ import './LibraryPage.css'
  * time, narrowed by the Library filter. It predates ADR 0004, so neither its
  * "Compartidas" collection nor its Author column is built: every Hand here is
  * the Account's own, whatever its Hero, so the Hero takes the Author's place.
+ * Opened from a Room, it leads back there and adds the selected Hands to the
+ * Room's Queue, as the board's "Añadir a la sala" does.
  */
-export function LibraryPage() {
+export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const { t } = useI18n()
   const { token } = useIdentity()
   const [pageNumber, setPageNumber] = useState(1)
@@ -43,6 +47,8 @@ export function LibraryPage() {
   // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [addFailure, setAddFailure] = useState<FailureReason | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -123,8 +129,24 @@ export function LibraryPage() {
       // A refusal reads the Library too: a selected Hand may have left it elsewhere.
       .finally(() => setRevision((n) => n + 1))
 
+  // The same Hands go to the end of the Queue, as this person's; the Room shows them on the way back.
+  const addToRoom = (code: string) => {
+    setAdding(true)
+    setAddFailure(null)
+    api(`/rooms/${encodeURIComponent(code)}/library-hands`, {
+      token,
+      method: 'POST',
+      body: { handIds: selectedHands.map((hand) => hand.id) },
+    })
+      .then(() => navigate(roomPath(code)))
+      .catch((error: unknown) => {
+        setAddFailure(reasonOf(error))
+        setAdding(false)
+      })
+  }
+
   return (
-    <LibraryFrame>
+    <LibraryFrame room={room}>
       <div className="library__body">
         <nav className="library__side" aria-label={t('library.collections')}>
           <div className="library__group">
@@ -193,9 +215,26 @@ export function LibraryPage() {
                   <Icon name="delete" size={16} />
                   {t('library.remove')}
                 </Button>
+                {room && (
+                  <Button
+                    variant="primary"
+                    disabledReason={adding ? t('library.addToRoom.adding') : undefined}
+                    onClick={() => addToRoom(room.code)}
+                  >
+                    <Icon name="add" size={16} />
+                    {t(selectedHands.length === 1 ? 'library.addToRoom.one' : 'library.addToRoom.other', {
+                      count: selectedHands.length,
+                    })}
+                  </Button>
+                )}
               </>
             )}
           </div>
+          {addFailure && (
+            <p className="library__failure" role="alert">
+              {t(`reason.${addFailure}`)}
+            </p>
+          )}
 
           {load?.state === 'failed' && (
             <p className="library__failure" role="alert">
@@ -255,8 +294,11 @@ export function LibraryPage() {
   )
 }
 
-/** The header every Library screen shares: back home, where this is, Settings and who is signed in. */
-export function LibraryFrame({ children }: { children: ReactNode }) {
+/**
+ * The header every Library screen shares: back home, where this is, the way
+ * back to the Room it was opened from, Settings and who is signed in.
+ */
+export function LibraryFrame({ room, children }: { room?: RoomSummary; children: ReactNode }) {
   const { t } = useI18n()
   const { identity } = useIdentity()
   const name = identity.displayName ?? ''
@@ -270,6 +312,12 @@ export function LibraryFrame({ children }: { children: ReactNode }) {
         <span className="library__divider" aria-hidden="true" />
         <span className="library__where">{t('library.title')}</span>
         <span className="library__spacer" />
+        {room && (
+          <a href={roomPath(room.code)} className="library__back" onClick={followLink}>
+            <Icon name="chevron" size={14} className="library__back-icon" />
+            {t('library.backToRoom', { room: room.name })}
+          </a>
+        )}
         <a href={settingsPath} className="library__nav" aria-label={t('room.settings')} onClick={followLink}>
           <Icon name="settings" size={17} />
         </a>
