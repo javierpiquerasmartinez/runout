@@ -164,7 +164,7 @@ function HandNotes({ handId }: { handId: string }) {
   }
 
   return (
-    <section className="room-notes" aria-labelledby="library-notes-title">
+    <section className="room-side__section room-notes" aria-labelledby="library-notes-title">
       <h3 id="library-notes-title" className="room-side__title">
         {t('library.notes.title')}
       </h3>
