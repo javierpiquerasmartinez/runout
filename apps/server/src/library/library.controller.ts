@@ -16,12 +16,14 @@ import {
   type LibraryPage,
   type MarkChange,
 } from './library.service.js';
+import { ResultsService, type Results } from './results.service.js';
 
 @Controller('library')
 export class LibraryController {
   constructor(
     private readonly identities: IdentityService,
     private readonly library: LibraryService,
+    private readonly results: ResultsService,
   ) {}
 
   /**
@@ -43,6 +45,26 @@ export class LibraryController {
       parseLibraryFilter(query),
       query.page,
       query.pageSize,
+    );
+  }
+
+  /**
+   * The running Results over the Hands the Library filter in the query keeps
+   * (the same filter as the list), downsampled to at most `points` points.
+   */
+  @Get('results')
+  @Header('Cache-Control', 'private, no-cache')
+  async runningResults(
+    @Headers('authorization') authorization: string | undefined,
+    @Query() query: Record<string, unknown>,
+  ): Promise<Results> {
+    const account = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    return this.results.results(
+      account,
+      parseLibraryFilter(query),
+      query.points,
     );
   }
 

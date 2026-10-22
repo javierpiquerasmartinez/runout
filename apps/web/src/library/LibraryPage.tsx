@@ -17,6 +17,8 @@ import { IconButton } from '../ui/IconButton'
 import { LIBRARY_PAGE_SIZE, libraryHandPath, type LibraryHand, type LibraryPage as Page } from './library'
 import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, type LibraryFilter } from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
+import type { Results } from './results'
+import { ResultsGraph } from './ResultsGraph'
 import './LibraryPage.css'
 
 /**
@@ -33,6 +35,7 @@ export function LibraryPage() {
   // Bumped after an import, so the list is read again.
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
+  const [results, setResults] = useState<Results | null>(null)
   const [importing, setImporting] = useState(false)
 
   useEffect(() => {
@@ -47,12 +50,26 @@ export function LibraryPage() {
     }
   }, [token, pageNumber, filter, revision])
 
+  // The Results Graph reads the same filter, so it describes the same Hands; paging leaves it be.
+  useEffect(() => {
+    let cancelled = false
+    api<Results>(`/library/results?${libraryFilterQuery(filter)}`, { token })
+      .then((read) => !cancelled && setResults(read))
+      // A graph that can't be read is left out; the list says what went wrong.
+      .catch(() => !cancelled && setResults(null))
+    return () => {
+      cancelled = true
+    }
+  }, [token, filter, revision])
+
   const page = load?.state === 'loaded' ? load.page : null
   const openImport = () => setImporting(true)
   // Any change of filter starts again from the first page.
   const changeFilter = (next: LibraryFilter) => {
     setFilter(next)
     setPageNumber(1)
+    // The graph of other Hands mustn't stay beside the new list.
+    setResults(null)
   }
   const setMark = (hand: LibraryHand, marked: boolean) => {
     api(`/library/hands/${encodeURIComponent(hand.id)}/mark`, { token, method: marked ? 'PUT' : 'DELETE' })
@@ -110,6 +127,7 @@ export function LibraryPage() {
             </p>
           )}
           {page && page.counts.all > 0 && <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />}
+          {page && page.total > 0 && results && results.hands > 0 && <ResultsGraph results={results} />}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{t('library.noMatches')}</p>
