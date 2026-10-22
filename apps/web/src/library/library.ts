@@ -29,6 +29,15 @@ export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 
   result: number
   /** Whether this person has Marked it. Nobody else is ever told. */
   marked: boolean
+  /** This person's Tags on it, sorted by name. Nobody else is ever told. */
+  tags: Pick<Tag, 'id' | 'name'>[]
+}
+
+/** One of the Account's Tags, with how many Hands of its Library carry it. */
+export interface Tag {
+  id: string
+  name: string
+  hands: number
 }
 
 /** One page of the Hands a Library filter keeps, newest first, with how many it keeps. */
@@ -43,6 +52,8 @@ export interface LibraryPage {
     sites: LibraryHand['site'][]
     heroes: string[]
     stakes: LibraryHand['stake'][]
+    /** Every one of the Account's Tags, sorted by name. */
+    tags: Tag[]
   }
   /** The whole Library's Hands, and how many of them are Marked. */
   counts: { all: number; marked: number }

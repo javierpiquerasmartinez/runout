@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
-import { hands, libraryEntries, marks } from '../database/schema.js';
+import { hands, libraryEntries, marks, tagLinks } from '../database/schema.js';
+import { isUuid } from '../database/uuid.js';
 import type { PokerSite, Stake } from '../hands/hand.js';
 import { Rejected } from '../rejection/rejection.js';
 
@@ -11,7 +12,8 @@ import { Rejected } from '../rejection/rejection.js';
  * Query: `from` and `to` as ISO 8601 instants (the web turns the viewer's
  * local days into them; `to` is exclusive), `site`, `hero` and `stake`
  * repeated for each value allowed, `stake` written `limit:small:big:currency`,
- * and `marked=true`.
+ * `marked=true`, and `tag` repeated with the id of each Tag allowed (a Hand
+ * carrying any of them is kept).
  */
 export interface LibraryFilter {
   from: Date | null;
@@ -20,6 +22,8 @@ export interface LibraryFilter {
   heroes: string[];
   stakes: Stake[];
   markedOnly: boolean;
+  /** Tag ids: a Hand carrying any of them is kept. Only the viewer's own Tags match. */
+  tags: string[];
 }
 
 /** What a Library holds to filter by, whatever the filter. */
@@ -50,6 +54,7 @@ export function parseLibraryFilter(
     heroes: list(query.hero),
     stakes: list(query.stake).map(stakeOf),
     markedOnly: marked === 'true',
+    tags: list(query.tag).map(tagId),
   };
 }
 
@@ -84,6 +89,11 @@ export function libraryFilterWhere(
     );
   }
   if (filter.markedOnly) conditions.push(markedBy(identityId));
+  if (filter.tags.length > 0) {
+    conditions.push(
+      sql`exists (select 1 from ${tagLinks} where ${tagLinks.identityId} = ${identityId} and ${tagLinks.handId} = ${hands.id} and ${inArray(tagLinks.tagId, filter.tags)})`,
+    );
+  }
   return and(...conditions)!;
 }
 
@@ -131,6 +141,11 @@ function instant(raw: unknown): Date | null {
     throw new Rejected('invalid-library-filter');
   }
   return date;
+}
+
+function tagId(value: string): string {
+  if (!isUuid(value)) throw new Rejected('invalid-library-filter');
+  return value;
 }
 
 /** `no-limit:5:10:EUR` as a Stake. */

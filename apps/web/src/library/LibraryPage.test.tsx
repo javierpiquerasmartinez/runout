@@ -20,6 +20,7 @@ const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryH
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   result: 49,
   marked: false,
+  tags: [],
   summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
   ...overrides,
 })
@@ -31,6 +32,10 @@ const options: Page['options'] = {
     { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
     { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'USDT' },
     { limit: 'no-limit', smallBlind: 25, bigBlind: 50, currency: 'EUR' },
+  ],
+  tags: [
+    { id: 't1', name: 'All-in', hands: 1 },
+    { id: 't2', name: 'Multiway', hands: 2 },
   ],
 }
 
@@ -48,11 +53,17 @@ let results: Results
 let resultsRequests: string[]
 /** Mark changes, as `PUT /api/library/hands/h1/mark`. */
 let markRequests: string[]
+/** Tag changes, as `PUT /api/library/tags/t1/hands {"handIds":["h1"]}`. */
+let tagRequests: string[]
+/** What the server answers a Tag change with, unless the test says otherwise. */
+let tagReply: () => Response
 
 beforeEach(() => {
   requests = []
   resultsRequests = []
   markRequests = []
+  tagRequests = []
+  tagReply = () => Response.json({})
   results = {
     hands: 3,
     currency: 'EUR',
@@ -60,13 +71,17 @@ beforeEach(() => {
     points: [{ hand: 3, bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } }],
   }
   pages = {
-    '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1'), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),
+    '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1', { tags: [{ id: 't1', name: 'All-in' }, { id: 't2', name: 'Multiway' }] }), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),
     '2': libraryPage({ total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { summary: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] }),
   }
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
+      if (url.startsWith('/api/library/tags')) {
+        tagRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
+        return tagReply()
+      }
       if (method !== 'GET') {
         markRequests.push(`${method} ${url}`)
         const handId = url.split('/').at(-2)!
@@ -325,6 +340,130 @@ describe('LibraryPage', () => {
 
       expect(markRequests.at(-1)).toBe('DELETE /api/library/hands/h1/mark')
       await waitFor(() => expect(mark.getAttribute('aria-pressed')).toBe('false'))
+    })
+  })
+
+  describe('Tags', () => {
+    it('shows each Hand’s Tags in its row, and each Tag’s count in the sidebar', async () => {
+      renderLibrary()
+
+      const table = await screen.findByRole('table', { name: 'All hands' })
+      expect(within(table).getByRole('columnheader', { name: 'Tags' })).toBeTruthy()
+      const [tagged, untagged] = within(table).getAllByRole('row').slice(1)
+      expect(within(tagged).getByText('All-in')).toBeTruthy()
+      expect(within(tagged).getByText('Multiway')).toBeTruthy()
+      expect(within(untagged).queryByText('Multiway')).toBeNull()
+      const tags = screen.getByRole('group', { name: 'Tags' })
+      expect(within(tags).getByRole('button', { name: /Multiway/ }).textContent).toContain('2')
+      expect(within(tags).getByRole('button', { name: /All-in/ }).textContent).toContain('1')
+    })
+
+    it('filters by any of the Tags chosen in the sidebar, list and graph alike', async () => {
+      renderLibrary()
+      const tags = await screen.findByRole('group', { name: 'Tags' })
+      const multiway = within(tags).getByRole('button', { name: /Multiway/ })
+
+      await userEvent.click(multiway)
+      await userEvent.click(within(tags).getByRole('button', { name: /All-in/ }))
+
+      expect(lastFilterQuery()).toBe('tag=t2&tag=t1')
+      expect(resultsRequests.at(-1)).toBe('/api/library/results?tag=t2&tag=t1')
+      expect(multiway.getAttribute('aria-pressed')).toBe('true')
+
+      await userEvent.click(multiway)
+
+      expect(lastFilterQuery()).toBe('tag=t1')
+      expect(multiway.getAttribute('aria-pressed')).toBe('false')
+      await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+      expect(lastFilterQuery()).toBe('')
+    })
+
+    it('creates a Tag, saying why when the server refuses it', async () => {
+      renderLibrary()
+      const tags = await screen.findByRole('group', { name: 'Tags' })
+      tagReply = () => Response.json({ reason: 'tag-name-taken' }, { status: 409 })
+
+      await userEvent.click(within(tags).getByRole('button', { name: 'New tag' }))
+      await userEvent.type(within(tags).getByRole('textbox', { name: 'Tag name' }), 'multiway{Enter}')
+
+      expect(tagRequests).toEqual(['POST /api/library/tags {"name":"multiway"}'])
+      expect(await within(tags).findByText('You already have a tag with that name.')).toBeTruthy()
+
+      tagReply = () => Response.json({ id: 't3', name: '3-bet pots', hands: 0 })
+      const reads = requests.length
+      const name = within(tags).getByRole('textbox', { name: 'Tag name' })
+      await userEvent.clear(name)
+      await userEvent.type(name, '3-bet pots{Enter}')
+
+      // Read again, so the new Tag is listed with the others.
+      await waitFor(() => expect(requests.length).toBeGreaterThan(reads))
+      expect(within(tags).queryByRole('textbox', { name: 'Tag name' })).toBeNull()
+    })
+
+    it('renames and deletes Tags while editing them', async () => {
+      renderLibrary()
+      const tags = await screen.findByRole('group', { name: 'Tags' })
+
+      await userEvent.click(within(tags).getByRole('button', { name: 'Edit tags' }))
+      const name = within(tags).getByRole('textbox', { name: 'Rename Multiway' })
+      await userEvent.clear(name)
+      await userEvent.type(name, 'Multiway pots{Enter}')
+
+      expect(tagRequests).toEqual(['PATCH /api/library/tags/t2 {"name":"Multiway pots"}'])
+
+      await userEvent.click(within(tags).getByRole('button', { name: 'Delete All-in' }))
+      // Deleting asks first: it takes the Tag off every Hand that carries it.
+      expect(tagRequests).toHaveLength(1)
+      await userEvent.click(within(tags).getByRole('button', { name: 'Delete All-in from 1 hand' }))
+
+      expect(tagRequests.at(-1)).toBe('DELETE /api/library/tags/t1')
+      await userEvent.click(within(tags).getByRole('button', { name: 'Done' }))
+      expect(within(tags).queryByRole('textbox')).toBeNull()
+    })
+
+    it('attaches and detaches Tags on the selected Hands', async () => {
+      pages['1'].hands[1] = { ...pages['1'].hands[1], tags: [{ id: 't2', name: 'Multiway' }] }
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select BTN vs BB, Hero' }))
+      expect(screen.getByRole('heading', { name: 'All hands' }).nextElementSibling?.textContent).toBe('3 hands · 2 selected')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Tag the selected hands' }))
+      const menu = screen.getByRole('group', { name: 'Tag the selected hands' })
+      const allIn = within(menu).getByRole('checkbox', { name: 'All-in' }) as HTMLInputElement
+      const multiway = within(menu).getByRole('checkbox', { name: 'Multiway' }) as HTMLInputElement
+      // Only one of them carries All-in; both carry Multiway.
+      expect(allIn.indeterminate).toBe(true)
+      expect(multiway.checked).toBe(true)
+
+      await userEvent.click(multiway)
+      await userEvent.click(allIn)
+
+      expect(tagRequests).toEqual([
+        'DELETE /api/library/tags/t2/hands {"handIds":["h1","h2"]}',
+        'PUT /api/library/tags/t1/hands {"handIds":["h1","h2"]}',
+      ])
+
+      tagReply = () => Response.json({ reason: 'tag-not-found' }, { status: 404 })
+      await userEvent.click(within(menu).getByRole('checkbox', { name: 'Multiway' }))
+
+      expect(await within(menu).findByText('That tag no longer exists.')).toBeTruthy()
+    })
+
+    it('selects every Hand of the page at once, and forgets the selection when the Hands change', async () => {
+      renderLibrary()
+      const all = await screen.findByRole('checkbox', { name: 'Select every hand on this page' })
+
+      await userEvent.click(all)
+
+      expect(screen.getByRole('checkbox', { name: 'Select BTN vs BB, Hero' })).toHaveProperty('checked', true)
+      expect(screen.getByRole('heading', { name: 'All hands' }).nextElementSibling?.textContent).toBe('3 hands · 2 selected')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+
+      await screen.findByText('Showing 3–3 of 3')
+      expect(screen.queryByRole('button', { name: 'Tag the selected hands' })).toBeNull()
+      expect(screen.getByRole('heading', { name: 'All hands' }).nextElementSibling?.textContent).toBe('3 hands')
     })
   })
 })

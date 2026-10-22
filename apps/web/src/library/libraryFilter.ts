@@ -21,6 +21,8 @@ export interface LibraryFilter {
   /** A Stake as `stakeKey` writes it. */
   stake: string | null
   markedOnly: boolean
+  /** Tag ids: a Hand carrying any of them is kept. */
+  tags: string[]
 }
 
 export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
@@ -30,6 +32,7 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   hero: null,
   stake: null,
   markedOnly: false,
+  tags: [],
 }
 
 export type QuickRange = 'last-7-days' | 'last-30-days' | 'this-year' | 'all-time'
@@ -63,7 +66,9 @@ export function periodOf(period: Pick<LibraryFilter, 'from' | 'to'>, now: Date =
 
 /** Whether any part of the filter narrows the Library. */
 export function isFiltering(filter: LibraryFilter): boolean {
-  return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) => filter[key] !== EMPTY_LIBRARY_FILTER[key])
+  return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) =>
+    key === 'tags' ? filter.tags.length > 0 : filter[key] !== EMPTY_LIBRARY_FILTER[key],
+  )
 }
 
 /** The filter as the server's query: the viewer's days become instants, `to` exclusive. */
@@ -75,6 +80,7 @@ export function libraryFilterQuery(filter: LibraryFilter): URLSearchParams {
   if (filter.hero) query.set('hero', filter.hero)
   if (filter.stake) query.set('stake', filter.stake)
   if (filter.markedOnly) query.set('marked', 'true')
+  for (const tag of filter.tags) query.append('tag', tag)
   return query
 }
 

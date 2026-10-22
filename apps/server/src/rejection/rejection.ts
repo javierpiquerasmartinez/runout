@@ -35,7 +35,11 @@ export type RejectionReason =
   | 'undo-expired'
   | 'invalid-note'
   | 'note-not-found'
-  | 'invalid-library-filter';
+  | 'invalid-library-filter'
+  | 'invalid-tag-name'
+  | 'tag-name-taken'
+  | 'tag-not-found'
+  | 'invalid-tag-hands';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

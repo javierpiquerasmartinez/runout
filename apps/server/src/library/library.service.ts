@@ -6,7 +6,13 @@ import {
   type Database,
   type Transaction,
 } from '../database/database.js';
-import { hands, libraryEntries, marks } from '../database/schema.js';
+import {
+  hands,
+  libraryEntries,
+  marks,
+  tagLinks,
+  tags,
+} from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
 import { keyOf, storedIds, storeHands } from '../hands/hand-store.js';
@@ -15,6 +21,7 @@ import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { boundedInt } from './query.js';
+import { TagsService, type Tag } from './tags.service.js';
 import {
   libraryFilterWhere,
   markedBy,
@@ -38,6 +45,8 @@ export interface LibraryHand {
   result: number;
   /** Whether this person has Marked it. Nobody else is ever told. */
   marked: boolean;
+  /** This person's Tags on it, sorted by name. Nobody else is ever told. */
+  tags: Pick<Tag, 'id' | 'name'>[];
   summary: HandSummary;
 }
 
@@ -48,8 +57,8 @@ export interface LibraryPage {
   page: number;
   pageSize: number;
   hands: LibraryHand[];
-  /** What the whole Library holds to filter by, whatever this filter. */
-  options: LibraryFilterOptions;
+  /** What the whole Library holds to filter by, whatever this filter, and the Account's Tags. */
+  options: LibraryFilterOptions & { tags: Tag[] };
   counts: LibraryCounts;
 }
 
@@ -78,6 +87,7 @@ export class LibraryService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly tagsService: TagsService,
   ) {}
 
   /**
@@ -144,7 +154,7 @@ export class LibraryService {
     const number = boundedInt(page, 1, 1, Number.MAX_SAFE_INTEGER);
     const kept = libraryFilterWhere(account.id, filter);
     const marked = markedBy(account.id);
-    const [[{ total }], rows, options, counts] = await Promise.all([
+    const [[{ total }], rows, options, ownTags, counts] = await Promise.all([
       this.db
         .select({ total: count() })
         .from(libraryEntries)
@@ -156,6 +166,7 @@ export class LibraryService {
           result: hands.heroResult,
           content: hands.content,
           marked: sql<boolean>`${marked}`,
+          tags: tagsOn(account.id),
         })
         .from(libraryEntries)
         .innerJoin(hands, eq(hands.id, libraryEntries.handId))
@@ -164,13 +175,14 @@ export class LibraryService {
         .limit(size)
         .offset((number - 1) * size),
       this.options(account),
+      this.tagsService.list(account),
       this.counts(account),
     ]);
     return {
       total,
       page: number,
       pageSize: size,
-      hands: rows.map(({ id, result, content, marked }) => ({
+      hands: rows.map(({ id, result, content, marked, tags: handTags }) => ({
         id,
         site: content.site,
         siteHandId: content.siteHandId,
@@ -180,9 +192,10 @@ export class LibraryService {
         stake: content.stake,
         result,
         marked,
+        tags: handTags,
         summary: summarise(content),
       })),
-      options,
+      options: { ...options, tags: ownTags },
       counts,
     };
   }
@@ -300,6 +313,19 @@ export class LibraryService {
       [...stored].filter(([, id]) => held.has(id)).map(([key]) => key),
     );
   }
+}
+
+/** The Tags `identityId` has put on the row's Hand, sorted by name ignoring case. */
+function tagsOn(identityId: string) {
+  return sql<Pick<Tag, 'id' | 'name'>[]>`(
+    select coalesce(
+      json_agg(json_build_object('id', ${tags.id}, 'name', ${tags.name})
+        order by lower(${tags.name}), ${tags.name}),
+      '[]'::json)
+    from ${tagLinks}
+    inner join ${tags} on ${tags.id} = ${tagLinks.tagId}
+    where ${tagLinks.identityId} = ${identityId} and ${tagLinks.handId} = ${hands.id}
+  )`;
 }
 
 function sortedUnique<T extends string>(values: T[]): T[] {
