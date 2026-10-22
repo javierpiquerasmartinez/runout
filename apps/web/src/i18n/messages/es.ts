@@ -446,6 +446,8 @@ export const es = {
   'import.file.reading': 'Leyendo…',
   'import.file.hands.one': '{count} mano',
   'import.file.hands.other': '{count} manos',
+  'import.file.fromLibrary.one': '{count} de tu biblioteca',
+  'import.file.fromLibrary.other': '{count} de tu biblioteca',
   'import.file.discarded.one': '{count} descartada',
   'import.file.discarded.other': '{count} descartadas',
   'import.file.undetected': 'Formato no reconocido · probados: {formats}',

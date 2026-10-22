@@ -38,6 +38,8 @@ export type HandPreview = Pick<QueueEntry, 'playedAt' | 'stake' | 'summary'> & {
   author?: QueueEntry['author']
   /** Into a Room only: false when nobody in the Room has the Hero among their Screen Names, so the Importer is the Author. */
   heroMatched?: boolean
+  /** Into a Room only: the Hand is in the Importer's Library, and confirming queues that Library Hand. */
+  inLibrary?: boolean
   board: string[]
 }
 

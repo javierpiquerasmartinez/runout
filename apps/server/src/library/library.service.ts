@@ -308,10 +308,10 @@ export class LibraryService {
   }
 
   /** The keys of the Hands among `read` this Library already has. */
-  private async inLibrary(
+  async inLibrary(
     account: Identity,
     read: Hand[],
-    db: Database | Transaction,
+    db: Database | Transaction = this.db,
   ): Promise<Set<string>> {
     const stored = await storedIds(db, read);
     if (stored.size === 0) return new Set();
