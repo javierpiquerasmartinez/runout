@@ -63,7 +63,7 @@ The Participant who brought a Hand into Runout. Recorded for audit only; carries
 _Avoid_: Author
 
 **Note**:
-A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room only the Master edits or deletes it; outside a Room, anyone who has the Hand in their Library can.
+A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room any Participant writes one, but only the Master edits or deletes it; outside a Room, anyone who has the Hand in their Library can write, edit or delete.
 _Avoid_: Comment, annotation
 
 **Tag**:
