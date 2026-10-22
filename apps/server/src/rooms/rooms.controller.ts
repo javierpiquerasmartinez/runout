@@ -119,4 +119,28 @@ export class RoomsController {
     if (entries.length > 0) await this.gateway.entriesAdded(room.id, entries);
     return { imported: entries.length, discarded };
   }
+
+  /**
+   * Adds Hands of the sender's own Library to the end of the Room's Queue,
+   * as themselves, all of them or none. Only an Account has a Library:
+   * `account-required` otherwise. The new Queue Entries reach every
+   * Participant over the WebSocket.
+   */
+  @Post(':code/library-hands')
+  async addFromLibrary(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('code') code: string,
+    @Body() body: { handIds?: unknown } = {},
+  ): Promise<{ added: number }> {
+    const sender = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    const { room, entries } = await this.queue.addFromLibrary(
+      sender,
+      code,
+      body.handIds,
+    );
+    if (entries.length > 0) await this.gateway.entriesAdded(room.id, entries);
+    return { added: entries.length };
+  }
 }

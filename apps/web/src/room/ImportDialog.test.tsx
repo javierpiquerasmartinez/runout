@@ -5,6 +5,7 @@ import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { ImportDialog } from './ImportDialog'
 import type { ImportDestination, ImportPreview } from './importBatch'
+import type { Identity } from '../identity/identity'
 import { fakeSession } from '../test/fakeSession'
 
 const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
@@ -75,10 +76,13 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderDialog(destination: ImportDestination = { kind: 'room', code: 'ABCD2345', name: 'Martes NL10' }) {
+function renderDialog(
+  destination: ImportDestination = { kind: 'room', code: 'ABCD2345', name: 'Martes NL10' },
+  identity: Partial<Identity> = {},
+) {
   const onClose = vi.fn()
   const onImported = vi.fn()
-  const session = fakeSession({ screenNames: ['Javier_PS'] })
+  const session = fakeSession({ screenNames: ['Javier_PS'], ...identity })
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -190,6 +194,33 @@ describe('ImportDialog', () => {
 
     expect(await screen.findByText('The file is over 20 MB.')).toBeTruthy()
     expect(requests).toEqual([])
+  })
+
+  describe('from the Library', () => {
+    afterEach(() => {
+      window.history.pushState(null, '', '/')
+    })
+
+    it('sends an Account to pick Hands of their Library for the Room', async () => {
+      renderDialog()
+
+      await userEvent.click(screen.getByRole('tab', { name: 'From my library' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Choose from my library' }))
+
+      expect(window.location.pathname).toBe('/room/ABCD2345/library')
+    })
+
+    it('offers nothing of the kind to an anonymous Participant, who has no Library', () => {
+      renderDialog(undefined, { account: null, room: { code: 'ABCD2345' } })
+
+      expect(screen.queryByRole('tab', { name: 'From my library' })).toBeNull()
+    })
+
+    it('offers nothing of the kind when importing into the Library itself', () => {
+      renderDialog({ kind: 'library' })
+
+      expect(screen.queryByRole('tab', { name: 'From my library' })).toBeNull()
+    })
   })
 
   describe('into the Library', () => {

@@ -267,3 +267,18 @@ describe('RoomPresence Screen Names', () => {
     expect(presence.setScreenNames('nobody', ['X'])).toEqual([]);
   });
 });
+
+describe('RoomPresence.roomsOf', () => {
+  it('lists the Rooms the person is present in, and none they have left', () => {
+    const presence = new RoomPresence<string>();
+    presence.enter(room, javier.identityId, javier, 'javier-tab', start);
+    presence.enter('room-2', javier.identityId, javier, 'javier-2', start);
+    presence.enter('room-3', marta.identityId, javier, 'javier-3', start);
+    presence.enter('room-3', marta.identityId, marta, 'marta-tab', start);
+
+    presence.exit('javier-3');
+
+    expect(presence.roomsOf(javier.identityId)).toEqual([room, 'room-2']);
+    expect(presence.roomsOf('id-nobody')).toEqual([]);
+  });
+});

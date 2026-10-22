@@ -1570,6 +1570,17 @@
   color: var(--text-secondary);
 }
 
+/* The Hand is in the viewer's Library: it outlives the Room. */
+.queue-entry__chip--in-library {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
 /* The way out of the Room. A Master is asked to choose first. */
 .room-header__leave {
   flex-shrink: 0;

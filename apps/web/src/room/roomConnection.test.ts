@@ -17,6 +17,7 @@ const room: RoomSnapshot = {
   playback: null,
   notes: [],
   marks: [],
+  inLibrary: [],
   revision: 7,
   presence: [],
 }

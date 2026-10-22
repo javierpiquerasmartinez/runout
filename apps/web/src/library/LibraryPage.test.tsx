@@ -61,6 +61,10 @@ let tagReply: () => Response
 let removeRequests: string[]
 /** What the server answers a removal with, unless the test says otherwise. */
 let removeReply: () => Response
+/** Hands added to a Room, as `POST /api/rooms/RNT4K9PX/library-hands {"handIds":["h1"]}`. */
+let addRequests: string[]
+/** What the server answers adding to a Room with, unless the test says otherwise. */
+let addReply: () => Response
 
 beforeEach(() => {
   requests = []
@@ -70,6 +74,8 @@ beforeEach(() => {
   tagReply = () => Response.json({})
   removeRequests = []
   removeReply = () => Response.json({})
+  addRequests = []
+  addReply = () => Response.json({ added: 2 }, { status: 201 })
   results = {
     hands: 3,
     currency: 'EUR',
@@ -87,6 +93,10 @@ beforeEach(() => {
       if (url.startsWith('/api/library/tags')) {
         tagRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
         return tagReply()
+      }
+      if (url.startsWith('/api/rooms/')) {
+        addRequests.push(`${method} ${url} ${String(init?.body)}`)
+        return addReply()
       }
       if (method === 'DELETE' && url === '/api/library/hands') {
         removeRequests.push(`${method} ${url} ${String(init?.body)}`)
@@ -125,12 +135,12 @@ afterEach(() => {
   window.history.pushState(null, '', '/')
 })
 
-function renderLibrary(preferences: Preferences = DEFAULT_PREFERENCES) {
+function renderLibrary(preferences: Preferences = DEFAULT_PREFERENCES, room?: { code: string; name: string }) {
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={fakeSession()}>
         <PreferencesContext.Provider value={preferences}>
-          <LibraryPage />
+          <LibraryPage room={room} />
         </PreferencesContext.Provider>
       </SessionContext.Provider>
     </I18nProvider>,
@@ -564,6 +574,47 @@ describe('LibraryPage', () => {
       // Read again, in case a selected Hand already left the Library elsewhere.
       await waitFor(() => expect(requests.length).toBe(reads + 1))
       expect(screen.getByRole('checkbox', { name: 'Select BTN vs BB, Hero' })).toHaveProperty('checked', true)
+    })
+  })
+
+  describe('picking Hands for a Room', () => {
+    const room = { code: 'RNT4K9PX', name: 'Martes NL50' }
+
+    it('leads back to the Room it was opened from', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room)
+
+      const back = await screen.findByRole('link', { name: 'Back to Martes NL50' })
+      expect(back.getAttribute('href')).toBe('/room/RNT4K9PX')
+    })
+
+    it('adds the selected Hands to the Room\u2019s Queue, then goes back to the Room', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room)
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select BTN vs BB, Hero' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Add 2 to the room' }))
+
+      expect(addRequests).toEqual(['POST /api/rooms/RNT4K9PX/library-hands {"handIds":["h1","h2"]}'])
+      await waitFor(() => expect(window.location.pathname).toBe('/room/RNT4K9PX'))
+    })
+
+    it('says why when the server refuses, staying in the Library', async () => {
+      addReply = () => Response.json({ reason: 'hand-not-found' }, { status: 404 })
+      renderLibrary(DEFAULT_PREFERENCES, room)
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Add 1 to the room' }))
+
+      expect(await screen.findByRole('alert')).toBeTruthy()
+      expect(window.location.pathname).toBe('/')
+    })
+
+    it('offers no Room to add to when opened on its own', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+
+      expect(screen.queryByRole('button', { name: /to the room/ })).toBeNull()
+      expect(screen.queryByRole('link', { name: /Back to/ })).toBeNull()
     })
   })
 })

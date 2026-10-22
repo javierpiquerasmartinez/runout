@@ -204,6 +204,13 @@ export class RoomPresence<Connection> {
     return renamed;
   }
 
+  /** The Rooms the Participant is present in right now. */
+  roomsOf(identityId: string): string[] {
+    return [...this.rooms]
+      .filter(([, room]) => room.present.has(identityId))
+      .map(([roomId]) => roomId);
+  }
+
   /** Whether anyone at all is connected to the Room right now. */
   isLive(roomId: string): boolean {
     return (this.rooms.get(roomId)?.present.size ?? 0) > 0;

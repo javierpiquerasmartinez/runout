@@ -123,12 +123,16 @@ export class LibraryService {
 
   /**
    * Adds the Hands to the Library inside the caller's transaction, storing
-   * those nobody has imported before. Returns how many were added: one
-   * added since it was previewed is skipped.
+   * those nobody has imported before. Returns the ids of the Hands added:
+   * one added since it was previewed is skipped.
    */
-  async add(tx: Transaction, account: Identity, read: Hand[]): Promise<number> {
+  async add(
+    tx: Transaction,
+    account: Identity,
+    read: Hand[],
+  ): Promise<string[]> {
     const { kept } = await this.planImport(account, read, [], tx);
-    if (kept.length === 0) return 0;
+    if (kept.length === 0) return [];
     const now = this.clock.now();
     const handIds = await storeHands(tx, account.id, kept, now);
     const added = await tx
@@ -142,7 +146,7 @@ export class LibraryService {
       )
       .onConflictDoNothing()
       .returning({ handId: libraryEntries.handId });
-    return added.length;
+    return added.map((row) => row.handId);
   }
 
   /**

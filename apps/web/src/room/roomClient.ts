@@ -114,6 +114,8 @@ export interface RoomSnapshot {
   notes: Note[]
   /** The Hands in the Queue this person has Marked. Nobody else is told. */
   marks: string[]
+  /** The Hands in the Queue that are in this person's Library. Nobody else is told. */
+  inLibrary: string[]
   /** The revision this snapshot is at; every later change carries a higher one. */
   revision: number
   presence: ParticipantPresence[]
@@ -179,6 +181,8 @@ export type RoomEvent =
    * what the Room shares and carries no revision of its own.
    */
   | { type: 'markChanged'; handId: string; marked: boolean }
+  /** Queue Hands coming into this person's Library or leaving it: theirs alone too, without a revision. */
+  | { type: 'inLibraryChanged'; handIds: string[]; inLibrary: boolean }
   | { type: 'latency'; latencyMs: number }
   /** The socket is open again; the Room as it stands is on its way. */
   | { type: 'connecting' }
@@ -206,6 +210,8 @@ export type RoomView =
       notes: Note[]
       /** The Hands this person has Marked. Private: nobody else's are ever here. */
       marks: string[]
+      /** The Queue's Hands that are in this person's Library: what they will keep once the Room closes. */
+      inLibrary: string[]
       /** The revision of the last change applied: where this view stands. */
       revision: number
       presence: ParticipantPresence[]
@@ -222,7 +228,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
       // Whatever was held is dropped: this is the Room as it stands.
-      const { room, you, participants, queue, playback, notes, marks, revision, presence } = event.snapshot
+      const { room, you, participants, queue, playback, notes, marks, inLibrary, revision, presence } = event.snapshot
       const held = view.phase === 'in-room' ? view : null
       const seenRevision = Math.max(held?.sync.seenRevision ?? 0, revision)
       // Changes can go past while a snapshot is being drawn. One that lands
@@ -238,6 +244,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         playback,
         notes,
         marks,
+        inLibrary,
         revision,
         presence,
         sync: {
@@ -259,6 +266,13 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
       if (view.phase !== 'in-room') return view
       const marks = view.marks.filter((handId) => handId !== event.handId)
       return { ...view, marks: event.marked ? [...marks, event.handId] : marks }
+    }
+    case 'inLibraryChanged': {
+      if (view.phase !== 'in-room') return view
+      const inLibrary = event.inLibrary
+        ? [...view.inLibrary, ...event.handIds.filter((handId) => !view.inLibrary.includes(handId))]
+        : view.inLibrary.filter((handId) => !event.handIds.includes(handId))
+      return { ...view, inLibrary }
     }
     case 'latency':
       if (view.phase !== 'in-room') return view
@@ -444,6 +458,12 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       return { type: 'presence', participants: data.participants as ParticipantPresence[] }
     case 'hand.markChanged':
       return { type: 'markChanged', handId: String(data.handId), marked: data.marked === true }
+    case 'queue.inLibrary':
+      return {
+        type: 'inLibraryChanged',
+        handIds: Array.isArray(data.handIds) ? data.handIds.map(String) : [],
+        inLibrary: data.inLibrary === true,
+      }
     case 'rejected':
       return { type: 'rejected', command: String(data.command), reason: data.reason as RejectionReason }
     default: {

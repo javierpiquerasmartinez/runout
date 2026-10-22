@@ -110,6 +110,7 @@ export class ImportsController {
     );
   }
 
+  /** A Room the Importer is in that reviews any of the added Hands tells them it is theirs now. */
   @Post('library/imports')
   async confirmForLibrary(
     @Headers('authorization') authorization: string | undefined,
@@ -118,8 +119,13 @@ export class ImportsController {
     const importer = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
-    return {
-      imported: await this.imports.confirmIntoLibrary(importer, body.previews),
-    };
+    const added = await this.imports.confirmIntoLibrary(
+      importer,
+      body.previews,
+    );
+    if (added.length > 0) {
+      await this.gateway.libraryChanged(importer.id, added, true);
+    }
+    return { imported: added.length };
   }
 }

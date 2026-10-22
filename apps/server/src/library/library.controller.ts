@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
+import { RoomGateway } from '../rooms/room.gateway.js';
 import { parseLibraryFilter } from './library-filter.js';
 import {
   LibraryService,
@@ -26,6 +27,7 @@ export class LibraryController {
     private readonly identities: IdentityService,
     private readonly library: LibraryService,
     private readonly results: ResultsService,
+    private readonly gateway: RoomGateway,
   ) {}
 
   /**
@@ -73,7 +75,8 @@ export class LibraryController {
   /**
    * Takes the `handIds` out of the Account's Library, all of them or none.
    * Only this Library's references go: the Hands stay in other Libraries
-   * and in any Queue they are in.
+   * and in any Queue they are in, where the Account alone hears they are no
+   * longer in its Library.
    */
   @Delete('hands')
   async remove(
@@ -83,7 +86,9 @@ export class LibraryController {
     const account = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
-    return this.library.remove(account, body.handIds);
+    const removal = await this.library.remove(account, body.handIds);
+    await this.gateway.libraryChanged(account.id, removal.handIds, false);
+    return removal;
   }
 
   /** Marks a Hand of the Account's Library. Marking it again changes nothing. */

@@ -3,6 +3,8 @@ import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
+import { roomLibraryPath } from '../library/library'
+import { navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Icon, type IconName } from '../ui/Icon'
@@ -27,7 +29,7 @@ import { usePreferences } from '../preferences/context'
 import { Secondary } from '../ui/Secondary'
 import './ImportDialog.css'
 
-type Tab = 'files' | 'paste'
+type Tab = 'files' | 'paste' | 'library'
 
 /** What one item is read from: an uploaded file, or pasted text. */
 type Source = File | string
@@ -37,10 +39,11 @@ type Source = File | string
  * Tracker exports or pastes text, reviews what each file gave and what was
  * discarded, and confirms. The server reads each item into a preview; only
  * confirming puts Hands in the destination, a Room's Queue or the Importer's
- * Library. There is no Author picker (Authors come from Screen Names) and no
- * Library tab; into a Room, the "detected Hero" block offers to add a Hero
- * nobody is recognised as to the Importer's Screen Names instead of changing
- * it. A Library has no Authors, so it has neither.
+ * Library. There is no Author picker (Authors come from Screen Names); into
+ * a Room, the "detected Hero" block offers to add a Hero nobody is recognised
+ * as to the Importer's Screen Names instead of changing it, and an Account's
+ * "Desde mi biblioteca" tab sends them to pick Hands in their Library, where
+ * its filters are. A Library has no Authors, so it has neither.
  */
 export function ImportDialog({
   destination,
@@ -54,7 +57,7 @@ export function ImportDialog({
 }) {
   const i18n = useI18n()
   const { t } = i18n
-  const { token } = useIdentity()
+  const { token, identity } = useIdentity()
   const dialog = useRef<HTMLDialogElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const sources = useRef(new Map<string, Source>())
@@ -70,6 +73,8 @@ export function ImportDialog({
   const hands = batchHands(batch)
   const showingDiscarded = batch.items.find((item) => item.key === discardedOf && item.state === 'read')
   const destinationKind = destination.kind
+  // Only an Account has a Library to bring Hands from (ADR 0005).
+  const tabs: Tab[] = destination.kind === 'room' && identity.account ? ['files', 'paste', 'library'] : ['files', 'paste']
 
   useEffect(() => {
     const element = dialog.current
@@ -186,7 +191,7 @@ export function ImportDialog({
       </header>
 
       <div className="import-dialog__tabs" role="tablist">
-        {(['files', 'paste'] as const).map((name) => (
+        {tabs.map((name) => (
           <button
             key={name}
             type="button"
@@ -205,7 +210,15 @@ export function ImportDialog({
       <div className="import-dialog__body">
         <div className="import-dialog__main">
           <div id="import-tabpanel" role="tabpanel" aria-labelledby={`import-tab-${tab}`}>
-            {tab === 'files' ? (
+            {tab === 'library' && destination.kind === 'room' ? (
+              <div className="import-from-library">
+                <Icon name="library" size={30} className="import-from-library__icon" />
+                <p className="import-from-library__body">{t('import.fromLibrary.body')}</p>
+                <Button variant="secondary" size="compact" onClick={() => navigate(roomLibraryPath(destination.code))}>
+                  {t('import.fromLibrary.open')}
+                </Button>
+              </div>
+            ) : tab === 'files' ? (
               <div
                 className="import-drop"
                 data-dragging={dragging || undefined}
@@ -244,13 +257,15 @@ export function ImportDialog({
             )}
           </div>
 
-          <ul className="import-formats" aria-label={t('import.formats.label')}>
-            {SOURCE_FORMATS.map((format) => (
-              <li key={format} className="import-formats__chip ro-mono">
-                {t(`import.format.${format}`)}
-              </li>
-            ))}
-          </ul>
+          {tab !== 'library' && (
+            <ul className="import-formats" aria-label={t('import.formats.label')}>
+              {SOURCE_FORMATS.map((format) => (
+                <li key={format} className="import-formats__chip ro-mono">
+                  {t(`import.format.${format}`)}
+                </li>
+              ))}
+            </ul>
+          )}
 
           {batch.items.length > 0 && (
             <section className="import-files" aria-labelledby="import-files-title">
