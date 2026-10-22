@@ -32,6 +32,8 @@ export type RejectionReason =
   | 'entry-not-in-queue'
   | 'nothing-to-undo'
   | 'undo-expired'
+  | 'invalid-note'
+  | 'note-not-found'
   | 'invalid-library-filter'
   | 'invalid-tag-name'
   | 'tag-name-taken'

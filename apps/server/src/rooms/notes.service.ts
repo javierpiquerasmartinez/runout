@@ -2,9 +2,15 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import { identities, notes, queueEntries } from '../database/schema.js';
+import {
+  identities,
+  libraryEntries,
+  notes,
+  queueEntries,
+} from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
+import { requireInLibrary } from '../library/library-hand.js';
 import { Rejected } from '../rejection/rejection.js';
 import { requireQueued } from './queued-hand.js';
 import { RoomsService } from './rooms.service.js';
@@ -23,15 +29,16 @@ export interface Note {
   body: string;
   /** When it was written, as an ISO instant. */
   writtenAt: string;
-  /** When a Master last rewrote it; null while it stands as written. */
+  /** When it was last rewritten; null while it stands as written. */
   editedAt: string | null;
 }
 
 /**
- * The conclusions written on Hands. Any Participant writes one; only the
- * Master of a Room the Hand is in rewrites or removes it, and a removal can
- * be undone for as long as the undo window lasts. Notes outlive the Room they
- * were written in, and outside one they are only ever read.
+ * The conclusions written on Hands. In a Room, any Participant writes one and
+ * only its Master rewrites or removes one. Outside a Room, whoever has the
+ * Hand in their Library writes, rewrites and removes any of its Notes. Either
+ * way a removal can be undone for as long as the undo window lasts, and Notes
+ * outlive the Room they were written in.
  */
 @Injectable()
 export class NotesService {
@@ -153,6 +160,100 @@ export class NotesService {
       .set({ removedAt: null })
       .where(eq(notes.id, noteId));
     return this.byId(noteId);
+  }
+
+  /** Outside a Room, whoever has the Hand in their Library writes a Note on it. */
+  async writeFromLibrary(
+    account: Identity,
+    handId: string,
+    body: unknown,
+  ): Promise<Note> {
+    const held = await requireInLibrary(this.db, account, handId);
+    const [written] = await this.db
+      .insert(notes)
+      .values({
+        handId: held,
+        writerId: account.id,
+        body: validBody(body),
+        writtenAt: this.clock.now(),
+      })
+      .returning({ id: notes.id });
+    return this.byId(written.id);
+  }
+
+  /** Outside a Room, whoever has the Hand in their Library rewrites any of its Notes. */
+  async editFromLibrary(
+    account: Identity,
+    noteId: string,
+    body: unknown,
+  ): Promise<Note> {
+    const { id } = await this.noteInLibrary(account, noteId, false);
+    await this.db
+      .update(notes)
+      .set({ body: validBody(body), editedAt: this.clock.now() })
+      .where(eq(notes.id, id));
+    return this.byId(id);
+  }
+
+  /**
+   * Outside a Room, whoever has the Hand in their Library removes any of its
+   * Notes, soft, as the Master does in a Room.
+   */
+  async removeFromLibrary(
+    account: Identity,
+    noteId: string,
+  ): Promise<{ id: string; handId: string }> {
+    const { id, handId } = await this.noteInLibrary(account, noteId, false);
+    await this.db
+      .update(notes)
+      .set({ removedAt: this.clock.now() })
+      .where(eq(notes.id, id));
+    return { id, handId };
+  }
+
+  /** Whoever has the Hand in their Library undoes a removal within its window. */
+  async undoRemovalFromLibrary(
+    account: Identity,
+    noteId: string,
+  ): Promise<Note> {
+    const { id, removedAt } = await this.noteInLibrary(account, noteId, true);
+    requireUndoable(this.clock, removedAt);
+    await this.db
+      .update(notes)
+      .set({ removedAt: null })
+      .where(eq(notes.id, id));
+    return this.byId(id);
+  }
+
+  /**
+   * A Note on a Hand of this Library: a standing one, or with `removed`, one
+   * whose removal may be undone. Anything else is `note-not-found`, or
+   * `nothing-to-undo` when undoing, as if it didn't exist.
+   */
+  private async noteInLibrary(
+    account: Identity,
+    noteId: string,
+    removed: boolean,
+  ): Promise<{ id: string; handId: string; removedAt: Date | null }> {
+    const missing = removed ? 'nothing-to-undo' : 'note-not-found';
+    if (!isUuid(noteId)) throw new Rejected(missing);
+    const [row] = await this.db
+      .select({
+        id: notes.id,
+        handId: notes.handId,
+        removedAt: notes.removedAt,
+      })
+      .from(notes)
+      .innerJoin(
+        libraryEntries,
+        and(
+          eq(libraryEntries.handId, notes.handId),
+          eq(libraryEntries.identityId, account.id),
+        ),
+      )
+      .where(eq(notes.id, noteId));
+    if (!row || (!removed && row.removedAt)) throw new Rejected(missing);
+    return row;
   }
 
   /**

@@ -56,6 +56,13 @@ export interface RoomSnapshot {
   presence: ParticipantPresence[];
 }
 
+/** A change to a Hand's Notes, as a Room hears of it. */
+export type NoteChange =
+  | { event: 'notes.written'; data: { note: Note } }
+  | { event: 'notes.edited'; data: { note: Note } }
+  | { event: 'notes.removed'; data: { id: string } }
+  | { event: 'notes.restored'; data: { note: Note } };
+
 export interface HeartbeatCommand {
   /** The client's own clock when it sent this, echoed back so it can time the round trip. */
   sentAt: number;
@@ -813,6 +820,16 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       entries.map((entry) => entry.handId),
     );
     this.publish(roomId, 'queue.entriesAdded', { entries, notes });
+  }
+
+  /**
+   * Tells every open Room reviewing the Hand about a change to its Notes made
+   * from a Library, as if it had been made there.
+   */
+  async handNotesChanged(handId: string, change: NoteChange): Promise<void> {
+    for (const roomId of await this.queue.openRoomsQueueing(handId)) {
+      this.publish(roomId, change.event, change.data);
+    }
   }
 
   /**

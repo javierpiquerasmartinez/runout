@@ -13,13 +13,12 @@ import {
   tagLinks,
   tags,
 } from '../database/schema.js';
-import { isUuid } from '../database/uuid.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
 import { keyOf, storedIds, storeHands } from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
-import { Rejected } from '../rejection/rejection.js';
+import { requireInLibrary } from './library-hand.js';
 import { boundedInt } from './query.js';
 import { TagsService, type Tag } from './tags.service.js';
 import {
@@ -209,9 +208,7 @@ export class LibraryService {
     handId: string,
     marked: boolean,
   ): Promise<MarkChange> {
-    if (!isUuid(handId) || !(await this.holds(account, handId))) {
-      throw new Rejected('hand-not-found');
-    }
+    await requireInLibrary(this.db, account, handId);
     if (marked) {
       await this.db
         .insert(marks)
@@ -275,20 +272,6 @@ export class LibraryService {
       .innerJoin(hands, eq(hands.id, libraryEntries.handId))
       .where(eq(libraryEntries.identityId, account.id));
     return row;
-  }
-
-  /** Whether the Hand is in this Library. */
-  private async holds(account: Identity, handId: string): Promise<boolean> {
-    const [row] = await this.db
-      .select({ handId: libraryEntries.handId })
-      .from(libraryEntries)
-      .where(
-        and(
-          eq(libraryEntries.identityId, account.id),
-          eq(libraryEntries.handId, handId),
-        ),
-      );
-    return row !== undefined;
   }
 
   /** The keys of the Hands among `read` this Library already has. */

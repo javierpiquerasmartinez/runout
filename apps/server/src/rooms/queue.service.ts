@@ -358,6 +358,21 @@ export class QueueService {
     return rows.map(toQueueEntry);
   }
 
+  /** The open Rooms whose Queue holds the Hand right now. */
+  async openRoomsQueueing(handId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ roomId: queueEntries.roomId })
+      .from(queueEntries)
+      .innerJoin(
+        rooms,
+        and(eq(rooms.id, queueEntries.roomId), eq(rooms.status, 'open')),
+      )
+      .where(
+        and(eq(queueEntries.handId, handId), isNull(queueEntries.removedAt)),
+      );
+    return rows.map((row) => row.roomId);
+  }
+
   /** One Queue Entry by id, regardless of whether it's removed. */
   private async entryById(
     db: Database | Transaction,
