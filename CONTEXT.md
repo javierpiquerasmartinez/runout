@@ -88,7 +88,7 @@ What the Hero won or lost in a Hand, after rake.
 _Avoid_: Profit, winnings, net
 
 **All-in EV**:
-The Hero's Result with luck taken out: when the Hero is all-in before the river and the opponents' cards are shown, their share of each pot by equity instead of what they actually won. Otherwise it equals the Result.
+The Hero's Result with luck taken out: when an all-in leaves no betting before the river with the Hero still in (all-in themselves, or covering whoever is) and every opponent still in has shown their cards, their share of each pot by equity instead of what they actually won. Otherwise it equals the Result.
 _Avoid_: EV (alone), expected value, adjusted
 
 **Showdown Result**:
