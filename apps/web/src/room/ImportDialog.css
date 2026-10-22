@@ -335,6 +335,15 @@
   font-weight: 600;
   color: var(--brass-ink);
 }
+/* Confirming queues the Importer's own Library Hand, Notes and all. */
+.import-preview__in-library {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
 .import-preview__next {
   margin-top: auto;
 }

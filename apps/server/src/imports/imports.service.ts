@@ -14,6 +14,7 @@ import {
   type SourceFormat,
   type Stake,
 } from '../hands/hand.js';
+import { keyOf } from '../hands/hand-store.js';
 import {
   importHandHistory,
   SOURCE_FORMATS,
@@ -44,6 +45,8 @@ export interface HandPreview extends Partial<Attribution> {
   stake: Stake;
   board: string[];
   summary: HandSummary;
+  /** Into a Room only: whether the Hand is in the Importer's Library, so confirming queues that Library Hand. */
+  inLibrary?: boolean;
 }
 
 /** What was read from one file or paste, before it is confirmed. */
@@ -115,9 +118,11 @@ export class ImportsService {
         result.texts,
       );
       kept = plan.queued.map(({ hand }) => hand);
-      previews = plan.queued.map(({ hand, author, heroMatched }) =>
-        handPreview(hand, { author, heroMatched }),
-      );
+      const inLibrary = await this.library.inLibrary(importer, kept);
+      previews = plan.queued.map(({ hand, author, heroMatched }) => ({
+        ...handPreview(hand, { author, heroMatched }),
+        inLibrary: inLibrary.has(keyOf(hand)),
+      }));
       duplicates = plan.duplicates;
     }
 

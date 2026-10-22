@@ -48,6 +48,13 @@ const previews: Record<string, ImportPreview> = {
     hands: [{ ...hand([], 'iMapleAA'), author: undefined, heroMatched: undefined }],
     discarded: [{ text: 'a hand already kept', reason: 'duplicate' }],
   },
+  'kept.txt': {
+    id: 'p-kept',
+    format: 'pokerstars',
+    tried: ['pokerstars'],
+    hands: [{ ...hand([]), inLibrary: true }, { ...hand([]), inLibrary: false }],
+    discarded: [],
+  },
   'forum.txt': { id: 'p-forum', format: null, tried: ['pokerstars'], hands: [], discarded: [] },
 }
 
@@ -146,6 +153,21 @@ describe('ImportDialog', () => {
     const preview = await screen.findByRole('region', { name: 'Preview · hand 1 of 2' })
     expect(within(preview).getByText('Marta88')).toBeTruthy()
     expect(within(preview).getByText('Marta')).toBeTruthy()
+  })
+
+  it('tells which Hands are already in the Importer’s Library, as confirming queues those', async () => {
+    renderDialog()
+
+    await choose('kept.txt')
+
+    expect(await screen.findByText('PokerStars · 2 hands · 1 from your library')).toBeTruthy()
+    const preview = screen.getByRole('region', { name: 'Preview · hand 1 of 2' })
+    expect(within(preview).getByText('In your library')).toBeTruthy()
+
+    await userEvent.click(within(preview).getByRole('button', { name: 'Step through the 2 hands' }))
+
+    const next = screen.getByRole('region', { name: 'Preview · hand 2 of 2' })
+    expect(within(next).queryByText('In your library')).toBeNull()
   })
 
   it('offers to add a Hero nobody is recognised as to the Importer’s Screen Names', async () => {

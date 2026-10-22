@@ -14,6 +14,7 @@ interface Preview {
     heroNamed: boolean;
     author: { identityId: string; displayName: string };
     heroMatched: boolean;
+    inLibrary: boolean;
     playedAt: string;
     stake: { bigBlind: number; currency: string };
     board: string[];
@@ -139,6 +140,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
         heroNamed: true,
         author: { identityId: guest.id, displayName: 'Marta' },
         heroMatched: false,
+        inLibrary: false,
         playedAt: '2026-09-18T12:34:30.000Z',
         stake: {
           limit: 'no-limit',

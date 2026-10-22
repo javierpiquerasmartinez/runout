@@ -447,6 +447,8 @@ export const en: Messages = {
   'import.file.reading': 'Reading…',
   'import.file.hands.one': '{count} hand',
   'import.file.hands.other': '{count} hands',
+  'import.file.fromLibrary.one': '{count} from your library',
+  'import.file.fromLibrary.other': '{count} from your library',
   'import.file.discarded.one': '{count} discarded',
   'import.file.discarded.other': '{count} discarded',
   'import.file.undetected': 'Format not recognised · tried: {formats}',

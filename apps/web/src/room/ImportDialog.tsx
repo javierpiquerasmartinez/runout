@@ -409,7 +409,7 @@ function rowStatus(item: ImportItem): RowStatus {
   return item.preview.discarded.length > 0 || item.preview.hands.length === 0 ? 'warning' : 'ok'
 }
 
-/** "PokerStars · 42 manos · 1 ya en la cola · 3 descartadas", or why it gave nothing. */
+/** "PokerStars · 42 manos · 2 de tu biblioteca · 1 ya en la cola · 3 descartadas", or why it gave nothing. */
 function fileMeta(item: ImportItem, destinationKind: ImportDestination['kind'], { t }: Translator): string {
   if (item.state === 'reading') return t('import.file.reading')
   if (item.state === 'failed') return t(`reason.${item.reason}`)
@@ -424,6 +424,10 @@ function fileMeta(item: ImportItem, destinationKind: ImportDestination['kind'], 
     t(`import.format.${format}`),
     t(hands.length === 1 ? 'import.file.hands.one' : 'import.file.hands.other', { count: hands.length }),
   ]
+  const fromLibrary = hands.filter((hand) => hand.inLibrary).length
+  if (fromLibrary > 0) {
+    parts.push(t(fromLibrary === 1 ? 'import.file.fromLibrary.one' : 'import.file.fromLibrary.other', { count: fromLibrary }))
+  }
   if (duplicates > 0) {
     parts.push(
       t(duplicates === 1 ? `import.${destinationKind}.duplicates.one` : `import.${destinationKind}.duplicates.other`, { count: duplicates }),
@@ -501,6 +505,12 @@ function HandPreviewPanel({
           </div>
         )}
       </dl>
+      {hand.inLibrary && (
+        <p className="import-preview__in-library">
+          <Icon name="library" size={12} />
+          {t('room.queue.inLibrary')}
+        </p>
+      )}
       {hands.length > 1 && (
         <Button variant="secondary" size="compact" className="import-preview__next" onClick={onNext}>
           {t('import.preview.next', { count: hands.length })}

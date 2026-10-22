@@ -285,6 +285,106 @@ describe('Library Hands in a Room (e2e)', () => {
     ]);
   });
 
+  describe('importing into a Room a Hand already in the Importer’s Library', () => {
+    function previewIntoRoom(token: string, code: string, text: string) {
+      return request(running.httpServer)
+        .post(`/api/rooms/${code}/imports/previews`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ text })
+        .expect(201);
+    }
+
+    it('marks, in the preview, the Hands already in the Importer’s Library', async () => {
+      const { marta, code } = await roomOfTwo();
+      const text = freshHandHistory('pokerstars-session.txt');
+      const [first, second] = text.split(/\n\s*\n/);
+      await importIntoLibrary(marta.token, first);
+
+      const preview = await previewIntoRoom(
+        marta.token,
+        code,
+        `${first}\n\n${second}`,
+      );
+
+      expect(
+        (preview.body.hands as { inLibrary: boolean }[]).map(
+          (hand) => hand.inLibrary,
+        ),
+      ).toEqual([true, false]);
+    });
+
+    it('marks nothing for someone else’s Library', async () => {
+      const { javier, marta, code } = await roomOfTwo();
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      await importIntoLibrary(marta.token, text);
+
+      const preview = await previewIntoRoom(javier.token, code, text);
+
+      expect(preview.body.hands).toEqual([
+        expect.objectContaining({ inLibrary: false }),
+      ]);
+    });
+
+    it('queues the Library Hand itself, so the Notes written in the Room are in the Library afterwards', async () => {
+      const { javier, marta, code, javierSocket } = await roomOfTwo();
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      const [handId] = await importIntoLibrary(marta.token, text);
+      const preview = await previewIntoRoom(marta.token, code, text);
+
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/imports`)
+        .set('Authorization', `Bearer ${marta.token}`)
+        .send({ previews: [preview.body.id as string] })
+        .expect(201);
+
+      const { entries } = await javierSocket.next<{ entries: QueueEntry[] }>(
+        'queue.entriesAdded',
+      );
+      expect(entries).toEqual([expect.objectContaining({ handId })]);
+      javierSocket.send('notes.write', { handId, body: 'Overbet de river.' });
+      await javierSocket.next('notes.written');
+      javierSocket.send('room.close');
+      await javierSocket.next('room.closed');
+
+      const library = await request(running.httpServer)
+        .get('/api/library/hands')
+        .set('Authorization', `Bearer ${marta.token}`)
+        .expect(200);
+      expect(
+        (library.body.hands as { id: string }[]).map((hand) => hand.id),
+      ).toEqual([handId]);
+      const notes = await request(running.httpServer)
+        .get(`/api/hands/${handId}/notes`)
+        .set('Authorization', `Bearer ${marta.token}`)
+        .expect(200);
+      expect(notes.body.notes).toEqual([
+        expect.objectContaining({
+          body: 'Overbet de river.',
+          writer: { identityId: javier.id, displayName: 'Javier' },
+        }),
+      ]);
+    });
+
+    it('marks nothing for an anonymous Participant: they have no Library', async () => {
+      const { code } = await roomOfTwo();
+      const guest = await request(running.httpServer)
+        .post(`/api/rooms/${code}/guests`)
+        .send({ displayName: 'Alberto' })
+        .expect(201);
+      await join(guest.body.token as string, code, 'Alberto');
+
+      const preview = await previewIntoRoom(
+        guest.body.token as string,
+        code,
+        freshHandHistory('pokerstars-showdown.txt'),
+      );
+
+      expect(preview.body.hands).toEqual([
+        expect.objectContaining({ inLibrary: false }),
+      ]);
+    });
+  });
+
   describe('whether a Queue Entry is in the viewer’s Library', () => {
     it('tells only the Participants who have the Hand, as it joins the Queue', async () => {
       const { javier, marta, code, javierSocket, martaSocket } =
