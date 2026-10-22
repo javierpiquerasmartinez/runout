@@ -4,6 +4,7 @@ import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { usePreferences } from '../preferences/context'
 import { ImportDialog } from '../room/ImportDialog'
+import { RoomDialog } from '../room/RoomDialog'
 import { quantity } from '../room/quantity'
 import { playedAtLabel, positionsLabel, siteLabel, stakeLabel, streetLabel } from '../room/queueEntryView'
 import { followLink } from '../routing'
@@ -39,8 +40,9 @@ export function LibraryPage() {
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [results, setResults] = useState<Results | null>(null)
   const [importing, setImporting] = useState(false)
-  // The Hands of this page chosen for a Tag; another page or filter starts with none.
+  // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -106,6 +108,21 @@ export function LibraryPage() {
       setRevision((n) => n + 1)
     })
 
+  // Only this Library's references go; the list, the counts and the graph all follow.
+  const removeSelected = () =>
+    api('/library/hands', { token, method: 'DELETE', body: { handIds: selectedHands.map((hand) => hand.id) } })
+      .then(() => {
+        setConfirmingRemoval(false)
+        setSelected([])
+        // Later Hands move up into this page; once there are none, it steps back to the last one left.
+        if (page) {
+          const left = page.total - selectedHands.length
+          setPageNumber(Math.min(pageNumber, Math.max(1, Math.ceil(left / page.pageSize))))
+        }
+      })
+      // A refusal reads the Library too: a selected Hand may have left it elsewhere.
+      .finally(() => setRevision((n) => n + 1))
+
   return (
     <LibraryFrame>
       <div className="library__body">
@@ -169,7 +186,15 @@ export function LibraryPage() {
                 </span>
               )}
             </div>
-            {page && selectedHands.length > 0 && <TagSelection tags={page.options.tags} selected={selectedHands} onSet={setTag} />}
+            {page && selectedHands.length > 0 && (
+              <>
+                <TagSelection tags={page.options.tags} selected={selectedHands} onSet={setTag} />
+                <Button variant="secondary" onClick={() => setConfirmingRemoval(true)}>
+                  <Icon name="delete" size={16} />
+                  {t('library.remove')}
+                </Button>
+              </>
+            )}
           </div>
 
           {load?.state === 'failed' && (
@@ -211,6 +236,9 @@ export function LibraryPage() {
         </main>
       </div>
 
+      {confirmingRemoval && selectedHands.length > 0 && (
+        <RemoveDialog count={selectedHands.length} onRemove={removeSelected} onClose={() => setConfirmingRemoval(false)} />
+      )}
       {importing && (
         <ImportDialog
           destination={{ kind: 'library' }}
@@ -249,6 +277,39 @@ export function LibraryFrame({ children }: { children: ReactNode }) {
       </header>
       {children}
     </div>
+  )
+}
+
+/** Asks before the selected Hands leave the Library, saying what stays. */
+function RemoveDialog({ count, onRemove, onClose }: { count: number; onRemove: () => Promise<void>; onClose: () => void }) {
+  const { t } = useI18n()
+  const [removing, setRemoving] = useState(false)
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+  const plural = count === 1 ? 'one' : 'other'
+  const remove = () => {
+    setRemoving(true)
+    onRemove().catch((error: unknown) => {
+      setFailure(reasonOf(error))
+      setRemoving(false)
+    })
+  }
+  return (
+    <RoomDialog
+      title={t(`library.remove.title.${plural}`, { count })}
+      body={t(`library.remove.body.${plural}`)}
+      onClose={onClose}
+      actions={
+        <Button variant="destructive" autoFocus disabledReason={removing ? t('library.remove.removing') : undefined} onClick={remove}>
+          {t(`library.remove.confirm.${plural}`, { count })}
+        </Button>
+      }
+    >
+      {failure && (
+        <p className="library__remove-failure" role="alert">
+          {t(`reason.${failure}`)}
+        </p>
+      )}
+    </RoomDialog>
   )
 }
 

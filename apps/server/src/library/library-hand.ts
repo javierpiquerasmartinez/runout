@@ -3,7 +3,7 @@ import type { Database } from '../database/database.js';
 import { libraryEntries } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
-import { Rejected } from '../rejection/rejection.js';
+import { Rejected, type RejectionReason } from '../rejection/rejection.js';
 
 /**
  * The id of a Hand in this person's Library, for what they change on it from
@@ -27,4 +27,24 @@ export async function requireInLibrary(
     );
   if (!row) throw new Rejected('hand-not-found');
   return handId;
+}
+
+/** Most Hands one change may name: a page of the list, twice over. */
+const MAX_SELECTION = 200;
+
+/**
+ * Distinct Hand ids chosen in the Library, at least one: `invalid` when it
+ * isn't such a list, `hand-not-found` for an id that can't be a Hand.
+ */
+export function handSelection(
+  raw: unknown,
+  invalid: RejectionReason,
+): string[] {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_SELECTION) {
+    throw new Rejected(invalid);
+  }
+  if (!raw.every((id) => typeof id === 'string')) throw new Rejected(invalid);
+  const ids = [...new Set(raw as string[])];
+  if (!ids.every(isUuid)) throw new Rejected('hand-not-found');
+  return ids;
 }

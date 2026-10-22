@@ -18,7 +18,8 @@ import { keyOf, storedIds, storeHands } from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
 import { summarise, type HandSummary } from '../hands/replay/summary.js';
 import type { Identity } from '../identity/identity.service.js';
-import { requireInLibrary } from './library-hand.js';
+import { Rejected } from '../rejection/rejection.js';
+import { handSelection, requireInLibrary } from './library-hand.js';
 import { boundedInt } from './query.js';
 import { TagsService, type Tag } from './tags.service.js';
 import {
@@ -65,6 +66,11 @@ export interface LibraryPage {
 export interface MarkChange {
   handId: string;
   marked: boolean;
+}
+
+/** The Hands a person took out of their Library. */
+export interface Removal {
+  handIds: string[];
 }
 
 /** How many Hands a whole Library holds, and how many of them are Marked. */
@@ -220,6 +226,29 @@ export class LibraryService {
         .where(and(eq(marks.identityId, account.id), eq(marks.handId, handId)));
     }
     return { handId, marked };
+  }
+
+  /**
+   * Takes the Hands out of the person's Library, and their Tags off them.
+   * Nothing else happens to a Hand: it stays in other Libraries, with its
+   * Notes, and in any Queue it is in.
+   */
+  async remove(account: Identity, handIds: unknown): Promise<Removal> {
+    const ids = handSelection(handIds, 'invalid-hand-selection');
+    await this.db.transaction(async (tx) => {
+      const removed = await tx
+        .delete(libraryEntries)
+        .where(
+          and(
+            eq(libraryEntries.identityId, account.id),
+            inArray(libraryEntries.handId, ids),
+          ),
+        )
+        .returning({ handId: libraryEntries.handId });
+      // One Hand outside the Library and nothing goes.
+      if (removed.length !== ids.length) throw new Rejected('hand-not-found');
+    });
+    return { handIds: ids };
   }
 
   /** The Poker Sites, Heroes and Stakes present in the Library, sorted. */

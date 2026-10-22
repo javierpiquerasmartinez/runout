@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -15,6 +16,7 @@ import {
   LibraryService,
   type LibraryPage,
   type MarkChange,
+  type Removal,
 } from './library.service.js';
 import { ResultsService, type Results } from './results.service.js';
 
@@ -66,6 +68,22 @@ export class LibraryController {
       parseLibraryFilter(query),
       query.points,
     );
+  }
+
+  /**
+   * Takes the `handIds` out of the Account's Library, all of them or none.
+   * Only this Library's references go: the Hands stay in other Libraries
+   * and in any Queue they are in.
+   */
+  @Delete('hands')
+  async remove(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: { handIds?: unknown } = {},
+  ): Promise<Removal> {
+    const account = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    return this.library.remove(account, body.handIds);
   }
 
   /** Marks a Hand of the Account's Library. Marking it again changes nothing. */

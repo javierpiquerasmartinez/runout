@@ -45,6 +45,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'tag-name-taken': HttpStatus.CONFLICT,
   'tag-not-found': HttpStatus.NOT_FOUND,
   'invalid-tag-hands': HttpStatus.BAD_REQUEST,
+  'invalid-hand-selection': HttpStatus.BAD_REQUEST,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }`. */

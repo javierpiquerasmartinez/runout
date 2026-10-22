@@ -6,6 +6,7 @@ import { libraryEntries, tagLinks, tags } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
+import { handSelection } from './library-hand.js';
 
 /** A Tag as its owner sees it: with how many Hands of their Library carry it. */
 export interface Tag {
@@ -23,9 +24,6 @@ export interface TagChange {
 
 /** How long a Tag's name may be, in characters, once trimmed. */
 const MAX_NAME_LENGTH = 40;
-
-/** Most Hands one attach or detach may name: a page of the list, twice over. */
-const MAX_HANDS = 200;
 
 /**
  * An Account's Tags: its own way of classifying the Hands of its Library.
@@ -108,7 +106,7 @@ export class TagsService {
     handIds: unknown,
     attached: boolean,
   ): Promise<TagChange> {
-    const ids = handIdsOf(handIds);
+    const ids = handSelection(handIds, 'invalid-tag-hands');
     await this.owned(account, tagId);
     const held = await this.db
       .select({ handId: libraryEntries.handId })
@@ -153,19 +151,6 @@ function nameOf(raw: unknown): string {
     throw new Rejected('invalid-tag-name');
   }
   return name;
-}
-
-/** Distinct Hand ids, at least one; `hand-not-found` for one that can't be a Hand. */
-function handIdsOf(raw: unknown): string[] {
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_HANDS) {
-    throw new Rejected('invalid-tag-hands');
-  }
-  if (!raw.every((id) => typeof id === 'string')) {
-    throw new Rejected('invalid-tag-hands');
-  }
-  const ids = [...new Set(raw as string[])];
-  if (!ids.every(isUuid)) throw new Rejected('hand-not-found');
-  return ids;
 }
 
 /** Whether the database refused a write for breaking a unique index. */
