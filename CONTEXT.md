@@ -15,7 +15,7 @@ One browser holding a bearer token for an identity. An Account has one per brows
 _Avoid_: Session (outside the code and those UI phrases), login
 
 **Participant**:
-A person present in a Room: either with their Account, or anonymously, with an identity that exists for that one Room and is lost when it closes.
+A person present in a Room: either with their Account, or anonymously, with an identity that exists for that one Room and is lost when it closes. Being anonymous says nothing about being Master or Guest; the UI offers it as entering "sin cuenta", never "como invitado".
 _Avoid_: User, player, member, anonymous user
 
 **Master**:
