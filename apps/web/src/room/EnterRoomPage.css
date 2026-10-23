@@ -1,0 +1,5 @@
+/* `/room`: the welcome board's join card, alone on the Room's door. */
+
+.enter-room {
+  width: min(440px, 100%);
+}

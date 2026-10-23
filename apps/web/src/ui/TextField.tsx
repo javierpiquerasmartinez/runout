@@ -1,7 +1,8 @@
-import { useId, type InputHTMLAttributes } from 'react'
+import { useId, type InputHTMLAttributes, type Ref } from 'react'
 import { lockedProps } from './locked'
 
 export type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'disabled' | 'id'> & {
+  ref?: Ref<HTMLInputElement>
   label: string
   error?: string
   /** Codes such as a Room Code are typed in tabular mono. */

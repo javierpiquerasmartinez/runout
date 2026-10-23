@@ -3,6 +3,9 @@ export function formatRoomCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`
 }
 
+/** Where anyone types a Room Code to reach its Room. */
+export const enterRoomPath = '/room'
+
 export function roomPath(code: string): string {
   return `/room/${code}`
 }

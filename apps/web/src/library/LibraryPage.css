@@ -10,50 +10,10 @@
   background: var(--color-canvas);
 }
 
-.library__header {
-  height: 56px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--color-panel-border);
-  background: var(--color-panel);
-}
-.library__brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--text-primary);
-  font-size: 19px;
-  letter-spacing: 0.09em;
-  text-decoration: none;
-}
-.library__divider {
-  width: 1px;
-  height: 20px;
-  background: var(--color-rule-strong);
-}
-.library__where {
-  font-size: 14px;
-  font-weight: 600;
-}
 .library__spacer {
   flex-grow: 1;
 }
-.library__nav {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--text-secondary);
-}
-.library__nav:hover {
-  background: var(--color-hover);
-  color: var(--text-primary);
-}
+/* Back from a Library Hand to the list. */
 .library__back {
   height: var(--control-compact);
   box-sizing: border-box;
@@ -303,10 +263,6 @@
   font-size: 12.5px;
   color: var(--text-muted);
 }
-.library__import {
-  margin-top: auto;
-}
-
 .library__main {
   flex-grow: 1;
   min-width: 0;
@@ -316,6 +272,38 @@
   gap: 16px;
   padding: 22px 28px;
 }
+/* The Manos | Gráfica switch keeps its own width under the filters. */
+.library__main > .ro-segmented {
+  align-self: flex-start;
+}
+/*
+ * The graph view gives the Results Graph the rest of the main column: its
+ * width, and the viewport's height left under the header and the controls.
+ */
+@media (min-width: 761px) {
+  .library:has(.library__main[data-view='graph']) {
+    height: 100vh;
+    height: 100dvh;
+  }
+  /* A long list of Tags scrolls on its own rather than stretching the graph past the viewport. */
+  .library:has(.library__main[data-view='graph']) .library__side,
+  .library__main[data-view='graph'] {
+    overflow-y: auto;
+  }
+}
+.library__main[data-view='graph'] .results {
+  flex-grow: 1;
+  min-height: 360px;
+}
+.library__main[data-view='graph'] .results__body {
+  flex-grow: 1;
+  min-height: 0;
+}
+.library__main[data-view='graph'] .results__plot {
+  height: auto;
+  min-height: 260px;
+}
+
 .library__heading {
   display: flex;
   align-items: flex-end;
@@ -355,6 +343,8 @@
 }
 
 .library-table__frame {
+  /* Holds the table's hidden labels too, which would otherwise widen the page on a phone. */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--color-panel-border);
   border-radius: 10px;

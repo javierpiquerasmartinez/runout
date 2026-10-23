@@ -1,0 +1,74 @@
+/* The landing: a placeholder until it is designed, in the "Bienvenida" board's measures. */
+
+.landing {
+  min-height: 100vh;
+  max-width: 620px;
+  padding: 56px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.landing__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landing__beta {
+  font-size: 10px;
+  color: var(--text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  padding: 3px 6px;
+}
+
+.landing__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.landing__title {
+  font-size: 50px;
+  line-height: 1.06;
+  white-space: pre-line;
+  text-wrap: pretty;
+}
+
+.landing__lead {
+  max-width: 460px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.landing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+.landing__link {
+  text-decoration: none;
+}
+
+.landing__code {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brass-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .landing {
+    padding: 40px 16px;
+  }
+  .landing__title {
+    font-size: 38px;
+  }
+}

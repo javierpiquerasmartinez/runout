@@ -22,20 +22,6 @@
   --avatar-ring: var(--color-panel);
 }
 
-.room-header__brand,
-.room-gate__brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--text-primary);
-  font-size: 19px;
-  letter-spacing: 0.09em;
-}
-.room-header__brand:hover,
-.room-gate__brand:hover {
-  color: var(--text-primary);
-}
-
 .room-header__divider {
   width: 1px;
   height: 20px;
@@ -1352,6 +1338,26 @@
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--text-secondary);
+}
+
+/* The door's two ways in, split as the welcome board splits create and join. */
+.room-gate__or {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.room-gate__or span {
+  flex-grow: 1;
+  height: 1px;
+  background: var(--color-rule);
+}
+
+.room-gate__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 @media (max-width: 760px) {

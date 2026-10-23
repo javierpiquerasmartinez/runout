@@ -3,18 +3,13 @@ import { useHealth, usePing } from './backend/useBackendStatus'
 import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
 import { FirstDisplayName } from './identity/ChooseDisplayName'
-import { useSession } from './identity/context'
 import { SessionProvider } from './identity/SessionProvider'
-import { libraryHandIdFromPath, libraryPath, roomCodeFromLibraryPath } from './library/library'
-import { LibraryHandPage } from './library/LibraryHandPage'
-import { LibraryPage } from './library/LibraryPage'
-import { RoomPage } from './room/RoomPage'
-import { useHeldRoom } from './room/heldRoomContext'
+import { roomCodeFromLibraryPath } from './library/library'
 import { RoomHolder } from './room/RoomHolder'
-import { SettingsPage, settingsPath } from './settings/SettingsPage'
-import { formatRoomCode, roomCodeFromPath } from './room/roomCode'
+import { roomCodeFromPath } from './room/roomCode'
 import { usePath } from './routing'
-import { WelcomePage } from './welcome/WelcomePage'
+import { Routes } from './routes/Routes'
+import { settingsPath } from './settings/SettingsPage'
 
 export const designSystemPath = '/design-system'
 export const statusPath = '/status'
@@ -23,11 +18,12 @@ function App() {
   const path = usePath()
   if (path === designSystemPath) return <DesignSystemPage />
   if (path === statusPath) return <ConnectionStatus />
-  const code = roomCodeFromPath(path)
   return (
     <SessionProvider>
       <FirstDisplayName>
-        <KeepRoom path={path}>{code ? <RoomPage code={code} /> : <Screen path={path} />}</KeepRoom>
+        <KeepRoom path={path}>
+          <Routes />
+        </KeepRoom>
       </FirstDisplayName>
     </SessionProvider>
   )
@@ -54,28 +50,6 @@ function KeepRoom({ path, children }: { path: string; children: ReactNode }) {
 /** The Room a path belongs to: its own screen, or picking Hands for it in the Library. */
 function roomCodeIn(path: string): string | null {
   return roomCodeFromPath(path) ?? roomCodeFromLibraryPath(path)
-}
-
-function Screen({ path }: { path: string }) {
-  // Settings are an identity's: without one there is nothing to set yet.
-  const { identity } = useSession()
-  if (path === settingsPath && identity) return <SettingsPage />
-  // Only an Account has a Library (ADR 0005); anyone else is sent to the start.
-  if (identity?.account) {
-    if (path === libraryPath) return <LibraryPage />
-    const pickingFor = roomCodeFromLibraryPath(path)
-    if (pickingFor) return <RoomLibrary code={pickingFor} />
-    const handId = libraryHandIdFromPath(path)
-    if (handId) return <LibraryHandPage key={handId} handId={handId} />
-  }
-  return <WelcomePage />
-}
-
-/** The Library, opened from the Room this person is still in, to add Hands to its Queue. */
-function RoomLibrary({ code }: { code: string }) {
-  const view = useHeldRoom()?.view
-  const name = view && 'room' in view ? view.room.name : formatRoomCode(code)
-  return <LibraryPage room={{ code, name }} />
 }
 
 function ConnectionStatus() {

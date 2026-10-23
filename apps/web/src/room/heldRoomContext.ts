@@ -14,7 +14,7 @@ export interface HeldRoom {
 
 export const HeldRoomContext = createContext<HeldRoom | null>(null)
 
-/** The Room in progress, or null when there is none (e.g. Settings opened from the welcome screen). */
+/** The Room in progress, or null when there is none (e.g. Settings opened from the Library). */
 export function useHeldRoom(): HeldRoom | null {
   return useContext(HeldRoomContext)
 }

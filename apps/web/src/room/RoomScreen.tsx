@@ -6,7 +6,7 @@ import { useIdentity } from '../identity/context'
 import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { Avatar } from '../ui/Avatar'
 import { copyText } from '../ui/clipboard'
-import { BrandMark } from '../ui/BrandMark'
+import { Brand } from '../ui/Brand'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -592,10 +592,7 @@ function RoomHeader({
 
   return (
     <header className="room-header">
-      <a href="/" className="room-header__brand" aria-label={t('room.home')} onClick={followLink}>
-        <BrandMark size={22} />
-        <span className="ro-serif">{t('brand.wordmark')}</span>
-      </a>
+      <Brand />
       <span className="room-header__divider" />
       <h1 className="room-header__name">{view.room.name}</h1>
       <span className="room-header__code">

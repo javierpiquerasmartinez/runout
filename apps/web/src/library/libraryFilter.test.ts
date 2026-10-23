@@ -1,5 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { EMPTY_LIBRARY_FILTER, isFiltering, libraryFilterQuery, periodOf, quickRange } from './libraryFilter'
+import {
+  EMPTY_LIBRARY_FILTER,
+  isFiltering,
+  libraryFilterFromSearch,
+  libraryFilterQuery,
+  librarySearch,
+  periodOf,
+  quickRange,
+  type LibraryFilter,
+} from './libraryFilter'
 
 // The viewer's time zone: Madrid is UTC+2 in summer, UTC+1 in winter.
 beforeAll(() => {
@@ -73,5 +82,33 @@ describe('isFiltering', () => {
     expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, markedOnly: true })).toBe(true)
     expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, tags: [] })).toBe(false)
     expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, tags: ['t1'] })).toBe(true)
+  })
+})
+
+describe('the filter in the address', () => {
+  const everything: LibraryFilter = {
+    from: '2026-10-15',
+    to: '2026-10-21',
+    site: 'pokerstars',
+    hero: 'iMapleAA',
+    stake: 'no-limit:5:10:EUR',
+    markedOnly: true,
+    tags: ['t1', 't2'],
+  }
+
+  it('writes the viewer’s days as they are, and reads back the same filter', () => {
+    const search = librarySearch(everything)
+
+    expect(search).toBe('?from=2026-10-15&to=2026-10-21&site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&marked=true&tag=t1&tag=t2')
+    expect(libraryFilterFromSearch(search)).toEqual(everything)
+  })
+
+  it('leaves the address bare for an empty filter, and an empty address is the empty filter', () => {
+    expect(librarySearch(EMPTY_LIBRARY_FILTER)).toBe('')
+    expect(libraryFilterFromSearch('')).toEqual(EMPTY_LIBRARY_FILTER)
+  })
+
+  it('ignores what isn’t a filter, and days that aren’t days', () => {
+    expect(libraryFilterFromSearch('?page=3&from=yesterday&to=2026-13-01&marked=yes&site=')).toEqual(EMPTY_LIBRARY_FILTER)
   })
 })

@@ -7,7 +7,7 @@ export interface GoogleIdentity {
       type?: 'standard'
       theme?: 'outline' | 'filled_black'
       size?: 'large'
-      text?: 'signin_with'
+      text?: 'signin_with' | 'continue_with'
       shape?: 'rectangular'
       logo_alignment?: 'left' | 'center'
       /** In pixels; Google draws it at most 400 wide. */

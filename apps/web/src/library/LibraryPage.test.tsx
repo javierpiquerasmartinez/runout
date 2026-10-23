@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -135,7 +135,13 @@ afterEach(() => {
   window.history.pushState(null, '', '/')
 })
 
-function renderLibrary(preferences: Preferences = DEFAULT_PREFERENCES, room?: { code: string; name: string }) {
+/** The Library at `path`, as `Routes` shows it there: its view and filter are in the address. */
+function renderLibrary(
+  preferences: Preferences = DEFAULT_PREFERENCES,
+  room?: { code: string; name: string },
+  path = room ? `/room/${room.code}/library` : '/library',
+) {
+  window.history.replaceState(null, '', path)
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={fakeSession()}>
@@ -216,6 +222,76 @@ describe('LibraryPage', () => {
     expect(screen.getByRole('heading', { name: 'Import hands into your library' })).toBeTruthy()
   })
 
+  it('offers to import from the title row, not from the side column', async () => {
+    renderLibrary()
+    const collections = await screen.findByRole('navigation', { name: 'Collections' })
+    await screen.findByRole('table', { name: 'All hands' })
+
+    expect(within(collections).queryByRole('button', { name: 'Import hands' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Import hands' }))
+
+    expect(screen.getByRole('heading', { name: 'Import hands into your library' })).toBeTruthy()
+  })
+
+  describe('views', () => {
+    it('switches between the Hands at /library and the Results Graph at /library/graph', async () => {
+      renderLibrary()
+      const view = await screen.findByRole('radiogroup', { name: 'View' })
+      expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
+      expect(within(view).getByRole('radio', { name: 'Hands' }).getAttribute('aria-checked')).toBe('true')
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Graph' }))
+
+      expect(window.location.pathname).toBe('/library/graph')
+      expect(await screen.findByRole('region', { name: 'Results' })).toBeTruthy()
+      expect(screen.queryByRole('table', { name: 'All hands' })).toBeNull()
+      expect(within(view).getByRole('radio', { name: 'Graph' }).getAttribute('aria-checked')).toBe('true')
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Hands' }))
+
+      expect(window.location.pathname).toBe('/library')
+      expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
+      expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+    })
+
+    it('starts again from the first page when the address brings another filter', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+      await screen.findByText('Showing 3–3 of 3')
+
+      act(() => {
+        window.history.pushState(null, '', '/library?hero=Hero')
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      })
+
+      await waitFor(() => expect(lastFilterQuery()).toBe('hero=Hero'))
+      expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('page')).toBe('1')
+    })
+
+    it('keeps the filter when switching views', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Poker site' }), 'PokerStars')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Graph' }))
+
+      expect(window.location.pathname).toBe('/library/graph')
+      expect(window.location.search).toBe('?site=pokerstars')
+      await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?site=pokerstars'))
+      expect((within(filters).getByRole('combobox', { name: 'Poker site' }) as HTMLSelectElement).value).toBe('pokerstars')
+    })
+
+    it.each(['/library', '/library/graph'])('reads the filter back from the address at %s, as after a reload', async (path) => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?hero=iMapleAA&marked=true&tag=t2`)
+
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(lastFilterQuery()).toBe('hero=iMapleAA&marked=true&tag=t2')
+      expect((within(filters).getByRole('combobox', { name: 'Hero' }) as HTMLSelectElement).value).toBe('iMapleAA')
+      expect(screen.getByRole('heading', { name: 'Marked hands' })).toBeTruthy()
+      expect(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: /Multiway/ }).getAttribute('aria-pressed')).toBe('true')
+    })
+  })
+
   describe('filters', () => {
     it('offers only the Poker Sites, Heroes and Stakes the Library holds', async () => {
       renderLibrary()
@@ -241,6 +317,7 @@ describe('LibraryPage', () => {
 
       expect(lastFilterQuery()).toBe('site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR')
       expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('page')).toBe('1')
+      expect(window.location.search).toBe('?site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR')
 
       await userEvent.click(within(filters).getByRole('button', { name: 'Clear filters' }))
 
@@ -307,8 +384,10 @@ describe('LibraryPage', () => {
   })
 
   describe('Results Graph', () => {
+    const renderGraph = () => renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph')
+
     it('draws the Results of the same Hands the list shows', async () => {
-      renderLibrary()
+      renderGraph()
       const graph = await screen.findByRole('region', { name: 'Results' })
       expect(within(graph).getByText('3 hands')).toBeTruthy()
       expect(within(graph).getByText('+3.9 BB')).toBeTruthy()
@@ -322,26 +401,36 @@ describe('LibraryPage', () => {
       expect(lastFilterQuery()).toBe('site=pokerstars&stake=no-limit%3A5%3A10%3AEUR')
     })
 
-    it('reads the Results again only when the Hands change, not the page', async () => {
+    it('is asked for only in the graph view', async () => {
       renderLibrary()
+      await screen.findByRole('table', { name: 'All hands' })
+      expect(resultsRequests).toEqual([])
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Graph' }))
+
+      await waitFor(() => expect(resultsRequests).toHaveLength(1))
+    })
+
+    it('keeps the side column, whose Marked collection narrows the graph', async () => {
+      renderGraph()
+      const collections = await screen.findByRole('navigation', { name: 'Collections' })
       await screen.findByRole('region', { name: 'Results' })
 
-      await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
-      await screen.findByText('Showing 3–3 of 3')
-      expect(resultsRequests).toHaveLength(1)
+      await userEvent.click(within(collections).getByRole('button', { name: /Marked/ }))
 
-      await userEvent.click(screen.getByRole('button', { name: 'Mark CO vs SB, iMapleAA' }))
-      await waitFor(() => expect(resultsRequests).toHaveLength(2))
+      await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?marked=true'))
+      expect(window.location.pathname).toBe('/library/graph')
     })
 
     it('draws nothing when no Hand matches, inviting to import instead', async () => {
       pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
       results = { hands: 0, currency: null, totals: { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: null }, points: [] }
-      renderLibrary()
+      renderGraph()
 
       expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()
       await waitFor(() => expect(resultsRequests).toHaveLength(1))
       expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Import hands' })).toHaveLength(2)
     })
   })
 
@@ -379,7 +468,7 @@ describe('LibraryPage', () => {
     })
 
     it('filters by any of the Tags chosen in the sidebar, list and graph alike', async () => {
-      renderLibrary()
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph')
       const tags = await screen.findByRole('group', { name: 'Tags' })
       const multiway = within(tags).getByRole('button', { name: /Multiway/ })
 
@@ -606,7 +695,25 @@ describe('LibraryPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add 1 to the room' }))
 
       expect(await screen.findByRole('alert')).toBeTruthy()
-      expect(window.location.pathname).toBe('/')
+      expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
+    })
+
+    it('shows only the list, with no view to switch to', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room)
+
+      expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
+      expect(screen.queryByRole('radiogroup', { name: 'View' })).toBeNull()
+      expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+    })
+
+    it('keeps its filter in the address too', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room)
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'Hero')
+
+      expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
+      expect(window.location.search).toBe('?hero=Hero')
     })
 
     it('offers no Room to add to when opened on its own', async () => {
