@@ -36,12 +36,18 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   tags: [],
 }
 
-/** What the Library shows until the viewer changes it: today's Hands. */
-export function defaultLibraryFilter(now: Date = new Date()): LibraryFilter {
-  return { ...EMPTY_LIBRARY_FILTER, ...quickRange('today', now) }
-}
-
 export type QuickRange = 'today' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
+
+/** The period the Library starts on, and the one a bare address means. */
+export const DEFAULT_PERIOD: QuickRange = 'today'
+
+/** How the address says all time, since leaving the period out means the default one. */
+const ALL_TIME_PARAM = { name: 'period', value: 'all' } as const
+
+/** What the Library shows until the viewer changes it: the default period's Hands, nothing else narrowed. */
+export function defaultLibraryFilter(now: Date = new Date()): LibraryFilter {
+  return { ...EMPTY_LIBRARY_FILTER, ...quickRange(DEFAULT_PERIOD, now) }
+}
 
 /** Shortest first, so days two of them share are named by the shorter. */
 export const QUICK_RANGES: QuickRange[] = ['today', 'this-week', 'this-month', 'this-year', 'all-time']
@@ -74,12 +80,17 @@ export function periodOf(period: Pick<LibraryFilter, 'from' | 'to'>, now: Date =
   return match ?? 'custom'
 }
 
-/** Whether any part of the filter differs from the default, today's Hands. */
-export function isFiltering(filter: LibraryFilter, now: Date = new Date()): boolean {
+/** Whether any part of the filter differs from the default, the period included. */
+export function differsFromDefault(filter: LibraryFilter, now: Date = new Date()): boolean {
   const byDefault = defaultLibraryFilter(now)
   return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) =>
     key === 'tags' ? filter.tags.length > 0 : filter[key] !== byDefault[key],
   )
+}
+
+/** Whether every part of the filter but the period is the default. */
+export function isDefaultBesidesPeriod(filter: LibraryFilter, now: Date = new Date()): boolean {
+  return !differsFromDefault({ ...filter, ...quickRange(DEFAULT_PERIOD, now) }, now)
 }
 
 /** The filter as the server's query: the viewer's days become instants, `to` exclusive. */
@@ -90,17 +101,17 @@ export function libraryFilterQuery(filter: LibraryFilter): URLSearchParams {
 /**
  * The filter as the Library's address keeps it, so a view switch, a reload
  * or a shared link keeps the same Hands: `?site=pokerstars&tag=t1`. Days stay
- * the viewer's days, unlike the server's query. Today is left out, so a bare
- * address is whatever day it is when opened; all time is `period=all`.
+ * the viewer's days, unlike the server's query. The default period is left
+ * out, so a bare address follows the day it is opened; all time is `period=all`.
  */
 export function librarySearch(filter: LibraryFilter, now: Date = new Date()): string {
-  const today = quickRange('today', now)
-  const days =
-    filter.from === today.from && filter.to === today.to
-      ? { from: null, to: null }
-      : { from: filter.from, to: filter.to }
-  const query = new URLSearchParams(!filter.from && !filter.to ? { period: 'all' } : {})
-  writeFilter({ ...filter, ...days }, (day) => day).forEach((value, key) => query.append(key, value))
+  const byDefault = quickRange(DEFAULT_PERIOD, now)
+  const isDefaultPeriod = filter.from === byDefault.from && filter.to === byDefault.to
+  const query = new URLSearchParams()
+  if (!filter.from && !filter.to) query.set(ALL_TIME_PARAM.name, ALL_TIME_PARAM.value)
+  writeFilter(isDefaultPeriod ? { ...filter, from: null, to: null } : filter, (day) => day).forEach((value, key) =>
+    query.append(key, value),
+  )
   const search = query.toString()
   return search && `?${search}`
 }
@@ -113,7 +124,8 @@ export function libraryFilterFromSearch(search: string, now: Date = new Date()):
     return value && isDay(value) ? value : null
   }
   const days = { from: day('from'), to: day('to') }
-  const period = days.from || days.to || query.get('period') === 'all' ? days : quickRange('today', now)
+  const allTime = query.get(ALL_TIME_PARAM.name) === ALL_TIME_PARAM.value
+  const period = days.from || days.to || allTime ? days : quickRange(DEFAULT_PERIOD, now)
   return {
     ...period,
     site: query.get('site') || null,

@@ -52,12 +52,12 @@ describe('ResultsGraph', () => {
   it('shows the Win Rate beside the Hands, in big blinds per 100 Hands whatever the unit', async () => {
     renderGraph(euros, { ...DEFAULT_PREFERENCES, displayUnit: 'amount' })
 
-    // +4 BB over 5 Hands.
-    expect(screen.getByText('+80 BB/100')).toBeTruthy()
+    // +4 BB over 5 Hands, to a tenth even when whole.
+    expect(screen.getByText('+80.0 BB/100')).toBeTruthy()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Big blinds' }))
 
-    expect(screen.getByText('+80 BB/100')).toBeTruthy()
+    expect(screen.getByText('+80.0 BB/100')).toBeTruthy()
   })
 
   it('writes the Win Rate to a tenth, signed', () => {

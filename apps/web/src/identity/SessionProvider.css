@@ -1,8 +1,8 @@
 .session-gate__loader {
   color: var(--brass);
-  animation: session-gate-pulse 1.4s ease-in-out infinite;
+  animation: ro-gate-pulse 1.4s ease-in-out infinite;
 }
-@keyframes session-gate-pulse {
+@keyframes ro-gate-pulse {
   0%,
   100% {
     opacity: 0.35;

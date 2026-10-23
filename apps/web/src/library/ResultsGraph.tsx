@@ -67,6 +67,7 @@ export function ResultsGraph({ results }: { results: Results }) {
         <span className="results__win-rate ro-mono" title={t('library.results.winRate')}>
           {t('library.results.winRateValue', {
             value: i18n.formatNumber((results.totals.bigBlinds.result / results.hands) * 100, {
+              minimumFractionDigits: 1,
               maximumFractionDigits: 1,
               signDisplay: 'exceptZero',
             }),

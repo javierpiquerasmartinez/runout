@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   defaultLibraryFilter,
   EMPTY_LIBRARY_FILTER,
-  isFiltering,
+  differsFromDefault,
+  isDefaultBesidesPeriod,
   libraryFilterFromSearch,
   libraryFilterQuery,
   librarySearch,
@@ -88,20 +89,29 @@ describe('libraryFilterQuery', () => {
   })
 })
 
-describe('isFiltering', () => {
+describe('differsFromDefault', () => {
   it('is false for the default, today and nothing else', () => {
     expect(defaultLibraryFilter(now)).toEqual({ ...EMPTY_LIBRARY_FILTER, from: '2026-10-21', to: '2026-10-21' })
-    expect(isFiltering(defaultLibraryFilter(now), now)).toBe(false)
+    expect(differsFromDefault(defaultLibraryFilter(now), now)).toBe(false)
   })
 
   it('is true once any part narrows the Library otherwise, all time included', () => {
     const today = defaultLibraryFilter(now)
 
-    expect(isFiltering(EMPTY_LIBRARY_FILTER, now)).toBe(true)
-    expect(isFiltering({ ...today, from: '2026-10-19' }, now)).toBe(true)
-    expect(isFiltering({ ...today, markedOnly: true }, now)).toBe(true)
-    expect(isFiltering({ ...today, tags: [] }, now)).toBe(false)
-    expect(isFiltering({ ...today, tags: ['t1'] }, now)).toBe(true)
+    expect(differsFromDefault(EMPTY_LIBRARY_FILTER, now)).toBe(true)
+    expect(differsFromDefault({ ...today, from: '2026-10-19' }, now)).toBe(true)
+    expect(differsFromDefault({ ...today, markedOnly: true }, now)).toBe(true)
+    expect(differsFromDefault({ ...today, tags: [] }, now)).toBe(false)
+    expect(differsFromDefault({ ...today, tags: ['t1'] }, now)).toBe(true)
+  })
+})
+
+describe('isDefaultBesidesPeriod', () => {
+  it('looks past the period, whatever it is, at everything else', () => {
+    expect(isDefaultBesidesPeriod(defaultLibraryFilter(now), now)).toBe(true)
+    expect(isDefaultBesidesPeriod({ ...defaultLibraryFilter(now), from: '2026-10-01' }, now)).toBe(true)
+    expect(isDefaultBesidesPeriod(EMPTY_LIBRARY_FILTER, now)).toBe(true)
+    expect(isDefaultBesidesPeriod({ ...EMPTY_LIBRARY_FILTER, site: 'pokerstars' }, now)).toBe(false)
   })
 })
 
