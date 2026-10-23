@@ -26,6 +26,9 @@ const STROKE: Record<ResultLine, string> = {
 }
 const AXIS_TICK = { fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }
 
+/** The lines whose Win Rate the graph shows. */
+const WIN_RATE_LINES = ['result', 'allInEv'] as const satisfies readonly ResultLine[]
+
 /**
  * The Results Graph: the running Result, All-in EV, Showdown and Non-showdown Results
  * over the filtered Hands, with a legend that shows each line's total and
@@ -62,16 +65,6 @@ export function ResultsGraph({ results }: { results: Results }) {
         <h2 className="results__title ro-mono">{t('library.results.title')}</h2>
         <span className="results__hands">
           {t(results.hands === 1 ? 'library.count.one' : 'library.count.other', { count: i18n.formatNumber(results.hands) })}
-        </span>
-        {/* The Win Rate is in big blinds by definition, whichever unit draws the lines. */}
-        <span className="results__win-rate ro-mono" title={t('library.results.winRate')}>
-          {t('library.results.winRateValue', {
-            value: i18n.formatNumber((results.totals.bigBlinds.result / results.hands) * 100, {
-              minimumFractionDigits: 1,
-              maximumFractionDigits: 1,
-              signDisplay: 'exceptZero',
-            }),
-          })}
         </span>
         <span className="results__spacer" />
         <SegmentedControl<GraphUnit>
@@ -129,17 +122,37 @@ export function ResultsGraph({ results }: { results: Results }) {
             ))}
           </LineChart>
         </div>
-        <ul className="results__legend" aria-label={t('library.results.lines')}>
-          {RESULT_LINES.map((line) => (
-            <li key={line} className="results__entry" data-hidden={hidden.has(line) || undefined}>
-              <button type="button" className="results__toggle" aria-pressed={!hidden.has(line)} onClick={() => toggle(line)}>
-                <span className="results__swatch" style={{ background: STROKE[line] }} aria-hidden="true" />
-                {t(`library.results.line.${line}`)}
-              </button>
-              <span className="results__total ro-mono">{format(totals[line])}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="results__side">
+          <ul className="results__legend" aria-label={t('library.results.lines')}>
+            {RESULT_LINES.map((line) => (
+              <li key={line} className="results__entry" data-hidden={hidden.has(line) || undefined}>
+                <button type="button" className="results__toggle" aria-pressed={!hidden.has(line)} onClick={() => toggle(line)}>
+                  <span className="results__swatch" style={{ background: STROKE[line] }} aria-hidden="true" />
+                  {t(`library.results.line.${line}`)}
+                </button>
+                <span className="results__total ro-mono">{format(totals[line])}</span>
+              </li>
+            ))}
+          </ul>
+          {/* The Win Rate is in big blinds by definition, whichever unit draws the lines. */}
+          <div className="results__win-rates" role="group" aria-label={t('library.results.winRate')} title={t('library.results.winRateHint')}>
+            <span className="results__win-rates-title ro-mono">{t('library.results.winRate')}</span>
+            <dl>
+              {WIN_RATE_LINES.map((line) => (
+                <div key={line} className="results__win-rate">
+                  <dt>{t(`library.results.line.${line}`)}</dt>
+                  <dd className="ro-mono">
+                    {i18n.formatNumber((results.totals.bigBlinds[line] / results.hands) * 100, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                      signDisplay: 'exceptZero',
+                    })}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
       </div>
     </section>
   )
