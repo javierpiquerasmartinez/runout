@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { useSession } from '../identity/context'
+import { LandingPage } from '../landing/LandingPage'
+import { LoginPage, loginPath } from '../landing/LoginPage'
 import { libraryHandIdFromPath, libraryPath, roomCodeFromLibraryPath } from '../library/library'
 import { LibraryHandPage } from '../library/LibraryHandPage'
 import { LibraryPage } from '../library/LibraryPage'
@@ -11,7 +13,6 @@ import { roomsPath } from '../rooms/rooms'
 import { RoomsPage } from '../rooms/RoomsPage'
 import { redirect, usePath } from '../routing'
 import { SettingsPage, settingsPath } from '../settings/SettingsPage'
-import { WelcomePage } from '../welcome/WelcomePage'
 
 /**
  * Which screen this path shows to this browser's identity (none, anonymous,
@@ -28,22 +29,25 @@ export function Routes() {
   // An Account's Rooms screen already has a field for the code.
   if (path === enterRoomPath) return identity?.account ? <Redirect to={roomsPath} /> : <EnterRoomPage />
   // Settings are an identity's: without one there is nothing to set yet.
-  if (path === settingsPath && identity) return <SettingsPage />
-  // Creating a Room needs an Account (ADR 0005): anyone else is asked to sign in.
-  if (path === roomsPath) return identity?.account ? <RoomsPage /> : <Redirect to={loginPath} />
-  // Only an Account has a Library (ADR 0005); anyone else is sent to the start.
-  if (identity?.account) {
-    if (path === libraryPath) return <LibraryPage />
-    const pickingFor = roomCodeFromLibraryPath(path)
-    if (pickingFor) return <RoomLibrary code={pickingFor} />
-    const handId = libraryHandIdFromPath(path)
-    if (handId) return <LibraryHandPage key={handId} handId={handId} />
+  if (path === settingsPath) return identity ? <SettingsPage /> : <Redirect to={loginPath} />
+  // An Account has signed in already, and no sign-in returns anywhere but the Library.
+  if (path === loginPath) return identity?.account ? <Redirect to={libraryPath} /> : <LoginPage />
+  // Only an Account has a Library and creates Rooms (ADR 0005): anyone else is asked to sign in.
+  if (!identity?.account) {
+    if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`)) {
+      return <Redirect to={loginPath} />
+    }
+    return <LandingPage />
   }
-  return <WelcomePage />
+  if (path === roomsPath) return <RoomsPage />
+  if (path === libraryPath) return <LibraryPage />
+  const pickingFor = roomCodeFromLibraryPath(path)
+  if (pickingFor) return <RoomLibrary code={pickingFor} />
+  const handId = libraryHandIdFromPath(path)
+  if (handId) return <LibraryHandPage key={handId} handId={handId} />
+  // For an Account the landing, or a path that leads nowhere, is its Library.
+  return <Redirect to={libraryPath} />
 }
-
-/** Signing in. Until it has a screen of its own, the welcome screen offers it. */
-const loginPath = '/login'
 
 /** Sends this person to `to` in place of the path they opened, so going back skips it. */
 export function Redirect({ to }: { to: string }) {

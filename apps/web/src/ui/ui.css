@@ -577,6 +577,13 @@
 .ro-brand:hover {
   color: var(--text-primary);
 }
+/* The landing and `/login`: the "Bienvenida" board's 27 px, 0.1em apart. */
+.ro-brand--landing {
+  gap: 12px;
+  font-size: 27px;
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
 
 /* ---------- The Amount beside big blinds, when a reader shows both units ---------- */
 

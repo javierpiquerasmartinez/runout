@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +8,7 @@ import { HeldRoomContext } from '../room/heldRoomContext'
 import { initialRoomView } from '../room/roomClient'
 import splitPot from '../room/fixtures/split-pot.json'
 import type { RoomCommands } from '../room/useRoom'
+import { fakeGoogleIdentity } from '../test/fakeGoogle'
 import { fakeSession, fakeVisitor } from '../test/fakeSession'
 import { Redirect, Routes } from './Routes'
 
@@ -38,6 +40,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   window.history.replaceState(null, '', '/')
 })
 
@@ -69,7 +72,27 @@ function renderAt(path: string, session: SessionContextValue) {
   return confirmDisplayName
 }
 
-const welcome = () => screen.findByRole('heading', { name: /The group, the same hand/ })
+/** The app at `path` for a visitor whose Google sign-in makes this browser an Account. */
+function renderSigningIn(path: string) {
+  window.history.replaceState(null, '', path)
+  function SigningIn() {
+    const [signedIn, setSignedIn] = useState(false)
+    const [signedOut] = useState(() => fakeVisitor({ signIn: vi.fn(async () => setSignedIn(true)) }))
+    return (
+      <SessionContext.Provider value={signedIn ? fakeSession() : signedOut}>
+        <Routes />
+      </SessionContext.Provider>
+    )
+  }
+  render(
+    <I18nProvider initialLocale="en">
+      <SigningIn />
+    </I18nProvider>,
+  )
+}
+
+const landing = () => screen.findByRole('heading', { name: /The group, the same hand/ })
+const login = () => screen.findByRole('main', { name: 'Sign in' })
 const library = () => screen.findByRole('heading', { name: 'All hands' })
 const libraryHand = () => screen.findByRole('link', { name: /Back to the library/ })
 const roomLibrary = () => screen.findByRole('link', { name: /Back to RNT4-K9PX/ })
@@ -77,21 +100,31 @@ const settings = () => screen.findByRole('heading', { name: 'Profile and play' }
 const room = () => screen.findByRole('heading', { name: 'Martes NL50' })
 const rooms = () => screen.findByRole('heading', { name: 'Rooms' })
 
-describe('Routes · the welcome screen', () => {
+describe('Routes · the landing, for visitors', () => {
   it.each([
     ['no identity', visitor],
     ['an anonymous identity', anonymous],
-    ['an Account', account],
-  ])('shows it at / with %s', async (_, session) => {
+  ])('shows it at / with %s: sign in, or bring a Room Code', async (_, session) => {
     renderAt('/', session())
 
-    expect(await welcome()).toBeTruthy()
+    expect(await landing()).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
+    expect(screen.getByRole('link', { name: 'Have a room code?' }).getAttribute('href')).toBe('/room')
+    expect(screen.queryByRole('heading', { name: 'Create a room' })).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 
   it('is where an unknown path falls back to', async () => {
-    renderAt('/nowhere', account())
+    renderAt('/nowhere', visitor())
 
-    expect(await welcome()).toBeTruthy()
+    expect(await landing()).toBeTruthy()
+  })
+
+  it.each(['/', '/nowhere'])('sends an Account from %s to its Library', async (path) => {
+    renderAt(path, account())
+
+    expect(await library()).toBeTruthy()
+    expect(window.location.pathname).toBe('/library')
   })
 })
 
@@ -109,14 +142,66 @@ describe('Routes · the Library, only for an Account', () => {
   it.each([
     ['/library', 'no identity', visitor],
     ['/library', 'an anonymous identity', anonymous],
+    ['/library/graph', 'no identity', visitor],
+    ['/library/graph', 'an anonymous identity', anonymous],
     ['/library/hands/split-pot', 'no identity', visitor],
     ['/library/hands/split-pot', 'an anonymous identity', anonymous],
-    ['/room/RNT4K9PX/library', 'no identity', visitor],
-    ['/room/RNT4K9PX/library', 'an anonymous identity', anonymous],
-  ])('falls back to the welcome screen at %s with %s', async (path, _, session) => {
+  ])('sends %s with %s to /login', async (path, _, session) => {
     renderAt(path, session())
 
-    expect(await welcome()).toBeTruthy()
+    expect(await login()).toBeTruthy()
+    expect(window.location.pathname).toBe('/login')
+  })
+
+  it.each([
+    ['no identity', visitor],
+    ['an anonymous identity', anonymous],
+  ])("shows the landing at a Room's Library with %s", async (_, session) => {
+    renderAt('/room/RNT4K9PX/library', session())
+
+    expect(await landing()).toBeTruthy()
+  })
+})
+
+describe('Routes · /login, for anyone without an Account', () => {
+  it.each([
+    ['no identity', visitor],
+    ['an anonymous identity', anonymous],
+  ])('offers Google and the way back with %s', async (_, session) => {
+    fakeGoogleIdentity()
+    renderAt('/login', session())
+
+    expect(await login()).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Sign in with Google' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Back' }).getAttribute('href')).toBe('/')
+  })
+
+  it('sends an Account to its Library', async () => {
+    renderAt('/login', account())
+
+    expect(await library()).toBeTruthy()
+    expect(window.location.pathname).toBe('/library')
+  })
+
+  it('lands in the Library once signed in there', async () => {
+    fakeGoogleIdentity('id-token-from-google')
+    renderSigningIn('/login')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
+
+    expect(await library()).toBeTruthy()
+    expect(window.location.pathname).toBe('/library')
+  })
+
+  it('lands in the Library, not where they came from, once sent there from a protected screen', async () => {
+    fakeGoogleIdentity()
+    renderSigningIn('/library/hands/split-pot')
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
+
+    expect(await library()).toBeTruthy()
+    expect(window.location.pathname).toBe('/library')
   })
 })
 
@@ -133,7 +218,8 @@ describe('Routes · the Rooms screen, only for an Account', () => {
   ])('sends %s from /rooms to /login', async (_, session) => {
     renderAt('/rooms', session())
 
-    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    expect(await login()).toBeTruthy()
+    expect(window.location.pathname).toBe('/login')
     expect(screen.queryByRole('heading', { name: 'Rooms' })).toBeNull()
   })
 })
@@ -148,10 +234,11 @@ describe('Routes · Settings, for any identity', () => {
     expect(await settings()).toBeTruthy()
   })
 
-  it('falls back to the welcome screen with no identity', async () => {
+  it('sends no identity to /login', async () => {
     renderAt('/settings', visitor())
 
-    expect(await welcome()).toBeTruthy()
+    expect(await login()).toBeTruthy()
+    expect(window.location.pathname).toBe('/login')
   })
 })
 

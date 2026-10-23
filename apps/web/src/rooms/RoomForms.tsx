@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, reasonOf } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
-import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
 import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
@@ -110,6 +109,7 @@ export function RecentRooms({ token }: { token: string }) {
   )
 }
 
+/** Creating a Room needs an Account (ADR 0005): only the Account side shows this card. */
 function CreateRoomCard({ focus }: { focus: number | null }) {
   const { t } = useI18n()
   const { token, identity, rememberDisplayName } = useSession()
@@ -118,8 +118,6 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
   const [error, setError] = useState<{ field: 'name' | 'displayName' | 'form'; message: MessageKey } | null>(null)
   const [busy, setBusy] = useState(false)
   const nameField = useRef<HTMLInputElement>(null)
-  // Creating a Room needs an Account (ADR 0005): without one, sign in first.
-  const signedIn = Boolean(identity?.account)
 
   useEffect(() => {
     if (focus === null) return
@@ -129,7 +127,7 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
 
   async function create(event: FormEvent) {
     event.preventDefault()
-    if (busy || !signedIn) return
+    if (busy) return
     setBusy(true)
     setError(null)
     try {
@@ -149,7 +147,7 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
     <form className="room-form" onSubmit={create} noValidate>
       <div className="room-form__heading">
         <h2 className="room-form__title">{t('rooms.create.title')}</h2>
-        <p className="room-form__body">{t(signedIn ? 'rooms.create.body' : 'rooms.create.signIn')}</p>
+        <p className="room-form__body">{t('rooms.create.body')}</p>
       </div>
       <div className="room-form__fields">
         <TextField
@@ -170,15 +168,12 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
           error={error?.field === 'displayName' ? t(error.message) : undefined}
         />
       </div>
-      {/* Without an Account, signing in is what the card asks for first. */}
-      {!signedIn && <GoogleSignInButton />}
       <Button
         type="submit"
         variant="primary"
         size="prominent"
         aria-busy={busy}
         aria-label={t('rooms.create.submit')}
-        disabledReason={signedIn ? undefined : t('reason.account-required')}
       >
         <Icon name="add" size={16} />
         {t('rooms.create.submit')}
