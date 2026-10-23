@@ -13,10 +13,11 @@ type Failure = FailureReason | 'google-unavailable' | 'google-not-configured'
 const MAX_WIDTH = 400
 
 /**
- * Google's own "Sign in with Google" button. The ID token it hands back is
- * traded for an Account's session, and this browser becomes that Account.
+ * Google's own "Sign in with Google" button, or "Continue with Google" where
+ * signing in carries on into something, such as a Room. The ID token it hands
+ * back is traded for an Account's session, and this browser becomes that Account.
  */
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ label = 'sign-in' }: { label?: 'sign-in' | 'continue' }) {
   const { t, locale } = useI18n()
   const { signIn } = useSession()
   // Inside a Room (or in Settings with one behind), the Account takes this browser's place in it.
@@ -45,7 +46,7 @@ export function GoogleSignInButton() {
           type: 'standard',
           theme: theme === 'light' ? 'outline' : 'filled_black',
           size: 'large',
-          text: 'signin_with',
+          text: label === 'continue' ? 'continue_with' : 'signin_with',
           shape: 'rectangular',
           logo_alignment: 'left',
           ...(width > 0 && { width: Math.min(width, MAX_WIDTH) }),
@@ -56,7 +57,7 @@ export function GoogleSignInButton() {
     return () => {
       cancelled = true
     }
-  }, [clientId, signIn, fromRoom, theme, locale])
+  }, [clientId, signIn, fromRoom, theme, locale, label])
 
   return (
     <div className="google-sign-in">

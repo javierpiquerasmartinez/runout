@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext, type SessionContextValue } from '../identity/context'
@@ -25,6 +26,7 @@ beforeEach(() => {
       const path = new URL(url, 'http://localhost').pathname.replace(/^\/api/, '')
       if (path === '/rooms') return Response.json([])
       if (path === '/rooms/RNT4K9PX') return Response.json({ code: 'RNT4K9PX', name: 'Martes NL50' })
+      if (path.startsWith('/rooms/')) return Response.json({ reason: 'room-not-found' }, { status: 404 })
       if (path === '/library/hands') return Response.json(emptyLibrary)
       if (path === '/library/results') return Response.json({ points: [] })
       if (path.endsWith('/notes')) return Response.json({ notes: [], marked: false })
@@ -46,6 +48,7 @@ const account = () => fakeSession()
 /** The app at `path`, as this session finds it, with the Room RNT4K9PX held as `App` holds it on a Room's paths. */
 function renderAt(path: string, session: SessionContextValue) {
   window.history.replaceState(null, '', path)
+  const confirmDisplayName = vi.fn()
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -55,7 +58,7 @@ function renderAt(path: string, session: SessionContextValue) {
             view: initialRoomView,
             commands: {} as RoomCommands,
             displayName: null,
-            confirmDisplayName: vi.fn(),
+            confirmDisplayName,
           }}
         >
           <Routes />
@@ -63,6 +66,7 @@ function renderAt(path: string, session: SessionContextValue) {
       </SessionContext.Provider>
     </I18nProvider>,
   )
+  return confirmDisplayName
 }
 
 const welcome = () => screen.findByRole('heading', { name: /The group, the same hand/ })
@@ -151,15 +155,63 @@ describe('Routes · Settings, for any identity', () => {
   })
 })
 
-describe('Routes · a Room, for anyone with its link', () => {
+describe('Routes · typing a Room Code', () => {
   it.each([
     ['no identity', visitor],
     ['an anonymous identity', anonymous],
-    ['an Account', account],
-  ])('shows its door with %s', async (_, session) => {
+  ])('shows /room with %s', async (_, session) => {
+    renderAt('/room', session())
+
+    expect(await screen.findByRole('textbox', { name: 'Room code' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /The group, the same hand/ })).toBeNull()
+  })
+
+  it("leads from /room to the Room's door", async () => {
+    renderAt('/room', visitor())
+
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Room code' }), 'RNT4K9PX')
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }))
+
+    expect(await room()).toBeTruthy()
+    expect(window.location.pathname).toBe('/room/RNT4K9PX')
+  })
+
+  it('says so on /room when no open Room has that code', async () => {
+    renderAt('/room', visitor())
+
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Room code' }), 'NOPE1234')
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }))
+
+    expect(await screen.findByText('There is no open room with that code.')).toBeTruthy()
+    expect(window.location.pathname).toBe('/room')
+  })
+
+  it('sends an Account from /room to /rooms, which has a field for it too', async () => {
+    renderAt('/room', account())
+
+    await waitFor(() => expect(window.location.pathname).toBe('/rooms'))
+  })
+})
+
+describe('Routes · a Room, for anyone with its link', () => {
+  it.each([
+    ['no identity', visitor],
+    ['an anonymous identity of another Room', () => fakeSession({ account: null, room: { code: 'RNT7H2QD' } })],
+  ])('shows its door, with the two ways in, with %s', async (_, session) => {
     renderAt('/room/RNT4K9PX', session())
 
     expect(await room()).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Enter without an account' })).toBeTruthy()
+  })
+
+  it.each([
+    ['the anonymous identity of this Room', anonymous],
+    ['an Account', account],
+  ])('lets %s straight in', async (_, session) => {
+    const enter = renderAt('/room/RNT4K9PX', session())
+
+    await waitFor(() => expect(enter).toHaveBeenCalledWith('Javier'))
+    expect(screen.queryByRole('button', { name: 'Enter without an account' })).toBeNull()
   })
 })
 

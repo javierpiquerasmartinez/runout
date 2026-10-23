@@ -39,7 +39,7 @@ export function RoomForms({ focusCreate = null }: { focusCreate?: number | null 
         {t('rooms.or')}
         <span />
       </div>
-      <JoinRoomCard />
+      <JoinRoomForm />
     </div>
   )
 }
@@ -192,7 +192,8 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
   )
 }
 
-function JoinRoomCard() {
+/** Joins a Room by its code: it opens the Room's screen, or says why there is none. */
+export function JoinRoomForm({ heading: Heading = 'h2' }: { heading?: 'h1' | 'h2' }) {
   const { t } = useI18n()
   const { token } = useSession()
   const [code, setCode] = useState('')
@@ -221,7 +222,7 @@ function JoinRoomCard() {
   return (
     <form className="room-form room-form--join" onSubmit={join} noValidate>
       <div className="room-form__heading">
-        <h2 className="room-form__title">{t('rooms.join.title')}</h2>
+        <Heading className="room-form__title">{t('rooms.join.title')}</Heading>
         <p className="room-form__body">{t('rooms.join.body')}</p>
       </div>
       <div className="room-code">

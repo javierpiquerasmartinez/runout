@@ -4,7 +4,8 @@ import { libraryHandIdFromPath, libraryPath, roomCodeFromLibraryPath } from '../
 import { LibraryHandPage } from '../library/LibraryHandPage'
 import { LibraryPage } from '../library/LibraryPage'
 import { useHeldRoom } from '../room/heldRoomContext'
-import { formatRoomCode, roomCodeFromPath } from '../room/roomCode'
+import { EnterRoomPage } from '../room/EnterRoomPage'
+import { enterRoomPath, formatRoomCode, roomCodeFromPath } from '../room/roomCode'
 import { RoomPage } from '../room/RoomPage'
 import { roomsPath } from '../rooms/rooms'
 import { RoomsPage } from '../rooms/RoomsPage'
@@ -24,6 +25,8 @@ export function Routes() {
 
   const code = roomCodeFromPath(path)
   if (code) return <RoomPage code={code} />
+  // An Account's Rooms screen already has a field for the code.
+  if (path === enterRoomPath) return identity?.account ? <Redirect to={roomsPath} /> : <EnterRoomPage />
   // Settings are an identity's: without one there is nothing to set yet.
   if (path === settingsPath && identity) return <SettingsPage />
   // Creating a Room needs an Account (ADR 0005): anyone else is asked to sign in.
