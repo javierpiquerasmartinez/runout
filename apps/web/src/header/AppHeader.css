@@ -1,6 +1,8 @@
 /*
  * The header of the "Biblioteca" board, shared by the Account side: 56 px, the
  * brand, the navigation, where the person is, "Nueva sala" and the avatar's menu.
+ * No board draws it on a phone: there it keeps everything but loses what can
+ * go without words, so it fits without scrolling sideways.
  */
 
 .app-header {
@@ -59,6 +61,7 @@
 }
 
 .app-header__back-to-room {
+  min-width: 0;
   height: var(--control-compact);
   box-sizing: border-box;
   display: inline-flex;
@@ -166,4 +169,48 @@
   margin: 4px 10px 6px;
   font-size: 12.5px;
   color: var(--alert-ink);
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    gap: 8px;
+    padding: 0 16px;
+  }
+  /* The mark alone: the brand's link keeps its label. Settings name themselves in their own heading. */
+  .app-header .ro-brand .ro-serif,
+  .app-header__divider,
+  .app-header__where {
+    display: none;
+  }
+  .app-header__new-room,
+  .app-header__account {
+    flex-shrink: 0;
+  }
+  .app-header__nav-item {
+    padding: 0 8px;
+  }
+  /* "Nueva sala" keeps its name for screen readers, and shows only its plus. */
+  .app-header__new-room-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .app-header__new-room {
+    width: var(--control-compact);
+    justify-content: center;
+    padding: 0;
+  }
+  /* A long Room name gives way before anything else does. */
+  .app-header__back-label {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .app-header__live-dot {
+    flex-shrink: 0;
+  }
 }

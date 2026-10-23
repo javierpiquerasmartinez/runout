@@ -343,6 +343,8 @@
 }
 
 .library-table__frame {
+  /* Holds the table's hidden labels too, which would otherwise widen the page on a phone. */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--color-panel-border);
   border-radius: 10px;

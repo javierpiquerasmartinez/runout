@@ -75,6 +75,8 @@
 
 .room-code__code {
   flex-grow: 1;
+  /* Narrower than its input's own width on a phone, so "Entrar" stays on screen. */
+  min-width: 0;
   gap: 8px;
 }
 .room-code__code .ro-field__label {

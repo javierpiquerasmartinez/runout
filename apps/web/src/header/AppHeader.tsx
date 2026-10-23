@@ -38,9 +38,9 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
       <span className="app-header__spacer" />
       {back}
       {account && (
-        <Button variant="primary" size="compact" onClick={requestNewRoom}>
+        <Button variant="primary" size="compact" className="app-header__new-room" onClick={requestNewRoom}>
           <Icon name="add" size={14} />
-          {t('header.newRoom')}
+          <span className="app-header__new-room-label">{t('header.newRoom')}</span>
         </Button>
       )}
       {account && <AccountMenu />}
@@ -78,7 +78,7 @@ export function BackToRoom({ code, name }: { code: string; name: string }) {
   return (
     <a href={roomPath(code)} className="app-header__back-to-room" onClick={followLink}>
       <span className="app-header__live-dot" aria-hidden="true" />
-      {t('header.backToRoom', { name })}
+      <span className="app-header__back-label">{t('header.backToRoom', { name })}</span>
     </a>
   )
 }
