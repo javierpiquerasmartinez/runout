@@ -71,6 +71,7 @@ const libraryHand = () => screen.findByRole('link', { name: /Back to the library
 const roomLibrary = () => screen.findByRole('link', { name: /Back to RNT4-K9PX/ })
 const settings = () => screen.findByRole('heading', { name: 'Profile and play' })
 const room = () => screen.findByRole('heading', { name: 'Martes NL50' })
+const rooms = () => screen.findByRole('heading', { name: 'Rooms' })
 
 describe('Routes · the welcome screen', () => {
   it.each([
@@ -112,6 +113,24 @@ describe('Routes · the Library, only for an Account', () => {
     renderAt(path, session())
 
     expect(await welcome()).toBeTruthy()
+  })
+})
+
+describe('Routes · the Rooms screen, only for an Account', () => {
+  it('shows /rooms to an Account', async () => {
+    renderAt('/rooms', account())
+
+    expect(await rooms()).toBeTruthy()
+  })
+
+  it.each([
+    ['no identity', visitor],
+    ['an anonymous identity', anonymous],
+  ])('sends %s from /rooms to /login', async (_, session) => {
+    renderAt('/rooms', session())
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    expect(screen.queryByRole('heading', { name: 'Rooms' })).toBeNull()
   })
 })
 

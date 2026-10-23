@@ -2,30 +2,73 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useSignOut } from '../identity/useSignOut'
+import { libraryPath } from '../library/library'
 import { roomPath } from '../room/roomCode'
+import { requestNewRoom, roomsPath } from '../rooms/rooms'
 import { followLink } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
 import { Avatar } from '../ui/Avatar'
 import { Brand } from '../ui/Brand'
+import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import './AppHeader.css'
 
+/** The screens of the header's navigation. */
+type Section = 'library' | 'rooms'
+
 /**
- * The header of the Library, a Library Hand and Settings: the brand, where
- * the person is, a way back (to a Room still held, say) and, for an Account,
- * the avatar's menu. An anonymous Participant has no Sign-in to end, so no menu.
+ * The header of the Account side (the Library, the Rooms screen, Settings) and of
+ * Settings opened from a Room. An Account gets the brand leading to its
+ * Library, the navigation with the `current` section marked, `where` for a
+ * screen outside it, a way back (to a Room still held, say), "Nueva sala" and
+ * the avatar's menu. An anonymous Participant gets only the brand, `where`
+ * and the way back: no Library, no Rooms to create, no Sign-in to end.
  */
-export function AppHeader({ where, back }: { where: string; back?: ReactNode }) {
+export function AppHeader({ current, where, back }: { current?: Section; where?: string; back?: ReactNode }) {
+  const { t } = useI18n()
   const { identity } = useIdentity()
+  const account = Boolean(identity.account)
   return (
     <header className="app-header">
-      <Brand />
+      {account ? <Brand href={libraryPath} label={t('header.brandToLibrary')} /> : <Brand />}
       <span className="app-header__divider" aria-hidden="true" />
-      <span className="app-header__where">{where}</span>
+      {account && <SectionNav current={current} />}
+      {account && where && <span className="app-header__divider" aria-hidden="true" />}
+      {where && <span className="app-header__where">{where}</span>}
       <span className="app-header__spacer" />
       {back}
-      {identity.account && <AccountMenu />}
+      {account && (
+        <Button variant="primary" size="compact" onClick={requestNewRoom}>
+          <Icon name="add" size={14} />
+          {t('header.newRoom')}
+        </Button>
+      )}
+      {account && <AccountMenu />}
     </header>
+  )
+}
+
+/** "Biblioteca · Salas", the section this person is in marked. */
+function SectionNav({ current }: { current?: Section }) {
+  const { t } = useI18n()
+  const sections: { section: Section; href: string; label: string }[] = [
+    { section: 'library', href: libraryPath, label: t('header.nav.library') },
+    { section: 'rooms', href: roomsPath, label: t('header.nav.rooms') },
+  ]
+  return (
+    <nav className="app-header__nav" aria-label={t('header.nav')}>
+      {sections.map(({ section, href, label }) => (
+        <a
+          key={section}
+          href={href}
+          className="app-header__nav-item"
+          aria-current={section === current ? 'page' : undefined}
+          onClick={followLink}
+        >
+          {label}
+        </a>
+      ))}
+    </nav>
   )
 }
 

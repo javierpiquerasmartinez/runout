@@ -31,6 +31,11 @@ export function usePath(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname)
 }
 
+/** A primitive read from the current history entry's state, kept up to date like the path. */
+export function useHistoryState<T extends string | number | null>(read: (state: unknown) => T): T {
+  return useSyncExternalStore(subscribe, () => read(window.history.state))
+}
+
 /** For an in-app `<a href>`: navigates without reloading the page. */
 export function followLink(event: MouseEvent<HTMLAnchorElement>) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return

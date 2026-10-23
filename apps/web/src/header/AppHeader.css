@@ -1,6 +1,6 @@
 /*
- * The header of the "Biblioteca" board, shared by the Library, a Library Hand
- * and Settings: 56 px, the brand, where the person is, and the avatar's menu.
+ * The header of the "Biblioteca" board, shared by the Account side: 56 px, the
+ * brand, the navigation, where the person is, "Nueva sala" and the avatar's menu.
  */
 
 .app-header {
@@ -22,6 +22,38 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.app-header__nav-item {
+  height: var(--control-compact);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.app-header__nav-item:hover {
+  background: var(--color-hover);
+  color: var(--text-primary);
+}
+.app-header__nav-item[aria-current='page'] {
+  background: var(--color-hover);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.app-header__nav-item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 .app-header__spacer {
   flex-grow: 1;
 }

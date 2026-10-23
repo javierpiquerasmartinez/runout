@@ -1,0 +1,36 @@
+/* The Rooms screen ("Salas"): the welcome board's entry column, under the shared header. */
+
+.rooms-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-canvas);
+}
+
+.rooms-page__main {
+  width: 100%;
+  max-width: 620px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 40px 16px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.rooms-page__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rooms-page__title {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.rooms-page__lead {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}

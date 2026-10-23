@@ -293,14 +293,13 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
 }
 
 /**
- * The header every Library screen shares: back home, where this is, the way
- * back to the Room it was opened from, Settings and who is signed in.
+ * The frame every Library screen shares: the Account's header, with the way
+ * back to the Room it was opened from.
  */
 export function LibraryFrame({ room, children }: { room?: RoomSummary; children: ReactNode }) {
-  const { t } = useI18n()
   return (
     <div className="library">
-      <AppHeader where={t('library.title')} back={room && <BackToRoom code={room.code} name={room.name} />} />
+      <AppHeader current="library" back={room && <BackToRoom code={room.code} name={room.name} />} />
       {children}
     </div>
   )

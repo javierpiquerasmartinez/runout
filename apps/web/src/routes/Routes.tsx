@@ -6,6 +6,8 @@ import { LibraryPage } from '../library/LibraryPage'
 import { useHeldRoom } from '../room/heldRoomContext'
 import { formatRoomCode, roomCodeFromPath } from '../room/roomCode'
 import { RoomPage } from '../room/RoomPage'
+import { roomsPath } from '../rooms/rooms'
+import { RoomsPage } from '../rooms/RoomsPage'
 import { redirect, usePath } from '../routing'
 import { SettingsPage, settingsPath } from '../settings/SettingsPage'
 import { WelcomePage } from '../welcome/WelcomePage'
@@ -24,6 +26,8 @@ export function Routes() {
   if (code) return <RoomPage code={code} />
   // Settings are an identity's: without one there is nothing to set yet.
   if (path === settingsPath && identity) return <SettingsPage />
+  // Creating a Room needs an Account (ADR 0005): anyone else is asked to sign in.
+  if (path === roomsPath) return identity?.account ? <RoomsPage /> : <Redirect to={loginPath} />
   // Only an Account has a Library (ADR 0005); anyone else is sent to the start.
   if (identity?.account) {
     if (path === libraryPath) return <LibraryPage />
@@ -34,6 +38,9 @@ export function Routes() {
   }
   return <WelcomePage />
 }
+
+/** Signing in. Until it has a screen of its own, the welcome screen offers it. */
+const loginPath = '/login'
 
 /** Sends this person to `to` in place of the path they opened, so going back skips it. */
 export function Redirect({ to }: { to: string }) {

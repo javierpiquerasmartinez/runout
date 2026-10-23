@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../backend/api'
@@ -13,7 +13,7 @@ function renderHeader(session: SessionContextValue = fakeSession()) {
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
-        <AppHeader where="Settings" />
+        <AppHeader current="library" />
       </SessionContext.Provider>
     </I18nProvider>,
   )
@@ -78,5 +78,41 @@ describe('AppHeader · the account menu', () => {
 
     expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+  })
+})
+
+describe('AppHeader · getting around', () => {
+  it('marks the screen the person is on in Library · Rooms', () => {
+    renderHeader()
+
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    const library = within(nav).getByRole('link', { name: 'Library' })
+    const rooms = within(nav).getByRole('link', { name: 'Rooms' })
+    expect(library.getAttribute('aria-current')).toBe('page')
+    expect(rooms.getAttribute('aria-current')).toBeNull()
+    expect(rooms.getAttribute('href')).toBe('/rooms')
+  })
+
+  it('leads the brand to the Library', () => {
+    renderHeader()
+
+    expect(screen.getByRole('link', { name: 'Runout, go to your library' }).getAttribute('href')).toBe('/library')
+  })
+
+  it('opens Rooms from "New room"', async () => {
+    window.history.pushState(null, '', '/library')
+    renderHeader()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
+
+    expect(window.location.pathname).toBe('/rooms')
+  })
+
+  it('offers an anonymous Participant neither the sections nor a new Room', () => {
+    renderHeader(fakeSession({ account: null, room: { code: 'ABCDEF' } }))
+
+    expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New room' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Runout, go to the start' }).getAttribute('href')).toBe('/')
   })
 })
