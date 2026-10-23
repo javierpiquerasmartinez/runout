@@ -48,22 +48,29 @@ function legendEntry(line: string) {
   return within(legend).getByRole('button', { name: line }).closest('li')!
 }
 
+/** A line's Win Rate, as the BB/100 box under the legend shows it. */
+function winRate(line: string) {
+  const box = screen.getByRole('group', { name: 'BB/100' })
+  return within(box).getByText(line).nextElementSibling?.textContent
+}
+
 describe('ResultsGraph', () => {
-  it('shows the Win Rate beside the Hands, in big blinds per 100 Hands whatever the unit', async () => {
+  it('shows the Win Rate of the Result and of All-in EV, in big blinds per 100 Hands whatever the unit', async () => {
     renderGraph(euros, { ...DEFAULT_PREFERENCES, displayUnit: 'amount' })
 
-    // +4 BB over 5 Hands, to a tenth even when whole.
-    expect(screen.getByText('+80.0 BB/100')).toBeTruthy()
+    // +4 BB and +1 BB over 5 Hands, to a tenth even when whole.
+    expect(winRate('Result')).toBe('+80.0')
+    expect(winRate('All-in EV')).toBe('+20.0')
 
     await userEvent.click(screen.getByRole('radio', { name: 'Big blinds' }))
 
-    expect(screen.getByText('+80.0 BB/100')).toBeTruthy()
+    expect(winRate('Result')).toBe('+80.0')
   })
 
   it('writes the Win Rate to a tenth, signed', () => {
     renderGraph({ ...euros, hands: 3, totals: { ...euros.totals, bigBlinds: { ...euros.totals.bigBlinds, result: -1 } } })
 
-    expect(screen.getByText('-33.3 BB/100')).toBeTruthy()
+    expect(winRate('Result')).toBe('-33.3')
   })
 
   it('shows each line’s total in big blinds, and how many Hands it draws', () => {
