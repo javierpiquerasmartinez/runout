@@ -8,7 +8,7 @@ Domain terms (Account, Room, Master, Guest, Hand, Hero, Author, Library, Room Ha
 
 Runout is a web Room where several players review the same poker Hand at once, synchronised in real time. The Master steps through the Hand Action by Action and everyone else sees exactly the same table on their own screen.
 
-It is also where each player keeps their own Hands. Their Library holds the Hands they import into it, and the Results Graph above it shows whether they are winning. The aim is that the Tracker stops being the only place their history lives (ADR 0004).
+It is also where each player keeps their own Hands. Their Library holds the Hands they import into it, and its Results Graph shows whether they are winning. The aim is that the Tracker stops being the only place their history lives (ADR 0004).
 
 It solves the problem of a group that already meets every week and today shares a screen over Discord or Zoom. That format turns one person into the operator and everyone else into spectators: nobody else can point, go back or bring their own Hands without breaking the session. The picture also arrives compressed, and reading a stack in big blinds off a rescaled video is harder than it looks.
 
@@ -66,9 +66,9 @@ flowchart LR
 
 The loop between stepping and discussing is where most of the session goes: stop, discuss, go back, step forward again, dozens of times per Hand. Playback only moves when the Master moves it; there is no automatic play, because the conversation sets the pace.
 
-1. **The Master creates the Room.** Signed in with their Account, they give the Room a name. The Room exists from that moment, even while empty.
+1. **The Master creates the Room.** Signed in with their Account, they give the Room a name on the **Salas** screen. The Room exists from that moment, even while empty.
 2. **They share access.** The system generates an eight-character Room Code and a copyable link. The Master pastes it into the group's chat.
-3. **Guests join.** With the link they go straight in; with the code they type it. Either way they only confirm their Display Name: signed in, or anonymously for that Room. No registration.
+3. **Guests join.** With the link they open the Room; with the code they type it. Signed in, they go straight in under their Display Name; otherwise they continue with Google or enter without an Account under a Display Name for that Room. No registration.
 4. **Everyone brings Hands.** Each person uploads their Tracker export, pastes Hand History text, or adds Hands from their own Library. Each Queue Entry gets its Author.
 5. **The Master drives Playback.** They load a Hand from the Queue and step through it Action by Action or jump between Streets.
 6. **The group discusses.** Everyone sees the same state at the same moment; they stop at the decision point, talk over voice, and the conclusion is left as a Note on the Hand.
@@ -98,7 +98,8 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 
 **H1.1 — Create a Room.** As the player organising the session, I want to create a Room with a name, so I have somewhere to call the group to.
 
-- Creating a Room needs an Account; without one I am asked to sign in first.
+- I create it on the **Salas** screen (`/rooms`). The **Nueva sala** button in the header takes me there from any screen with the shared header (H8.9), with the name field ready.
+- Creating a Room needs an Account, and **Salas** is only reached with one; without it I am sent to `/login`.
 - On creation I become the Master automatically.
 - The name allows up to 60 characters.
 - The Room exists and is reachable even with no Hands yet.
@@ -111,15 +112,18 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 
 **H1.3 — Join with the Room Code.** As a Guest, I want to type the code and get in, so I don't depend on someone forwarding me the link.
 
+- Without an Account I type it on `/room`, reached from the landing's "¿Tienes un código de sala?" link. With an Account I type it on **Salas**, and `/room` takes me there.
 - The field accepts the code with or without a dash and ignores case.
 - An unknown or closed code shows an error next to the field, without reloading the page.
 - On joining I see the Room's current state, including the loaded Hand and its current Action.
 
 **H1.4 — Join by direct link.** As a Guest, I want to open the link and be in, with no intermediate step.
 
-- The link leads to the Room and only asks me to confirm my Display Name.
-- Signed in, the Display Name is prefilled with my Account's.
-- Without an Account I join anonymously, choosing a Display Name for this Room only. The Room tells me that what I do there is lost when it closes, and that I can sign in to keep my Hands.
+- Signed in, the link takes me straight into the Room under my Account's Display Name.
+- Without an identity for this Room, the link shows the Room's name and two ways in: **Continuar con Google** and **Entrar sin cuenta**.
+- Continuing with Google signs me in right there and takes me into the Room as my Account, with no detour through `/login`.
+- Entering without an Account, I choose a Display Name for this Room only and join anonymously. The Room tells me that what I do there is lost when it closes, and that I can sign in to keep my Hands.
+- The interface calls this entering "sin cuenta", never "como invitado": any Participant who is not the Master is a Guest, with or without an Account.
 - If I sign in while inside the Room, I continue in it as my Account, keeping the Master role if I had it.
 
 **H1.5 — See who is in the Room.** As a Participant, I want to see who is present and who is Master, so I know whether someone is missing before we start.
@@ -153,6 +157,11 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 - Room Hands are discarded with their Notes and Marks, unless the Queue of another open Room still holds them; then they go when the last of those closes. The same happens when the Room closes after 30 minutes with nobody connected.
 - Library Hands stay in their Libraries, with the Notes written on them in the Room.
 - The Room's anonymous identities stop working.
+
+**H1.10 — Go back to my Rooms.** As a player with an Account, I want to see my recent Rooms, so I can return to one without asking for its code again.
+
+- **Salas** lists my recent open Rooms and flags the ones with someone in them right now as live.
+- Opening one takes me back into it.
 
 ## E2 · Hand import
 
@@ -350,37 +359,43 @@ What makes a session outlive itself. Notes are in the MVP because without them t
 
 ## E7 · Library and Results
 
-The Library is a person's own repository: the Hands they imported into it, whatever their Hero, and nothing else (ADR 0004). Hands seen in other people's Rooms are not in it. Above it, the Results Graph shows how they are doing over time. The Library needs an Account.
+The Library is a person's own repository: the Hands they imported into it, whatever their Hero, and nothing else (ADR 0004). Hands seen in other people's Rooms are not in it. It has two views over the same filtered Hands: the list of Hands, and the Results Graph, which shows how they are doing over time. The Library needs an Account.
 
 **H7.1 — Import into my Library.** As a player, I want to import Hand History files or pasted text into my Library, so my Hands are kept in Runout.
 
+- **Importar manos** sits in the Library's title row, on the right, so it is always in sight without scrolling, in both views. An empty Library also invites me to import.
 - The flow, preview and 20 MB limit are those of Room import (E2). I can import several files one after the other to bring in more than 20 MB.
 - The preview marks each Hand as new, already in my Library, or discarded with its reason. Hands already in my Library are not added twice, so my Results are not inflated.
 - Hands whose Hero is not me (a friend's export, a forum Hand) are accepted, as are CoinPoker Hands whose Hero is written `Hero`.
 - If someone else already imported the same Hand from the same seat, my import still succeeds: we share the Hand, and I see the Notes already written on it.
 
-**H7.2 — See my Library.** As a player, I want a Library screen reachable from the welcome screen, so I can go to my Hands without being in a Room.
+**H7.2 — See my Library.** As a player, I want my Library to be where I land, so I can go to my Hands without being in a Room.
 
-- It lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands.
+- Signing in, or opening Runout already signed in, takes me to my Library. **Biblioteca** in the header, and the brand, take me back to it from any screen with the shared header (H8.9).
+- The list view, at `/library`, lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands.
 - Each row shows the hole cards, the Positions involved, Hero, Poker Site, Stake, final pot, Final Street, Showdown, my Result, the date and my Tags.
-- The header says how many Hands match the current filters.
-- An empty Library, or filters that match nothing, show an empty state that invites me to import.
-- Anonymous Participants cannot reach a Library.
+- The title row says how many Hands match the current filters. With Hands selected, the selection actions (tag, remove, add to the Room) appear in it next to **Importar manos**.
+- A **Manos | Gráfica** switch below the filters moves between the list and the Results Graph (H7.5). Each view has its own address, so the back button and links return to the view I was on.
+- An empty Library, or filters that match nothing, show an empty state that invites me to import, whichever view I'm on.
+- Anonymous Participants cannot reach a Library: without an Account, its addresses send me to `/login`.
 
 **H7.3 — Filter my Library.** As a player, I want to narrow my Library, to find a specific kind of spot or stretch of play.
 
+- The filters sit on top, above both views. The side column, with **Todas las manos**, **Marcadas** and my Tags, stays in both views.
 - Filters are period (from–to dates in my time zone, plus quick ranges: last 7 days, last 30 days, this year, all time), Poker Site, Hero, Stake, Marked only and Tags (any of the chosen ones).
 - Poker Site, Hero, Stake and Tag options are those present in my Library.
 - Filters combine and clear in one go.
-- The same filters apply to the list and the Results Graph, so both always describe the same Hands.
+- The same filters apply to the list and the Results Graph, so both always describe the same Hands. Switching views keeps them.
+- The filters are part of the address, so a reload or a shared link keeps them.
 
 **H7.4 — Replay a Hand from my Library.** As a player, I want to open a Hand and step through it on my own, to prepare a session or look back at a spot.
 
 - The Hand opens on the same table as in a Room, stepped Action by Action, with nobody else watching.
 - Its Notes are shown alongside it.
 
-**H7.5 — See my Results Graph.** As a player, I want a graph of my running results above my Library, so I see whether I am winning.
+**H7.5 — See my Results Graph.** As a player, I want a graph of my running results as a view of my Library, so I see whether I am winning.
 
+- It is the Library's graph view, at `/library/graph`. It takes the whole main column and the remaining height of the screen, so it can be read properly.
 - It draws four running totals Hand by Hand over the filtered Hands: Result, All-in EV, Showdown Result and Non-showdown Result.
 - Each line can be shown or hidden.
 - It is in big blinds by default, so Hands at different Stakes and currencies add up.
@@ -407,7 +422,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 
 **H7.9 — Bring Library Hands into a Room.** As a signed-in Participant, I want to add Hands from my Library to the Queue of the Room I'm in, so I bring my prepared spots to the session.
 
-- I can filter my Library while choosing, select several Hands and add them in a single action, at the end of the Queue.
+- I can filter my Library while choosing, select several Hands and add them in a single action, at the end of the Queue. Only the list is shown, with no view switch.
 - Only Hands in my own Library can be added.
 - I become the Author of those Queue Entries until the Master reassigns them.
 - They are the same Hands, not copies: Notes the group writes on them in the Room stay with them in my Library after the Room closes.
@@ -452,6 +467,9 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.7 — Sign in with Google.** As a player, I want to sign in with my Google account, so my Hands and results are not tied to one browser.
 
+- Without an Account, `/` shows a short landing: the brand, what Runout is, a **Iniciar sesión** button and a "¿Tienes un código de sala?" link to `/room`.
+- **Iniciar sesión** takes me to `/login`, which offers only Google and a way back. I can also sign in from a Room's link (H1.4).
+- Signing in on `/login` takes me to my Library, wherever I was sent there from. Signed in, `/` and `/login` take me to my Library too.
 - Signing in for the first time creates my Account on the spot and asks for my Display Name, with no separate sign-up form.
 - I am recognised on any device where I sign in, with everything my Account holds: Library, Screen Names, Display Name, Preferences, Marks and Tags.
 - My sign-in survives closing the tab or the browser.
@@ -459,8 +477,16 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.8 — Sign out.** As a signed-in player, I want to sign out, so I can leave a shared computer safely.
 
-- Settings shows the signed-in Account and a sign-out action.
-- Signing out ends the sign-in on this browser only.
+- The avatar in the header opens a menu with my Display Name, **Ajustes** and **Cerrar sesión**. Settings' account section also has **Cerrar sesión**.
+- Signing out takes me to the landing without asking for confirmation, and ends the sign-in on this browser only.
+- If it fails, I am told why and stay signed in.
+
+**H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
+
+- The Library, a Library Hand, **Salas** and Settings share the same header: the brand, **Biblioteca** and **Salas** with the current one marked, **Nueva sala** and the avatar menu.
+- The brand looks the same on every screen, Rooms included.
+- While I hold a Room, the header offers a way back to it.
+- An anonymous Participant who steps out to Settings sees only the brand and a way back, and their Room carries on behind it. Without any identity, Settings sends me to `/login`.
 
 ## MVP scope and out of scope
 
