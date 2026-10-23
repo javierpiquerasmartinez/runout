@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useSession } from '../identity/context'
 import { LandingPage } from '../landing/LandingPage'
 import { LoginPage, loginPath } from '../landing/LoginPage'
-import { libraryHandIdFromPath, libraryPath, roomCodeFromLibraryPath } from '../library/library'
+import { libraryHandIdFromPath, libraryPath, libraryViewFromPath, roomCodeFromLibraryPath } from '../library/library'
 import { LibraryHandPage } from '../library/LibraryHandPage'
 import { LibraryPage } from '../library/LibraryPage'
 import { useHeldRoom } from '../room/heldRoomContext'
@@ -40,7 +40,8 @@ export function Routes() {
     return <LandingPage />
   }
   if (path === roomsPath) return <RoomsPage />
-  if (path === libraryPath) return <LibraryPage />
+  // One screen for both views, so switching keeps its state; it reads which from the path.
+  if (libraryViewFromPath(path)) return <LibraryPage />
   const pickingFor = roomCodeFromLibraryPath(path)
   if (pickingFor) return <RoomLibrary code={pickingFor} />
   const handId = libraryHandIdFromPath(path)

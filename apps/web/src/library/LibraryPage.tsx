@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { useI18n } from '../i18n'
@@ -10,14 +10,23 @@ import type { RoomSummary } from '../room/roomClient'
 import { roomPath } from '../room/roomCode'
 import { quantity } from '../room/quantity'
 import { playedAtLabel, positionsLabel, siteLabel, stakeLabel, streetLabel } from '../room/queueEntryView'
-import { followLink, navigate } from '../routing'
+import { followLink, navigate, redirect, usePath, useSearch } from '../routing'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { LIBRARY_PAGE_SIZE, libraryHandPath, type LibraryHand, type LibraryPage as Page } from './library'
-import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, type LibraryFilter } from './libraryFilter'
+import { SegmentedControl } from '../ui/SegmentedControl'
+import {
+  LIBRARY_PAGE_SIZE,
+  libraryHandPath,
+  libraryViewFromPath,
+  libraryViewPath,
+  type LibraryHand,
+  type LibraryPage as Page,
+  type LibraryView,
+} from './library'
+import { EMPTY_LIBRARY_FILTER, libraryFilterFromSearch, libraryFilterQuery, librarySearch, type LibraryFilter } from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
 import { LibraryTags, TagSelection } from './LibraryTags'
 import type { Results } from './results'
@@ -29,14 +38,20 @@ import './LibraryPage.css'
  * time, narrowed by the Library filter. It predates ADR 0004, so neither its
  * "Compartidas" collection nor its Author column is built: every Hand here is
  * the Account's own, whatever its Hero, so the Hero takes the Author's place.
- * Opened from a Room, it leads back there and adds the selected Hands to the
- * Room's Queue, as the board's "Añadir a la sala" does.
+ * The filter lives in the address, so the list at `/library` and the Results
+ * Graph at `/library/graph` describe the same Hands, and a reload or a shared
+ * link keeps them. Opened from a Room, it leads back there and adds the
+ * selected Hands to the Room's Queue, as the board's "Añadir a la sala" does;
+ * there it is only ever the list.
  */
 export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const { t } = useI18n()
   const { token } = useIdentity()
+  const path = usePath()
+  const search = useSearch()
+  const view: LibraryView = (!room && libraryViewFromPath(path)) || 'list'
+  const filter = useMemo(() => libraryFilterFromSearch(search), [search])
   const [pageNumber, setPageNumber] = useState(1)
-  const [filter, setFilter] = useState<LibraryFilter>(EMPTY_LIBRARY_FILTER)
   // Bumped after an import, so the list is read again.
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
@@ -47,6 +62,15 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
   const [adding, setAdding] = useState(false)
   const [addFailure, setAddFailure] = useState<FailureReason | null>(null)
+  // Any change of filter, from a control or from the history, starts again from the first page with nothing selected.
+  const [filteredBy, setFilteredBy] = useState(search)
+  if (filteredBy !== search) {
+    setFilteredBy(search)
+    setPageNumber(1)
+    setSelected([])
+    // The graph of other Hands mustn't stay beside the new list.
+    setResults(null)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -62,6 +86,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
 
   // The Results Graph reads the same filter, so it describes the same Hands; paging leaves it be.
   useEffect(() => {
+    if (view !== 'graph') return
     let cancelled = false
     api<Results>(`/library/results?${libraryFilterQuery(filter)}`, { token })
       .then((read) => !cancelled && setResults(read))
@@ -70,7 +95,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     return () => {
       cancelled = true
     }
-  }, [token, filter, revision])
+  }, [token, filter, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
   const goToPage = (number: number) => {
@@ -80,12 +105,13 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   // Only what this page still shows counts as selected.
   const selectedHands = page ? page.hands.filter((hand) => selected.includes(hand.id)) : []
   const openImport = () => setImporting(true)
-  // Any change of filter starts again from the first page.
-  const changeFilter = (next: LibraryFilter) => {
-    setFilter(next)
-    goToPage(1)
-    // The graph of other Hands mustn't stay beside the new list.
-    setResults(null)
+  // Replaced, not pushed: going back leaves the Library rather than undoing each filter.
+  const changeFilter = (next: LibraryFilter) => redirect(`${path}${librarySearch(next)}`)
+  // Either view keeps the filter; going back returns to the view left.
+  const showView = (next: LibraryView) => {
+    // The graph shows no rows to select.
+    setSelected([])
+    navigate(`${libraryViewPath(next)}${search}`)
   }
   const setMark = (hand: LibraryHand, marked: boolean) => {
     api(`/library/hands/${encodeURIComponent(hand.id)}/mark`, { token, method: marked ? 'PUT' : 'DELETE' })
@@ -184,13 +210,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               onDelete={deleteTag}
             />
           )}
-          <Button variant="secondary" className="library__import" onClick={openImport}>
-            <Icon name="import" size={16} />
-            {t('library.import')}
-          </Button>
         </nav>
 
-        <main className="library__main">
+        <main className="library__main" data-view={view}>
           <div className="library__heading">
             <div className="library__intro">
               <h1 className="library__title ro-serif">{t(filter.markedOnly ? 'library.markedTitle' : 'library.all')}</h1>
@@ -227,6 +249,10 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
                 )}
               </>
             )}
+            <Button variant="secondary" onClick={openImport}>
+              <Icon name="import" size={16} />
+              {t('library.import')}
+            </Button>
           </div>
           {addFailure && (
             <p className="library__failure" role="alert">
@@ -240,7 +266,18 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             </p>
           )}
           {page && page.counts.all > 0 && <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />}
-          {page && page.total > 0 && results && results.hands > 0 && <ResultsGraph results={results} />}
+          {!room && (
+            <SegmentedControl
+              label={t('library.view')}
+              options={[
+                { value: 'list', label: t('library.view.hands') },
+                { value: 'graph', label: t('library.view.graph') },
+              ]}
+              value={view}
+              onChange={showView}
+            />
+          )}
+          {view === 'graph' && page && page.total > 0 && results && results.hands > 0 && <ResultsGraph results={results} />}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{t('library.noMatches')}</p>
@@ -264,7 +301,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               </Button>
             </div>
           )}
-          {page && page.hands.length > 0 && (
+          {view === 'list' && page && page.hands.length > 0 && (
             <>
               <HandTable hands={page.hands} selected={selected} onSelect={setSelected} onSetMark={setMark} />
               <Pagination page={page} onGoTo={goToPage} />

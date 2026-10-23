@@ -8,6 +8,24 @@ import { roomPath } from '../room/roomCode'
 
 export const libraryPath = '/library'
 
+/** Where the Library shows its Results Graph instead of its Hands. */
+export const libraryGraphPath = `${libraryPath}/graph`
+
+/** What the Library shows under its filters: its Hands, or their Results Graph. */
+export type LibraryView = 'list' | 'graph'
+
+/** Where the Library shows this view. */
+export function libraryViewPath(view: LibraryView): string {
+  return view === 'graph' ? libraryGraphPath : libraryPath
+}
+
+/** The view a Library path shows, or null for any other path. */
+export function libraryViewFromPath(path: string): LibraryView | null {
+  if (path === libraryPath) return 'list'
+  if (path === libraryGraphPath) return 'graph'
+  return null
+}
+
 /** Where a Hand opened from the Library is replayed. */
 export function libraryHandPath(handId: string): string {
   return `${libraryPath}/hands/${encodeURIComponent(handId)}`

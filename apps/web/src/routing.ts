@@ -31,6 +31,11 @@ export function usePath(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname)
 }
 
+/** The current query string, as `?site=pokerstars`, or `''`; kept up to date like the path. */
+export function useSearch(): string {
+  return useSyncExternalStore(subscribe, () => window.location.search)
+}
+
 /** A primitive read from the current history entry's state, kept up to date like the path. */
 export function useHistoryState<T extends string | number | null>(read: (state: unknown) => T): T {
   return useSyncExternalStore(subscribe, () => read(window.history.state))

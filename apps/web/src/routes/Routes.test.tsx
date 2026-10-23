@@ -94,6 +94,10 @@ function renderSigningIn(path: string) {
 const landing = () => screen.findByRole('heading', { name: /The group, the same hand/ })
 const login = () => screen.findByRole('main', { name: 'Sign in' })
 const library = () => screen.findByRole('heading', { name: 'All hands' })
+const libraryGraph = async () => {
+  const graph = await screen.findByRole('radio', { name: 'Graph' })
+  return graph.getAttribute('aria-checked') === 'true' && window.location.pathname === '/library/graph'
+}
 const libraryHand = () => screen.findByRole('link', { name: /Back to the library/ })
 const roomLibrary = () => screen.findByRole('link', { name: /Back to RNT4-K9PX/ })
 const settings = () => screen.findByRole('heading', { name: 'Profile and play' })
@@ -131,6 +135,7 @@ describe('Routes · the landing, for visitors', () => {
 describe('Routes · the Library, only for an Account', () => {
   it.each([
     ['/library', library],
+    ['/library/graph', libraryGraph],
     ['/library/hands/split-pot', libraryHand],
     ['/room/RNT4K9PX/library', roomLibrary],
   ])('shows %s to an Account', async (path, shown) => {

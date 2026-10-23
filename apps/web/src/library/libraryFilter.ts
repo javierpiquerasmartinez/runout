@@ -73,15 +73,55 @@ export function isFiltering(filter: LibraryFilter): boolean {
 
 /** The filter as the server's query: the viewer's days become instants, `to` exclusive. */
 export function libraryFilterQuery(filter: LibraryFilter): URLSearchParams {
+  return writeFilter(filter, (day, end) => startOf(day, end === 'to' ? 1 : 0))
+}
+
+/**
+ * The filter as the Library's address keeps it, so a view switch, a reload
+ * or a shared link keeps the same Hands: `?site=pokerstars&tag=t1`, or `''`
+ * for no filter. Days stay the viewer's days, unlike the server's query.
+ */
+export function librarySearch(filter: LibraryFilter): string {
+  const search = writeFilter(filter, (day) => day).toString()
+  return search && `?${search}`
+}
+
+/** The filter an address keeps, as `librarySearch` writes it; anything else in it is left out. */
+export function libraryFilterFromSearch(search: string): LibraryFilter {
+  const query = new URLSearchParams(search)
+  const day = (key: string) => {
+    const value = query.get(key)
+    return value && isDay(value) ? value : null
+  }
+  return {
+    from: day('from'),
+    to: day('to'),
+    site: query.get('site') || null,
+    hero: query.get('hero') || null,
+    stake: query.get('stake') || null,
+    markedOnly: query.get('marked') === 'true',
+    tags: query.getAll('tag').filter(Boolean),
+  }
+}
+
+/** The filter's parameters, in one order for the server and the address alike; only the days are written differently. */
+function writeFilter(filter: LibraryFilter, writeDay: (day: string, end: 'from' | 'to') => string): URLSearchParams {
   const query = new URLSearchParams()
-  if (filter.from) query.set('from', startOf(filter.from, 0))
-  if (filter.to) query.set('to', startOf(filter.to, 1))
+  if (filter.from) query.set('from', writeDay(filter.from, 'from'))
+  if (filter.to) query.set('to', writeDay(filter.to, 'to'))
   if (filter.site) query.set('site', filter.site)
   if (filter.hero) query.set('hero', filter.hero)
   if (filter.stake) query.set('stake', filter.stake)
   if (filter.markedOnly) query.set('marked', 'true')
   for (const tag of filter.tags) query.append('tag', tag)
   return query
+}
+
+/** Whether the text is a real `YYYY-MM-DD` day. */
+function isDay(text: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false
+  const [year, month, date] = text.split('-').map(Number)
+  return localDay(new Date(year, month - 1, date)) === text
 }
 
 /** A Stake as the query writes it: `no-limit:5:10:EUR`. */

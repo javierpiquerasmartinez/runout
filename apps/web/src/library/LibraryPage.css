@@ -263,10 +263,6 @@
   font-size: 12.5px;
   color: var(--text-muted);
 }
-.library__import {
-  margin-top: auto;
-}
-
 .library__main {
   flex-grow: 1;
   min-width: 0;
@@ -276,6 +272,38 @@
   gap: 16px;
   padding: 22px 28px;
 }
+/* The Manos | Gráfica switch keeps its own width under the filters. */
+.library__main > .ro-segmented {
+  align-self: flex-start;
+}
+/*
+ * The graph view gives the Results Graph the rest of the main column: its
+ * width, and the viewport's height left under the header and the controls.
+ */
+@media (min-width: 761px) {
+  .library:has(.library__main[data-view='graph']) {
+    height: 100vh;
+    height: 100dvh;
+  }
+  /* A long list of Tags scrolls on its own rather than stretching the graph past the viewport. */
+  .library:has(.library__main[data-view='graph']) .library__side,
+  .library__main[data-view='graph'] {
+    overflow-y: auto;
+  }
+}
+.library__main[data-view='graph'] .results {
+  flex-grow: 1;
+  min-height: 360px;
+}
+.library__main[data-view='graph'] .results__body {
+  flex-grow: 1;
+  min-height: 0;
+}
+.library__main[data-view='graph'] .results__plot {
+  height: auto;
+  min-height: 260px;
+}
+
 .library__heading {
   display: flex;
   align-items: flex-end;
