@@ -399,7 +399,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 
 - It is the Library's graph view, at `/library/graph`. It takes the whole main column and the remaining height of the screen, so it can be read properly.
 - It draws four running totals Hand by Hand over the filtered Hands: Result, All-in EV, Showdown Result and Non-showdown Result.
-- Beside the number of Hands it shows my Win Rate, in BB/100, always in big blinds.
+- Under the legend it shows my Win Rate in BB/100 for the Result and for All-in EV, always in big blinds.
 - Each line can be shown or hidden.
 - It is in big blinds by default, so Hands at different Stakes and currencies add up.
 - When every filtered Hand shares one currency, I can see it in Amounts, following my Display Unit. When currencies mix, that option is locked with its reason.

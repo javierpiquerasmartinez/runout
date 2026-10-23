@@ -100,7 +100,7 @@ The running total over a person's Library, Hand by Hand: Result, All-in EV, Show
 _Avoid_: Chart, winrate graph
 
 **Win Rate**:
-The Result per 100 Hands, in big blinds whatever the currency, over the Hands the Results Graph shows. Written as BB/100.
+A Result line per 100 Hands, in big blinds whatever the currency, over the Hands the Results Graph shows: the Result's, and the All-in EV's. Written as BB/100.
 _Avoid_: bb/100 (as a name), winnings rate
 
 ### Room and queue
