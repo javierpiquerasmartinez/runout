@@ -382,11 +382,13 @@ The Library is a person's own repository: the Hands they imported into it, whate
 **H7.3 — Filter my Library.** As a player, I want to narrow my Library, to find a specific kind of spot or stretch of play.
 
 - The filters sit on top, above both views. The side column, with **Todas las manos**, **Marcadas** and my Tags, stays in both views.
-- Filters are period (from–to dates in my time zone, plus quick ranges: last 7 days, last 30 days, this year, all time), Poker Site, Hero, Stake, Marked only and Tags (any of the chosen ones).
+- Filters are period (from–to dates in my time zone, plus quick ranges: today, this week from Monday, this month, this year, all time), Poker Site, Hero, Stake, Marked only and Tags (any of the chosen ones).
+- The period starts as today, in both views and when picking Hands for a Room. Clearing the filters goes back to today.
+- When only the period leaves nothing to show, the Library says so ("Ninguna mano hoy.") and offers **Ver todo**.
 - Poker Site, Hero, Stake and Tag options are those present in my Library.
 - Filters combine and clear in one go.
 - The same filters apply to the list and the Results Graph, so both always describe the same Hands. Switching views keeps them.
-- The filters are part of the address, so a reload or a shared link keeps them.
+- The filters are part of the address, so a reload or a shared link keeps them. A bare `/library` is today's Hands, whatever day it is opened.
 
 **H7.4 — Replay a Hand from my Library.** As a player, I want to open a Hand and step through it on my own, to prepare a session or look back at a spot.
 
@@ -397,6 +399,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 
 - It is the Library's graph view, at `/library/graph`. It takes the whole main column and the remaining height of the screen, so it can be read properly.
 - It draws four running totals Hand by Hand over the filtered Hands: Result, All-in EV, Showdown Result and Non-showdown Result.
+- Beside the number of Hands it shows my Win Rate, in BB/100, always in big blinds.
 - Each line can be shown or hidden.
 - It is in big blinds by default, so Hands at different Stakes and currencies add up.
 - When every filtered Hand shares one currency, I can see it in Amounts, following my Display Unit. When currencies mix, that option is locked with its reason.

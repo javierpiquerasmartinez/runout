@@ -26,7 +26,16 @@ import {
   type LibraryPage as Page,
   type LibraryView,
 } from './library'
-import { EMPTY_LIBRARY_FILTER, libraryFilterFromSearch, libraryFilterQuery, librarySearch, type LibraryFilter } from './libraryFilter'
+import {
+  defaultLibraryFilter,
+  EMPTY_LIBRARY_FILTER,
+  isFiltering,
+  libraryFilterFromSearch,
+  libraryFilterQuery,
+  librarySearch,
+  periodOf,
+  type LibraryFilter,
+} from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
 import { LibraryTags, TagSelection } from './LibraryTags'
 import type { Results } from './results'
@@ -98,6 +107,10 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   }, [token, filter, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
+  // When only a quick period leaves nothing, the way out is all the Library, not clearing filters.
+  const period = periodOf(filter)
+  const onlyThePeriod = !isFiltering({ ...filter, ...defaultLibraryFilter() })
+  const emptyPeriod = onlyThePeriod && period !== 'custom' && period !== 'all-time' ? period : null
   const goToPage = (number: number) => {
     setPageNumber(number)
     setSelected([])
@@ -278,11 +291,25 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             />
           )}
           {view === 'graph' && page && page.total > 0 && results && results.hands > 0 && <ResultsGraph results={results} />}
-          {page && page.total === 0 && page.counts.all > 0 && (
+          {page && page.total === 0 && page.counts.all > 0 && emptyPeriod && (
+            <div className="library__empty">
+              <p>{t(`library.noHands.${emptyPeriod}`)}</p>
+              <div className="library__empty-actions">
+                <Button variant="secondary" onClick={() => changeFilter(EMPTY_LIBRARY_FILTER)}>
+                  {t('library.showAll')}
+                </Button>
+                <Button variant="primary" onClick={openImport}>
+                  <Icon name="import" size={16} />
+                  {t('library.import')}
+                </Button>
+              </div>
+            </div>
+          )}
+          {page && page.total === 0 && page.counts.all > 0 && !emptyPeriod && (
             <div className="library__empty">
               <p>{t('library.noMatches')}</p>
               <div className="library__empty-actions">
-                <Button variant="secondary" onClick={() => changeFilter(EMPTY_LIBRARY_FILTER)}>
+                <Button variant="secondary" onClick={() => changeFilter(defaultLibraryFilter())}>
                   {t('library.filter.clear')}
                 </Button>
                 <Button variant="primary" onClick={openImport}>

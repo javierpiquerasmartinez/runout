@@ -2,7 +2,7 @@ import { useI18n } from '../i18n'
 import { siteLabel, stakeLabel } from '../room/queueEntryView'
 import type { LibraryPage } from './library'
 import {
-  EMPTY_LIBRARY_FILTER,
+  defaultLibraryFilter,
   isFiltering,
   periodOf,
   QUICK_RANGES,
@@ -38,7 +38,7 @@ export function LibraryFilters({
 
   return (
     <div className="library-filters" role="group" aria-label={t('library.filters')}>
-      <label className="library-filters__field" data-active={period !== 'all-time' || undefined}>
+      <label className="library-filters__field" data-active={period !== 'today' || undefined}>
         <span className="library-filters__label">{t('library.filter.period')}</span>
         <select
           value={period}
@@ -97,11 +97,11 @@ export function LibraryFilters({
         onChange={(stake) => set({ stake })}
       />
       <span className="library-filters__spacer" />
-      {/* Always there, as on the board; it does nothing while nothing narrows the Library. */}
+      {/* Always there, as on the board; it does nothing while the filter is the default, today's Hands. */}
       <button
         type="button"
         className="library-filters__clear"
-        onClick={() => isFiltering(filter) && onChange(EMPTY_LIBRARY_FILTER)}
+        onClick={() => isFiltering(filter) && onChange(defaultLibraryFilter())}
       >
         {t('library.filter.clear')}
       </button>

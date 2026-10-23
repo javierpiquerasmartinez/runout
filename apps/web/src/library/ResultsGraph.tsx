@@ -63,6 +63,15 @@ export function ResultsGraph({ results }: { results: Results }) {
         <span className="results__hands">
           {t(results.hands === 1 ? 'library.count.one' : 'library.count.other', { count: i18n.formatNumber(results.hands) })}
         </span>
+        {/* The Win Rate is in big blinds by definition, whichever unit draws the lines. */}
+        <span className="results__win-rate ro-mono" title={t('library.results.winRate')}>
+          {t('library.results.winRateValue', {
+            value: i18n.formatNumber((results.totals.bigBlinds.result / results.hands) * 100, {
+              maximumFractionDigits: 1,
+              signDisplay: 'exceptZero',
+            }),
+          })}
+        </span>
         <span className="results__spacer" />
         <SegmentedControl<GraphUnit>
           label={t('library.results.unit')}
