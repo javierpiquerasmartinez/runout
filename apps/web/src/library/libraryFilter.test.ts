@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
+  defaultLibraryFilter,
   EMPTY_LIBRARY_FILTER,
-  isFiltering,
+  differsFromDefault,
+  isDefaultBesidesPeriod,
   libraryFilterFromSearch,
   libraryFilterQuery,
   librarySearch,
@@ -23,12 +25,18 @@ afterAll(() => {
 const now = new Date('2026-10-21T15:30:00+02:00')
 
 describe('quickRange', () => {
-  it('counts today among the last 7 and 30 days', () => {
-    expect(quickRange('last-7-days', now)).toEqual({ from: '2026-10-15', to: '2026-10-21' })
-    expect(quickRange('last-30-days', now)).toEqual({ from: '2026-09-22', to: '2026-10-21' })
+  it('is just today for today', () => {
+    expect(quickRange('today', now)).toEqual({ from: '2026-10-21', to: '2026-10-21' })
   })
 
-  it('starts this year on 1 January', () => {
+  it('starts this week on Monday, whatever the language', () => {
+    expect(quickRange('this-week', now)).toEqual({ from: '2026-10-19', to: '2026-10-21' })
+    // A Sunday: the week began in the month before.
+    expect(quickRange('this-week', new Date('2026-11-01T12:00:00+01:00'))).toEqual({ from: '2026-10-26', to: '2026-11-01' })
+  })
+
+  it('starts this month on its first day, and this year on 1 January', () => {
+    expect(quickRange('this-month', now)).toEqual({ from: '2026-10-01', to: '2026-10-21' })
     expect(quickRange('this-year', now)).toEqual({ from: '2026-01-01', to: '2026-10-21' })
   })
 
@@ -40,9 +48,15 @@ describe('quickRange', () => {
 describe('periodOf', () => {
   it('names the quick range the dates match, or calls them custom', () => {
     expect(periodOf({ from: null, to: null }, now)).toBe('all-time')
-    expect(periodOf({ from: '2026-10-15', to: '2026-10-21' }, now)).toBe('last-7-days')
+    expect(periodOf({ from: '2026-10-19', to: '2026-10-21' }, now)).toBe('this-week')
     expect(periodOf({ from: '2026-10-14', to: '2026-10-21' }, now)).toBe('custom')
     expect(periodOf({ from: null, to: '2026-10-21' }, now)).toBe('custom')
+  })
+
+  it('names the shortest when two quick ranges are the same days', () => {
+    const monday = new Date('2026-10-19T10:00:00+02:00')
+
+    expect(periodOf({ from: '2026-10-19', to: '2026-10-19' }, monday)).toBe('today')
   })
 })
 
@@ -75,13 +89,29 @@ describe('libraryFilterQuery', () => {
   })
 })
 
-describe('isFiltering', () => {
-  it('is true once any part narrows the Library', () => {
-    expect(isFiltering(EMPTY_LIBRARY_FILTER)).toBe(false)
-    expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, to: '2026-10-21' })).toBe(true)
-    expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, markedOnly: true })).toBe(true)
-    expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, tags: [] })).toBe(false)
-    expect(isFiltering({ ...EMPTY_LIBRARY_FILTER, tags: ['t1'] })).toBe(true)
+describe('differsFromDefault', () => {
+  it('is false for the default, today and nothing else', () => {
+    expect(defaultLibraryFilter(now)).toEqual({ ...EMPTY_LIBRARY_FILTER, from: '2026-10-21', to: '2026-10-21' })
+    expect(differsFromDefault(defaultLibraryFilter(now), now)).toBe(false)
+  })
+
+  it('is true once any part narrows the Library otherwise, all time included', () => {
+    const today = defaultLibraryFilter(now)
+
+    expect(differsFromDefault(EMPTY_LIBRARY_FILTER, now)).toBe(true)
+    expect(differsFromDefault({ ...today, from: '2026-10-19' }, now)).toBe(true)
+    expect(differsFromDefault({ ...today, markedOnly: true }, now)).toBe(true)
+    expect(differsFromDefault({ ...today, tags: [] }, now)).toBe(false)
+    expect(differsFromDefault({ ...today, tags: ['t1'] }, now)).toBe(true)
+  })
+})
+
+describe('isDefaultBesidesPeriod', () => {
+  it('looks past the period, whatever it is, at everything else', () => {
+    expect(isDefaultBesidesPeriod(defaultLibraryFilter(now), now)).toBe(true)
+    expect(isDefaultBesidesPeriod({ ...defaultLibraryFilter(now), from: '2026-10-01' }, now)).toBe(true)
+    expect(isDefaultBesidesPeriod(EMPTY_LIBRARY_FILTER, now)).toBe(true)
+    expect(isDefaultBesidesPeriod({ ...EMPTY_LIBRARY_FILTER, site: 'pokerstars' }, now)).toBe(false)
   })
 })
 
@@ -97,18 +127,25 @@ describe('the filter in the address', () => {
   }
 
   it('writes the viewer’s days as they are, and reads back the same filter', () => {
-    const search = librarySearch(everything)
+    const search = librarySearch(everything, now)
 
     expect(search).toBe('?from=2026-10-15&to=2026-10-21&site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&marked=true&tag=t1&tag=t2')
-    expect(libraryFilterFromSearch(search)).toEqual(everything)
+    expect(libraryFilterFromSearch(search, now)).toEqual(everything)
   })
 
-  it('leaves the address bare for an empty filter, and an empty address is the empty filter', () => {
-    expect(librarySearch(EMPTY_LIBRARY_FILTER)).toBe('')
-    expect(libraryFilterFromSearch('')).toEqual(EMPTY_LIBRARY_FILTER)
+  it('leaves the address bare for the default, and a bare address is whatever day it is now', () => {
+    expect(librarySearch(defaultLibraryFilter(now), now)).toBe('')
+    expect(libraryFilterFromSearch('', new Date('2026-10-22T09:00:00+02:00'))).toEqual(
+      defaultLibraryFilter(new Date('2026-10-22T09:00:00+02:00')),
+    )
+  })
+
+  it('says all time out loud, since a bare address is today', () => {
+    expect(librarySearch(EMPTY_LIBRARY_FILTER, now)).toBe('?period=all')
+    expect(libraryFilterFromSearch('?period=all', now)).toEqual(EMPTY_LIBRARY_FILTER)
   })
 
   it('ignores what isn’t a filter, and days that aren’t days', () => {
-    expect(libraryFilterFromSearch('?page=3&from=yesterday&to=2026-13-01&marked=yes&site=')).toEqual(EMPTY_LIBRARY_FILTER)
+    expect(libraryFilterFromSearch('?page=3&from=yesterday&to=2026-13-01&marked=yes&site=', now)).toEqual(defaultLibraryFilter(now))
   })
 })

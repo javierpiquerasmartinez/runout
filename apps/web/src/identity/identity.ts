@@ -1,4 +1,5 @@
 import { api, ApiError } from '../backend/api'
+import { untilAwake } from '../backend/untilAwake'
 import type { Preferences } from '../preferences/preferences'
 
 export interface Identity {
@@ -44,7 +45,8 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
   const stored = readToken(storage)
   if (!stored) return null
   try {
-    const identity = await api<Identity>('/identities/me', { token: stored })
+    // The first request of a visit may find the server asleep: it waits for it to wake.
+    const identity = await untilAwake(() => api<Identity>('/identities/me', { token: stored }))
     return { token: stored, identity }
   } catch (error) {
     if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error

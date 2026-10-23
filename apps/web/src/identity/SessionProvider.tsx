@@ -4,6 +4,7 @@ import { useI18n } from '../i18n'
 import { PreferencesContext } from '../preferences/context'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 import { useTheme } from '../preferences/theme'
+import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { SessionContext } from './context'
 import {
@@ -135,13 +136,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut, joinRoom, forgetEnded],
   )
 
-  if (loading.state === 'loading') {
-    return (
-      <main className="session-gate" aria-busy="true">
-        <p>{t('identity.loading')}</p>
-      </main>
-    )
-  }
+  if (loading.state === 'loading') return <SessionLoading />
   if (!value) {
     return (
       <main className="session-gate">
@@ -162,6 +157,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     <SessionContext value={value}>
       <PreferencesContext value={preferences}>{children}</PreferencesContext>
     </SessionContext>
+  )
+}
+
+/** Shown after a moment, and only then: a server that answers at once flashes nothing. */
+const LOADER_AFTER_MS = 300
+/** Long enough that the server is likely waking up, so the wait gets a reason. */
+const SLOW_AFTER_MS = 5000
+
+/** What shows while the identity loads: nothing, then the brand mark, then why it takes a while. */
+function SessionLoading() {
+  const { t } = useI18n()
+  const [stage, setStage] = useState<'quiet' | 'loader' | 'slow'>('quiet')
+  useEffect(() => {
+    const loader = setTimeout(() => setStage('loader'), LOADER_AFTER_MS)
+    const slow = setTimeout(() => setStage('slow'), SLOW_AFTER_MS)
+    return () => {
+      clearTimeout(loader)
+      clearTimeout(slow)
+    }
+  }, [])
+
+  return (
+    <main className="session-gate" aria-busy="true">
+      {stage !== 'quiet' && (
+        <div className="session-gate__loader" role="progressbar" aria-label={t('identity.loading')}>
+          <BrandMark size={40} />
+        </div>
+      )}
+      {stage === 'slow' && <p>{t('identity.waking')}</p>}
+    </main>
   )
 }
 

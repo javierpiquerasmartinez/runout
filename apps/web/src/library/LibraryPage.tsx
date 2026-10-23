@@ -26,7 +26,16 @@ import {
   type LibraryPage as Page,
   type LibraryView,
 } from './library'
-import { EMPTY_LIBRARY_FILTER, libraryFilterFromSearch, libraryFilterQuery, librarySearch, type LibraryFilter } from './libraryFilter'
+import {
+  defaultLibraryFilter,
+  EMPTY_LIBRARY_FILTER,
+  isDefaultBesidesPeriod,
+  libraryFilterFromSearch,
+  libraryFilterQuery,
+  librarySearch,
+  periodOf,
+  type LibraryFilter,
+} from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
 import { LibraryTags, TagSelection } from './LibraryTags'
 import type { Results } from './results'
@@ -98,6 +107,12 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   }, [token, filter, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
+  // When only a quick period leaves nothing, the way out is all the Library, not clearing filters.
+  const period = periodOf(filter)
+  const emptyPeriod = isDefaultBesidesPeriod(filter) && period !== 'custom' && period !== 'all-time' ? period : null
+  const noMatches = emptyPeriod
+    ? { message: t(`library.noHands.${emptyPeriod}`), action: t('library.showAll'), filter: EMPTY_LIBRARY_FILTER }
+    : { message: t('library.noMatches'), action: t('library.filter.clear'), filter: defaultLibraryFilter() }
   const goToPage = (number: number) => {
     setPageNumber(number)
     setSelected([])
@@ -280,10 +295,10 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
           {view === 'graph' && page && page.total > 0 && results && results.hands > 0 && <ResultsGraph results={results} />}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
-              <p>{t('library.noMatches')}</p>
+              <p>{noMatches.message}</p>
               <div className="library__empty-actions">
-                <Button variant="secondary" onClick={() => changeFilter(EMPTY_LIBRARY_FILTER)}>
-                  {t('library.filter.clear')}
+                <Button variant="secondary" onClick={() => changeFilter(noMatches.filter)}>
+                  {noMatches.action}
                 </Button>
                 <Button variant="primary" onClick={openImport}>
                   <Icon name="import" size={16} />

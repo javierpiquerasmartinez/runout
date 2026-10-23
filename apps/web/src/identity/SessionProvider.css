@@ -1,3 +1,21 @@
+.session-gate__loader {
+  color: var(--brass);
+  animation: ro-gate-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ro-gate-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-gate__loader {
+    animation: none;
+  }
+}
 .session-gate {
   min-height: 100vh;
   display: flex;

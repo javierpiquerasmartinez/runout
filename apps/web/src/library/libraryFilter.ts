@@ -25,6 +25,7 @@ export interface LibraryFilter {
   tags: string[]
 }
 
+/** Every Hand of the Library: nothing narrows it, not even the period. */
 export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   from: null,
   to: null,
@@ -35,19 +36,34 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   tags: [],
 }
 
-export type QuickRange = 'last-7-days' | 'last-30-days' | 'this-year' | 'all-time'
+export type QuickRange = 'today' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
 
-export const QUICK_RANGES: QuickRange[] = ['last-7-days', 'last-30-days', 'this-year', 'all-time']
+/** The period the Library starts on, and the one a bare address means. */
+export const DEFAULT_PERIOD: QuickRange = 'today'
 
-/** The quick range's days, counted back from today in the viewer's time zone. */
+/** How the address says all time, since leaving the period out means the default one. */
+const ALL_TIME_PARAM = { name: 'period', value: 'all' } as const
+
+/** What the Library shows until the viewer changes it: the default period's Hands, nothing else narrowed. */
+export function defaultLibraryFilter(now: Date = new Date()): LibraryFilter {
+  return { ...EMPTY_LIBRARY_FILTER, ...quickRange(DEFAULT_PERIOD, now) }
+}
+
+/** Shortest first, so days two of them share are named by the shorter. */
+export const QUICK_RANGES: QuickRange[] = ['today', 'this-week', 'this-month', 'this-year', 'all-time']
+
+/** The quick range's days, up to today in the viewer's time zone. Weeks start on Monday. */
 export function quickRange(range: QuickRange, now: Date = new Date()): Pick<LibraryFilter, 'from' | 'to'> {
   const today = localDay(now)
-  const daysBack = (days: number) => localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days))
   switch (range) {
-    case 'last-7-days':
-      return { from: daysBack(6), to: today }
-    case 'last-30-days':
-      return { from: daysBack(29), to: today }
+    case 'today':
+      return { from: today, to: today }
+    case 'this-week': {
+      const sinceMonday = (now.getDay() + 6) % 7
+      return { from: localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - sinceMonday)), to: today }
+    }
+    case 'this-month':
+      return { from: localDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: today }
     case 'this-year':
       return { from: `${now.getFullYear()}-01-01`, to: today }
     case 'all-time':
@@ -64,11 +80,17 @@ export function periodOf(period: Pick<LibraryFilter, 'from' | 'to'>, now: Date =
   return match ?? 'custom'
 }
 
-/** Whether any part of the filter narrows the Library. */
-export function isFiltering(filter: LibraryFilter): boolean {
+/** Whether any part of the filter differs from the default, the period included. */
+export function differsFromDefault(filter: LibraryFilter, now: Date = new Date()): boolean {
+  const byDefault = defaultLibraryFilter(now)
   return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) =>
-    key === 'tags' ? filter.tags.length > 0 : filter[key] !== EMPTY_LIBRARY_FILTER[key],
+    key === 'tags' ? filter.tags.length > 0 : filter[key] !== byDefault[key],
   )
+}
+
+/** Whether every part of the filter but the period is the default. */
+export function isDefaultBesidesPeriod(filter: LibraryFilter, now: Date = new Date()): boolean {
+  return !differsFromDefault({ ...filter, ...quickRange(DEFAULT_PERIOD, now) }, now)
 }
 
 /** The filter as the server's query: the viewer's days become instants, `to` exclusive. */
@@ -78,24 +100,34 @@ export function libraryFilterQuery(filter: LibraryFilter): URLSearchParams {
 
 /**
  * The filter as the Library's address keeps it, so a view switch, a reload
- * or a shared link keeps the same Hands: `?site=pokerstars&tag=t1`, or `''`
- * for no filter. Days stay the viewer's days, unlike the server's query.
+ * or a shared link keeps the same Hands: `?site=pokerstars&tag=t1`. Days stay
+ * the viewer's days, unlike the server's query. The default period is left
+ * out, so a bare address follows the day it is opened; all time is `period=all`.
  */
-export function librarySearch(filter: LibraryFilter): string {
-  const search = writeFilter(filter, (day) => day).toString()
+export function librarySearch(filter: LibraryFilter, now: Date = new Date()): string {
+  const byDefault = quickRange(DEFAULT_PERIOD, now)
+  const isDefaultPeriod = filter.from === byDefault.from && filter.to === byDefault.to
+  const query = new URLSearchParams()
+  if (!filter.from && !filter.to) query.set(ALL_TIME_PARAM.name, ALL_TIME_PARAM.value)
+  writeFilter(isDefaultPeriod ? { ...filter, from: null, to: null } : filter, (day) => day).forEach((value, key) =>
+    query.append(key, value),
+  )
+  const search = query.toString()
   return search && `?${search}`
 }
 
 /** The filter an address keeps, as `librarySearch` writes it; anything else in it is left out. */
-export function libraryFilterFromSearch(search: string): LibraryFilter {
+export function libraryFilterFromSearch(search: string, now: Date = new Date()): LibraryFilter {
   const query = new URLSearchParams(search)
   const day = (key: string) => {
     const value = query.get(key)
     return value && isDay(value) ? value : null
   }
+  const days = { from: day('from'), to: day('to') }
+  const allTime = query.get(ALL_TIME_PARAM.name) === ALL_TIME_PARAM.value
+  const period = days.from || days.to || allTime ? days : quickRange(DEFAULT_PERIOD, now)
   return {
-    from: day('from'),
-    to: day('to'),
+    ...period,
     site: query.get('site') || null,
     hero: query.get('hero') || null,
     stake: query.get('stake') || null,
