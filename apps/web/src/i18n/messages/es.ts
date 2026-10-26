@@ -675,6 +675,7 @@ export const es = {
   'reason.invalid-google-token': 'Google no confirmó el inicio de sesión. Vuelve a intentarlo.',
   'reason.account-required': 'Inicia sesión con Google para crear una sala.',
   'reason.invalid-library-filter': 'El servidor no ha podido leer estos filtros. Límpialos y vuelve a intentarlo.',
+  'reason.invalid-library-sort': 'El servidor no ha podido leer este orden. Ordena por otra columna y vuelve a intentarlo.',
   'reason.invalid-tag-name': 'Una etiqueta necesita un nombre de hasta 40 caracteres.',
   'reason.tag-name-taken': 'Ya tienes una etiqueta con ese nombre.',
   'reason.tag-not-found': 'Esa etiqueta ya no existe.',

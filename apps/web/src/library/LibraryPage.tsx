@@ -37,17 +37,26 @@ import {
   type LibraryFilter,
 } from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
+import {
+  librarySortFromSearch,
+  librarySortQuery,
+  nextLibrarySort,
+  withLibrarySort,
+  type LibrarySort,
+  type LibrarySortColumn,
+} from './librarySort'
 import { LibraryTags, TagSelection } from './LibraryTags'
 import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import './LibraryPage.css'
 
 /**
- * The "Biblioteca" board: the Account's Hands, newest first, a page at a
- * time, narrowed by the Library filter. It predates ADR 0004, so neither its
+ * The "Biblioteca" board: the Account's Hands, newest first unless a column
+ * header sorts them otherwise, a page at a time, narrowed by the Library
+ * filter. It predates ADR 0004, so neither its
  * "Compartidas" collection nor its Author column is built: every Hand here is
  * the Account's own, whatever its Hero, so the Hero takes the Author's place.
- * The filter lives in the address, so the list at `/library` and the Results
+ * The filter and the sort live in the address, so the list at `/library` and the Results
  * Graph at `/library/graph` describe the same Hands, and a reload or a shared
  * link keeps them. Opened from a Room, it leads back there and adds the
  * selected Hands to the Room's Queue, as the board's "Añadir a la sala" does;
@@ -60,6 +69,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const search = useSearch()
   const view: LibraryView = (!room && libraryViewFromPath(path)) || 'list'
   const filter = useMemo(() => libraryFilterFromSearch(search), [search])
+  const sort = useMemo(() => librarySortFromSearch(search), [search])
   const [pageNumber, setPageNumber] = useState(1)
   // Bumped after an import, so the list is read again.
   const [revision, setRevision] = useState(0)
@@ -71,7 +81,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
   const [adding, setAdding] = useState(false)
   const [addFailure, setAddFailure] = useState<FailureReason | null>(null)
-  // Any change of filter, from a control or from the history, starts again from the first page with nothing selected.
+  // Any change of filter or sort, from a control or from the history, starts again from the first page with nothing selected.
   const [filteredBy, setFilteredBy] = useState(search)
   if (filteredBy !== search) {
     setFilteredBy(search)
@@ -85,13 +95,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     let cancelled = false
     const query = new URLSearchParams({ page: String(pageNumber), pageSize: String(LIBRARY_PAGE_SIZE) })
     libraryFilterQuery(filter).forEach((value, key) => query.append(key, value))
+    librarySortQuery(sort).forEach((value, key) => query.append(key, value))
     api<Page>(`/library/hands?${query}`, { token })
       .then((page) => !cancelled && setLoad({ state: 'loaded', page }))
       .catch((error: unknown) => !cancelled && setLoad({ state: 'failed', reason: reasonOf(error) }))
     return () => {
       cancelled = true
     }
-  }, [token, pageNumber, filter, revision])
+  }, [token, pageNumber, filter, sort, revision])
 
   // The Results Graph reads the same filter, so it describes the same Hands; paging leaves it be.
   useEffect(() => {
@@ -120,8 +131,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   // Only what this page still shows counts as selected.
   const selectedHands = page ? page.hands.filter((hand) => selected.includes(hand.id)) : []
   const openImport = () => setImporting(true)
-  // Replaced, not pushed: going back leaves the Library rather than undoing each filter.
-  const changeFilter = (next: LibraryFilter) => redirect(`${path}${librarySearch(next)}`)
+  // Replaced, not pushed: going back leaves the Library rather than undoing each filter. The sort stays as it was.
+  const changeFilter = (next: LibraryFilter) => redirect(`${path}${withLibrarySort(librarySearch(next), sort)}`)
+  const changeSort = (by: LibrarySortColumn) => redirect(`${path}${withLibrarySort(search, nextLibrarySort(sort, by))}`)
   // Either view keeps the filter; going back returns to the view left.
   const showView = (next: LibraryView) => {
     // The graph shows no rows to select.
@@ -318,7 +330,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
           )}
           {view === 'list' && page && page.hands.length > 0 && (
             <>
-              <HandTable hands={page.hands} selected={selected} onSelect={setSelected} onSetMark={setMark} />
+              <HandTable
+                hands={page.hands}
+                sort={sort}
+                onSort={changeSort}
+                selected={selected}
+                onSelect={setSelected}
+                onSetMark={setMark}
+              />
               <Pagination page={page} onGoTo={goToPage} />
             </>
           )}
@@ -392,11 +411,15 @@ function RemoveDialog({ count, onRemove, onClose }: { count: number; onRemove: (
 
 function HandTable({
   hands,
+  sort,
+  onSort,
   selected,
   onSelect,
   onSetMark,
 }: {
   hands: LibraryHand[]
+  sort: LibrarySort
+  onSort: (by: LibrarySortColumn) => void
   /** The ids of the selected Hands. */
   selected: string[]
   onSelect: (selected: string[]) => void
@@ -423,11 +446,19 @@ function HandTable({
               {t('library.column.hand')}
             </th>
             <th scope="col">{t('library.column.hero')}</th>
-            <th scope="col">{t('library.column.stake')}</th>
-            <th scope="col">{t('library.column.pot')}</th>
-            <th scope="col">{t('library.column.result')}</th>
+            <SortableHeader by="stake" sort={sort} onSort={onSort}>
+              {t('library.column.stake')}
+            </SortableHeader>
+            <SortableHeader by="pot" sort={sort} onSort={onSort}>
+              {t('library.column.pot')}
+            </SortableHeader>
+            <SortableHeader by="result" sort={sort} onSort={onSort}>
+              {t('library.column.result')}
+            </SortableHeader>
             <th scope="col">{t('library.column.street')}</th>
-            <th scope="col">{t('library.column.date')}</th>
+            <SortableHeader by="date" sort={sort} onSort={onSort}>
+              {t('library.column.date')}
+            </SortableHeader>
             <th scope="col">{t('library.column.tags')}</th>
             <th scope="col" className="library-table__mark">
               <span className="library-table__hidden">{t('library.marked')}</span>
@@ -511,6 +542,39 @@ function HandTable({
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * A column header that sorts the list by it: the biggest first, then the
+ * other way. Only the current one shows which way; the rest hint at it on
+ * hover and focus.
+ */
+function SortableHeader({
+  by,
+  sort,
+  onSort,
+  children,
+}: {
+  by: LibrarySortColumn
+  sort: LibrarySort
+  onSort: (by: LibrarySortColumn) => void
+  children: ReactNode
+}) {
+  const current = sort.by === by
+  return (
+    <th scope="col" aria-sort={current ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}>
+      <button
+        type="button"
+        className="library-table__sort"
+        data-current={current || undefined}
+        data-dir={current ? sort.dir : undefined}
+        onClick={() => onSort(by)}
+      >
+        {children}
+        <Icon name={current ? 'expand' : 'sort'} size={12} className="library-table__sort-icon" />
+      </button>
+    </th>
   )
 }
 
