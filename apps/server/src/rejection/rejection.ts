@@ -36,6 +36,7 @@ export type RejectionReason =
   | 'invalid-note'
   | 'note-not-found'
   | 'invalid-library-filter'
+  | 'invalid-library-sort'
   | 'invalid-tag-name'
   | 'tag-name-taken'
   | 'tag-not-found'

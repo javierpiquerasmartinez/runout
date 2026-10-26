@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
@@ -30,6 +30,7 @@ import {
   type LibraryFilter,
   type LibraryFilterOptions,
 } from './library-filter.js';
+import { librarySortOrder, type LibrarySort } from './library-sort.js';
 
 /** A Library row: what tells the spot apart at a glance. */
 export interface LibraryHand {
@@ -150,12 +151,13 @@ export class LibraryService {
   }
 
   /**
-   * One page of the Hands the filter keeps, newest first by when each Hand
-   * was played, with what the whole Library offers to filter by.
+   * One page of the Hands the filter keeps, in the sort's order, with what
+   * the whole Library offers to filter by.
    */
   async page(
     account: Identity,
     filter: LibraryFilter,
+    sort: LibrarySort,
     page: unknown,
     pageSize: unknown,
   ): Promise<LibraryPage> {
@@ -180,7 +182,7 @@ export class LibraryService {
         .from(libraryEntries)
         .innerJoin(hands, eq(hands.id, libraryEntries.handId))
         .where(kept)
-        .orderBy(desc(hands.playedAt), desc(hands.id))
+        .orderBy(...librarySortOrder(sort))
         .limit(size)
         .offset((number - 1) * size),
       this.options(account),

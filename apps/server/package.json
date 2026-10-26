@@ -22,7 +22,8 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:local": "node scripts/local-db.ts"
+    "db:local": "node scripts/local-db.ts",
+    "db:backfill-final-pot": "nest build && node dist/backfill-final-pot.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

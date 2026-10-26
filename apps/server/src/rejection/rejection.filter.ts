@@ -41,6 +41,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'invalid-note': HttpStatus.BAD_REQUEST,
   'note-not-found': HttpStatus.NOT_FOUND,
   'invalid-library-filter': HttpStatus.BAD_REQUEST,
+  'invalid-library-sort': HttpStatus.BAD_REQUEST,
   'invalid-tag-name': HttpStatus.BAD_REQUEST,
   'tag-name-taken': HttpStatus.CONFLICT,
   'tag-not-found': HttpStatus.NOT_FOUND,

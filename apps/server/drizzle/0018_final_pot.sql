@@ -1,0 +1,2 @@
+-- Each Hand now stores its final pot, worked out at import, so the Library sorts on it. Hands stored before stay null until `backfill-final-pot` fills them in; a later migration makes it NOT NULL.
+ALTER TABLE "hands" ADD COLUMN "final_pot" integer;

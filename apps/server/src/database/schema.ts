@@ -145,6 +145,12 @@ export const hands = pgTable(
     heroAllInEv: integer('hero_all_in_ev').notNull(),
     /** Whether the Hero reached Showdown, worked out from `content` at import. */
     heroReachedShowdown: boolean('hero_reached_showdown').notNull(),
+    /**
+     * The final pot as an Amount, worked out from `content` at import, so the
+     * Library sorts on it. Null only on a Hand stored before it was kept,
+     * until `backfill-final-pot` fills it in.
+     */
+    finalPot: integer('final_pot'),
     content: jsonb('content').$type<Hand>().notNull(),
     importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
   },
