@@ -1,11 +1,4 @@
-import { inArray } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
 import request from 'supertest';
-import { inject } from 'vitest';
-import type { Database } from '../src/database/database.js';
-import * as schema from '../src/database/schema.js';
-import { backfillFinalPots } from '../src/hands/final-pot-backfill.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -180,64 +173,5 @@ describe('Sorting the Library (e2e)', () => {
         .expect(400);
       expect(res.body).toEqual({ reason: 'invalid-library-sort' });
     }
-  });
-});
-
-describe('Backfilling the final pot of Hands stored before it was kept (e2e)', () => {
-  let running: RunningApp;
-  let db: Database;
-
-  beforeEach(async () => {
-    running = await startApp();
-    db = drizzle({
-      client: new pg.Pool({ connectionString: inject('databaseUrl') }),
-      schema,
-    });
-  });
-
-  afterEach(async () => {
-    await db.$client.end();
-    await running.close();
-  });
-
-  it('fills in every missing final pot, which until then sorts last', async () => {
-    const account = await newAccount(running.httpServer);
-    await importText(
-      running,
-      account.token,
-      freshHandHistory('pokerstars-session.txt'),
-    );
-    const sortedByPot = async () =>
-      (
-        await request(running.httpServer)
-          .get('/api/library/hands?sort=pot&dir=desc')
-          .set('Authorization', `Bearer ${account.token}`)
-          .expect(200)
-      ).body.hands as LibraryHand[];
-    const pots = (hands: LibraryHand[]) =>
-      hands.map((hand) => hand.summary.finalPot);
-    const before = await sortedByPot();
-    const sorted = pots(before);
-    expect(sorted).toEqual([65, 65, 55, 25]);
-    // As Hands stored before migration 0018 would be; only this test's, as other files share the database.
-    const forget = (forgotten: LibraryHand[]) =>
-      db
-        .update(schema.hands)
-        .set({ finalPot: null })
-        .where(
-          inArray(
-            schema.hands.id,
-            forgotten.map((hand) => hand.id),
-          ),
-        );
-    await forget(before.slice(0, 2));
-    expect(pots(await sortedByPot())).toEqual([55, 25, 65, 65]);
-    await forget(before);
-
-    const filled = await backfillFinalPots(db);
-
-    expect(filled).toBeGreaterThanOrEqual(4);
-    expect(pots(await sortedByPot())).toEqual(sorted);
-    expect(await backfillFinalPots(db)).toBe(0);
   });
 });

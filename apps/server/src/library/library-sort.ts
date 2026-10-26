@@ -38,9 +38,8 @@ export function parseLibrarySort(query: Record<string, unknown>): LibrarySort {
 /** The `order by` of the sort, over `hands`, ties broken newest first. */
 export function librarySortOrder(sort: LibrarySort): SQL[] {
   const direction = sort.dir === 'desc' ? sql`desc` : sql`asc`;
-  // A Hand stored before its final pot was kept has none to sort on yet: it goes last.
   return [
-    sql`${KEYS[sort.by]} ${direction} nulls last`,
+    sql`${KEYS[sort.by]} ${direction}`,
     desc(hands.playedAt),
     desc(hands.id),
   ];
