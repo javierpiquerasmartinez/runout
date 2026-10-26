@@ -368,6 +368,43 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+/* A sortable header reads as the others until it is the current sort or the pointer finds it. */
+.library-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 -4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.library-table__sort:hover,
+.library-table__sort[data-current] {
+  color: var(--text-primary);
+}
+.library-table__sort:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.library-table__sort-icon {
+  opacity: 0;
+}
+.library-table__sort:hover .library-table__sort-icon,
+.library-table__sort:focus-visible .library-table__sort-icon {
+  opacity: 0.6;
+}
+.library-table__sort[data-current] .library-table__sort-icon {
+  opacity: 1;
+}
+.library-table__sort[data-dir='asc'] .library-table__sort-icon {
+  transform: rotate(180deg);
+}
 .library-table td {
   height: 62px;
   padding: 0 12px;

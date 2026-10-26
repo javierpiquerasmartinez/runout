@@ -419,6 +419,87 @@ describe('LibraryPage', () => {
     })
   })
 
+  describe('sorting', () => {
+    const header = (name: string) => screen.getByRole('columnheader', { name: new RegExp(name) })
+
+    it('sorts by a column from its header, the biggest first and then the other way', async () => {
+      renderLibrary()
+      await screen.findByRole('table', { name: 'All hands' })
+      expect(header('Date').getAttribute('aria-sort')).toBe('descending')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Result' }))
+
+      await waitFor(() => expect(lastFilterQuery()).toBe('sort=result&dir=desc'))
+      expect(window.location.search).toBe('?period=all&sort=result&dir=desc')
+      expect(header('Result').getAttribute('aria-sort')).toBe('descending')
+      expect(header('Date').getAttribute('aria-sort')).toBeNull()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Result' }))
+
+      await waitFor(() => expect(lastFilterQuery()).toBe('sort=result&dir=asc'))
+      expect(header('Result').getAttribute('aria-sort')).toBe('ascending')
+    })
+
+    it('leaves the address bare again once back on the newest first', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&sort=date&dir=asc')
+      await screen.findByRole('table', { name: 'All hands' })
+      expect(header('Date').getAttribute('aria-sort')).toBe('ascending')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Date' }))
+
+      expect(window.location.search).toBe('?period=all')
+      await waitFor(() => expect(lastFilterQuery()).toBe(''))
+    })
+
+    it('sorts only by Date, Stake, Final pot and Result', async () => {
+      renderLibrary()
+      const table = await screen.findByRole('table', { name: 'All hands' })
+
+      const sortable = within(table)
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+      expect(sortable).toEqual(expect.arrayContaining(['Stake', 'Final pot', 'Result', 'Date']))
+      for (const name of ['Hand', 'Hero', 'Ends on', 'Tags']) {
+        expect(within(table).queryByRole('button', { name })).toBeNull()
+      }
+    })
+
+    it('reads the sort back from the address, and keeps it when the filter changes', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&sort=pot&dir=asc')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(lastFilterQuery()).toBe('sort=pot&dir=asc')
+      expect(header('Final pot').getAttribute('aria-sort')).toBe('ascending')
+
+      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'Hero')
+
+      expect(window.location.search).toBe('?period=all&hero=Hero&sort=pot&dir=asc')
+      await waitFor(() => expect(lastFilterQuery()).toBe('hero=Hero&sort=pot&dir=asc'))
+    })
+
+    it('starts again from the first page with nothing selected', async () => {
+      renderLibrary()
+      await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+      await screen.findByText('Showing 3–3 of 3')
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select CO vs SB, iMapleAA' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Stake' }))
+
+      await screen.findByText('Showing 1–2 of 3')
+      expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('page')).toBe('1')
+      expect(screen.queryByText(/selected/)).toBeNull()
+    })
+
+    it('sorts the Library opened from a Room too, keeping the Room in the address', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, { code: 'RNT4K9PX', name: 'Martes' })
+      await screen.findByRole('table', { name: 'All hands' })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Final pot' }))
+
+      expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
+      expect(window.location.search).toBe('?period=all&sort=pot&dir=desc')
+    })
+  })
+
   describe('Results Graph', () => {
     const renderGraph = () => renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph?period=all')
 

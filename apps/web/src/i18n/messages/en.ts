@@ -676,6 +676,7 @@ export const en: Messages = {
   'reason.invalid-google-token': "Google didn't confirm the sign-in. Try again.",
   'reason.account-required': 'Sign in with Google to create a room.',
   'reason.invalid-library-filter': "The server couldn't read these filters. Clear them and try again.",
+  'reason.invalid-library-sort': "The server couldn't read this order. Sort by another column and try again.",
   'reason.invalid-tag-name': 'A tag needs a name of up to 40 characters.',
   'reason.tag-name-taken': 'You already have a tag with that name.',
   'reason.tag-not-found': 'That tag no longer exists.',

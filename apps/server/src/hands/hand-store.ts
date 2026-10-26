@@ -3,6 +3,7 @@ import type { Database, Transaction } from '../database/database.js';
 import { hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 import { heroResult } from './replay/hero-result.js';
+import { finalPot } from './replay/summary.js';
 
 /*
  * Hands are stored once each (ADR 0002) and belong to no one (ADR 0004):
@@ -102,6 +103,7 @@ export async function storeHands(
             heroResult: result,
             heroAllInEv: allInEv,
             heroReachedShowdown: reachedShowdown,
+            finalPot: finalPot(hand),
             content: hand,
             importedAt: now,
           };

@@ -44,7 +44,8 @@ function positionsInvolved(hand: Hand): Position[] {
   return heroFirst.map((name) => positionOf.get(name)!);
 }
 
-function finalPot(hand: Hand): number {
+/** Everything put in the pot, before rake and with any Splash, as an Amount. */
+export function finalPot(hand: Hand): number {
   let pot = hand.splash ?? 0;
   // What each player has bet on the current Street, so a raise "to" a total
   // only adds the difference.

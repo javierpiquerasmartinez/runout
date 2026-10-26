@@ -47,6 +47,7 @@ The server persists to Postgres through [Drizzle](https://orm.drizzle.team): Neo
 - **Local Postgres.** `pnpm --filter @runout/server db:local` runs a Postgres that matches `.env.example` on port 5432, without Docker. It keeps its data in `apps/server/.data/postgres`; stop it with Ctrl+C. Any other Postgres works too: point `DATABASE_URL` at it.
 - **Changing the schema.** Edit `apps/server/src/database/schema.ts`, then run `pnpm --filter @runout/server db:generate` to write a versioned SQL migration into `apps/server/drizzle/`. Review it and commit it with the schema change. Never edit a migration that has already been applied anywhere; write a new one.
 - **Applying migrations.** `pnpm --filter @runout/server db:migrate` applies pending migrations to the database at `DATABASE_URL`. Run it locally after pulling, and against Neon (with Neon's `DATABASE_URL`, `sslmode=require`) before deploying a server that needs the new schema.
+- **Backfilling the final pot.** Migration `0018_final_pot` keeps each Hand's final pot so the Library can sort on it; Hands stored before it have none. After applying it, run `pnpm --filter @runout/server db:backfill-final-pot` once against the same `DATABASE_URL` to fill them in. It can run again safely and says how many Hands it filled. Until it has run, sorting by final pot puts those Hands last.
 
 ## Tests
 

@@ -372,7 +372,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 **H7.2 — See my Library.** As a player, I want my Library to be where I land, so I can go to my Hands without being in a Room.
 
 - Signing in, or opening Runout already signed in, takes me to my Library. **Biblioteca** in the header, and the brand, take me back to it from any screen with the shared header (H8.9).
-- The list view, at `/library`, lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands.
+- The list view, at `/library`, lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands. Its headers sort it another way (H7.10).
 - Each row shows the hole cards, the Positions involved, Hero, Poker Site, Stake, final pot, Final Street, Showdown, my Result, the date and my Tags.
 - The title row says how many Hands match the current filters. With Hands selected, the selection actions (tag, remove, add to the Room) appear in it next to **Importar manos**.
 - A **Manos | Gráfica** switch below the filters moves between the list and the Results Graph (H7.5). Each view has its own address, so the back button and links return to the view I was on.
@@ -429,6 +429,15 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - Only Hands in my own Library can be added.
 - I become the Author of those Queue Entries until the Master reassigns them.
 - They are the same Hands, not copies: Notes the group writes on them in the Room stay with them in my Library after the Room closes.
+
+**H7.10 — Sort my Library.** As a player, I want to sort my Hands by Date, Stake, final pot or Result, to find my biggest pots, wins and losses quickly.
+
+- The Date, Stake, final pot and Result headers sort the list, one at a time. Clicking one sorts biggest first (newest, highest Stake, biggest pot, biggest win); clicking it again sorts the other way. The current one shows which way; the others hint they can sort on hover.
+- The order covers every Hand the filters keep, not just the page shown: the first page sorted by Result holds my biggest Results in the whole filtered Library.
+- Result and final pot sort in big blinds, whatever the Display Unit, so Hands at different Stakes and currencies compare. Stake sorts on its big blind, whatever the currency.
+- Hands that tie go newest first, whichever the direction.
+- The sort is part of the address, next to the filters, so a reload, a shared link or switching views keeps it; the default, newest first, leaves the address bare. Changing the sort goes back to the first page with nothing selected. Changing the filters keeps the sort.
+- The Results Graph always runs in played order. Picking Hands for a Room sorts the same way.
 
 ## E8 · Accounts and preferences
 

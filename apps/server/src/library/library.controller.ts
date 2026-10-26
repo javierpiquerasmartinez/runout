@@ -13,6 +13,7 @@ import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { RoomGateway } from '../rooms/room.gateway.js';
 import { parseLibraryFilter } from './library-filter.js';
+import { parseLibrarySort } from './library-sort.js';
 import {
   LibraryService,
   type LibraryPage,
@@ -31,8 +32,9 @@ export class LibraryController {
   ) {}
 
   /**
-   * One page of the Account's Library, newest first, narrowed by the Library
-   * filter in the query (see `LibraryFilter`), with its total. An anonymous
+   * One page of the Account's Library, narrowed by the Library filter in the
+   * query (see `LibraryFilter`) and in the order its sort asks for (see
+   * `LibrarySort`; newest first by default), with its total. An anonymous
    * identity has no Library: `account-required`.
    */
   @Get('hands')
@@ -47,6 +49,7 @@ export class LibraryController {
     return this.library.page(
       account,
       parseLibraryFilter(query),
+      parseLibrarySort(query),
       query.page,
       query.pageSize,
     );
