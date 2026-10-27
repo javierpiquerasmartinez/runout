@@ -1,6 +1,6 @@
 import { api, ApiError } from '../backend/api'
 import { untilAwake } from '../backend/untilAwake'
-import type { Preferences } from '../preferences/preferences'
+import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 
 export interface Identity {
   id: string
@@ -18,6 +18,19 @@ export interface Identity {
 export interface Session {
   token: string
   identity: Identity
+}
+
+/**
+ * The identity as the server sends it, with any Preference it leaves out read
+ * as its default. The web can go live before the server that knows a new
+ * Preference, and a missing one must never draw as nothing.
+ */
+function withDefaultPreferences(identity: Identity): Identity {
+  return { ...identity, preferences: { ...DEFAULT_PREFERENCES, ...identity.preferences } }
+}
+
+function withDefaults(session: Session): Session {
+  return { ...session, identity: withDefaultPreferences(session.identity) }
 }
 
 /** Same limit the server enforces. */
@@ -47,7 +60,7 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
   try {
     // The first request of a visit may find the server asleep: it waits for it to wake.
     const identity = await untilAwake(() => api<Identity>('/identities/me', { token: stored }))
-    return { token: stored, identity }
+    return { token: stored, identity: withDefaultPreferences(identity) }
   } catch (error) {
     if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error
   }
@@ -64,10 +77,12 @@ export async function joinAnonymously(
   displayName: string,
   storage: Storage = window.localStorage,
 ): Promise<Session> {
-  const session = await api<Session>(`/rooms/${encodeURIComponent(code)}/guests`, {
-    method: 'POST',
-    body: { displayName },
-  })
+  const session = withDefaults(
+    await api<Session>(`/rooms/${encodeURIComponent(code)}/guests`, {
+      method: 'POST',
+      body: { displayName },
+    }),
+  )
   writeToken(storage, session.token)
   loading = Promise.resolve(session)
   return session
@@ -94,11 +109,13 @@ export async function signInWithGoogle(
   fromToken: string | null,
   storage: Storage = window.localStorage,
 ): Promise<Session> {
-  const session = await api<Session>('/sessions/google', {
-    token: fromToken ?? undefined,
-    method: 'POST',
-    body: { idToken },
-  })
+  const session = withDefaults(
+    await api<Session>('/sessions/google', {
+      token: fromToken ?? undefined,
+      method: 'POST',
+      body: { idToken },
+    }),
+  )
   writeToken(storage, session.token)
   loading = Promise.resolve(session)
   return session
