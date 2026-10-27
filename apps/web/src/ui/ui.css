@@ -892,6 +892,7 @@
 }
 /* A tick box, drawn in brass once ticked; the option's own name stays as it is. */
 .ro-dropdown__check {
+  position: relative;
   width: 14px;
   height: 14px;
   flex-shrink: 0;
@@ -901,8 +902,15 @@
 }
 .ro-dropdown__option[aria-selected='true'] .ro-dropdown__check {
   border-color: var(--brass);
-  background: var(--brass)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2 6 9.6l4.5-5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+  background: var(--brass);
+}
+/* The tick is a mask, so its colour is the token's, in either Theme. */
+.ro-dropdown__option[aria-selected='true'] .ro-dropdown__check::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--on-brass);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2 6 9.6l4.5-5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     center / 12px no-repeat;
 }
 .ro-dropdown__list[aria-multiselectable] .ro-dropdown__option[aria-selected='true'] {

@@ -131,7 +131,10 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     if (!page || restoredScroll.current) return
     restoredScroll.current = true
     const scrollY = libraryScroll(window.history.state)
-    if (scrollY !== null) window.scrollTo(0, scrollY)
+    if (scrollY === null) return
+    window.scrollTo(0, scrollY)
+    // Landed once: a reload of this entry later starts at the top, as any page does.
+    window.history.replaceState(withLibraryScroll(window.history.state, null), '')
   }, [page])
   // Opening a Hand keeps where the Library was, so "Volver" leads back to it.
   const openHand = (event: MouseEvent<HTMLAnchorElement>) => {

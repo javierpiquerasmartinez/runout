@@ -60,9 +60,10 @@ export function libraryOpenedFrom(state: unknown): string | null {
   return typeof address === 'string' ? address : null
 }
 
-/** The history state of the Library's entry, keeping how far down it is scrolled. */
-export function withLibraryScroll(state: unknown, scrollY: number): Record<string, unknown> {
-  return { ...(isRecord(state) ? state : {}), [SCROLLED_TO]: scrollY }
+/** The history state of the Library's entry, keeping how far down it is scrolled, or no longer keeping it (null). */
+export function withLibraryScroll(state: unknown, scrollY: number | null): Record<string, unknown> {
+  const { [SCROLLED_TO]: _kept, ...rest } = isRecord(state) ? state : {}
+  return scrollY === null ? rest : { ...rest, [SCROLLED_TO]: scrollY }
 }
 
 /** How far down the Library's entry was scrolled when a Hand was opened from it, or null. */

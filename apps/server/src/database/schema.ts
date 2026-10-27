@@ -70,10 +70,6 @@ export const screenNames = pgTable(
   (table) => [primaryKey({ columns: [table.identityId, table.screenName] })],
 );
 
-/**
- * How one person reads the table: personal, never shared with the Room. An
- * identity without a row reads it the default way.
- */
 /** The palette Graph Colours are picked from; the web gives each a value per Theme. */
 export const GRAPH_COLOURS = [
   'teal',
@@ -86,6 +82,10 @@ export const GRAPH_COLOURS = [
   'grey',
 ] as const;
 
+/**
+ * How one person reads the table and their Results Graph: personal, never
+ * shared with the Room. An identity without a row reads it the default way.
+ */
 export const preferences = pgTable('preferences', {
   identityId: uuid('identity_id')
     .primaryKey()

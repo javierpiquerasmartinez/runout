@@ -381,6 +381,8 @@ describe('Routes · from a Library Hand back to the Library', () => {
     expect(listReads.at(-1)).toContain('site=pokerstars')
     expect(listReads.at(-1)).toContain('sort=result')
     await waitFor(() => expect(scrollTo).toHaveBeenLastCalledWith(0, 420))
+    // Landed once: the entry no longer keeps it, so a reload starts at the top.
+    expect(window.history.state).not.toHaveProperty('libraryScrollY')
   })
 
   it('opens the page an address keeps, as after a reload', async () => {
