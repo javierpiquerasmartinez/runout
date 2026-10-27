@@ -47,3 +47,46 @@ describe('SessionProvider while the server wakes up', () => {
     expect(screen.getByText('Conectando con el servidor…')).toBeTruthy()
   })
 })
+
+describe('SessionProvider with a server from before a Preference existed', () => {
+  // The web can go live before the server that knows a new Preference: what it doesn't send reads as its default.
+  it('reads any Preference the server leaves out as its default', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          id: 'me',
+          displayName: 'Javier',
+          screenNames: [],
+          preferences: { deckStyle: 'full-suit', fourColour: true, potPercentage: false, displayUnit: 'both', theme: 'dark', language: 'en' },
+          account: { email: 'javier@example.com' },
+          room: null,
+        }),
+      ),
+    )
+    const { I18nProvider } = await import('../i18n')
+    const { SessionProvider } = await import('./SessionProvider')
+    const { usePreferences } = await import('../preferences/context')
+    const { useIdentity } = await import('./context')
+    function Reader() {
+      const preferences = usePreferences()
+      const { identity } = useIdentity()
+      return (
+        <p>
+          {preferences.deckStyle} {preferences.resultColour} {preferences.nonShowdownColour} {identity?.preferences.allInEvColour}
+        </p>
+      )
+    }
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionProvider>
+          <Reader />
+        </SessionProvider>
+      </I18nProvider>,
+    )
+
+    await act(() => vi.advanceTimersByTimeAsync(0))
+
+    expect(screen.getByText('full-suit teal red amber')).toBeTruthy()
+  })
+})
