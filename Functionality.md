@@ -383,17 +383,21 @@ The Library is a person's own repository: the Hands they imported into it, whate
 
 - The filters sit on top, above both views. The side column, with **Todas las manos**, **Marcadas** and my Tags, stays in both views.
 - Filters are period (from–to dates in my time zone, plus quick ranges: today, this week from Monday, this month, this year, all time), Poker Site, Hero, Stake, Marked only and Tags (any of the chosen ones).
+- I can tick several Poker Sites, Heroes and Stakes: a Hand matching any of a filter's values is kept. Closed, a filter names its first value and how many more ("PokerStars +2"). A filter with more than 8 options offers a search.
+- The filters' dropdowns are drawn in Runout's style, not the browser's or the operating system's, and work by keyboard.
 - The period starts as today, in both views and when picking Hands for a Room. Clearing the filters goes back to today.
 - When only the period leaves nothing to show, the Library says so ("Ninguna mano hoy.") and offers **Ver todo**.
 - Poker Site, Hero, Stake and Tag options are those present in my Library.
 - Filters combine and clear in one go.
 - The same filters apply to the list and the Results Graph, so both always describe the same Hands. Switching views keeps them.
-- The filters are part of the address, so a reload or a shared link keeps them. A bare `/library` is today's Hands, whatever day it is opened.
+- The filters are part of the address, so a reload or a shared link keeps them. A bare `/library` is today's Hands, whatever day it is opened. Links from when each filter took one value still open the same Hands.
+- The page of the list is part of the address too.
 
 **H7.4 — Replay a Hand from my Library.** As a player, I want to open a Hand and step through it on my own, to prepare a session or look back at a spot.
 
 - The Hand opens on the same table as in a Room, stepped Action by Action, with nobody else watching.
 - Its Notes are shown alongside it.
+- **Volver** takes me back to the Library as I left it: the same filters, sort and page, scrolled where I was. A Hand opened on its own, from a link or a new tab, leads back to the Library as it starts.
 
 **H7.5 — See my Results Graph.** As a player, I want a graph of my running results as a view of my Library, so I see whether I am winning.
 
@@ -404,6 +408,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - It is in big blinds by default, so Hands at different Stakes and currencies add up.
 - When every filtered Hand shares one currency, I can see it in Amounts, following my Display Unit. When currencies mix, that option is locked with its reason.
 - The total of each line and the number of Hands are shown next to the graph; hovering shows the Hand number and each line's value.
+- Each line is drawn in my Graph Colours (H8.10), in the graph, its legend, the hover box and its Win Rate.
 - It follows my Theme and the app's visual style.
 
 **H7.6 — Tag Hands.** As a player, I want to put my own Tags on Hands in my Library, to group them by topic instead of by date.
@@ -499,6 +504,13 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
 - An anonymous Participant who steps out to Settings sees only the brand and a way back, and their Room carries on behind it. Without any identity, Settings sends me to `/login`.
+
+**H8.10 — Choose my Graph Colours.** As a player, I want to choose the colour of each line of my Results Graph, to tell them apart the way I read best.
+
+- Settings has a **Gráfica de resultados** card with a row per line (Result, All-in EV, Showdown, Non-showdown), each picking a colour of a palette of eight, and a preview of the four lines.
+- Every colour of the palette has a light and a dark version, so it reads in either Theme. Two lines may share a colour.
+- The colours the lines have always had are the defaults; **Restaurar colores** puts every line back on its own.
+- Like the other Preferences, the choice is personal, applies at once and is kept with my identity.
 
 ## MVP scope and out of scope
 
