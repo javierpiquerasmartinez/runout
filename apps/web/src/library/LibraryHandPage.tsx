@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
@@ -13,11 +13,11 @@ import { useShortcuts } from '../room/shortcuts'
 import { StreetLog } from '../room/StreetLog'
 import { tableView } from '../room/tableView'
 import { useHand } from '../room/useHand'
-import { followLink } from '../routing'
+import { followLink, isPlainClick, useHistoryState } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { libraryPath } from './library'
+import { libraryOpenedFrom, libraryPath } from './library'
 import { LibraryFrame } from './LibraryPage'
 import '../room/RoomPage.css'
 import './LibraryHandPage.css'
@@ -33,6 +33,14 @@ export function LibraryHandPage({ handId }: { handId: string }) {
   const { token } = useIdentity()
   const preferences = usePreferences()
   const load = useHand(handId, token)
+  // Opened from the Library, back is where it was left; opened on its own, the Library as it starts.
+  const openedFrom = useHistoryState(libraryOpenedFrom)
+  const back = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!openedFrom) return followLink(event)
+    if (!isPlainClick(event)) return
+    event.preventDefault()
+    window.history.back()
+  }
   const [actionIndex, setActionIndex] = useState(0)
   const table = load.state === 'loaded' ? tableView(load.hand, actionIndex, i18n, undefined, preferences) : null
   const goTo = (index: number | null) => (index === null ? undefined : () => setActionIndex(index))
@@ -47,7 +55,7 @@ export function LibraryHandPage({ handId }: { handId: string }) {
     <LibraryFrame>
       <div className="library-hand">
         <main className="library-hand__stage room-stage">
-          <a href={libraryPath} className="library__back" onClick={followLink}>
+          <a href={openedFrom ?? libraryPath} className="library__back" onClick={back}>
             <Icon name="chevron" size={14} className="library__back-icon" />
             {t('library.back')}
           </a>

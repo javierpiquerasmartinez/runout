@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { useI18n } from '../i18n'
@@ -10,7 +10,7 @@ import type { RoomSummary } from '../room/roomClient'
 import { roomPath } from '../room/roomCode'
 import { quantity } from '../room/quantity'
 import { playedAtLabel, positionsLabel, siteLabel, stakeLabel, streetLabel } from '../room/queueEntryView'
-import { followLink, navigate, redirect, usePath, useSearch } from '../routing'
+import { isPlainClick, navigate, redirect, usePath, useSearch } from '../routing'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
@@ -20,8 +20,13 @@ import { SegmentedControl } from '../ui/SegmentedControl'
 import {
   LIBRARY_PAGE_SIZE,
   libraryHandPath,
+  libraryPageFromSearch,
+  libraryScroll,
   libraryViewFromPath,
   libraryViewPath,
+  openedFromLibrary,
+  withLibraryPage,
+  withLibraryScroll,
   type LibraryHand,
   type LibraryPage as Page,
   type LibraryView,
@@ -70,7 +75,8 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const view: LibraryView = (!room && libraryViewFromPath(path)) || 'list'
   const filter = useMemo(() => libraryFilterFromSearch(search), [search])
   const sort = useMemo(() => librarySortFromSearch(search), [search])
-  const [pageNumber, setPageNumber] = useState(1)
+  // The page is in the address too, so coming back from a Hand, or a reload, opens the same one.
+  const pageNumber = libraryPageFromSearch(search)
   // Bumped after an import, so the list is read again.
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
@@ -81,11 +87,12 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
   const [adding, setAdding] = useState(false)
   const [addFailure, setAddFailure] = useState<FailureReason | null>(null)
-  // Any change of filter or sort, from a control or from the history, starts again from the first page with nothing selected.
-  const [filteredBy, setFilteredBy] = useState(search)
-  if (filteredBy !== search) {
-    setFilteredBy(search)
-    setPageNumber(1)
+  // Any change of filter or sort, from a control or from the history, starts with nothing selected; the address it
+  // comes in has no page, so it is the first.
+  const filteredBy = withLibraryPage(search, 1)
+  const [lastFilteredBy, setLastFilteredBy] = useState(filteredBy)
+  if (lastFilteredBy !== filteredBy) {
+    setLastFilteredBy(filteredBy)
     setSelected([])
     // The graph of other Hands mustn't stay beside the new list.
     setResults(null)
@@ -118,22 +125,39 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   }, [token, filter, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
+  // Back from a Hand, the list lands as far down as it was left, once its Hands are there again.
+  const restoredScroll = useRef(false)
+  useEffect(() => {
+    if (!page || restoredScroll.current) return
+    restoredScroll.current = true
+    const scrollY = libraryScroll(window.history.state)
+    if (scrollY !== null) window.scrollTo(0, scrollY)
+  }, [page])
+  // Opening a Hand keeps where the Library was, so "Volver" leads back to it.
+  const openHand = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!isPlainClick(event)) return
+    event.preventDefault()
+    window.history.replaceState(withLibraryScroll(window.history.state, window.scrollY), '')
+    navigate(event.currentTarget.pathname, openedFromLibrary(`${path}${search}`))
+  }
   // When only a quick period leaves nothing, the way out is all the Library, not clearing filters.
   const period = periodOf(filter)
   const emptyPeriod = isDefaultBesidesPeriod(filter) && period !== 'custom' && period !== 'all-time' ? period : null
   const noMatches = emptyPeriod
     ? { message: t(`library.noHands.${emptyPeriod}`), action: t('library.showAll'), filter: EMPTY_LIBRARY_FILTER }
     : { message: t('library.noMatches'), action: t('library.filter.clear'), filter: defaultLibraryFilter() }
+  // Replaced, like a filter: going back leaves the Library rather than paging back.
   const goToPage = (number: number) => {
-    setPageNumber(number)
     setSelected([])
+    redirect(`${path}${withLibraryPage(search, number)}`)
   }
   // Only what this page still shows counts as selected.
   const selectedHands = page ? page.hands.filter((hand) => selected.includes(hand.id)) : []
   const openImport = () => setImporting(true)
   // Replaced, not pushed: going back leaves the Library rather than undoing each filter. The sort stays as it was.
   const changeFilter = (next: LibraryFilter) => redirect(`${path}${withLibrarySort(librarySearch(next), sort)}`)
-  const changeSort = (by: LibrarySortColumn) => redirect(`${path}${withLibrarySort(search, nextLibrarySort(sort, by))}`)
+  const changeSort = (by: LibrarySortColumn) =>
+    redirect(`${path}${withLibraryPage(withLibrarySort(search, nextLibrarySort(sort, by)), 1)}`)
   // Either view keeps the filter; going back returns to the view left.
   const showView = (next: LibraryView) => {
     // The graph shows no rows to select.
@@ -174,7 +198,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
         // Later Hands move up into this page; once there are none, it steps back to the last one left.
         if (page) {
           const left = page.total - selectedHands.length
-          setPageNumber(Math.min(pageNumber, Math.max(1, Math.ceil(left / page.pageSize))))
+          goToPage(Math.min(pageNumber, Math.max(1, Math.ceil(left / page.pageSize))))
         }
       })
       // A refusal reads the Library too: a selected Hand may have left it elsewhere.
@@ -337,6 +361,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
                 selected={selected}
                 onSelect={setSelected}
                 onSetMark={setMark}
+                onOpen={openHand}
               />
               <Pagination page={page} onGoTo={goToPage} />
             </>
@@ -354,7 +379,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
           onImported={(imported) => {
             if (imported === 0) return
             // Back to the first page: the list is newest first by when each Hand was played.
-            setPageNumber(1)
+            goToPage(1)
             setRevision((n) => n + 1)
           }}
         />
@@ -416,6 +441,7 @@ function HandTable({
   selected,
   onSelect,
   onSetMark,
+  onOpen,
 }: {
   hands: LibraryHand[]
   sort: LibrarySort
@@ -424,6 +450,7 @@ function HandTable({
   selected: string[]
   onSelect: (selected: string[]) => void
   onSetMark: (hand: LibraryHand, marked: boolean) => void
+  onOpen: (event: MouseEvent<HTMLAnchorElement>) => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -491,7 +518,7 @@ function HandTable({
                     href={libraryHandPath(hand.id)}
                     className="library-row__open"
                     aria-label={t('library.open', { positions, hero: hand.hero })}
-                    onClick={followLink}
+                    onClick={onOpen}
                   >
                     <span className="library-row__cards">
                       {hand.holeCards.map((card) => (
