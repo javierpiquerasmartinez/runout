@@ -8,6 +8,7 @@ import {
   type Transaction,
 } from '../database/database.js';
 import {
+  GRAPH_COLOURS,
   identities,
   marks,
   preferences,
@@ -33,7 +34,14 @@ export interface Preferences {
   displayUnit: 'big-blinds' | 'amount' | 'both';
   theme: 'dark' | 'light' | 'system';
   language: 'es' | 'en';
+  /** Graph Colours: each Results Graph line's colour, two lines may share one. */
+  resultColour: GraphColour;
+  allInEvColour: GraphColour;
+  showdownColour: GraphColour;
+  nonShowdownColour: GraphColour;
 }
+
+export type GraphColour = (typeof GRAPH_COLOURS)[number];
 
 export const DEFAULT_PREFERENCES: Preferences = {
   deckStyle: 'classic',
@@ -42,6 +50,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   displayUnit: 'big-blinds',
   theme: 'dark',
   language: 'es',
+  resultColour: 'teal',
+  allInEvColour: 'amber',
+  showdownColour: 'blue',
+  nonShowdownColour: 'red',
 };
 
 /**
@@ -456,6 +468,10 @@ const PREFERENCE_VALUES: {
   displayUnit: ['big-blinds', 'amount', 'both'],
   theme: ['dark', 'light', 'system'],
   language: ['es', 'en'],
+  resultColour: GRAPH_COLOURS,
+  allInEvColour: GRAPH_COLOURS,
+  showdownColour: GRAPH_COLOURS,
+  nonShowdownColour: GRAPH_COLOURS,
 };
 
 /** Some preferences, each a known one with an allowed value, or `invalid-preferences`. */

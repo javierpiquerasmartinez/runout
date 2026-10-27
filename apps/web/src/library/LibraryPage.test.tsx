@@ -157,6 +157,30 @@ function renderLibrary(
   )
 }
 
+/** One of the filters bar's dropdowns, by its label. */
+function filterButton(filters: HTMLElement, name: string) {
+  return within(filters).getByRole('button', { name: new RegExp(`^${name} `) })
+}
+
+/** Picks an option of one of the filters bar's dropdowns. */
+async function choose(filters: HTMLElement, name: string, option: string) {
+  await userEvent.click(filterButton(filters, name))
+  await userEvent.click(screen.getByRole('option', { name: option }))
+}
+
+/** What one of the filters bar's dropdowns reads, closed. */
+function chosen(filters: HTMLElement, name: string) {
+  return filterButton(filters, name).textContent?.slice(name.length)
+}
+
+/** The options one of the filters bar's dropdowns offers, closing it again. */
+async function optionsOf(filters: HTMLElement, name: string) {
+  await userEvent.click(filterButton(filters, name))
+  const options = screen.getAllByRole('option').map((option) => option.textContent)
+  await userEvent.keyboard('{Escape}')
+  return options
+}
+
 describe('LibraryPage', () => {
   it('lists the Library’s Hands as the server orders them, with the total', async () => {
     renderLibrary()
@@ -275,14 +299,14 @@ describe('LibraryPage', () => {
     it('keeps the filter when switching views', async () => {
       renderLibrary()
       const filters = await screen.findByRole('group', { name: 'Filters' })
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Poker site' }), 'PokerStars')
+      await choose(filters, 'Poker site', 'PokerStars')
 
       await userEvent.click(screen.getByRole('radio', { name: 'Graph' }))
 
       expect(window.location.pathname).toBe('/library/graph')
       expect(window.location.search).toBe('?period=all&site=pokerstars')
       await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?site=pokerstars'))
-      expect((within(filters).getByRole('combobox', { name: 'Poker site' }) as HTMLSelectElement).value).toBe('pokerstars')
+      expect(chosen(filters, 'Poker site')).toBe('PokerStars')
     })
 
     it.each(['/library', '/library/graph'])('reads the filter back from the address at %s, as after a reload', async (path) => {
@@ -290,7 +314,7 @@ describe('LibraryPage', () => {
 
       const filters = await screen.findByRole('group', { name: 'Filters' })
       expect(lastFilterQuery()).toBe('hero=iMapleAA&marked=true&tag=t2')
-      expect((within(filters).getByRole('combobox', { name: 'Hero' }) as HTMLSelectElement).value).toBe('iMapleAA')
+      expect(chosen(filters, 'Hero')).toBe('iMapleAA')
       expect(screen.getByRole('heading', { name: 'Marked hands' })).toBeTruthy()
       expect(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: /Multiway/ }).getAttribute('aria-pressed')).toBe('true')
     })
@@ -301,12 +325,39 @@ describe('LibraryPage', () => {
       renderLibrary()
       const filters = await screen.findByRole('group', { name: 'Filters' })
 
-      const optionsOf = (name: string) =>
-        within(within(filters).getByRole('combobox', { name })).getAllByRole('option').map((option) => option.textContent)
-      expect(optionsOf('Poker site')).toEqual(['All sites', 'CoinPoker', 'PokerStars'])
-      expect(optionsOf('Hero')).toEqual(['All heroes', 'Hero', 'iMapleAA'])
+      expect(await optionsOf(filters, 'Poker site')).toEqual(['CoinPoker', 'PokerStars'])
+      expect(await optionsOf(filters, 'Hero')).toEqual(['Hero', 'iMapleAA'])
       // Two Stakes that read alike say their currency.
-      expect(optionsOf('Stake')).toEqual(['All stakes', 'NL10 EUR', 'NL10 USDT', 'NL50'])
+      expect(await optionsOf(filters, 'Stake')).toEqual(['NL10 EUR', 'NL10 USDT', 'NL50'])
+    })
+
+    it('keeps the Hands matching any of the values ticked in one filter, list and graph alike', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await choose(filters, 'Poker site', 'PokerStars')
+      await userEvent.click(screen.getByRole('option', { name: 'CoinPoker' }))
+      await userEvent.keyboard('{Escape}')
+      await choose(filters, 'Stake', 'NL50')
+      await userEvent.click(screen.getByRole('option', { name: 'NL10 USDT' }))
+
+      expect(chosen(filters, 'Poker site')).toBe('CoinPoker +1')
+      expect(chosen(filters, 'Stake')).toBe('NL10 USDT +1')
+      expect(lastFilterQuery()).toBe('site=pokerstars&site=coinpoker&stake=no-limit%3A25%3A50%3AEUR&stake=no-limit%3A5%3A10%3AUSDT')
+      expect(window.location.search).toBe(
+        '?period=all&site=pokerstars&site=coinpoker&stake=no-limit%3A25%3A50%3AEUR&stake=no-limit%3A5%3A10%3AUSDT',
+      )
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Graph' }))
+      await waitFor(() =>
+        expect(resultsRequests.at(-1)).toBe(
+          '/api/library/results?site=pokerstars&site=coinpoker&stake=no-limit%3A25%3A50%3AEUR&stake=no-limit%3A5%3A10%3AUSDT',
+        ),
+      )
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Clear filters' }))
+      expect(chosen(filters, 'Poker site')).toBe('All sites')
+      expect(chosen(filters, 'Stake')).toBe('All stakes')
     })
 
     it('combines the filters, going back to the first page, and one action clears them all', async () => {
@@ -315,9 +366,9 @@ describe('LibraryPage', () => {
       await screen.findByText('Showing 3–3 of 3')
       const filters = screen.getByRole('group', { name: 'Filters' })
 
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Poker site' }), 'PokerStars')
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'iMapleAA')
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Stake' }), 'NL10 EUR')
+      await choose(filters, 'Poker site', 'PokerStars')
+      await choose(filters, 'Hero', 'iMapleAA')
+      await choose(filters, 'Stake', 'NL10 EUR')
 
       expect(lastFilterQuery()).toBe('site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR')
       expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('page')).toBe('1')
@@ -327,9 +378,9 @@ describe('LibraryPage', () => {
 
       // Back to the default: today's Hands, and a bare address.
       expect(window.location.search).toBe('')
-      expect((within(filters).getByRole('combobox', { name: 'Period' }) as HTMLSelectElement).value).toBe('today')
-      expect((within(filters).getByRole('combobox', { name: 'Poker site' }) as HTMLSelectElement).value).toBe('')
-      expect((within(filters).getByRole('combobox', { name: 'Hero' }) as HTMLSelectElement).value).toBe('')
+      expect(chosen(filters, 'Period')).toBe('Today')
+      expect(chosen(filters, 'Poker site')).toBe('All sites')
+      expect(chosen(filters, 'Hero')).toBe('All heroes')
     })
 
     it('narrows the period to a quick range of the viewer’s days', async () => {
@@ -339,7 +390,7 @@ describe('LibraryPage', () => {
         renderLibrary()
         const filters = await screen.findByRole('group', { name: 'Filters' })
 
-        await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Period' }), 'This week')
+        await choose(filters, 'Period', 'This week')
 
         // A Wednesday: the week began on Monday.
         expect((within(filters).getByLabelText('From') as HTMLInputElement).value).toBe('2026-10-19')
@@ -359,7 +410,7 @@ describe('LibraryPage', () => {
         renderLibrary(DEFAULT_PREFERENCES, undefined, '/library')
         const filters = await screen.findByRole('group', { name: 'Filters' })
 
-        expect((within(filters).getByRole('combobox', { name: 'Period' }) as HTMLSelectElement).value).toBe('today')
+        expect(chosen(filters, 'Period')).toBe('Today')
         const query = new URL(requests.at(-1)!, 'http://localhost').searchParams
         expect(query.get('from')).toBe(new Date(2026, 9, 21).toISOString())
         expect(query.get('to')).toBe(new Date(2026, 9, 22).toISOString())
@@ -389,7 +440,7 @@ describe('LibraryPage', () => {
 
       expect(new URL(requests.at(-1)!, 'http://localhost').searchParams.get('from')).toBe(new Date(2026, 8, 1).toISOString())
       expect(lastFilterQuery()).not.toContain('to=')
-      expect((within(filters).getByRole('combobox', { name: 'Period' }) as HTMLSelectElement).value).toBe('custom')
+      expect(chosen(filters, 'Period')).toBe('Custom')
     })
 
     it('shows only the Marked Hands from the collections', async () => {
@@ -409,7 +460,7 @@ describe('LibraryPage', () => {
       const filters = await screen.findByRole('group', { name: 'Filters' })
       pages['1'] = { ...pages['1'], total: 0, hands: [] }
 
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'Hero')
+      await choose(filters, 'Hero', 'Hero')
 
       expect(await screen.findByText('No hands match these filters.')).toBeTruthy()
       expect(screen.queryByText('Your library is empty. Import your hand histories to keep them here.')).toBeNull()
@@ -470,7 +521,7 @@ describe('LibraryPage', () => {
       expect(lastFilterQuery()).toBe('sort=pot&dir=asc')
       expect(header('Final pot').getAttribute('aria-sort')).toBe('ascending')
 
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'Hero')
+      await choose(filters, 'Hero', 'Hero')
 
       expect(window.location.search).toBe('?period=all&hero=Hero&sort=pot&dir=asc')
       await waitFor(() => expect(lastFilterQuery()).toBe('hero=Hero&sort=pot&dir=asc'))
@@ -511,8 +562,8 @@ describe('LibraryPage', () => {
       expect(resultsRequests).toEqual(['/api/library/results?'])
 
       const filters = screen.getByRole('group', { name: 'Filters' })
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Poker site' }), 'PokerStars')
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Stake' }), 'NL10 EUR')
+      await choose(filters, 'Poker site', 'PokerStars')
+      await choose(filters, 'Stake', 'NL10 EUR')
 
       expect(resultsRequests.at(-1)).toBe(`/api/library/results?${lastFilterQuery()}`)
       expect(lastFilterQuery()).toBe('site=pokerstars&stake=no-limit%3A5%3A10%3AEUR')
@@ -827,7 +878,7 @@ describe('LibraryPage', () => {
       renderLibrary(DEFAULT_PREFERENCES, room)
       const filters = await screen.findByRole('group', { name: 'Filters' })
 
-      await userEvent.selectOptions(within(filters).getByRole('combobox', { name: 'Hero' }), 'Hero')
+      await choose(filters, 'Hero', 'Hero')
 
       expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
       expect(window.location.search).toBe('?period=all&hero=Hero')

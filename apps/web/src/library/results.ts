@@ -1,3 +1,5 @@
+import type { GraphColourPreference } from '../preferences/preferences'
+
 /*
  * The running Results over the Hands a Library filter keeps, as the server's
  * `GET /library/results` sends them (ADR 0001: no shared code).
@@ -7,6 +9,14 @@
 export const RESULT_LINES = ['result', 'allInEv', 'showdown', 'nonShowdown'] as const
 
 export type ResultLine = (typeof RESULT_LINES)[number]
+
+/** The Preference (Graph Colours) that holds each line's colour. */
+export const LINE_COLOUR: Record<ResultLine, GraphColourPreference> = {
+  result: 'resultColour',
+  allInEv: 'allInEvColour',
+  showdown: 'showdownColour',
+  nonShowdown: 'nonShowdownColour',
+}
 
 export type ResultLines = Record<ResultLine, number>
 

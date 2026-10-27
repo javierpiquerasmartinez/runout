@@ -7,7 +7,16 @@ import { GoogleSignInButton } from '../identity/GoogleSignInButton'
 import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
 import { useSignOut } from '../identity/useSignOut'
-import type { DeckStyle, DisplayUnit, Preferences, Theme } from '../preferences/preferences'
+import { LINE_COLOUR, RESULT_LINES } from '../library/results'
+import {
+  DEFAULT_GRAPH_COLOURS,
+  GRAPH_COLOURS,
+  graphColour,
+  type DeckStyle,
+  type DisplayUnit,
+  type Preferences,
+  type Theme,
+} from '../preferences/preferences'
 import { quantity } from '../room/quantity'
 import { useHeldRoom } from '../room/heldRoomContext'
 import { followLink, navigate } from '../routing'
@@ -49,6 +58,7 @@ export function SettingsPage() {
             </div>
             <ProfileCard />
             <TableReadingCard />
+            <GraphColoursCard />
           </div>
           <div className="settings__column settings__column--side">
             <AccountCard />
@@ -306,6 +316,94 @@ function TableReadingCard() {
       </SettingRow>
       <Failure message={failure} />
     </section>
+  )
+}
+
+/**
+ * Graph Colours: each Results Graph line on a colour of the palette, which
+ * reads in either Theme. Two lines may share one; the legend names them.
+ */
+function GraphColoursCard() {
+  const { t } = useI18n()
+  const { identity } = useIdentity()
+  const preferences = identity.preferences
+  const [change, failure] = usePreferenceChange()
+  const onDefaults = RESULT_LINES.every((line) => preferences[LINE_COLOUR[line]] === DEFAULT_GRAPH_COLOURS[LINE_COLOUR[line]])
+  return (
+    <section className="settings-card settings-card--rows" aria-labelledby="settings-graph-title">
+      <h2 id="settings-graph-title" className="settings-card__eyebrow">
+        {t('settings.graph.title')}
+      </h2>
+      <div className="settings-graph">
+        <div className="settings-graph__lines">
+          {RESULT_LINES.map((line) => {
+            const name = t(`library.results.line.${line}`)
+            const chosen = preferences[LINE_COLOUR[line]]
+            return (
+              <div key={line} className="settings-graph__line">
+                <span className="settings-row__label">{name}</span>
+                <div role="radiogroup" aria-label={name} className="settings-graph__swatches">
+                  {GRAPH_COLOURS.map((colour) => (
+                    <button
+                      key={colour}
+                      type="button"
+                      role="radio"
+                      aria-checked={colour === chosen}
+                      aria-label={t('settings.graph.option', { line: name, colour: t(`settings.graph.colour.${colour}`) })}
+                      title={t(`settings.graph.colour.${colour}`)}
+                      className="settings-graph__swatch"
+                      style={{ background: graphColour(colour) }}
+                      onClick={() => colour !== chosen && change({ [LINE_COLOUR[line]]: colour })}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <GraphPreview preferences={preferences} />
+      </div>
+      <p className="settings-card__hint settings-card__hint--flat">{t('settings.graph.hint')}</p>
+      <div className="settings-card__actions">
+        <Failure message={failure} />
+        <Button
+          variant="secondary"
+          size="compact"
+          disabledReason={onDefaults ? t('settings.graph.onDefaults') : undefined}
+          onClick={() => change(DEFAULT_GRAPH_COLOURS)}
+        >
+          {t('settings.graph.restore')}
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+/** Four running totals drawn as the Results Graph draws them, in the chosen colours. */
+const PREVIEW_PATHS = {
+  result: 'M0 44 L20 38 L40 40 L60 28 L80 30 L100 18 L120 12',
+  allInEv: 'M0 44 L20 40 L40 36 L60 32 L80 26 L100 22 L120 18',
+  showdown: 'M0 44 L20 34 L40 38 L60 30 L80 36 L100 30 L120 26',
+  nonShowdown: 'M0 44 L20 46 L40 44 L60 46 L80 44 L100 40 L120 38',
+}
+
+function GraphPreview({ preferences }: { preferences: Preferences }) {
+  const { t } = useI18n()
+  return (
+    <svg className="settings-graph__preview" viewBox="0 0 120 56" role="img" aria-label={t('settings.graph.preview')}>
+      <line x1="0" y1="44" x2="120" y2="44" stroke="var(--color-border-strong)" strokeWidth="1" />
+      {RESULT_LINES.map((line) => (
+        <path
+          key={line}
+          d={PREVIEW_PATHS[line]}
+          fill="none"
+          stroke={graphColour(preferences[LINE_COLOUR[line]])}
+          strokeWidth={line === 'result' ? 2 : 1.5}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
   )
 }
 

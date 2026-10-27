@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../backend/api'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import type { Identity } from '../identity/identity'
+import { DEFAULT_PREFERENCES } from '../preferences/preferences'
 import { fakeSession } from '../test/fakeSession'
 import { fakeGoogleIdentity } from '../test/fakeGoogle'
 import { SettingsPage } from './SettingsPage'
@@ -14,8 +15,12 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-function renderSettings(identity: Partial<Identity> = {}, signOut: () => Promise<void> = async () => {}) {
-  const session = fakeSession(identity, { signOut: vi.fn(signOut) })
+function renderSettings(
+  identity: Partial<Identity> = {},
+  signOut: () => Promise<void> = async () => {},
+  changePreferences: () => Promise<void> = async () => {},
+) {
+  const session = fakeSession(identity, { signOut: vi.fn(signOut), changePreferences: vi.fn(changePreferences) })
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -55,5 +60,54 @@ describe('SettingsPage · the Account', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
     expect(session.signIn).toHaveBeenCalledWith('id-token-from-google', false)
+  })
+})
+
+describe('SettingsPage · Graph Colours', () => {
+  it('shows each Results Graph line on its colour, the board’s by default', () => {
+    renderSettings()
+
+    const card = screen.getByRole('region', { name: 'Results graph' })
+    expect(within(card).getByRole('radiogroup', { name: 'Result' })).toBeTruthy()
+    expect(within(card).getByRole('radio', { name: 'Result: Teal' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(card).getByRole('radio', { name: 'All-in EV: Amber' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(card).getByRole('radio', { name: 'Showdown: Blue' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(card).getByRole('radio', { name: 'Non-showdown: Red' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(card).getAllByRole('radio')).toHaveLength(4 * 8)
+  })
+
+  it('gives a line any colour of the palette, even one another line already has', async () => {
+    const session = renderSettings()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Non-showdown: Teal' }))
+
+    expect(session.changePreferences).toHaveBeenCalledWith({ nonShowdownColour: 'teal' })
+  })
+
+  it('puts every line back on its default colour', async () => {
+    const session = renderSettings({
+      preferences: { ...DEFAULT_PREFERENCES, resultColour: 'violet', showdownColour: 'lime' },
+    })
+
+    expect(screen.getByRole('radio', { name: 'Result: Violet' }).getAttribute('aria-checked')).toBe('true')
+    await userEvent.click(screen.getByRole('button', { name: 'Restore colours' }))
+
+    expect(session.changePreferences).toHaveBeenCalledWith({
+      resultColour: 'teal',
+      allInEvColour: 'amber',
+      showdownColour: 'blue',
+      nonShowdownColour: 'red',
+    })
+  })
+
+  it('says so when a colour can’t be saved', async () => {
+    renderSettings({}, undefined, async () => {
+      throw new ApiError(0, 'network')
+    })
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Result: Pink' }))
+
+    const card = screen.getByRole('region', { name: 'Results graph' })
+    expect((await within(card).findByRole('alert')).textContent).toContain("We couldn't reach the server")
   })
 })

@@ -199,7 +199,7 @@ One of the Preferences.
 ### Preferences
 
 **Preferences**:
-How one person reads the table: Deck Style, four-colour classic deck, pot percentage on bets, Display Unit, Theme and language. Personal and stored with their identity: they never change what anyone else in the Room sees. Hide Opponent Names is not one of them; it belongs to Playback.
+How one person reads the table and their Results Graph: Deck Style, four-colour classic deck, pot percentage on bets, Display Unit, Theme, Graph Colours and language. Personal and stored with their identity: they never change what anyone else in the Room sees. Hide Opponent Names is not one of them; it belongs to Playback.
 _Avoid_: Settings (the screen, not the choices), options, profile
 
 **Deck Style**:
@@ -209,3 +209,7 @@ _Avoid_: Skin, card theme
 **Theme**:
 The colour scheme a person's screens use: dark (the default), light, or following the operating system.
 _Avoid_: Mode, appearance
+
+**Graph Colours**:
+The colour a person gives each line of their Results Graph (Result, All-in EV, Showdown Result, Non-showdown Result), picked from a fixed palette that reads in either Theme. A line keeps its colour wherever it shows: the line itself, its legend toggle, the hover box and its Win Rate. Each line has its own default, and they can go back to it.
+_Avoid_: Chart colours, line colours, graph theme

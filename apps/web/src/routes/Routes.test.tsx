@@ -319,3 +319,85 @@ describe('Redirect', () => {
     expect(window.history.length).toBe(entries)
   })
 })
+
+describe('Routes · from a Library Hand back to the Library', () => {
+  const hand = (id: string, positions: string[]) => ({
+    id,
+    site: 'pokerstars',
+    siteHandId: `site-${id}`,
+    hero: 'iMapleAA',
+    holeCards: ['Js', '8s'],
+    playedAt: '2026-09-18T12:34:30.000Z',
+    stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+    result: 49,
+    marked: false,
+    tags: [],
+    summary: { positions, finalPot: 105, finalStreet: 'river', showdown: true },
+  })
+  const listPage = (page: number, hands: unknown[]) => ({
+    ...emptyLibrary,
+    total: 3,
+    page,
+    pageSize: 2,
+    hands,
+    options: { sites: ['pokerstars'], heroes: ['iMapleAA'], stakes: [], tags: [] },
+    counts: { all: 3, marked: 0 },
+  })
+  /** List reads, as `/api/library/hands?page=2&pageSize=50&site=pokerstars`. */
+  let listReads: string[]
+
+  beforeEach(() => {
+    listReads = []
+    const fallback = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (String(url).startsWith('/api/library/hands?')) {
+        listReads.push(String(url))
+        const page = new URL(String(url), 'http://localhost').searchParams.get('page')
+        return Response.json(page === '2' ? listPage(2, [hand('split-pot', ['CO', 'SB'])]) : listPage(1, [hand('h1', ['BTN', 'BB']), hand('h2', ['BTN', 'BB'])]))
+      }
+      return fallback(url, init)
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('goes back to the same filter, sort and page, scrolled where it was', async () => {
+    renderAt('/library?period=all&site=pokerstars&sort=result&dir=asc', account())
+    await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+    await screen.findByText('Showing 3–3 of 3')
+    const left = '/library?period=all&site=pokerstars&sort=result&dir=asc&page=2'
+    expect(`${window.location.pathname}${window.location.search}`).toBe(left)
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(420)
+
+    await userEvent.click(screen.getByRole('link', { name: 'Open CO vs SB, iMapleAA' }))
+    await userEvent.click(await libraryHand())
+
+    await waitFor(() => expect(`${window.location.pathname}${window.location.search}`).toBe(left))
+    expect(await screen.findByText('Showing 3–3 of 3')).toBeTruthy()
+    expect(listReads.at(-1)).toContain('page=2')
+    expect(listReads.at(-1)).toContain('site=pokerstars')
+    expect(listReads.at(-1)).toContain('sort=result')
+    await waitFor(() => expect(scrollTo).toHaveBeenLastCalledWith(0, 420))
+    // Landed once: the entry no longer keeps it, so a reload starts at the top.
+    expect(window.history.state).not.toHaveProperty('libraryScrollY')
+  })
+
+  it('opens the page an address keeps, as after a reload', async () => {
+    renderAt('/library?period=all&page=2', account())
+
+    expect(await screen.findByText('Showing 3–3 of 3')).toBeTruthy()
+  })
+
+  it('goes to the default Library from a Hand opened on its own', async () => {
+    renderAt('/library/hands/split-pot', account())
+
+    expect((await libraryHand()).getAttribute('href')).toBe('/library')
+    await userEvent.click(await libraryHand())
+
+    expect(await library()).toBeTruthy()
+    expect(window.location.search).toBe('')
+  })
+})

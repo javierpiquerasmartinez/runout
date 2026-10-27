@@ -767,3 +767,162 @@
   background: var(--card-slot-bg);
   box-shadow: none;
 }
+
+/* ---------- Dropdown: a filter chip that opens its options under it ---------- */
+
+.ro-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+.ro-dropdown__button {
+  height: 34px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-panel);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.ro-dropdown__button:hover {
+  border-color: var(--color-border-hover);
+}
+.ro-dropdown__button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.ro-dropdown[data-active] .ro-dropdown__button {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+  font-weight: 600;
+}
+.ro-dropdown__label {
+  white-space: nowrap;
+}
+.ro-dropdown__value {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.ro-dropdown[data-active] .ro-dropdown__value {
+  color: inherit;
+}
+.ro-dropdown__chevron {
+  transform: rotate(90deg);
+  transition: transform 120ms ease;
+}
+.ro-dropdown__button[aria-expanded='true'] .ro-dropdown__chevron {
+  transform: rotate(-90deg);
+}
+.ro-dropdown__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 3;
+  min-width: max(100%, 180px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+}
+.ro-dropdown__search {
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-panel);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.ro-dropdown__search::placeholder {
+  color: var(--text-muted);
+}
+.ro-dropdown__search:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -1px;
+}
+.ro-dropdown__list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ro-dropdown__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ro-dropdown__option:hover,
+.ro-dropdown__option:focus {
+  outline: none;
+  background: var(--color-hover);
+}
+.ro-dropdown__option:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--sync);
+}
+.ro-dropdown__option[aria-selected='true'] {
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+/* A tick box, drawn in brass once ticked; the option's own name stays as it is. */
+.ro-dropdown__check {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 3px;
+}
+.ro-dropdown__option[aria-selected='true'] .ro-dropdown__check {
+  border-color: var(--brass);
+  background: var(--brass);
+}
+/* The tick is a mask, so its colour is the token's, in either Theme. */
+.ro-dropdown__option[aria-selected='true'] .ro-dropdown__check::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--on-brass);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2 6 9.6l4.5-5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+.ro-dropdown__list[aria-multiselectable] .ro-dropdown__option[aria-selected='true'] {
+  font-weight: 400;
+  color: var(--text-primary);
+}
+.ro-dropdown__option[aria-disabled='true'] {
+  color: var(--text-muted);
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .ro-dropdown__panel {
+    max-width: calc(100vw - 32px);
+  }
+}

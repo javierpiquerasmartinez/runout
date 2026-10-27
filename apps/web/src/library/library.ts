@@ -26,6 +26,56 @@ export function libraryViewFromPath(path: string): LibraryView | null {
   return null
 }
 
+/** The list's page an address keeps: the first unless it says another. */
+export function libraryPageFromSearch(search: string): number {
+  const page = Number(new URLSearchParams(search).get('page'))
+  return Number.isInteger(page) && page > 1 ? page : 1
+}
+
+/** The address's search with the page written in place of whichever it had; the first page is left out. */
+export function withLibraryPage(search: string, page: number): string {
+  const query = new URLSearchParams(search)
+  query.delete('page')
+  if (page > 1) query.set('page', String(page))
+  const written = query.toString()
+  return written && `?${written}`
+}
+
+/*
+ * A Hand opened from the Library keeps, in its history entry, the Library's
+ * address it was opened from, so "Volver" goes back there; the Library's own
+ * entry keeps how far down it was scrolled, to land there again.
+ */
+const OPENED_FROM = 'openedFromLibrary'
+const SCROLLED_TO = 'libraryScrollY'
+
+/** The history state for a Hand opened from the Library at this address. */
+export function openedFromLibrary(address: string): Record<string, unknown> {
+  return { [OPENED_FROM]: address }
+}
+
+/** The Library's address a Hand's history entry was opened from, or null when it wasn't. */
+export function libraryOpenedFrom(state: unknown): string | null {
+  const address = isRecord(state) ? state[OPENED_FROM] : undefined
+  return typeof address === 'string' ? address : null
+}
+
+/** The history state of the Library's entry, keeping how far down it is scrolled, or no longer keeping it (null). */
+export function withLibraryScroll(state: unknown, scrollY: number | null): Record<string, unknown> {
+  const { [SCROLLED_TO]: _kept, ...rest } = isRecord(state) ? state : {}
+  return scrollY === null ? rest : { ...rest, [SCROLLED_TO]: scrollY }
+}
+
+/** How far down the Library's entry was scrolled when a Hand was opened from it, or null. */
+export function libraryScroll(state: unknown): number | null {
+  const scrollY = isRecord(state) ? state[SCROLLED_TO] : undefined
+  return typeof scrollY === 'number' ? scrollY : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 /** Where a Hand opened from the Library is replayed. */
 export function libraryHandPath(handId: string): string {
   return `${libraryPath}/hands/${encodeURIComponent(handId)}`

@@ -5,6 +5,7 @@ import { Chip } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { iconGroups } from '../ui/iconDrawings'
+import { Dropdown } from '../ui/Dropdown'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toggle } from '../ui/Toggle'
@@ -19,6 +20,9 @@ type DisplayUnit = 'bb' | 'amount' | 'both'
  * The three design-system boards of Design.html rebuilt from the real tokens,
  * components, icon sprite and message catalogue. Laid out for 1440×900.
  */
+/** Enough Screen Names for the dropdown of several to offer its search. */
+const DEMO_HEROES = ['iMapleAA', 'Hero', 'Villain', 'NitKing', 'Fish1', 'Reg_Ana', 'Reg_Bo', 'TiltMe', 'Nit']
+
 export function DesignSystemPage() {
   const { t, locale, setLocale } = useI18n()
   const [theme, setTheme] = useState<Theme>('dark')
@@ -368,6 +372,8 @@ function ControlsBoard() {
   const [hideNames, setHideNames] = useState(true)
   const [markHand, setMarkHand] = useState(false)
   const [unit, setUnit] = useState<DisplayUnit>('bb')
+  const [site, setSite] = useState('')
+  const [heroes, setHeroes] = useState<string[]>(['iMapleAA'])
   const [stakeFilter, setStakeFilter] = useState(true)
   const lockedReason = t('design.controls.lockedReason')
   const unitOptions = [
@@ -512,6 +518,30 @@ function ControlsBoard() {
             <div className="ds-segmented-row">
               <SegmentedControl label={t('design.controls.unit.label')} options={unitOptions} value={unit} onChange={setUnit} />
               <span className="ds-caption">{t('design.controls.segmentedNote')}</span>
+            </div>
+            <div className="ds-segmented-row">
+              <Dropdown
+                label={t('design.controls.dropdown.label')}
+                active={site !== ''}
+                value={site}
+                options={[
+                  { value: '', label: t('design.controls.dropdown.all') },
+                  { value: 'pokerstars', label: 'PokerStars' },
+                  { value: 'coinpoker', label: 'CoinPoker' },
+                ]}
+                onChange={setSite}
+              />
+              <Dropdown
+                multiple
+                label={t('design.controls.dropdown.heroes')}
+                none={t('design.controls.dropdown.allHeroes')}
+                searchLabel={t('design.controls.dropdown.search')}
+                active={heroes.length > 0}
+                value={heroes}
+                options={DEMO_HEROES.map((hero) => ({ value: hero, label: hero }))}
+                onChange={setHeroes}
+              />
+              <span className="ds-caption">{t('design.controls.dropdownNote')}</span>
             </div>
           </Panel>
 

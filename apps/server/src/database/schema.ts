@@ -70,9 +70,21 @@ export const screenNames = pgTable(
   (table) => [primaryKey({ columns: [table.identityId, table.screenName] })],
 );
 
+/** The palette Graph Colours are picked from; the web gives each a value per Theme. */
+export const GRAPH_COLOURS = [
+  'teal',
+  'amber',
+  'blue',
+  'red',
+  'violet',
+  'pink',
+  'lime',
+  'grey',
+] as const;
+
 /**
- * How one person reads the table: personal, never shared with the Room. An
- * identity without a row reads it the default way.
+ * How one person reads the table and their Results Graph: personal, never
+ * shared with the Room. An identity without a row reads it the default way.
  */
 export const preferences = pgTable('preferences', {
   identityId: uuid('identity_id')
@@ -87,6 +99,19 @@ export const preferences = pgTable('preferences', {
   }).notNull(),
   theme: text('theme', { enum: ['dark', 'light', 'system'] }).notNull(),
   language: text('language', { enum: ['es', 'en'] }).notNull(),
+  /** Graph Colours: each Results Graph line's colour, named from the palette. */
+  resultColour: text('result_colour', { enum: GRAPH_COLOURS })
+    .notNull()
+    .default('teal'),
+  allInEvColour: text('all_in_ev_colour', { enum: GRAPH_COLOURS })
+    .notNull()
+    .default('amber'),
+  showdownColour: text('showdown_colour', { enum: GRAPH_COLOURS })
+    .notNull()
+    .default('blue'),
+  nonShowdownColour: text('non_showdown_colour', { enum: GRAPH_COLOURS })
+    .notNull()
+    .default('red'),
 });
 
 export const rooms = pgTable('rooms', {

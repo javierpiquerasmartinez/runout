@@ -41,9 +41,14 @@ export function useHistoryState<T extends string | number | null>(read: (state: 
   return useSyncExternalStore(subscribe, () => read(window.history.state))
 }
 
+/** Whether a click on a link opens it here, rather than in another tab or window. */
+export function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0
+}
+
 /** For an in-app `<a href>`: navigates without reloading the page. */
 export function followLink(event: MouseEvent<HTMLAnchorElement>) {
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+  if (!isPlainClick(event)) return
   event.preventDefault()
   navigate(event.currentTarget.pathname)
 }

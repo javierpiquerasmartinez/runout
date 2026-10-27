@@ -155,4 +155,19 @@ describe('ResultsGraph', () => {
       expect(within(legendEntry('Result')).getByText('+4 BB')).toBeTruthy()
     })
   })
+
+  it('draws each line, its legend entry and its Win Rate in the person’s Graph Colours', () => {
+    const { container } = renderGraph(euros, { ...DEFAULT_PREFERENCES, resultColour: 'violet', allInEvColour: 'violet' })
+
+    const swatch = (line: string) => legendEntry(line).querySelector<HTMLElement>('.results__swatch')!.style.background
+    expect(swatch('Result')).toBe('var(--graph-violet)')
+    expect(swatch('All-in EV')).toBe('var(--graph-violet)')
+    expect(swatch('Showdown')).toBe('var(--graph-blue)')
+    expect(swatch('Non-showdown')).toBe('var(--graph-red)')
+    const box = screen.getByRole('group', { name: 'BB/100' })
+    expect(within(box).getByText('Result').querySelector<HTMLElement>('.results__swatch')!.style.background).toBe(
+      'var(--graph-violet)',
+    )
+    expect(container.querySelector('.results__line--result path')?.getAttribute('stroke')).toBe('var(--graph-violet)')
+  })
 })
