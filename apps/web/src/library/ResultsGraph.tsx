@@ -3,9 +3,9 @@ import { CartesianGrid, Line, LineChart, ReferenceLine, Tooltip, XAxis, YAxis } 
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
-import type { DisplayUnit } from '../preferences/preferences'
+import { graphColour, type DisplayUnit, type Preferences } from '../preferences/preferences'
 import { SegmentedControl } from '../ui/SegmentedControl'
-import { RESULT_LINES, type ResultLine, type ResultLines, type Results } from './results'
+import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results } from './results'
 import './ResultsGraph.css'
 
 /** What the graph adds up in: big blinds always, Amounts only in one currency. */
@@ -16,13 +16,14 @@ type Point = { hand: number } & ResultLines
 /*
  * Recharts draws the shapes; everything it would style on its own (colours,
  * fonts, strokes, the hover box) comes from the design tokens here and in
- * ResultsGraph.css, so the graph follows the Theme.
+ * ResultsGraph.css, so the graph follows the Theme. Each line's colour is the
+ * reader's Graph Colours.
  */
-const STROKE: Record<ResultLine, string> = {
-  result: 'var(--graph-result)',
-  allInEv: 'var(--graph-all-in-ev)',
-  showdown: 'var(--graph-showdown)',
-  nonShowdown: 'var(--graph-non-showdown)',
+/** Each line's colour as CSS, from the reader's Graph Colours. */
+function strokes(preferences: Preferences): Record<ResultLine, string> {
+  return Object.fromEntries(
+    RESULT_LINES.map((line) => [line, graphColour(preferences[LINE_COLOUR[line]])]),
+  ) as Record<ResultLine, string>
 }
 const AXIS_TICK = { fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }
 
@@ -37,7 +38,9 @@ const WIN_RATE_LINES = ['result', 'allInEv'] as const satisfies readonly ResultL
 export function ResultsGraph({ results }: { results: Results }) {
   const i18n = useI18n()
   const { t } = i18n
-  const { displayUnit } = usePreferences()
+  const preferences = usePreferences()
+  const { displayUnit } = preferences
+  const stroke = strokes(preferences)
   const [hidden, setHidden] = useState<ReadonlySet<ResultLine>>(new Set())
   // Amounts when the reader reads them first, as long as the Hands allow it.
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
@@ -104,7 +107,9 @@ export function ResultsGraph({ results }: { results: Results }) {
               cursor={{ stroke: 'var(--color-border-hover)', strokeDasharray: '3 3' }}
               isAnimationActive={false}
               content={({ active, payload }) =>
-                active && payload?.[0] ? <Readout point={payload[0].payload as Point} format={format} hidden={hidden} /> : null
+                active && payload?.[0] ? (
+                  <Readout point={payload[0].payload as Point} format={format} hidden={hidden} stroke={stroke} />
+                ) : null
               }
             />
             {RESULT_LINES.map((line) => (
@@ -112,10 +117,10 @@ export function ResultsGraph({ results }: { results: Results }) {
                 key={line}
                 dataKey={line}
                 className={`results__line results__line--${line}`}
-                stroke={STROKE[line]}
+                stroke={stroke[line]}
                 strokeWidth={line === 'result' ? 2 : 1.5}
                 dot={false}
-                activeDot={{ r: 3, stroke: 'var(--color-panel)', strokeWidth: 1.5, fill: STROKE[line] }}
+                activeDot={{ r: 3, stroke: 'var(--color-panel)', strokeWidth: 1.5, fill: stroke[line] }}
                 hide={hidden.has(line)}
                 isAnimationActive={false}
               />
@@ -127,7 +132,7 @@ export function ResultsGraph({ results }: { results: Results }) {
             {RESULT_LINES.map((line) => (
               <li key={line} className="results__entry" data-hidden={hidden.has(line) || undefined}>
                 <button type="button" className="results__toggle" aria-pressed={!hidden.has(line)} onClick={() => toggle(line)}>
-                  <span className="results__swatch" style={{ background: STROKE[line] }} aria-hidden="true" />
+                  <span className="results__swatch" style={{ background: stroke[line] }} aria-hidden="true" />
                   {t(`library.results.line.${line}`)}
                 </button>
                 <span className="results__total ro-mono">{format(totals[line])}</span>
@@ -140,7 +145,10 @@ export function ResultsGraph({ results }: { results: Results }) {
             <dl>
               {WIN_RATE_LINES.map((line) => (
                 <div key={line} className="results__win-rate">
-                  <dt>{t(`library.results.line.${line}`)}</dt>
+                  <dt>
+                    <span className="results__swatch" style={{ background: stroke[line] }} aria-hidden="true" />
+                    {t(`library.results.line.${line}`)}
+                  </dt>
                   <dd className="ro-mono">
                     {i18n.formatNumber((results.totals.bigBlinds[line] / results.hands) * 100, {
                       minimumFractionDigits: 1,
@@ -163,10 +171,12 @@ function Readout({
   point,
   format,
   hidden,
+  stroke,
 }: {
   point: Point
   format: (value: number) => string
   hidden: ReadonlySet<ResultLine>
+  stroke: Record<ResultLine, string>
 }) {
   const { t, formatNumber } = useI18n()
   return (
@@ -174,7 +184,7 @@ function Readout({
       <span className="results__readout-hand ro-mono">{t('library.results.hand', { hand: formatNumber(point.hand) })}</span>
       {RESULT_LINES.filter((line) => !hidden.has(line)).map((line) => (
         <span key={line} className="results__readout-line">
-          <span className="results__swatch" style={{ background: STROKE[line] }} aria-hidden="true" />
+          <span className="results__swatch" style={{ background: stroke[line] }} aria-hidden="true" />
           {t(`library.results.line.${line}`)}
           <span className="results__readout-value ro-mono">{format(point[line])}</span>
         </span>

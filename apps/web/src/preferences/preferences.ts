@@ -13,6 +13,11 @@ export interface Preferences {
   displayUnit: DisplayUnit
   theme: Theme
   language: Locale
+  /** Graph Colours: each Results Graph line's colour; two lines may share one. */
+  resultColour: GraphColour
+  allInEvColour: GraphColour
+  showdownColour: GraphColour
+  nonShowdownColour: GraphColour
 }
 
 export type DeckStyle = 'classic' | 'full-suit'
@@ -22,6 +27,27 @@ export type DisplayUnit = 'big-blinds' | 'amount' | 'both'
 
 export type Theme = 'dark' | 'light' | 'system'
 
+/** The palette Graph Colours are picked from, as the server names them; the tokens give each a value per Theme. */
+export const GRAPH_COLOURS = ['teal', 'amber', 'blue', 'red', 'violet', 'pink', 'lime', 'grey'] as const
+
+export type GraphColour = (typeof GRAPH_COLOURS)[number]
+
+/** The Preference holding each Results Graph line's colour. */
+export type GraphColourPreference = 'resultColour' | 'allInEvColour' | 'showdownColour' | 'nonShowdownColour'
+
+/** Each line's colour on the board, until the person picks another. */
+export const DEFAULT_GRAPH_COLOURS: Pick<Preferences, GraphColourPreference> = {
+  resultColour: 'teal',
+  allInEvColour: 'amber',
+  showdownColour: 'blue',
+  nonShowdownColour: 'red',
+}
+
+/** A palette colour as CSS, for the current Theme. */
+export function graphColour(colour: GraphColour): string {
+  return `var(--graph-${colour})`
+}
+
 /** Same defaults as the server's: what a first visit, and anything outside a session, reads. */
 export const DEFAULT_PREFERENCES: Preferences = {
   deckStyle: 'classic',
@@ -30,4 +56,5 @@ export const DEFAULT_PREFERENCES: Preferences = {
   displayUnit: 'big-blinds',
   theme: 'dark',
   language: 'es',
+  ...DEFAULT_GRAPH_COLOURS,
 }

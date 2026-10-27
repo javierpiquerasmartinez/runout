@@ -95,6 +95,9 @@
   font-size: 13px;
 }
 .results__win-rate dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   color: var(--text-secondary);
 }
 .results__win-rate dd {

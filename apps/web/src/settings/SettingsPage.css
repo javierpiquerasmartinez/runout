@@ -413,3 +413,74 @@
   color: var(--text);
   overflow-wrap: anywhere;
 }
+
+/* ---------- "Gráfica de resultados": a colour of the palette per line ---------- */
+
+.settings-graph {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.settings-graph__lines {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-graph__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.settings-graph__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.settings-graph__swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--color-panel);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-border);
+  cursor: pointer;
+}
+.settings-graph__swatch:hover {
+  box-shadow: 0 0 0 1px var(--color-border-hover);
+}
+.settings-graph__swatch[aria-checked='true'] {
+  box-shadow: 0 0 0 2px var(--text-primary);
+}
+.settings-graph__swatch:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.settings-graph__preview {
+  flex-shrink: 0;
+  width: 160px;
+  height: 76px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: visible;
+}
+.settings-card__actions .settings-card__failure {
+  margin-right: auto;
+}
+
+@media (max-width: 720px) {
+  .settings-graph {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .settings-graph__line {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .settings-graph__preview {
+    width: 100%;
+  }
+}

@@ -51,7 +51,7 @@ describe('Profile and preferences (e2e)', () => {
   }
 
   describe('preferences', () => {
-    it('starts every identity on the defaults: classic four-colour deck, big blinds with pot percentages, dark, Spanish', async () => {
+    it('starts every identity on the defaults: classic four-colour deck, big blinds with pot percentages, dark, Spanish, the Graph Colours of the board', async () => {
       const res = await request(running.httpServer)
         .post('/api/sessions/google')
         .send({ idToken: googleIdToken('new-subject') });
@@ -63,6 +63,10 @@ describe('Profile and preferences (e2e)', () => {
         displayUnit: 'big-blinds',
         theme: 'dark',
         language: 'es',
+        resultColour: 'teal',
+        allInEvColour: 'amber',
+        showdownColour: 'blue',
+        nonShowdownColour: 'red',
       });
     });
 
@@ -84,6 +88,8 @@ describe('Profile and preferences (e2e)', () => {
         potPercentage: false,
         theme: 'system',
         language: 'en',
+        resultColour: 'violet',
+        nonShowdownColour: 'violet',
       }).expect(200);
 
       expect((await me(token)).body.preferences).toEqual({
@@ -93,6 +99,10 @@ describe('Profile and preferences (e2e)', () => {
         displayUnit: 'both',
         theme: 'system',
         language: 'en',
+        resultColour: 'violet',
+        allInEvColour: 'amber',
+        showdownColour: 'blue',
+        nonShowdownColour: 'violet',
       });
     });
 
@@ -111,6 +121,8 @@ describe('Profile and preferences (e2e)', () => {
       { displayUnit: 'chips' },
       { theme: 'sepia' },
       { language: 'fr' },
+      { resultColour: 'gold' },
+      { showdownColour: '#ff0000' },
       { speed: 2 },
     ])('refuses %o with a reason, changing nothing', async (changes) => {
       const { token } = await newAccount(running.httpServer);

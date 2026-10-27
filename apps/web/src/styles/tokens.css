@@ -111,14 +111,19 @@
   --avatar-4-ink: #e0645c;
 
   /*
-   * The Results Graph's lines, coloured as Trackers colour them. They borrow
-   * the avatar inks, so each Theme gets its own. Here red names a line; it
-   * never says "losing".
+   * The palette the Results Graph's lines are picked from (Graph Colours).
+   * The first four are the avatar inks, the lines' colours on the board, as
+   * Trackers colour them; each Theme gets its own value of every colour. Here
+   * red names a line; it never says "losing".
    */
-  --graph-result: var(--avatar-2-ink);
-  --graph-all-in-ev: var(--avatar-1-ink);
-  --graph-showdown: var(--avatar-3-ink);
-  --graph-non-showdown: var(--avatar-4-ink);
+  --graph-teal: var(--avatar-2-ink);
+  --graph-amber: var(--avatar-1-ink);
+  --graph-blue: var(--avatar-3-ink);
+  --graph-red: var(--avatar-4-ink);
+  --graph-violet: #a98be8;
+  --graph-pink: #e27aa8;
+  --graph-lime: #a6c84a;
+  --graph-grey: #9aa6a2;
 
   /* Elevation */
   --shadow-raised: 0 8px 22px rgb(0 0 0 / 50%);
@@ -249,6 +254,11 @@
   --avatar-3-ink: #1f5f99;
   --avatar-4-bg: #fbe9e7;
   --avatar-4-ink: #c0392f;
+
+  --graph-violet: #6a4bb5;
+  --graph-pink: #b2366f;
+  --graph-lime: #557512;
+  --graph-grey: #5f6b67;
 
   --shadow-raised: 0 8px 22px rgb(40 34 20 / 12%);
   --shadow-modal: 0 32px 80px rgb(40 34 20 / 22%);
