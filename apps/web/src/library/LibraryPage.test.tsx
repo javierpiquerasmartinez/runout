@@ -325,10 +325,39 @@ describe('LibraryPage', () => {
       renderLibrary()
       const filters = await screen.findByRole('group', { name: 'Filters' })
 
-      expect(await optionsOf(filters, 'Poker site')).toEqual(['All sites', 'CoinPoker', 'PokerStars'])
-      expect(await optionsOf(filters, 'Hero')).toEqual(['All heroes', 'Hero', 'iMapleAA'])
+      expect(await optionsOf(filters, 'Poker site')).toEqual(['CoinPoker', 'PokerStars'])
+      expect(await optionsOf(filters, 'Hero')).toEqual(['Hero', 'iMapleAA'])
       // Two Stakes that read alike say their currency.
-      expect(await optionsOf(filters, 'Stake')).toEqual(['All stakes', 'NL10 EUR', 'NL10 USDT', 'NL50'])
+      expect(await optionsOf(filters, 'Stake')).toEqual(['NL10 EUR', 'NL10 USDT', 'NL50'])
+    })
+
+    it('keeps the Hands matching any of the values ticked in one filter, list and graph alike', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await choose(filters, 'Poker site', 'PokerStars')
+      await userEvent.click(screen.getByRole('option', { name: 'CoinPoker' }))
+      await userEvent.keyboard('{Escape}')
+      await choose(filters, 'Stake', 'NL50')
+      await userEvent.click(screen.getByRole('option', { name: 'NL10 USDT' }))
+
+      expect(chosen(filters, 'Poker site')).toBe('CoinPoker +1')
+      expect(chosen(filters, 'Stake')).toBe('NL10 USDT +1')
+      expect(lastFilterQuery()).toBe('site=pokerstars&site=coinpoker&stake=no-limit%3A25%3A50%3AEUR&stake=no-limit%3A5%3A10%3AUSDT')
+      expect(window.location.search).toBe(
+        '?period=all&site=pokerstars&site=coinpoker&stake=no-limit%3A25%3A50%3AEUR&stake=no-limit%3A5%3A10%3AUSDT',
+      )
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Graph' }))
+      await waitFor(() =>
+        expect(resultsRequests.at(-1)).toBe(
+          '/api/library/results?site=pokerstars&site=coinpoker&stake=no-limit%3A25%3A50%3AEUR&stake=no-limit%3A5%3A10%3AUSDT',
+        ),
+      )
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Clear filters' }))
+      expect(chosen(filters, 'Poker site')).toBe('All sites')
+      expect(chosen(filters, 'Stake')).toBe('All stakes')
     })
 
     it('combines the filters, going back to the first page, and one action clears them all', async () => {

@@ -20,6 +20,9 @@ type DisplayUnit = 'bb' | 'amount' | 'both'
  * The three design-system boards of Design.html rebuilt from the real tokens,
  * components, icon sprite and message catalogue. Laid out for 1440×900.
  */
+/** Enough Screen Names for the dropdown of several to offer its search. */
+const DEMO_HEROES = ['iMapleAA', 'Hero', 'Villain', 'NitKing', 'Fish1', 'Reg_Ana', 'Reg_Bo', 'TiltMe', 'Nit']
+
 export function DesignSystemPage() {
   const { t, locale, setLocale } = useI18n()
   const [theme, setTheme] = useState<Theme>('dark')
@@ -370,6 +373,7 @@ function ControlsBoard() {
   const [markHand, setMarkHand] = useState(false)
   const [unit, setUnit] = useState<DisplayUnit>('bb')
   const [site, setSite] = useState('')
+  const [heroes, setHeroes] = useState<string[]>(['iMapleAA'])
   const [stakeFilter, setStakeFilter] = useState(true)
   const lockedReason = t('design.controls.lockedReason')
   const unitOptions = [
@@ -526,6 +530,16 @@ function ControlsBoard() {
                   { value: 'coinpoker', label: 'CoinPoker' },
                 ]}
                 onChange={setSite}
+              />
+              <Dropdown
+                multiple
+                label={t('design.controls.dropdown.heroes')}
+                none={t('design.controls.dropdown.allHeroes')}
+                searchLabel={t('design.controls.dropdown.search')}
+                active={heroes.length > 0}
+                value={heroes}
+                options={DEMO_HEROES.map((hero) => ({ value: hero, label: hero }))}
+                onChange={setHeroes}
               />
               <span className="ds-caption">{t('design.controls.dropdownNote')}</span>
             </div>

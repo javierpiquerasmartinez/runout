@@ -92,4 +92,72 @@ describe('Dropdown', () => {
     expect(screen.getByText('Elegido: nada')).toBeTruthy()
     expect(screen.getByRole('listbox')).toBeTruthy()
   })
+
+  describe('choosing several', () => {
+    const heroes = ['iMapleAA', 'Hero', 'Villain', 'Fish1', 'Fish2', 'Reg1', 'Reg2', 'Reg3', 'Nit'].map((name) => ({ value: name, label: name }))
+
+    function Several({ options = sites.slice(1, 3) }: { options?: { value: string; label: string }[] }) {
+      const [chosen, setChosen] = useState<string[]>([])
+      return (
+        <>
+          <Dropdown multiple label="Sitio" none="Todos los sitios" searchLabel="Buscar" value={chosen} options={options} onChange={setChosen} />
+          <p>Elegidos: {chosen.join(', ') || 'nada'}</p>
+        </>
+      )
+    }
+
+    it('ticks several options, staying open, and names the first with how many more', async () => {
+      render(<Several />)
+      expect(trigger().textContent).toContain('Todos los sitios')
+
+      await userEvent.click(trigger())
+      expect(screen.getByRole('listbox').getAttribute('aria-multiselectable')).toBe('true')
+      await userEvent.click(screen.getByRole('option', { name: 'CoinPoker' }))
+      await userEvent.click(screen.getByRole('option', { name: 'PokerStars' }))
+
+      expect(screen.getByText('Elegidos: coinpoker, pokerstars')).toBeTruthy()
+      expect(screen.getByRole('option', { name: 'PokerStars' }).getAttribute('aria-selected')).toBe('true')
+      expect(screen.getByRole('listbox')).toBeTruthy()
+      // Named in the order the list offers them, whichever was ticked first.
+      expect(trigger().textContent).toContain('PokerStars +1')
+
+      await userEvent.click(screen.getByRole('option', { name: 'PokerStars' }))
+      expect(screen.getByText('Elegidos: coinpoker')).toBeTruthy()
+      expect(trigger().textContent).toContain('CoinPoker')
+    })
+
+    it('ticks and unticks by keyboard with Space, staying open until Escape', async () => {
+      render(<Several />)
+      trigger().focus()
+
+      await userEvent.keyboard('{ArrowDown} {ArrowDown} ')
+      expect(screen.getByText('Elegidos: pokerstars, coinpoker')).toBeTruthy()
+      expect(screen.getByRole('listbox')).toBeTruthy()
+      await userEvent.keyboard('{Escape}')
+
+      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(document.activeElement).toBe(trigger())
+    })
+
+    it('offers a search once there are more than 8 options, narrowing what it lists', async () => {
+      render(<Several options={heroes} />)
+
+      await userEvent.click(trigger())
+      const search = screen.getByRole('searchbox', { name: 'Buscar' })
+      expect(document.activeElement).toBe(search)
+      await userEvent.keyboard('reg')
+
+      expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Reg1', 'Reg2', 'Reg3'])
+      await userEvent.keyboard('{ArrowDown} ')
+      expect(screen.getByText('Elegidos: Reg1')).toBeTruthy()
+    })
+
+    it('has no search with 8 options or fewer', async () => {
+      render(<Several options={heroes.slice(0, 8)} />)
+
+      await userEvent.click(trigger())
+
+      expect(screen.queryByRole('searchbox')).toBeNull()
+    })
+  })
 })

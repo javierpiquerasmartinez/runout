@@ -822,25 +822,49 @@
 .ro-dropdown__button[aria-expanded='true'] .ro-dropdown__chevron {
   transform: rotate(-90deg);
 }
-.ro-dropdown__list {
+.ro-dropdown__panel {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   z-index: 3;
   min-width: max(100%, 180px);
-  max-height: 320px;
-  overflow-y: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 0;
+  gap: 6px;
   padding: 6px;
-  list-style: none;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-elevated);
   box-shadow: var(--shadow-preview);
+}
+.ro-dropdown__search {
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-panel);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.ro-dropdown__search::placeholder {
+  color: var(--text-muted);
+}
+.ro-dropdown__search:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -1px;
+}
+.ro-dropdown__list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .ro-dropdown__option {
   display: flex;
@@ -866,12 +890,31 @@
   font-weight: 600;
   color: var(--brass-ink);
 }
+/* A tick box, drawn in brass once ticked; the option's own name stays as it is. */
+.ro-dropdown__check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 3px;
+}
+.ro-dropdown__option[aria-selected='true'] .ro-dropdown__check {
+  border-color: var(--brass);
+  background: var(--brass)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2 6 9.6l4.5-5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+.ro-dropdown__list[aria-multiselectable] .ro-dropdown__option[aria-selected='true'] {
+  font-weight: 400;
+  color: var(--text-primary);
+}
 .ro-dropdown__option[aria-disabled='true'] {
   color: var(--text-muted);
   cursor: default;
 }
 @media (max-width: 760px) {
-  .ro-dropdown__list {
+  .ro-dropdown__panel {
     max-width: calc(100vw - 32px);
   }
 }

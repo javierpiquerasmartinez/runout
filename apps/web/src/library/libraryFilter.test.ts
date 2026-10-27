@@ -72,13 +72,13 @@ describe('libraryFilterQuery', () => {
   it('writes each chosen value, and nothing for what is left open', () => {
     const query = libraryFilterQuery({
       ...EMPTY_LIBRARY_FILTER,
-      site: 'pokerstars',
-      hero: 'iMapleAA',
-      stake: 'no-limit:5:10:EUR',
+      sites: ['pokerstars', 'coinpoker'],
+      heroes: ['iMapleAA'],
+      stakes: ['no-limit:5:10:EUR'],
       markedOnly: true,
     })
 
-    expect(query.toString()).toBe('site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&marked=true')
+    expect(query.toString()).toBe('site=pokerstars&site=coinpoker&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&marked=true')
     expect(libraryFilterQuery(EMPTY_LIBRARY_FILTER).toString()).toBe('')
   })
 
@@ -103,6 +103,8 @@ describe('differsFromDefault', () => {
     expect(differsFromDefault({ ...today, markedOnly: true }, now)).toBe(true)
     expect(differsFromDefault({ ...today, tags: [] }, now)).toBe(false)
     expect(differsFromDefault({ ...today, tags: ['t1'] }, now)).toBe(true)
+    expect(differsFromDefault({ ...today, sites: [] }, now)).toBe(false)
+    expect(differsFromDefault({ ...today, heroes: ['Hero'] }, now)).toBe(true)
   })
 })
 
@@ -111,7 +113,7 @@ describe('isDefaultBesidesPeriod', () => {
     expect(isDefaultBesidesPeriod(defaultLibraryFilter(now), now)).toBe(true)
     expect(isDefaultBesidesPeriod({ ...defaultLibraryFilter(now), from: '2026-10-01' }, now)).toBe(true)
     expect(isDefaultBesidesPeriod(EMPTY_LIBRARY_FILTER, now)).toBe(true)
-    expect(isDefaultBesidesPeriod({ ...EMPTY_LIBRARY_FILTER, site: 'pokerstars' }, now)).toBe(false)
+    expect(isDefaultBesidesPeriod({ ...EMPTY_LIBRARY_FILTER, sites: ['pokerstars'] }, now)).toBe(false)
   })
 })
 
@@ -119,9 +121,9 @@ describe('the filter in the address', () => {
   const everything: LibraryFilter = {
     from: '2026-10-15',
     to: '2026-10-21',
-    site: 'pokerstars',
-    hero: 'iMapleAA',
-    stake: 'no-limit:5:10:EUR',
+    sites: ['pokerstars', 'coinpoker'],
+    heroes: ['iMapleAA'],
+    stakes: ['no-limit:5:10:EUR', 'no-limit:25:50:EUR'],
     markedOnly: true,
     tags: ['t1', 't2'],
   }
@@ -129,7 +131,9 @@ describe('the filter in the address', () => {
   it('writes the viewer’s days as they are, and reads back the same filter', () => {
     const search = librarySearch(everything, now)
 
-    expect(search).toBe('?from=2026-10-15&to=2026-10-21&site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&marked=true&tag=t1&tag=t2')
+    expect(search).toBe(
+      '?from=2026-10-15&to=2026-10-21&site=pokerstars&site=coinpoker&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&stake=no-limit%3A25%3A50%3AEUR&marked=true&tag=t1&tag=t2',
+    )
     expect(libraryFilterFromSearch(search, now)).toEqual(everything)
   })
 
@@ -143,6 +147,15 @@ describe('the filter in the address', () => {
   it('says all time out loud, since a bare address is today', () => {
     expect(librarySearch(EMPTY_LIBRARY_FILTER, now)).toBe('?period=all')
     expect(libraryFilterFromSearch('?period=all', now)).toEqual(EMPTY_LIBRARY_FILTER)
+  })
+
+  it('reads a link from when each filter took one value as the same Hands', () => {
+    expect(libraryFilterFromSearch('?period=all&site=pokerstars&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR', now)).toEqual({
+      ...EMPTY_LIBRARY_FILTER,
+      sites: ['pokerstars'],
+      heroes: ['iMapleAA'],
+      stakes: ['no-limit:5:10:EUR'],
+    })
   })
 
   it('ignores what isn’t a filter, and days that aren’t days', () => {

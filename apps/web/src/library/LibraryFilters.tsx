@@ -17,8 +17,8 @@ import './LibraryFilters.css'
 
 /**
  * The "Biblioteca" board's filters bar: the period, then one filter per
- * Poker Site, Hero and Stake offering only what the Library holds, and a
- * way to clear them all. Marked only is the "Marcadas" collection beside it.
+ * Poker Site, Hero and Stake offering only what the Library holds, any
+ * number of each ticked, and a way to clear them all. Marked only is the "Marcadas" collection beside it.
  */
 export function LibraryFilters({
   filter,
@@ -69,26 +69,35 @@ export function LibraryFilters({
           onChange={(event) => set({ to: event.target.value || null })}
         />
       </label>
-      <Choice
+      <Dropdown
+        multiple
         label={t('library.filter.site')}
-        all={t('library.filter.site.all')}
-        value={filter.site}
-        choices={options.sites.map((site) => ({ value: site, label: siteLabel({ site }, i18n) }))}
-        onChange={(site) => set({ site })}
+        none={t('library.filter.site.all')}
+        searchLabel={t('library.filter.search')}
+        active={filter.sites.length > 0}
+        value={filter.sites}
+        options={options.sites.map((site) => ({ value: site, label: siteLabel({ site }, i18n) }))}
+        onChange={(sites) => set({ sites })}
       />
-      <Choice
+      <Dropdown
+        multiple
         label={t('library.filter.hero')}
-        all={t('library.filter.hero.all')}
-        value={filter.hero}
-        choices={options.heroes.map((hero) => ({ value: hero, label: hero }))}
-        onChange={(hero) => set({ hero })}
+        none={t('library.filter.hero.all')}
+        searchLabel={t('library.filter.search')}
+        active={filter.heroes.length > 0}
+        value={filter.heroes}
+        options={options.heroes.map((hero) => ({ value: hero, label: hero }))}
+        onChange={(heroes) => set({ heroes })}
       />
-      <Choice
+      <Dropdown
+        multiple
         label={t('library.filter.stake')}
-        all={t('library.filter.stake.all')}
-        value={filter.stake}
-        choices={stakes.map((stake) => ({ value: stake.key, label: stakeName(stake) }))}
-        onChange={(stake) => set({ stake })}
+        none={t('library.filter.stake.all')}
+        searchLabel={t('library.filter.search')}
+        active={filter.stakes.length > 0}
+        value={filter.stakes}
+        options={stakes.map((stake) => ({ value: stake.key, label: stakeName(stake) }))}
+        onChange={(stakes) => set({ stakes })}
       />
       <span className="library-filters__spacer" />
       {/* Always there, as on the board; it does nothing while the filter is the default. */}
@@ -100,30 +109,5 @@ export function LibraryFilters({
         {t('library.filter.clear')}
       </button>
     </div>
-  )
-}
-
-/** One filter: everything, or one of the values the Library holds. */
-function Choice({
-  label,
-  all,
-  value,
-  choices,
-  onChange,
-}: {
-  label: string
-  all: string
-  value: string | null
-  choices: { value: string; label: string }[]
-  onChange: (value: string | null) => void
-}) {
-  return (
-    <Dropdown
-      label={label}
-      active={value !== null}
-      value={value ?? ''}
-      options={[{ value: '', label: all }, ...choices]}
-      onChange={(chosen) => onChange(chosen || null)}
-    />
   )
 }

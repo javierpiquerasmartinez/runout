@@ -16,10 +16,11 @@ type Stake = QueueEntry['stake']
 export interface LibraryFilter {
   from: string | null
   to: string | null
-  site: string | null
-  hero: string | null
-  /** A Stake as `stakeKey` writes it. */
-  stake: string | null
+  /** Poker Sites, Heroes and Stakes: a Hand matching any of a part's values is kept; none leaves the part open. */
+  sites: string[]
+  heroes: string[]
+  /** Stakes as `stakeKey` writes them. */
+  stakes: string[]
   markedOnly: boolean
   /** Tag ids: a Hand carrying any of them is kept. */
   tags: string[]
@@ -29,9 +30,9 @@ export interface LibraryFilter {
 export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   from: null,
   to: null,
-  site: null,
-  hero: null,
-  stake: null,
+  sites: [],
+  heroes: [],
+  stakes: [],
   markedOnly: false,
   tags: [],
 }
@@ -83,9 +84,10 @@ export function periodOf(period: Pick<LibraryFilter, 'from' | 'to'>, now: Date =
 /** Whether any part of the filter differs from the default, the period included. */
 export function differsFromDefault(filter: LibraryFilter, now: Date = new Date()): boolean {
   const byDefault = defaultLibraryFilter(now)
-  return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) =>
-    key === 'tags' ? filter.tags.length > 0 : filter[key] !== byDefault[key],
-  )
+  return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) => {
+    const part = filter[key]
+    return Array.isArray(part) ? part.length > 0 : part !== byDefault[key]
+  })
 }
 
 /** Whether every part of the filter but the period is the default. */
@@ -128,9 +130,9 @@ export function libraryFilterFromSearch(search: string, now: Date = new Date()):
   const period = days.from || days.to || allTime ? days : quickRange(DEFAULT_PERIOD, now)
   return {
     ...period,
-    site: query.get('site') || null,
-    hero: query.get('hero') || null,
-    stake: query.get('stake') || null,
+    sites: query.getAll('site').filter(Boolean),
+    heroes: query.getAll('hero').filter(Boolean),
+    stakes: query.getAll('stake').filter(Boolean),
     markedOnly: query.get('marked') === 'true',
     tags: query.getAll('tag').filter(Boolean),
   }
@@ -141,9 +143,9 @@ function writeFilter(filter: LibraryFilter, writeDay: (day: string, end: 'from' 
   const query = new URLSearchParams()
   if (filter.from) query.set('from', writeDay(filter.from, 'from'))
   if (filter.to) query.set('to', writeDay(filter.to, 'to'))
-  if (filter.site) query.set('site', filter.site)
-  if (filter.hero) query.set('hero', filter.hero)
-  if (filter.stake) query.set('stake', filter.stake)
+  for (const site of filter.sites) query.append('site', site)
+  for (const hero of filter.heroes) query.append('hero', hero)
+  for (const stake of filter.stakes) query.append('stake', stake)
   if (filter.markedOnly) query.set('marked', 'true')
   for (const tag of filter.tags) query.append('tag', tag)
   return query
