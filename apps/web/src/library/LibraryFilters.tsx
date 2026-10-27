@@ -1,5 +1,6 @@
 import { useI18n } from '../i18n'
 import { siteLabel, stakeLabel } from '../room/queueEntryView'
+import { Dropdown } from '../ui/Dropdown'
 import type { LibraryPage } from './library'
 import {
   DEFAULT_PERIOD,
@@ -39,25 +40,17 @@ export function LibraryFilters({
 
   return (
     <div className="library-filters" role="group" aria-label={t('library.filters')}>
-      <label className="library-filters__field" data-active={period !== DEFAULT_PERIOD || undefined}>
-        <span className="library-filters__label">{t('library.filter.period')}</span>
-        <select
-          value={period}
-          onChange={(event) => {
-            const range = event.target.value as QuickRange | 'custom'
-            if (range !== 'custom') set(quickRange(range))
-          }}
-        >
-          {QUICK_RANGES.map((range) => (
-            <option key={range} value={range}>
-              {t(`library.filter.period.${range}`)}
-            </option>
-          ))}
-          <option value="custom" disabled={period !== 'custom'}>
-            {t('library.filter.period.custom')}
-          </option>
-        </select>
-      </label>
+      <Dropdown<QuickRange | 'custom'>
+        label={t('library.filter.period')}
+        active={period !== DEFAULT_PERIOD}
+        value={period}
+        options={[
+          ...QUICK_RANGES.map((range) => ({ value: range, label: t(`library.filter.period.${range}`) })),
+          // Named only when the days match no quick range; it is picked by typing them.
+          { value: 'custom' as const, label: t('library.filter.period.custom'), disabled: true },
+        ]}
+        onChange={(range) => range !== 'custom' && set(quickRange(range))}
+      />
       <label className="library-filters__date">
         <span className="library-filters__label">{t('library.filter.from')}</span>
         <input
@@ -125,16 +118,12 @@ function Choice({
   onChange: (value: string | null) => void
 }) {
   return (
-    <label className="library-filters__field" data-active={value !== null || undefined}>
-      <span className="library-filters__label">{label}</span>
-      <select value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
-        <option value="">{all}</option>
-        {choices.map((choice) => (
-          <option key={choice.value} value={choice.value}>
-            {choice.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Dropdown
+      label={label}
+      active={value !== null}
+      value={value ?? ''}
+      options={[{ value: '', label: all }, ...choices]}
+      onChange={(chosen) => onChange(chosen || null)}
+    />
   )
 }

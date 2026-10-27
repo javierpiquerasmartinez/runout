@@ -5,6 +5,7 @@ import { Chip } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { iconGroups } from '../ui/iconDrawings'
+import { Dropdown } from '../ui/Dropdown'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toggle } from '../ui/Toggle'
@@ -368,6 +369,7 @@ function ControlsBoard() {
   const [hideNames, setHideNames] = useState(true)
   const [markHand, setMarkHand] = useState(false)
   const [unit, setUnit] = useState<DisplayUnit>('bb')
+  const [site, setSite] = useState('')
   const [stakeFilter, setStakeFilter] = useState(true)
   const lockedReason = t('design.controls.lockedReason')
   const unitOptions = [
@@ -512,6 +514,20 @@ function ControlsBoard() {
             <div className="ds-segmented-row">
               <SegmentedControl label={t('design.controls.unit.label')} options={unitOptions} value={unit} onChange={setUnit} />
               <span className="ds-caption">{t('design.controls.segmentedNote')}</span>
+            </div>
+            <div className="ds-segmented-row">
+              <Dropdown
+                label={t('design.controls.dropdown.label')}
+                active={site !== ''}
+                value={site}
+                options={[
+                  { value: '', label: t('design.controls.dropdown.all') },
+                  { value: 'pokerstars', label: 'PokerStars' },
+                  { value: 'coinpoker', label: 'CoinPoker' },
+                ]}
+                onChange={setSite}
+              />
+              <span className="ds-caption">{t('design.controls.dropdownNote')}</span>
             </div>
           </Panel>
 
