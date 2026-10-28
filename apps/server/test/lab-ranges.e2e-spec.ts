@@ -46,6 +46,18 @@ describe('Ranges in the Lab (e2e)', () => {
       .set('Authorization', `Bearer ${token}`);
   }
 
+  function duplicate(token: string, id: string) {
+    return request(running.httpServer)
+      .post(`/api/lab/ranges/${id}/copies`)
+      .set('Authorization', `Bearer ${token}`);
+  }
+
+  function remove(token: string, id: string) {
+    return request(running.httpServer)
+      .delete(`/api/lab/ranges/${id}`)
+      .set('Authorization', `Bearer ${token}`);
+  }
+
   async function list(token: string): Promise<RangeSummary[]> {
     const res = await request(running.httpServer)
       .get('/api/lab/ranges')
@@ -137,6 +149,76 @@ describe('Ranges in the Lab (e2e)', () => {
     ]);
   });
 
+  it('duplicates a Range with its Combos under the first free "(copia)" name', async () => {
+    const account = await newAccount(running.httpServer);
+    const { id } = (
+      await create(account.token, {
+        name: 'OR BTN',
+        combos: { AsKs: 100, AhKd: 50 },
+      })
+    ).body as Range;
+
+    const first = await duplicate(account.token, id).expect(201);
+    const second = await duplicate(account.token, id).expect(201);
+    // A name freed is taken again, whatever case it was in.
+    await save(account.token, (first.body as Range).id, {
+      name: 'OR BTN (COPIA 3)',
+      combos: {},
+    });
+    const third = await duplicate(account.token, id).expect(201);
+
+    expect(first.body).toEqual({
+      id: expect.any(String),
+      name: 'OR BTN (copia)',
+      combos: { AsKs: 100, AhKd: 50 },
+    });
+    expect((second.body as Range).name).toBe('OR BTN (copia 2)');
+    expect((third.body as Range).name).toBe('OR BTN (copia)');
+    expect((await read(account.token, (third.body as Range).id)).body).toEqual(
+      third.body,
+    );
+    expect((await list(account.token)).map((each) => each.name).sort()).toEqual(
+      ['OR BTN', 'OR BTN (COPIA 3)', 'OR BTN (copia 2)', 'OR BTN (copia)'],
+    );
+  });
+
+  it("names a copy in the Account's language, within 60 characters", async () => {
+    const account = await newAccount(running.httpServer);
+    await request(running.httpServer)
+      .patch('/api/identities/me/preferences')
+      .set('Authorization', `Bearer ${account.token}`)
+      .send({ language: 'en' })
+      .expect(200);
+    const long = `${'x'.repeat(55)} BTN`;
+    const { id } = (await create(account.token, { name: long, combos: {} }))
+      .body as Range;
+
+    const first = (await duplicate(account.token, id).expect(201))
+      .body as Range;
+    const second = (await duplicate(account.token, id).expect(201))
+      .body as Range;
+
+    expect(first.name).toBe(`${'x'.repeat(53)} (copy)`);
+    expect(second.name).toBe(`${'x'.repeat(51)} (copy 2)`);
+  });
+
+  it('deletes a Range', async () => {
+    const account = await newAccount(running.httpServer);
+    const { id } = (await create(account.token, { name: 'OR BTN', combos: {} }))
+      .body as Range;
+    await create(account.token, { name: '3B BB', combos: {} });
+
+    await remove(account.token, id).expect(204);
+
+    expect((await list(account.token)).map((each) => each.name)).toEqual([
+      '3B BB',
+    ]);
+    expect((await read(account.token, id)).status).toBe(404);
+    expect((await remove(account.token, id)).status).toBe(404);
+    // Its name is free again.
+    await create(account.token, { name: 'or btn', combos: {} }).expect(201);
+  });
+
   it('refuses a name that is empty, too long or not text', async () => {
     const account = await newAccount(running.httpServer);
 
@@ -220,6 +302,10 @@ describe('Ranges in the Lab (e2e)', () => {
       await save(stranger.token, id, { name: 'Mine', combos: {} }),
       // Not theirs comes before what is wrong with the body.
       await save(stranger.token, id, { name: '', combos: { XxYy: 1 } }),
+      await duplicate(stranger.token, id),
+      await remove(stranger.token, id),
+      await duplicate(owner.token, 'not-a-uuid'),
+      await remove(owner.token, 'not-a-uuid'),
       await read(owner.token, '00000000-0000-4000-8000-000000000000'),
       await read(owner.token, 'not-a-uuid'),
     ]) {
@@ -253,6 +339,8 @@ describe('Ranges in the Lab (e2e)', () => {
       await read(token, id),
       await create(token, { name: 'Mine', combos: {} }),
       await save(token, id, { name: 'Mine', combos: {} }),
+      await duplicate(token, id),
+      await remove(token, id),
     ]) {
       expect(res.status).toBe(403);
       expect(res.body).toEqual({ reason: 'account-required' });
@@ -263,6 +351,8 @@ describe('Ranges in the Lab (e2e)', () => {
       await request(running.httpServer)
         .post('/api/lab/ranges')
         .send({ name: 'Mine', combos: {} }),
+      await request(running.httpServer).post(`/api/lab/ranges/${id}/copies`),
+      await request(running.httpServer).delete(`/api/lab/ranges/${id}`),
     ]) {
       expect(res.status).toBe(401);
       expect(res.body).toEqual({ reason: 'unauthenticated' });
