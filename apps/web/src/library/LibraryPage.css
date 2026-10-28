@@ -85,6 +85,13 @@
 .library__collection:hover {
   background: var(--color-hover);
 }
+/* A Tag only listed, where choosing it filters nothing. */
+.library__tag--listed {
+  cursor: default;
+}
+.library__tag--listed:hover {
+  background: transparent;
+}
 .library__collection[aria-current='page'] {
   background: var(--color-selected);
   color: var(--brass-ink);

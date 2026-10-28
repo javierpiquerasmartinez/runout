@@ -155,6 +155,13 @@
       "when": 1793179793320,
       "tag": "0021_ranges",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793187564732,
+      "tag": "0022_lab_tags",
+      "breakpoints": true
     }
   ]
 }

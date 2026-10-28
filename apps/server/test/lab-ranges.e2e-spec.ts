@@ -6,6 +6,7 @@ interface Range {
   id: string;
   name: string;
   combos: Record<string, number>;
+  tags: { id: string; name: string }[];
 }
 
 interface RangeSummary {
@@ -13,6 +14,7 @@ interface RangeSummary {
   name: string;
   comboCount: number;
   percent: number;
+  tags: { id: string; name: string }[];
 }
 
 describe('Ranges in the Lab (e2e)', () => {
@@ -78,6 +80,7 @@ describe('Ranges in the Lab (e2e)', () => {
       id: expect.any(String),
       name: 'OR BTN vs BB',
       combos: { AsKs: 100, AhKd: 50 },
+      tags: [],
     });
     const id = (created.body as Range).id;
     expect((await read(account.token, id).expect(200)).body).toEqual(
@@ -100,6 +103,7 @@ describe('Ranges in the Lab (e2e)', () => {
       id,
       name: 'OR BTN vs BB',
       combos: { QsQh: 25 },
+      tags: [],
     });
     expect((await read(account.token, id)).body).toEqual(saved.body);
   });
@@ -138,13 +142,21 @@ describe('Ranges in the Lab (e2e)', () => {
         name: 'AKo half',
         comboCount: 6,
         percent: (6 / 1326) * 100,
+        tags: [],
       },
-      { id: expect.any(String), name: 'empty', comboCount: 0, percent: 0 },
+      {
+        id: expect.any(String),
+        name: 'empty',
+        comboCount: 0,
+        percent: 0,
+        tags: [],
+      },
       {
         id: expect.any(String),
         name: 'zz aces',
         comboCount: 6,
         percent: (6 / 1326) * 100,
+        tags: [],
       },
     ]);
   });
@@ -171,6 +183,7 @@ describe('Ranges in the Lab (e2e)', () => {
       id: expect.any(String),
       name: 'OR BTN (copia)',
       combos: { AsKs: 100, AhKd: 50 },
+      tags: [],
     });
     expect((second.body as Range).name).toBe('OR BTN (copia 2)');
     expect((third.body as Range).name).toBe('OR BTN (copia)');
@@ -287,6 +300,7 @@ describe('Ranges in the Lab (e2e)', () => {
       id,
       name: 'OR',
       combos: {},
+      tags: [],
     });
   });
 

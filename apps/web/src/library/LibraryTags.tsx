@@ -5,25 +5,35 @@ import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import type { Tag } from './library'
+// The Lab's side column shows its Tags with this component too.
+import './LibraryPage.css'
 
 /**
  * The "Biblioteca" board's Tags in the sidebar: each of the Account's Tags
  * with how many Hands carry it. Choosing Tags narrows the Library to the
  * Hands carrying any of them. New ones are made here, and, while editing,
- * renamed and deleted (the board has no editing; it is added here).
+ * renamed and deleted (the board has no editing; it is added here). The Lab
+ * shows its own Tags the same way, counting Ranges.
  */
-export function LibraryTags({
+export function LibraryTags<T extends Pick<Tag, 'id' | 'name'>>({
   tags,
-  chosen,
+  count,
+  confirmDelete,
+  chosen = [],
   onToggle,
   onCreate,
   onRename,
   onDelete,
 }: {
-  tags: Tag[]
+  tags: T[]
+  /** How many Hands, or Ranges, carry the Tag. */
+  count: (tag: T) => number
+  /** What the button that deletes the Tag for good says. */
+  confirmDelete: (tag: T) => string
   /** The ids of the Tags the filter keeps. */
-  chosen: string[]
-  onToggle: (tagId: string) => void
+  chosen?: string[]
+  /** Without it the Tags are only listed, and choosing one filters nothing. */
+  onToggle?: (tagId: string) => void
   /** Each of these rejects with the server's reason when it refuses. */
   onCreate: (name: string) => Promise<void>
   onRename: (tagId: string, name: string) => Promise<void>
@@ -80,17 +90,25 @@ export function LibraryTags({
       </div>
       {tags.map((tag) =>
         !editing ? (
-          <button
-            key={tag.id}
-            type="button"
-            className="library__collection library__tag"
-            aria-pressed={chosen.includes(tag.id)}
-            onClick={() => onToggle(tag.id)}
-          >
-            <TagSwatch tagId={tag.id} />
-            <span className="library__tag-name">{tag.name}</span>
-            <span className="library__collection-count ro-mono">{tag.hands}</span>
-          </button>
+          onToggle ? (
+            <button
+              key={tag.id}
+              type="button"
+              className="library__collection library__tag"
+              aria-pressed={chosen.includes(tag.id)}
+              onClick={() => onToggle(tag.id)}
+            >
+              <TagSwatch tagId={tag.id} />
+              <span className="library__tag-name">{tag.name}</span>
+              <span className="library__collection-count ro-mono">{count(tag)}</span>
+            </button>
+          ) : (
+            <div key={tag.id} className="library__collection library__tag library__tag--listed">
+              <TagSwatch tagId={tag.id} />
+              <span className="library__tag-name">{tag.name}</span>
+              <span className="library__collection-count ro-mono">{count(tag)}</span>
+            </div>
+          )
         ) : deleting === tag.id ? (
           <div key={tag.id} className="library__tag-confirm">
             <button
@@ -98,10 +116,7 @@ export function LibraryTags({
               className="library__tag-delete"
               onClick={() => void attempt(onDelete(tag.id)).then(() => setDeleting(null))}
             >
-              {t(tag.hands === 1 ? 'library.tag.confirmDelete.one' : 'library.tag.confirmDelete.other', {
-                name: tag.name,
-                count: tag.hands,
-              })}
+              {confirmDelete(tag)}
             </button>
             <button type="button" className="library__group-action" onClick={() => setDeleting(null)}>
               {t('library.tag.cancel')}

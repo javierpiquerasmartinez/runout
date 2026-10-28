@@ -397,3 +397,43 @@ export const ranges = pgTable(
     ),
   ],
 );
+
+/**
+ * A label an Account puts on Ranges of its own Lab to group them. It is a set
+ * apart from the Library's Tags: neither ever shows among the other. Only its
+ * owner sees it. Its name is unique within the Account, ignoring case.
+ */
+export const labTags = pgTable(
+  'lab_tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('lab_tags_identity_id_name_idx').on(
+      table.identityId,
+      sql`lower(${table.name})`,
+    ),
+  ],
+);
+
+/** A Lab Tag on a Range. Deleting either the Range or the Tag removes it. */
+export const rangeTagLinks = pgTable(
+  'range_tag_links',
+  {
+    rangeId: uuid('range_id')
+      .notNull()
+      .references(() => ranges.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => labTags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.rangeId, table.tagId] }),
+    index('range_tag_links_tag_id_idx').on(table.tagId),
+  ],
+);

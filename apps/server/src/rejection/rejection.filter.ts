@@ -50,6 +50,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'invalid-range-name': HttpStatus.BAD_REQUEST,
   'range-name-taken': HttpStatus.CONFLICT,
   'invalid-range-combos': HttpStatus.BAD_REQUEST,
+  'invalid-range-tags': HttpStatus.BAD_REQUEST,
   'range-not-found': HttpStatus.NOT_FOUND,
 };
 

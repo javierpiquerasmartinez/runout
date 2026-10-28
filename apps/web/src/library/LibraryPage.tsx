@@ -252,6 +252,13 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
           {page && (
             <LibraryTags
               tags={page.options.tags}
+              count={(tag) => tag.hands}
+              confirmDelete={(tag) =>
+                t(tag.hands === 1 ? 'library.tag.confirmDelete.one' : 'library.tag.confirmDelete.other', {
+                  name: tag.name,
+                  count: tag.hands,
+                })
+              }
               chosen={filter.tags}
               onToggle={(tagId) =>
                 changeFilter({
