@@ -67,7 +67,7 @@ A written conclusion attached to a Hand, with its writer and date. Visible where
 _Avoid_: Comment, annotation
 
 **Tag**:
-A label a person puts on a Hand in their own Library to classify it. Only they see it.
+A label a person puts on a Hand in their own Library, or on a Range in their Lab, to classify it. Only they see it. The Library's Tags and the Lab's are separate sets: a Tag lives in one of the two and never labels anything in the other.
 _Avoid_: Category, group tag
 
 **Mark**:
@@ -213,3 +213,25 @@ _Avoid_: Mode, appearance
 **Graph Colours**:
 The colour a person gives each line of their Results Graph (Result, All-in EV, Showdown Result, Non-showdown Result), picked from a fixed palette that reads in either Theme. A line keeps its colour wherever it shows: the line itself, its legend toggle, the hover box and its Win Rate. Each line has its own default, and they can go back to it.
 _Avoid_: Chart colours, line colours, graph theme
+
+### Lab
+
+**Lab**:
+The section where a person builds and studies Ranges on their own. It has nothing to do with Rooms or the Library: nothing in it comes from a Hand or goes into one.
+_Avoid_: Laboratorio (UI only), tools, solver, Flopzilla
+
+**Range**:
+A named set of Combos a person builds and keeps in the Lab, each Combo in it at some Frequency. Belongs to one Account; nobody else sees it.
+_Avoid_: Chart, preset, spot
+
+**Combo**:
+One of the 1326 two-card holdings a player can be dealt, with its exact suits (A♥K♥). The unit a Range is made of and counted in.
+_Avoid_: Hand, holding, cards
+
+**Hand Class**:
+One of the 169 shapes a Combo has once suits are ignored, beyond whether they match: a pair (77, six Combos), suited (AKs, four) or offsuit (AKo, twelve). One cell of the matrix.
+_Avoid_: Hand, starting hand, cell (outside the UI)
+
+**Frequency**:
+How much of a Combo a Range holds, from 0 to 100 %: AKo at 50 % counts as six of its twelve Combos. A Combo at 0 % is not in the Range.
+_Avoid_: Weight, percentage (alone), mix
