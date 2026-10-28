@@ -248,7 +248,11 @@
 .lab__cell[data-full] {
   color: var(--on-range-fill);
 }
-/* A partial Frequency, in the corner. */
+/* A mixed cell's Combos differ: its fill is their average, drawn lighter. */
+.lab__cell[data-mixed] .lab__cell-fill {
+  opacity: 0.6;
+}
+/* A partial Frequency, or a mixed cell's average, in the corner. */
 .lab__cell-frequency {
   position: absolute;
   right: 3px;
@@ -257,7 +261,14 @@
   opacity: 0.8;
 }
 
-/* ---- Stats ---- */
+/* ---- Stats and the Range as text ---- */
+.lab__readout {
+  flex: 0 0 auto;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
 .lab__stats {
   flex: 0 0 auto;
   display: flex;
@@ -306,6 +317,37 @@
   white-space: nowrap;
 }
 
+.lab__text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab__text-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--color-border-hover);
+  border-radius: var(--radius-xl);
+  background: var(--color-pressed);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.lab__text-export {
+  background: var(--color-panel);
+  border-color: var(--color-panel-border);
+  /* Wraps anywhere, like code, instead of only at the dashes of runs like `AQs-A9s`. */
+  word-break: break-all;
+}
+.lab__text-actions {
+  display: flex;
+  gap: 8px;
+}
+.lab__text .lab__failure {
+  margin: 0;
+}
+
 @media (max-width: 760px) {
   .lab__body {
     flex-direction: column;
@@ -317,5 +359,8 @@
   }
   .lab__main {
     padding: 18px 16px;
+  }
+  .lab__readout {
+    width: 100%;
   }
 }

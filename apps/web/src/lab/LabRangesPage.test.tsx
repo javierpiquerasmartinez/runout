@@ -654,6 +654,109 @@ describe('LabRangesPage · unsaved changes', () => {
   })
 })
 
+const pasteBox = () => screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Paste a range' })
+const exported = () => screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Range as text' }).value
+const importButton = () => screen.getByRole('button', { name: /^Import/ })
+
+/** Pastes `text` into the box, as a paste from another tool does. */
+async function paste(text: string) {
+  await userEvent.click(pasteBox())
+  await userEvent.paste(text)
+}
+
+describe('LabRangesPage · importing text', () => {
+  it('replaces the matrix with the pasted Range, and empties the box', async () => {
+    renderLab()
+    await userEvent.click(cell('72o'))
+
+    await paste('TT+, AKs, AQo:0.5')
+    await userEvent.click(importButton())
+
+    expect(pressed(cell('72o'))).toBe(false)
+    expect(pressed(cell('TT'))).toBe(true)
+    expect(cell('AQo').textContent).toBe('AQo50')
+    expect(statsText()).toContain('40.0 of 1326 combos')
+    expect(pasteBox().value).toBe('')
+    expect(unsaved()).toBeTruthy()
+  })
+
+  it('refuses the whole paste, naming the first piece it does not understand, and changes nothing', async () => {
+    renderLab()
+    await userEvent.click(cell('72o'))
+
+    await paste('AA,KK:half,QQ,zz')
+    await userEvent.click(importButton())
+
+    expect(screen.getByRole('alert').textContent).toBe("“KK:half” isn't range notation Runout understands. Nothing was imported.")
+    expect(pressed(cell('72o'))).toBe(true)
+    expect(pressed(cell('AA'))).toBe(false)
+    expect(pasteBox().value).toBe('AA,KK:half,QQ,zz')
+  })
+
+  it('forgets a refusal once the paste is edited', async () => {
+    renderLab()
+    await paste('AKx')
+    await userEvent.click(importButton())
+
+    await userEvent.type(pasteBox(), 's')
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('has nothing to import while the box is empty', async () => {
+    renderLab()
+    await userEvent.click(cell('AA'))
+
+    await userEvent.click(importButton())
+
+    expect(pressed(cell('AA'))).toBe(true)
+  })
+
+  it('marks a cell whose Combos differ as mixed, at their average, and paints all its Combos with the brush', async () => {
+    renderLab()
+    await paste('AhKh,AsKs:0.5')
+    await userEvent.click(importButton())
+
+    expect(cell('AKs').textContent).toBe('AKs≈38')
+    expect(cell('AKs').title).toBe('AKs · 4 combos · mixed, 38 % on average')
+
+    await userEvent.click(cell('AKs'))
+
+    expect(cell('AKs').textContent).toBe('AKs')
+    expect(statsText()).toContain('4.0 of 1326 combos')
+  })
+})
+
+describe('LabRangesPage · exporting text', () => {
+  let writeText: ReturnType<typeof vi.fn>
+  beforeEach(() => {
+    writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  })
+
+  it('shows the Range in PioSolver notation as it is painted', async () => {
+    renderLab()
+    expect(exported()).toBe('')
+
+    await userEvent.click(cell('AA'))
+    await userEvent.click(cell('KK'))
+    await userEvent.click(preset(50))
+    await userEvent.click(cell('AKo'))
+
+    expect(exported()).toBe('KK+,AKo:0.5')
+  })
+
+  it('copies it with Copy range, and says so', async () => {
+    renderLab()
+    await userEvent.click(cell('AA'))
+
+    await userEvent.click(screen.getByRole('button', { name: /^Copy range/ }))
+
+    expect(writeText).toHaveBeenCalledWith('AA')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
+  })
+})
+
 describe('LabRangesPage · in Spanish', () => {
   it('names the controls and the stats in Spanish', async () => {
     renderLab('es')
@@ -674,6 +777,19 @@ describe('LabRangesPage · in Spanish', () => {
     expect(text).toContain('Parejas 6,0 / 78 100,0 % del rango')
     expect(screen.getByRole('slider', { name: 'Top % de los combos' })).toBeTruthy()
     expect(topValue()).toBe('0,5 %')
+    expect(screen.getByRole('textbox', { name: 'Pega un rango' })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Rango en texto' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Copiar rango/ })).toBeTruthy()
+  })
+
+  it('names importing and its refusal in Spanish', async () => {
+    renderLab('es')
+
+    await userEvent.click(screen.getByRole('textbox', { name: 'Pega un rango' }))
+    await userEvent.paste('AA,AKx')
+    await userEvent.click(screen.getByRole('button', { name: /^Importar/ }))
+
+    expect(screen.getByRole('alert').textContent).toBe('Runout no entiende «AKx» como notación de rangos. No se ha importado nada.')
   })
 
   it('names saving and the unsaved mark in Spanish', async () => {
