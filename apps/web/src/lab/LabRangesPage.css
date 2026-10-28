@@ -80,6 +80,33 @@
   flex-grow: 1;
 }
 
+/* The open Range's Tags, under its name. */
+.lab__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.lab__tags-field {
+  width: 120px;
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: 500 12px var(--font-sans);
+  color: var(--text-primary);
+}
+.lab__tags-field:focus-visible {
+  outline: none;
+  border-style: solid;
+  border-color: var(--brass-soft-border);
+}
+.lab__tags .lab__failure {
+  flex-basis: 100%;
+}
+
 .lab__work {
   display: flex;
   flex-wrap: wrap;
@@ -108,6 +135,7 @@
 }
 .lab__list-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   padding: 8px;
@@ -138,6 +166,16 @@
 }
 .lab__list-meta {
   font-size: 11.5px;
+  color: var(--text-muted);
+}
+.lab__list-tags {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 400;
   color: var(--text-muted);
 }
 

@@ -12,16 +12,26 @@ interface StoredRange {
   id: string
   name: string
   combos: Record<string, number>
+  tagIds?: string[]
+}
+
+interface StoredTag {
+  id: string
+  name: string
 }
 
 /** The Account's Ranges as the faked server keeps them. */
 let stored: StoredRange[]
-/** Writes, as `POST /api/lab/ranges {"name":"OR","combos":{}}`. */
+/** The Account's Lab Tags as the faked server keeps them. */
+let storedTags: StoredTag[]
+/** Writes, as `POST /api/lab/ranges {"name":"OR","combos":{},"tagIds":[]}`. */
 let writes: string[]
 /** What the server answers a write with, unless the test leaves it to the faked store. */
 let writeReply: (() => Response) | null
 /** While set, reading one Range waits for it. */
 let readHeld: Promise<void> | null
+/** While set, a write to the Lab Tags waits for it. */
+let tagWriteHeld: Promise<void> | null
 
 const aces = { AsAh: 100, AsAd: 100, AsAc: 100, AhAd: 100, AhAc: 100, AdAc: 100 }
 
@@ -30,25 +40,28 @@ beforeEach(() => {
     { id: 'r1', name: 'OR BTN', combos: aces },
     { id: 'r2', name: '3B BB', combos: {} },
   ]
+  storedTags = []
   writes = []
   writeReply = null
   readHeld = null
+  tagWriteHeld = null
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
+      if (url.startsWith('/api/lab/tags')) return tagsReply(method, url, init)
       const id = /^\/api\/lab\/ranges\/(.+)$/.exec(url)?.[1]
       if (method === 'GET' && url === '/api/lab/ranges') {
-        const summaries = stored.map(({ id, name, combos }) => {
+        const summaries = stored.map(({ id, name, combos, tagIds }) => {
           const comboCount = Object.values(combos).reduce((sum, value) => sum + value, 0) / 100
-          return { id, name, comboCount, percent: (comboCount / 1326) * 100 }
+          return { id, name, comboCount, percent: (comboCount / 1326) * 100, tags: tagsOf(tagIds) }
         })
         return Response.json(summaries.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())))
       }
       if (method === 'GET') {
         await readHeld
         const range = stored.find((each) => each.id === id)
-        return range ? Response.json(range) : Response.json({ reason: 'range-not-found' }, { status: 404 })
+        return range ? Response.json(opened(range)) : Response.json({ reason: 'range-not-found' }, { status: 404 })
       }
       writes.push(`${method} ${url} ${String(init?.body)}`)
       if (writeReply) return writeReply()
@@ -59,21 +72,54 @@ beforeEach(() => {
       const copied = /^(.+)\/copies$/.exec(id ?? '')?.[1]
       if (copied) {
         const original = stored.find((each) => each.id === copied)!
-        const copy = { id: `r${stored.length + 1}`, name: `${original.name} (copy)`, combos: original.combos }
+        const copy = { ...original, id: `r${stored.length + 1}`, name: `${original.name} (copy)` }
         stored = [...stored, copy]
-        return Response.json(copy, { status: 201 })
+        return Response.json(opened(copy), { status: 201 })
       }
       const body = JSON.parse(String(init?.body)) as Omit<StoredRange, 'id'>
       const name = body.name.trim()
       if (stored.some((each) => each.id !== id && each.name.toLowerCase() === name.toLowerCase())) {
         return Response.json({ reason: 'range-name-taken' }, { status: 409 })
       }
-      const range = { id: id ?? `r${stored.length + 1}`, name, combos: body.combos }
+      const range = { id: id ?? `r${stored.length + 1}`, name, combos: body.combos, tagIds: body.tagIds }
       stored = [...stored.filter((each) => each.id !== range.id), range]
-      return Response.json(range, { status: id ? 200 : 201 })
+      return Response.json(opened(range), { status: id ? 200 : 201 })
     }),
   )
 })
+
+const byName = (a: { name: string }, b: { name: string }) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+
+/** The Lab Tags with these ids, as a Range carries them. */
+const tagsOf = (tagIds: string[] = []) => storedTags.filter((tag) => tagIds.includes(tag.id)).sort(byName)
+
+/** A Range as the server opens it, with its Tags. */
+const opened = ({ tagIds, ...range }: StoredRange) => ({ ...range, tags: tagsOf(tagIds) })
+
+/** The faked `/api/lab/tags`: the Lab Tags, each with how many Ranges carry it. */
+async function tagsReply(method: string, url: string, init?: RequestInit): Promise<Response> {
+  const id = /^\/api\/lab\/tags\/(.+)$/.exec(url)?.[1]
+  if (method === 'GET') {
+    const counted = storedTags.map((tag) => ({ ...tag, ranges: stored.filter((range) => range.tagIds?.includes(tag.id)).length }))
+    return Response.json(counted.sort(byName))
+  }
+  writes.push(`${method} ${url} ${String(init?.body)}`)
+  await tagWriteHeld
+  if (writeReply) return writeReply()
+  if (method === 'DELETE') {
+    storedTags = storedTags.filter((tag) => tag.id !== id)
+    stored = stored.map((range) => ({ ...range, tagIds: range.tagIds?.filter((tagId) => tagId !== id) }))
+    return new Response(null, { status: 204 })
+  }
+  const name = (JSON.parse(String(init?.body)) as { name: string }).name.trim()
+  if (storedTags.some((tag) => tag.id !== id && tag.name.toLowerCase() === name.toLowerCase())) {
+    return Response.json({ reason: 'tag-name-taken' }, { status: 409 })
+  }
+  const tag = { id: id ?? `t${storedTags.length + 1}`, name }
+  storedTags = [...storedTags.filter((each) => each.id !== tag.id), tag]
+  const ranges = stored.filter((range) => range.tagIds?.includes(tag.id)).length
+  return Response.json({ ...tag, ranges }, { status: id ? 200 : 201 })
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -407,7 +453,7 @@ describe('LabRangesPage · saving', () => {
     await save()
 
     await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges/r3'))
-    expect(writes).toEqual(['POST /api/lab/ranges {"name":"OR CO","combos":{"AsKs":100,"AhKh":100,"AdKd":100,"AcKc":100}}'])
+    expect(writes).toEqual(['POST /api/lab/ranges {"name":"OR CO","combos":{"AsKs":100,"AhKh":100,"AdKd":100,"AcKc":100},"tagIds":[]}'])
     expect(await within(ranges()).findByRole('link', { name: /^OR CO/ })).toBeTruthy()
     expect(listed('OR CO').getAttribute('aria-current')).toBe('page')
     expect(nameField().value).toBe('OR CO')
@@ -420,7 +466,7 @@ describe('LabRangesPage · saving', () => {
 
     await save()
 
-    await waitFor(() => expect(writes).toEqual(['POST /api/lab/ranges {"name":"Later","combos":{}}']))
+    await waitFor(() => expect(writes).toEqual(['POST /api/lab/ranges {"name":"Later","combos":{},"tagIds":[]}']))
   })
 
   it('asks for a name before saving a new Range', async () => {
@@ -944,5 +990,219 @@ describe('LabRangesPage · in Spanish', () => {
     expect(screen.getByText('Sin guardar')).toBeTruthy()
     expect(screen.getByRole('alert').textContent).toBe('Ponle un nombre al rango para guardarlo.')
     expect(screen.getByRole('navigation', { name: 'Rangos guardados' })).toBeTruthy()
+  })
+})
+
+describe('LabRangesPage · Tags on a Range', () => {
+  beforeEach(() => {
+    storedTags = [
+      { id: 't1', name: 'OR' },
+      { id: 't2', name: 'BTN' },
+      { id: 't3', name: '3B' },
+    ]
+    stored = [
+      { id: 'r1', name: 'OR BTN', combos: aces, tagIds: ['t1'] },
+      { id: 'r2', name: '3B BB', combos: {} },
+    ]
+  })
+
+  const rangeTags = () => screen.getByRole('group', { name: 'Range tags' })
+  const tagField = () => within(rangeTags()).getByRole<HTMLInputElement>('combobox', { name: 'Add a tag' })
+  const chips = () => tagsOnRange(rangeTags())
+
+  it("shows the open Range's Tags, and each Range's Tags in the list", async () => {
+    renderLab('en', '/lab/ranges/r1')
+
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+    expect(listed('OR BTN').textContent).toContain('OR')
+  })
+
+  it('suggests the Lab Tags not on the Range yet', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+
+    await waitFor(() =>
+      expect(within(rangeTags()).getAllByRole('option', { hidden: true }).map((option) => (option as HTMLOptionElement).value)).toEqual([
+        '3B',
+        'BTN',
+      ]),
+    )
+  })
+
+  it('puts an existing Tag on the Range, whatever its case, and saves it with the Range', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+
+    await userEvent.type(tagField(), 'btn{Enter}')
+
+    expect(chips()).toEqual(['BTN', 'OR'])
+    expect(tagField().value).toBe('')
+    expect(unsaved()).toBeTruthy()
+    expect(writes).toEqual([])
+    await save()
+    await waitFor(() => expect(unsaved()).toBeNull())
+    expect(writes).toEqual([
+      `PUT /api/lab/ranges/r1 ${JSON.stringify({ name: 'OR BTN', combos: aces, tagIds: ['t2', 't1'] })}`,
+    ])
+  })
+
+  it('creates a Tag on a new name and puts it on the Range', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+
+    await userEvent.type(tagField(), ' vs BB {Enter}')
+
+    await waitFor(() => expect(chips()).toEqual(['OR', 'vs BB']))
+    expect(writes).toEqual([`POST /api/lab/tags ${JSON.stringify({ name: 'vs BB' })}`])
+    expect(within(sideTags()).getByText('vs BB')).toBeTruthy()
+    expect(unsaved()).toBeTruthy()
+  })
+
+  it('puts on every new Tag typed one after another, without waiting for the first', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+    let release = () => {}
+    tagWriteHeld = new Promise((resolve) => (release = resolve))
+
+    await userEvent.type(tagField(), 'vs BB{Enter}CO{Enter}')
+    release()
+
+    await waitFor(() => expect(chips()).toEqual(['CO', 'OR', 'vs BB']))
+    expect(writes).toEqual([
+      `POST /api/lab/tags ${JSON.stringify({ name: 'vs BB' })}`,
+      `POST /api/lab/tags ${JSON.stringify({ name: 'CO' })}`,
+    ])
+  })
+
+  it('says why a new Tag could not be made, and keeps what was typed', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+    writeReply = () => Response.json({ reason: 'invalid-tag-name' }, { status: 400 })
+
+    await userEvent.type(tagField(), 'x{Enter}')
+
+    expect(await within(rangeTags()).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'A tag needs a name of up to 40 characters.',
+    )
+    expect(tagField().value).toBe('x')
+    expect(chips()).toEqual(['OR'])
+  })
+
+  it('takes a Tag off the Range, which is then unsaved until put back', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(chips()).toEqual(['OR']))
+
+    await userEvent.click(within(rangeTags()).getByRole('button', { name: 'Remove OR' }))
+
+    expect(chips()).toEqual([])
+    expect(unsaved()).toBeTruthy()
+    await userEvent.type(tagField(), 'OR{Enter}')
+    expect(unsaved()).toBeNull()
+  })
+
+  it('puts Tags on a new Range and saves them with it', async () => {
+    renderLab()
+    await waitFor(() => expect(within(sideTags()).getByText('OR')).toBeTruthy())
+
+    await userEvent.type(tagField(), 'OR{Enter}')
+    await name('OR CO')
+    await save()
+
+    await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges/r3'))
+    expect(writes).toEqual([`POST /api/lab/ranges ${JSON.stringify({ name: 'OR CO', combos: {}, tagIds: ['t1'] })}`])
+    expect(chips()).toEqual(['OR'])
+  })
+
+  it('names the Tag field in Spanish', async () => {
+    renderLab('es', '/lab/ranges/r1')
+
+    const group = await screen.findByRole('group', { name: 'Etiquetas del rango' })
+    expect(within(group).getByRole('combobox', { name: 'Añadir una etiqueta' })).toBeTruthy()
+    expect(await within(group).findByRole('button', { name: 'Quitar OR' })).toBeTruthy()
+  })
+})
+
+const sideTags = () => screen.getByRole('group', { name: 'Tags' })
+/** The Tags on the Range, read from the button that takes each off. */
+const tagsOnRange = (group: HTMLElement) =>
+  within(group)
+    .queryAllByRole('button', { name: /^(Remove|Quitar) / })
+    .map((button) => button.getAttribute('aria-label')!.replace(/^(Remove|Quitar) /, ''))
+
+describe("LabRangesPage · the side column's Tags", () => {
+  beforeEach(() => {
+    storedTags = [
+      { id: 't1', name: 'OR' },
+      { id: 't2', name: 'BTN' },
+    ]
+    stored = [
+      { id: 'r1', name: 'OR BTN', combos: aces, tagIds: ['t1', 't2'] },
+      { id: 'r2', name: 'OR CO', combos: {}, tagIds: ['t1'] },
+    ]
+  })
+
+  const rangeChips = () => tagsOnRange(screen.getByRole('group', { name: 'Range tags' }))
+
+  it('lists the Lab Tags with how many Ranges carry each', async () => {
+    renderLab()
+
+    await waitFor(() => expect(within(sideTags()).getByText('BTN')).toBeTruthy())
+    expect(sideTags().textContent).toBe('TagsBTN1OR2New tag')
+  })
+
+  it("renames a Tag with the pencil, on the open Range and in the list, without marking it unsaved", async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(rangeChips()).toEqual(['BTN', 'OR']))
+
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Edit tags' }))
+    const field = within(sideTags()).getByRole('textbox', { name: 'Rename OR' })
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Open{Enter}')
+
+    await waitFor(() => expect(rangeChips()).toEqual(['BTN', 'Open']))
+    expect(writes).toEqual([`PATCH /api/lab/tags/t1 ${JSON.stringify({ name: 'Open' })}`])
+    expect(unsaved()).toBeNull()
+    await waitFor(() => expect(listed('OR CO').textContent).toContain('Open'))
+  })
+
+  it('deletes a Tag once confirmed, taking it off the open Range without marking it unsaved', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(rangeChips()).toEqual(['BTN', 'OR']))
+
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Edit tags' }))
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Delete OR' }))
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Delete OR from 2 ranges' }))
+
+    await waitFor(() => expect(rangeChips()).toEqual(['BTN']))
+    expect(writes).toEqual(['DELETE /api/lab/tags/t1 undefined'])
+    expect(unsaved()).toBeNull()
+    expect(stored.find((range) => range.id === 'r1')?.combos).toEqual(aces)
+    await waitFor(() => expect(within(sideTags()).queryByText('OR')).toBeNull())
+  })
+
+  it('keeps the changes unsaved on the open Range when a Tag is renamed or deleted', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(rangeChips()).toEqual(['BTN', 'OR']))
+    await userEvent.click(within(screen.getByRole('group', { name: 'Range tags' })).getByRole('button', { name: 'Remove BTN' }))
+
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Edit tags' }))
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Delete OR' }))
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Delete OR from 2 ranges' }))
+
+    await waitFor(() => expect(rangeChips()).toEqual([]))
+    // BTN taken off is still a change.
+    expect(unsaved()).toBeTruthy()
+  })
+
+  it('names deleting a Tag from its Ranges in Spanish', async () => {
+    renderLab('es')
+    const side = () => screen.getByRole('group', { name: 'Etiquetas' })
+    await waitFor(() => expect(within(side()).getByText('BTN')).toBeTruthy())
+
+    await userEvent.click(within(side()).getByRole('button', { name: 'Editar etiquetas' }))
+    await userEvent.click(within(side()).getByRole('button', { name: 'Borrar BTN' }))
+
+    expect(within(side()).getByRole('button', { name: 'Borrar BTN de 1 rango' })).toBeTruthy()
   })
 })

@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { RoomDialog } from '../room/RoomDialog'
+import { LibraryTags } from '../library/LibraryTags'
 import { isPlainClick, navigate, setLeaveGuard, usePath } from '../routing'
 import { Button } from '../ui/Button'
+import { Chip } from '../ui/Chip'
 import { copyText } from '../ui/clipboard'
 import { Icon } from '../ui/Icon'
 import { SegmentedControl } from '../ui/SegmentedControl'
@@ -30,11 +32,23 @@ import {
 } from './range'
 import './LabRangesPage.css'
 
+/** A Lab Tag as a Range carries it. */
+interface RangeTag {
+  id: string
+  name: string
+}
+
+/** A Lab Tag as the side column lists it, with how many Ranges carry it. */
+interface LabTag extends RangeTag {
+  ranges: number
+}
+
 /** A saved Range as the server opens it. */
 interface SavedRange {
   id: string
   name: string
   combos: Range
+  tags: RangeTag[]
 }
 
 /** A saved Range as the list shows it, without its Combos. */
@@ -43,15 +57,17 @@ interface RangeSummary {
   name: string
   comboCount: number
   percent: number
+  tags: RangeTag[]
 }
 
-/** What the screen edits: the name in the field and the matrix. */
+/** What the screen edits: the name in the field, the Tags under it and the matrix. */
 interface Draft {
   name: string
+  tags: RangeTag[]
   combos: Range
 }
 
-const NEW_DRAFT: Draft = { name: '', combos: EMPTY_RANGE }
+const NEW_DRAFT: Draft = { name: '', tags: [], combos: EMPTY_RANGE }
 
 /** What the open Range was last saved as; `id` is null for one never saved. */
 interface Baseline {
@@ -64,10 +80,26 @@ const NEW_BASELINE: Baseline = { id: null, draft: NEW_DRAFT }
 /** The saved Ranges for the side column, or why they could not be read; null while loading. */
 type RangeListLoad = { state: 'loaded'; ranges: RangeSummary[] } | { state: 'failed'; reason: FailureReason } | null
 
+/** Whether both hold the same Tags, in whatever order. */
+const sameTags = (a: RangeTag[], b: RangeTag[]) => a.length === b.length && a.every((tag) => b.some((each) => each.id === tag.id))
+
+/** Tags sorted by name ignoring case, as the server sorts them. */
+const sortedTags = <T extends RangeTag>(tags: T[]) =>
+  [...tags].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.name.localeCompare(b.name))
+
 /** How long a Range's name may be, as the server allows it. */
 const MAX_NAME_LENGTH = 60
 
-const draftOf = (range: SavedRange): Draft => ({ name: range.name, combos: range.combos })
+/** How long a Tag's name may be, as the server allows it. */
+const MAX_TAG_NAME_LENGTH = 40
+
+const draftOf = (range: SavedRange): Draft => ({ name: range.name, tags: range.tags, combos: range.combos })
+
+/** The draft with a Lab Tag renamed, or taken off when `name` is null, as the side column changed it. */
+const withTagChanged = (draft: Draft, tagId: string, name: string | null): Draft => ({
+  ...draft,
+  tags: sortedTags(draft.tags.flatMap((tag) => (tag.id !== tagId ? [tag] : name === null ? [] : [{ ...tag, name }]))),
+})
 
 /** The brush's shortcuts; any other whole Frequency from 1 to 100 is typed in its field. */
 const BRUSH_PRESETS = [100, 75, 50, 25] as const
@@ -95,6 +127,8 @@ export function LabRangesPage() {
   const openId = labRangeIdFromPath(path)
   const [list, setList] = useState<RangeListLoad>(null)
   const [listRevision, setListRevision] = useState(0)
+  /** The Account's Lab Tags; empty until they are read. */
+  const [labTags, setLabTags] = useState<LabTag[]>([])
   const [baseline, setBaseline] = useState<Baseline>(NEW_BASELINE)
   const [draft, setDraft] = useState<Draft>(NEW_DRAFT)
   /** Why the Range at this address could not be opened. */
@@ -114,7 +148,10 @@ export function LabRangesPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   // Saving trims the name, so spaces around it are no change.
-  const dirty = draft.name.trim() !== baseline.draft.name || !sameRange(draft.combos, baseline.draft.combos)
+  const dirty =
+    draft.name.trim() !== baseline.draft.name ||
+    !sameTags(draft.tags, baseline.draft.tags) ||
+    !sameRange(draft.combos, baseline.draft.combos)
   // A Range opened by its address, still on its way.
   const opening = openId !== null && openId !== baseline.id && unopened === null
   // Read by the leave guard and the path's effect, which outlive this render.
@@ -130,6 +167,18 @@ export function LabRangesPage() {
     api<RangeSummary[]>('/lab/ranges', { token })
       .then((ranges) => !cancelled && setList({ state: 'loaded', ranges }))
       .catch((error: unknown) => !cancelled && setList({ state: 'failed', reason: reasonOf(error) }))
+    return () => {
+      cancelled = true
+    }
+  }, [token, listRevision])
+
+  // Read again with the list, since saving a Range changes how many carry each.
+  useEffect(() => {
+    let cancelled = false
+    api<LabTag[]>('/lab/tags', { token })
+      .then((tags) => !cancelled && setLabTags(tags))
+      // The side column goes without them; a Tag can still be typed on the Range.
+      .catch(() => undefined)
     return () => {
       cancelled = true
     }
@@ -218,7 +267,7 @@ export function LabRangesPage() {
       const range = await api<SavedRange>(id ? `/lab/ranges/${encodeURIComponent(id)}` : '/lab/ranges', {
         token,
         method: id ? 'PUT' : 'POST',
-        body: { name, combos: sent.combos },
+        body: { name, combos: sent.combos, tagIds: sent.tags.map((tag) => tag.id) },
       })
       const saved = draftOf(range)
       baselineRef.current = { id: range.id, draft: saved }
@@ -290,6 +339,27 @@ export function LabRangesPage() {
     }
   }
 
+  /** A new Lab Tag, listed in the side column at once. Rejects with the server's reason. */
+  const createTag = async (tagName: string): Promise<LabTag> => {
+    const tag = await api<LabTag>('/lab/tags', { token, method: 'POST', body: { name: tagName } })
+    setLabTags((tags) => sortedTags([...tags, tag]))
+    return tag
+  }
+
+  /** Renames a Lab Tag, or deletes it when `name` is null, everywhere the screen shows it. */
+  const changeTag = async (tagId: string, tagName: string | null) => {
+    if (tagName === null) {
+      await api<void>(`/lab/tags/${encodeURIComponent(tagId)}`, { token, method: 'DELETE' })
+    } else {
+      await api<LabTag>(`/lab/tags/${encodeURIComponent(tagId)}`, { token, method: 'PATCH', body: { name: tagName } })
+    }
+    // The server changed the saved Range as well, so this is no unsaved change.
+    baselineRef.current = { ...baselineRef.current, draft: withTagChanged(baselineRef.current.draft, tagId, tagName) }
+    setBaseline(baselineRef.current)
+    setDraft((current) => withTagChanged(current, tagId, tagName))
+    setListRevision((revision) => revision + 1)
+  }
+
   // Unsaved changes stay behind: the copy is made from what was saved.
   const startDuplicate = () => (dirty ? setConfirmingDuplicate(true) : void duplicate())
 
@@ -314,6 +384,19 @@ export function LabRangesPage() {
             <Icon name="add" size={14} />
             {t('lab.ranges.new')}
           </Button>
+          <LibraryTags
+            tags={labTags}
+            count={(tag) => tag.ranges}
+            confirmDelete={(tag) =>
+              t(tag.ranges === 1 ? 'lab.tag.confirmDelete.one' : 'lab.tag.confirmDelete.other', {
+                name: tag.name,
+                count: tag.ranges,
+              })
+            }
+            onCreate={(tagName) => createTag(tagName).then(() => undefined)}
+            onRename={(tagId, tagName) => changeTag(tagId, tagName)}
+            onDelete={(tagId) => changeTag(tagId, null)}
+          />
           <RangeList list={list} openId={openId} onOpen={openRange} />
         </aside>
         <main className="lab__main">
@@ -358,6 +441,17 @@ export function LabRangesPage() {
               {t('lab.ranges.save')}
             </Button>
           </div>
+          <RangeTags
+            tags={draft.tags}
+            labTags={labTags}
+            onAdd={(tag) =>
+              setDraft((current) =>
+                current.tags.some((each) => each.id === tag.id) ? current : { ...current, tags: sortedTags([...current.tags, tag]) },
+              )
+            }
+            onRemove={(tagId) => setDraft((current) => ({ ...current, tags: current.tags.filter((tag) => tag.id !== tagId) }))}
+            onCreate={createTag}
+          />
           {failure && (
             <p className="lab__failure" role="alert">
               {failure}
@@ -455,12 +549,100 @@ function RangeList({
                 <span className="lab__list-meta ro-mono">
                   {t('lab.stats.percent', { percent: formatNumber(range.percent, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
                 </span>
+                {range.tags.length > 0 && (
+                  <span className="lab__list-tags">{range.tags.map((tag) => tag.name).join(' · ')}</span>
+                )}
               </a>
             </li>
           ))}
         </ul>
       )}
     </nav>
+  )
+}
+
+/**
+ * The open Range's Tags, each with a button that takes it off, and a field
+ * that puts one on: it suggests the Lab Tags not on the Range yet, and a name
+ * that is none of them makes a new Lab Tag.
+ */
+function RangeTags({
+  tags,
+  labTags,
+  onAdd,
+  onRemove,
+  onCreate,
+}: {
+  tags: RangeTag[]
+  labTags: LabTag[]
+  onAdd: (tag: RangeTag) => void
+  onRemove: (tagId: string) => void
+  /** Rejects with the server's reason when it refuses. */
+  onCreate: (name: string) => Promise<RangeTag>
+}) {
+  const { t } = useI18n()
+  const suggestionsId = useId()
+  const [typed, setTyped] = useState('')
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+  const suggested = labTags.filter((tag) => !tags.some((each) => each.id === tag.id))
+
+  // The field empties at once, so the next Tag can be typed while a new one is made.
+  const add = async () => {
+    const tagName = typed.trim()
+    if (!tagName) return
+    setTyped('')
+    setFailure(null)
+    const known = labTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase())
+    try {
+      const { id, name } = known ?? (await onCreate(tagName))
+      onAdd({ id, name })
+    } catch (error) {
+      setFailure(reasonOf(error))
+      // Given back to fix, unless something else is being typed already.
+      setTyped((current) => current || tagName)
+    }
+  }
+
+  return (
+    <div className="lab__tags" role="group" aria-label={t('lab.tags')}>
+      {tags.map((tag) => (
+        <Chip
+          key={tag.id}
+          variant="tag"
+          removeLabel={t('lab.tags.remove', { name: tag.name })}
+          onRemove={() => onRemove(tag.id)}
+        >
+          {tag.name}
+        </Chip>
+      ))}
+      <input
+        className="lab__tags-field"
+        list={suggestionsId}
+        value={typed}
+        maxLength={MAX_TAG_NAME_LENGTH}
+        placeholder={t('lab.tags.placeholder')}
+        aria-label={t('lab.tags.add')}
+        onChange={(event) => {
+          setTyped(event.target.value)
+          setFailure(null)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          void add()
+        }}
+      />
+      <datalist id={suggestionsId}>
+        {suggested.map((tag) => (
+          <option key={tag.id} value={tag.name} />
+        ))}
+      </datalist>
+      {failure && (
+        <p className="lab__failure" role="alert">
+          {t(`reason.${failure}`)}
+        </p>
+      )}
+    </div>
   )
 }
 

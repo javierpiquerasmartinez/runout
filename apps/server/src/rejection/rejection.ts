@@ -45,6 +45,7 @@ export type RejectionReason =
   | 'invalid-range-name'
   | 'range-name-taken'
   | 'invalid-range-combos'
+  | 'invalid-range-tags'
   | 'range-not-found';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
