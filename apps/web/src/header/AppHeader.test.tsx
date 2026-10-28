@@ -93,6 +93,23 @@ describe('AppHeader · getting around', () => {
     expect(rooms.getAttribute('href')).toBe('/rooms')
   })
 
+  it('leads to the Lab after Rooms, marked as current inside it', () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionContext.Provider value={fakeSession()}>
+          <AppHeader current="lab" />
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    const links = within(nav).getAllByRole('link')
+    expect(links.map((link) => link.textContent)).toEqual(['Library', 'Rooms', 'Lab'])
+    expect(links[2].getAttribute('href')).toBe('/lab/ranges')
+    expect(links[2].getAttribute('aria-current')).toBe('page')
+    expect(links[0].getAttribute('aria-current')).toBeNull()
+  })
+
   it('leads the brand to the Library', () => {
     renderHeader()
 

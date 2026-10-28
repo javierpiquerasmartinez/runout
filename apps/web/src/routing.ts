@@ -7,14 +7,58 @@ import { useSyncExternalStore, type MouseEvent } from 'react'
  */
 const NAVIGATE_EVENT = 'runout:navigate'
 
+/**
+ * Asked before every `navigate`, and before going back or forward with the
+ * browser: true lets it go ahead. A screen with unsaved work answers false
+ * and calls `go` later, once the person has chosen to discard it. One at a
+ * time; null when no screen is holding anyone.
+ */
+type LeaveGuard = (go: () => void) => boolean
+let leaveGuard: LeaveGuard | null = null
+
+/** The address on screen, so a Back the guard holds up can be put back. */
+let shownUrl = currentUrl()
+
+function currentUrl(): string {
+  return window.location.pathname + window.location.search
+}
+
+/** Holds every `navigate`, Back and Forward up to `guard` until it is cleared with null. */
+export function setLeaveGuard(guard: LeaveGuard | null) {
+  leaveGuard = guard
+  shownUrl = currentUrl()
+}
+
+// Added before any screen subscribes, so a Back the guard holds up never reaches them.
+window.addEventListener('popstate', (event: PopStateEvent) => {
+  const target = currentUrl()
+  if (leaveGuard) {
+    const state: unknown = event.state
+    const go = () => {
+      window.history.pushState(state, '', target)
+      shownUrl = target
+      window.dispatchEvent(new Event(NAVIGATE_EVENT))
+    }
+    if (!leaveGuard(go)) {
+      event.stopImmediatePropagation()
+      window.history.pushState(null, '', shownUrl)
+      return
+    }
+  }
+  shownUrl = target
+})
+
 export function navigate(path: string, state?: unknown) {
+  if (leaveGuard && !leaveGuard(() => navigate(path, state))) return
   window.history.pushState(state ?? null, '', path)
+  shownUrl = currentUrl()
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
 /** Like `navigate`, but replaces the current entry: going back skips the path left. */
 export function redirect(path: string) {
   window.history.replaceState(null, '', path)
+  shownUrl = currentUrl()
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 

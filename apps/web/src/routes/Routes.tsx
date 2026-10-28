@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { useSession } from '../identity/context'
 import { LandingPage } from '../landing/LandingPage'
+import { isLabPath, labPath, labRangeIdFromPath, labRangesPath } from '../lab/lab'
+import { LabRangesPage } from '../lab/LabRangesPage'
 import { LoginPage, loginPath } from '../landing/LoginPage'
 import { libraryHandIdFromPath, libraryPath, libraryViewFromPath, roomCodeFromLibraryPath } from '../library/library'
 import { LibraryHandPage } from '../library/LibraryHandPage'
@@ -32,14 +34,18 @@ export function Routes() {
   if (path === settingsPath) return identity ? <SettingsPage /> : <Redirect to={loginPath} />
   // An Account has signed in already, and no sign-in returns anywhere but the Library.
   if (path === loginPath) return identity?.account ? <Redirect to={libraryPath} /> : <LoginPage />
-  // Only an Account has a Library and creates Rooms (ADR 0005): anyone else is asked to sign in.
+  // Only an Account has a Library, a Lab and creates Rooms (ADR 0005): anyone else is asked to sign in.
   if (!identity?.account) {
-    if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`)) {
+    if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`) || isLabPath(path)) {
       return <Redirect to={loginPath} />
     }
     return <LandingPage />
   }
   if (path === roomsPath) return <RoomsPage />
+  // The Lab has only one tool so far, so it opens straight onto it.
+  if (path === labPath) return <Redirect to={labRangesPath} />
+  // One screen for the empty matrix and every saved Range, so opening one keeps the list; it reads which from the path.
+  if (path === labRangesPath || labRangeIdFromPath(path)) return <LabRangesPage />
   // One screen for both views, so switching keeps its state; it reads which from the path.
   if (libraryViewFromPath(path)) return <LibraryPage />
   const pickingFor = roomCodeFromLibraryPath(path)

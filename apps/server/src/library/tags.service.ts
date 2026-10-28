@@ -3,6 +3,7 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { libraryEntries, tagLinks, tags } from '../database/schema.js';
+import { isUniqueViolation } from '../database/unique-violation.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -151,12 +152,4 @@ function nameOf(raw: unknown): string {
     throw new Rejected('invalid-tag-name');
   }
   return name;
-}
-
-/** Whether the database refused a write for breaking a unique index. */
-function isUniqueViolation(error: unknown): boolean {
-  for (let cause = error; cause instanceof Error; cause = cause.cause) {
-    if ((cause as { code?: unknown }).code === '23505') return true;
-  }
-  return false;
 }

@@ -6,6 +6,8 @@
  *   sync   — Room liveness / being in sync, and the keyboard focus ring. Never a button fill.
  *   alert  — all-in, error and delete only. Never "losing".
  *
+ * Range fill is no accent: it only fills the Combos a Range holds in the Lab's matrix.
+ *
  * Dark is the default theme; [data-theme='light'] on <html> switches to the light counterpart.
  */
 :root {
@@ -63,6 +65,10 @@
   --alert-border: #7a2f2b;
   --alert-hover-bg: #1e0f0e;
   --alert-pressed-bg: #140a09;
+
+  /* Range fill: a Hand Class in the Range, on the Lab's matrix, with the label written over it */
+  --range-fill: #a98be8;
+  --on-range-fill: #0b0f0e;
 
   /* Disabled (locked) */
   --disabled-bg: #0f1413;
@@ -254,6 +260,9 @@
   --avatar-3-ink: #1f5f99;
   --avatar-4-bg: #fbe9e7;
   --avatar-4-ink: #c0392f;
+
+  --range-fill: #7d5fd0;
+  --on-range-fill: #ffffff;
 
   --graph-violet: #6a4bb5;
   --graph-pink: #b2366f;
