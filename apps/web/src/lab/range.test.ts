@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { handClassFrequency, EMPTY_RANGE, HAND_CLASSES, MATRIX, rangeStats, TOTAL_COMBOS, withHandClass } from './range'
+import { handClassFrequency, EMPTY_RANGE, HAND_CLASSES, MATRIX, rangeStats, sameRange, TOTAL_COMBOS, withHandClass } from './range'
 
 /** The Hand Class written as `name`. */
 const named = (name: string) => HAND_CLASSES.find((handClass) => handClass.name === name)!
@@ -96,5 +96,23 @@ describe('stats', () => {
     const range = HAND_CLASSES.reduce((sum, handClass) => withHandClass(sum, handClass, 100), EMPTY_RANGE)
 
     expect(rangeStats(range)).toMatchObject({ combos: 1326, percent: 100 })
+  })
+})
+
+describe('sameRange', () => {
+  it('is true for the same Combos at the same Frequencies, however they were built', () => {
+    const painted = withHandClass(withHandClass(EMPTY_RANGE, named('AKs'), 50), named('AA'), 100)
+    const unpainted = withHandClass(withHandClass(painted, named('KK'), 100), named('KK'), 0)
+
+    expect(sameRange(painted, unpainted)).toBe(true)
+    expect(sameRange(EMPTY_RANGE, {})).toBe(true)
+  })
+
+  it('is false when a Combo is missing or at another Frequency', () => {
+    const range = withHandClass(EMPTY_RANGE, named('AKs'), 50)
+
+    expect(sameRange(range, withHandClass(range, named('AKs'), 75))).toBe(false)
+    expect(sameRange(range, withHandClass(range, named('AA'), 100))).toBe(false)
+    expect(sameRange(withHandClass(range, named('AA'), 100), range)).toBe(false)
   })
 })

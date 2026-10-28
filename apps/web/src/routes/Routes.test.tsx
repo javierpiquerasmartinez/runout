@@ -33,6 +33,7 @@ beforeEach(() => {
       if (path === '/library/results') return Response.json({ points: [] })
       if (path.endsWith('/notes')) return Response.json({ notes: [], marked: false })
       if (path === '/hands/split-pot') return Response.json(splitPot)
+      if (path === '/lab/ranges') return Response.json([])
       return Response.json({ reason: 'not-found' }, { status: 404 })
     }),
   )

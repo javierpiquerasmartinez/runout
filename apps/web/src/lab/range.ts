@@ -70,6 +70,12 @@ export function withHandClass(range: Range, handClass: HandClass, frequency: num
   return next
 }
 
+/** Whether both Ranges hold the same Combos at the same Frequencies. */
+export function sameRange(a: Range, b: Range): boolean {
+  const combos = Object.keys(a)
+  return combos.length === Object.keys(b).length && combos.every((combo) => a[combo] === b[combo])
+}
+
 export interface RangeStats {
   /** Combos held, each counted by its Frequency: AKo at 50 % is 6. */
   combos: number

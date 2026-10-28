@@ -41,6 +41,10 @@ export type RejectionReason =
   | 'tag-not-found'
   | 'invalid-tag-hands'
   | 'invalid-hand-selection'
+  | 'invalid-range-name'
+  | 'range-name-taken'
+  | 'invalid-range-combos'
+  | 'range-not-found'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

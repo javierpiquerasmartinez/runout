@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useSession } from '../identity/context'
 import { LandingPage } from '../landing/LandingPage'
-import { isLabPath, labPath, labRangesPath } from '../lab/lab'
+import { isLabPath, labPath, labRangeIdFromPath, labRangesPath } from '../lab/lab'
 import { LabRangesPage } from '../lab/LabRangesPage'
 import { LoginPage, loginPath } from '../landing/LoginPage'
 import { libraryHandIdFromPath, libraryPath, libraryViewFromPath, roomCodeFromLibraryPath } from '../library/library'
@@ -44,7 +44,8 @@ export function Routes() {
   if (path === roomsPath) return <RoomsPage />
   // The Lab has only one tool so far, so it opens straight onto it.
   if (path === labPath) return <Redirect to={labRangesPath} />
-  if (path === labRangesPath) return <LabRangesPage />
+  // One screen for the empty matrix and every saved Range, so opening one keeps the list; it reads which from the path.
+  if (path === labRangesPath || labRangeIdFromPath(path)) return <LabRangesPage />
   // One screen for both views, so switching keeps its state; it reads which from the path.
   if (libraryViewFromPath(path)) return <LibraryPage />
   const pickingFor = roomCodeFromLibraryPath(path)

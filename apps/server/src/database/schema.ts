@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { Hand } from '../hands/hand.js';
+import type { Combos } from '../lab/combos.js';
 
 /**
  * A person as Runout knows them: an Account, signed in with Google and lasting
@@ -368,6 +369,31 @@ export const tagLinks = pgTable(
     index('tag_links_identity_id_hand_id_idx').on(
       table.identityId,
       table.handId,
+    ),
+  ],
+);
+
+/**
+ * A Range an Account keeps in its Lab: a Frequency for each Combo it holds
+ * (ADR 0006), as one JSON map that nothing queries inside. Only its owner
+ * sees it. Its name is unique within the Account, ignoring case.
+ */
+export const ranges = pgTable(
+  'ranges',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    name: text('name').notNull(),
+    combos: jsonb('combos').$type<Combos>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('ranges_identity_id_name_idx').on(
+      table.identityId,
+      sql`lower(${table.name})`,
     ),
   ],
 );

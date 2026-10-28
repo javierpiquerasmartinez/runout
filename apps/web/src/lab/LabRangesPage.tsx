@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
+import { useIdentity } from '../identity/context'
+import { RoomDialog } from '../room/RoomDialog'
+import { isPlainClick, navigate, setLeaveGuard, usePath } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
+import { labRangeIdFromPath, labRangePath, labRangesPath } from './lab'
 import {
   EMPTY_RANGE,
   HAND_CLASS_KINDS,
   HAND_CLASSES,
   handClassFrequency,
   rangeStats,
+  sameRange,
   TOTAL_COMBOS,
   withHandClass,
   type HandClass,
@@ -17,42 +23,310 @@ import {
 } from './range'
 import './LabRangesPage.css'
 
+/** A saved Range as the server opens it. */
+interface SavedRange {
+  id: string
+  name: string
+  combos: Range
+}
+
+/** A saved Range as the list shows it, without its Combos. */
+interface RangeSummary {
+  id: string
+  name: string
+  comboCount: number
+  percent: number
+}
+
+/** What the screen edits: the name in the field and the matrix. */
+interface Draft {
+  name: string
+  combos: Range
+}
+
+const NEW_DRAFT: Draft = { name: '', combos: EMPTY_RANGE }
+
+/** What the open Range was last saved as; `id` is null for one never saved. */
+interface Baseline {
+  id: string | null
+  draft: Draft
+}
+
+const NEW_BASELINE: Baseline = { id: null, draft: NEW_DRAFT }
+
+/** The saved Ranges for the side column, or why they could not be read; null while loading. */
+type RangeListLoad = { state: 'loaded'; ranges: RangeSummary[] } | { state: 'failed'; reason: FailureReason } | null
+
+/** How long a Range's name may be, as the server allows it. */
+const MAX_NAME_LENGTH = 60
+
+const draftOf = (range: SavedRange): Draft => ({ name: range.name, combos: range.combos })
+
 /**
- * The Lab's Ranges (variant A of the prototype): a side column, the matrix in
- * the main column and the stats to its right. For now a click puts a Hand
- * Class in the Range at 100 % or takes it out, and nothing is saved.
+ * The Lab's Ranges (variant A of the prototype): the saved Ranges in a side
+ * column, the matrix in the main column and the stats to its right. The path
+ * says which Range is open: `/lab/ranges` is a new one, `/lab/ranges/:id` a
+ * saved one. For now a click puts a Hand Class in the Range at 100 % or takes
+ * it out. Leaving changes unsaved asks first.
  */
 export function LabRangesPage() {
   const { t } = useI18n()
-  const [range, setRange] = useState<Range>(EMPTY_RANGE)
+  const { token } = useIdentity()
+  const path = usePath()
+  const openId = labRangeIdFromPath(path)
+  const [list, setList] = useState<RangeListLoad>(null)
+  const [listRevision, setListRevision] = useState(0)
+  const [baseline, setBaseline] = useState<Baseline>(NEW_BASELINE)
+  const [draft, setDraft] = useState<Draft>(NEW_DRAFT)
+  /** Why the Range at this address could not be opened. */
+  const [unopened, setUnopened] = useState<FailureReason | null>(null)
+  const [saveFailure, setSaveFailure] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  /** Where the person was going when asked to discard their changes. */
+  const [pendingLeave, setPendingLeave] = useState<{ go: () => void } | null>(null)
+
+  // Saving trims the name, so spaces around it are no change.
+  const dirty = draft.name.trim() !== baseline.draft.name || !sameRange(draft.combos, baseline.draft.combos)
+  // A Range opened by its address, still on its way.
+  const opening = openId !== null && openId !== baseline.id && unopened === null
+  // Read by the leave guard and the path's effect, which outlive this render.
+  const dirtyRef = useRef(dirty)
+  const baselineRef = useRef(baseline)
+  useEffect(() => {
+    dirtyRef.current = dirty
+    baselineRef.current = baseline
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    api<RangeSummary[]>('/lab/ranges', { token })
+      .then((ranges) => !cancelled && setList({ state: 'loaded', ranges }))
+      .catch((error: unknown) => !cancelled && setList({ state: 'failed', reason: reasonOf(error) }))
+    return () => {
+      cancelled = true
+    }
+  }, [token, listRevision])
+
+  /** Back to an empty matrix with nothing to compare it with. */
+  const resetToNew = () => {
+    setSaveFailure(null)
+    setUnopened(null)
+    setBaseline(NEW_BASELINE)
+    setDraft(NEW_DRAFT)
+  }
+
+  useEffect(() => {
+    // Already open, as a new Range is right after its first save.
+    if (openId !== null && openId === baselineRef.current.id) return
+    resetToNew()
+    if (openId === null) return
+    let cancelled = false
+    api<SavedRange>(`/lab/ranges/${encodeURIComponent(openId)}`, { token })
+      .then((range) => {
+        if (cancelled) return
+        setBaseline({ id: range.id, draft: draftOf(range) })
+        setDraft(draftOf(range))
+      })
+      .catch((error: unknown) => !cancelled && setUnopened(reasonOf(error)))
+    return () => {
+      cancelled = true
+    }
+  }, [openId, token])
+
+  // Leaving within the app asks through the dialog below.
+  useEffect(() => {
+    setLeaveGuard((go) => {
+      if (!dirtyRef.current) return true
+      setPendingLeave({ go })
+      return false
+    })
+    return () => setLeaveGuard(null)
+  }, [])
+
+  // Closing or reloading the tab asks through the browser's own prompt.
+  useEffect(() => {
+    if (!dirty) return
+    const holdOn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', holdOn)
+    return () => window.removeEventListener('beforeunload', holdOn)
+  }, [dirty])
+
+  /** Goes on with `go` once any unsaved changes are discarded, asking first. */
+  const leave = (go: () => void) => {
+    if (dirtyRef.current) setPendingLeave({ go })
+    else go()
+  }
+  const discard = () => {
+    const pending = pendingLeave
+    setPendingLeave(null)
+    dirtyRef.current = false
+    pending?.go()
+  }
+
+  const startNew = () =>
+    leave(() => {
+      resetToNew()
+      dirtyRef.current = false
+      if (path !== labRangesPath) navigate(labRangesPath)
+    })
+
+  const openRange = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
+    if (!isPlainClick(event)) return
+    event.preventDefault()
+    if (id !== openId) navigate(labRangePath(id))
+  }
+
+  const save = async () => {
+    const name = draft.name.trim()
+    if (!name) {
+      setSaveFailure(t('lab.ranges.nameRequired'))
+      return
+    }
+    const sent = draft
+    const { id } = baseline
+    setSaveFailure(null)
+    setSaving(true)
+    try {
+      const range = await api<SavedRange>(id ? `/lab/ranges/${encodeURIComponent(id)}` : '/lab/ranges', {
+        token,
+        method: id ? 'PUT' : 'POST',
+        body: { name, combos: sent.combos },
+      })
+      const saved = draftOf(range)
+      baselineRef.current = { id: range.id, draft: saved }
+      setBaseline(baselineRef.current)
+      // Edits made while it saved stay, still unsaved.
+      setDraft((current) => (current === sent ? saved : current))
+      setListRevision((revision) => revision + 1)
+      if (!id) {
+        dirtyRef.current = false
+        navigate(labRangePath(range.id))
+      }
+    } catch (error) {
+      const reason = reasonOf(error)
+      setSaveFailure(
+        reason === 'range-name-taken'
+          ? t('lab.ranges.nameTaken', { name })
+          : reason === 'invalid-range-name'
+            ? t('reason.invalid-range-name')
+            : t('lab.ranges.saveFailed'),
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const setCombos = (change: (combos: Range) => Range) => setDraft((current) => ({ ...current, combos: change(current.combos) }))
   const toggle = (handClass: HandClass) =>
-    setRange((current) => withHandClass(current, handClass, handClassFrequency(current, handClass).value === 100 ? 0 : 100))
+    setCombos((combos) => withHandClass(combos, handClass, handClassFrequency(combos, handClass).value === 100 ? 0 : 100))
 
   return (
     <div className="lab">
       <AppHeader current="lab" />
       <div className="lab__body">
         <aside className="lab__side">
-          <Button variant="secondary" size="compact" onClick={() => setRange(EMPTY_RANGE)}>
+          <Button variant="secondary" size="compact" onClick={startNew}>
             <Icon name="add" size={14} />
             {t('lab.ranges.new')}
           </Button>
+          <RangeList list={list} openId={openId} onOpen={openRange} />
         </aside>
         <main className="lab__main">
           <div className="lab__titlebar">
-            <h1 className="lab__title ro-serif">{t('lab.ranges.title')}</h1>
+            <input
+              className="lab__name ro-serif"
+              value={draft.name}
+              maxLength={MAX_NAME_LENGTH}
+              placeholder={t('lab.ranges.namePlaceholder')}
+              aria-label={t('lab.ranges.name')}
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+            />
+            {dirty && <span className="lab__unsaved">{t('lab.ranges.unsaved')}</span>}
             <span className="lab__spacer" />
-            <Button variant="secondary" size="compact" onClick={() => setRange(EMPTY_RANGE)}>
+            <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
               {t('lab.ranges.clear')}
             </Button>
+            <Button
+              variant="primary"
+              size="compact"
+              disabledReason={opening ? t('lab.ranges.opening') : saving ? t('lab.ranges.saving') : undefined}
+              onClick={() => void save()}
+            >
+              {t('lab.ranges.save')}
+            </Button>
           </div>
+          {saveFailure && (
+            <p className="lab__failure" role="alert">
+              {saveFailure}
+            </p>
+          )}
+          {unopened && (
+            <p className="lab__notice" role="status">
+              {unopened === 'range-not-found' ? t('lab.ranges.unavailable') : t(`reason.${unopened}`)}
+            </p>
+          )}
           <div className="lab__work">
-            <RangeMatrix range={range} onToggle={toggle} />
-            <Stats stats={rangeStats(range)} />
+            <RangeMatrix range={draft.combos} onToggle={toggle} />
+            <Stats stats={rangeStats(draft.combos)} />
           </div>
         </main>
       </div>
+      {pendingLeave && (
+        <RoomDialog
+          title={t('lab.leave.title')}
+          body={t('lab.leave.body')}
+          onClose={() => setPendingLeave(null)}
+          actions={
+            <Button variant="destructive" onClick={discard}>
+              {t('lab.leave.discard')}
+            </Button>
+          }
+        />
+      )}
     </div>
+  )
+}
+
+/** The Account's saved Ranges, each with its %, the open one marked. */
+function RangeList({
+  list,
+  openId,
+  onOpen,
+}: {
+  list: RangeListLoad
+  openId: string | null
+  onOpen: (event: MouseEvent<HTMLAnchorElement>, id: string) => void
+}) {
+  const { t, formatNumber } = useI18n()
+  return (
+    <nav className="lab__ranges" aria-label={t('lab.ranges.saved')}>
+      <span className="lab__label">{t('lab.ranges.saved')}</span>
+      {list?.state === 'failed' && (
+        <p className="lab__failure" role="alert">
+          {t(`reason.${list.reason}`)}
+        </p>
+      )}
+      {list?.state === 'loaded' && list.ranges.length === 0 && <p className="lab__none">{t('lab.ranges.none')}</p>}
+      {list?.state === 'loaded' && list.ranges.length > 0 && (
+        <ul className="lab__list">
+          {list.ranges.map((range) => (
+            <li key={range.id}>
+              <a
+                href={labRangePath(range.id)}
+                className="lab__list-item"
+                aria-current={range.id === openId ? 'page' : undefined}
+                onClick={(event) => onOpen(event, range.id)}
+              >
+                <span className="lab__list-name">{range.name}</span>
+                <span className="lab__list-meta ro-mono">
+                  {t('lab.stats.percent', { percent: formatNumber(range.percent, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </nav>
   )
 }
 
