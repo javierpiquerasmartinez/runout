@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   handClassFrequency,
   EMPTY_RANGE,
+  BY_EQUITY,
   HAND_CLASSES,
   MATRIX,
   rangeStats,
   sameRange,
   strokeFrequency,
+  topRange,
   TOTAL_COMBOS,
   withHandClass,
+  type Range,
 } from './range'
 
 /** The Hand Class written as `name`. */
@@ -145,5 +148,51 @@ describe('sameRange', () => {
     expect(sameRange(range, withHandClass(range, named('AKs'), 75))).toBe(false)
     expect(sameRange(range, withHandClass(range, named('AA'), 100))).toBe(false)
     expect(sameRange(withHandClass(range, named('AA'), 100), range)).toBe(false)
+  })
+})
+
+describe('the order by equity', () => {
+  it('holds each of the 169 Hand Classes once', () => {
+    expect(BY_EQUITY).toHaveLength(169)
+    expect(new Set(BY_EQUITY.map((handClass) => handClass.name)).size).toBe(169)
+  })
+})
+
+describe('the top X %', () => {
+  /** The Hand Classes a Range holds at 100 %, by name. */
+  const held = (range: Range) =>
+    HAND_CLASSES.filter((handClass) => handClassFrequency(range, handClass).value === 100).map((handClass) => handClass.name)
+
+  it('is empty at 0 %', () => {
+    expect(topRange(0)).toEqual(EMPTY_RANGE)
+  })
+
+  it('is every Combo at 100 % at 100 %', () => {
+    const range = topRange(100)
+
+    expect(Object.keys(range)).toHaveLength(1326)
+    expect(Object.values(range).every((frequency) => frequency === 100)).toBe(true)
+  })
+
+  it('stops before a Hand Class that would take it further from X %', () => {
+    // 0.5 % is 6.63 Combos: AA (6) is nearer than AA and KK (12).
+    expect(held(topRange(0.5))).toEqual(['AA'])
+  })
+
+  it('takes a Hand Class that brings it nearer to X %, even past it', () => {
+    // 5 % is 66.3 Combos: 88+, AKs, 77, AQs and AJs are 60; AKo makes 72, nearer; ATs would make 76.
+    const range = topRange(5)
+
+    expect(rangeStats(range).combos).toBe(72)
+    expect(held(range).sort()).toEqual(['88', '99', 'AA', 'AJs', 'AKo', 'AKs', 'AQs', 'JJ', 'KK', 'QQ', 'TT', '77'].sort())
+  })
+
+  it('snaps to whole Hand Classes at 10 %', () => {
+    // 10 % is 132.6 Combos: … KJs makes 130, A8s 134 (nearer), KTs would make 138.
+    const range = topRange(10)
+
+    expect(rangeStats(range).combos).toBe(134)
+    expect(held(range)).toContain('A8s')
+    expect(held(range)).not.toContain('KTs')
   })
 })

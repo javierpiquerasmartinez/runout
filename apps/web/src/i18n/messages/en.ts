@@ -748,6 +748,8 @@ export const en: Messages = {
   'lab.stats.kind.suited': 'Suited',
   'lab.stats.kind.offsuit': 'Offsuit',
   'lab.stats.shareOfRange': '{percent} % of the range',
+  'lab.top': 'Top',
+  'lab.top.slider': 'Top % of combos',
 
   'settings.account.title': 'Account',
   'settings.account.signedIn': 'Signed in with Google as {email}',

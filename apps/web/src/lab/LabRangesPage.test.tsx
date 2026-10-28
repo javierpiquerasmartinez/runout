@@ -322,6 +322,55 @@ describe('LabRangesPage · dragging', () => {
   })
 })
 
+const topSlider = () => screen.getByRole<HTMLInputElement>('slider', { name: 'Top % of combos' })
+/** What the slider says it is set to. */
+const topValue = () => within(screen.getByRole('group', { name: 'Top' })).getByRole('status').textContent
+
+describe('LabRangesPage · the top X % slider', () => {
+  it('starts at 0 %', () => {
+    renderLab()
+
+    expect(topSlider().value).toBe('0')
+    expect(topValue()).toBe('0.0 %')
+  })
+
+  it('replaces whatever was painted with the top X % at 100 %, and updates the stats', async () => {
+    renderLab()
+    await userEvent.click(cell('72o'))
+
+    fireEvent.change(topSlider(), { target: { value: '5' } })
+
+    expect(topValue()).toBe('5.0 %')
+    expect(cell('72o').getAttribute('aria-pressed')).toBe('false')
+    expect(cell('AKo').getAttribute('aria-pressed')).toBe('true')
+    expect(cell('ATs').getAttribute('aria-pressed')).toBe('false')
+    // 88+, AKs, 77, AQs, AJs and AKo: 72 Combos, the nearest whole Hand Classes to 66.3.
+    expect(statsText()).toContain('5.4 % of all combos 72.0 of 1326 combos')
+  })
+
+  it("follows the Range's % when cells are painted by hand", async () => {
+    renderLab()
+    fireEvent.change(topSlider(), { target: { value: '5' } })
+
+    await userEvent.click(cell('AKo'))
+
+    // 60 Combos are 4.5 % of 1326.
+    expect(topValue()).toBe('4.5 %')
+    expect(topSlider().value).toBe('4.5')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(topValue()).toBe('0.0 %')
+  })
+
+  it('follows the % of a Range opened from the list', async () => {
+    renderLab()
+
+    await userEvent.click(await screen.findByRole('link', { name: /^OR BTN/ }))
+
+    await waitFor(() => expect(topValue()).toBe('0.5 %'))
+  })
+})
+
 describe('LabRangesPage · the list of saved Ranges', () => {
   it('lists them by name, with their %', async () => {
     renderLab()
@@ -623,6 +672,8 @@ describe('LabRangesPage · in Spanish', () => {
     expect(text).toContain('0,5 % del total')
     expect(text).toContain('6,0 de 1326 combos')
     expect(text).toContain('Parejas 6,0 / 78 100,0 % del rango')
+    expect(screen.getByRole('slider', { name: 'Top % de los combos' })).toBeTruthy()
+    expect(topValue()).toBe('0,5 %')
   })
 
   it('names saving and the unsaved mark in Spanish', async () => {

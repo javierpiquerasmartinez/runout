@@ -12,11 +12,13 @@ import { labRangeIdFromPath, labRangePath, labRangesPath } from './lab'
 import {
   EMPTY_RANGE,
   HAND_CLASS_KINDS,
+  HAND_CLASS_BY_NAME,
   HAND_CLASSES,
   handClassFrequency,
   rangeStats,
   sameRange,
   strokeFrequency,
+  topRange,
   TOTAL_COMBOS,
   withHandClass,
   type HandClass,
@@ -70,7 +72,8 @@ const BRUSH_PRESETS = [100, 75, 50, 25] as const
 /** How far apart, in px, a drag's path is sampled between two pointer events, so a fast one skips no cell. */
 const STROKE_STEP = 6
 
-const HAND_CLASS_BY_NAME = new Map(HAND_CLASSES.map((handClass) => [handClass.name, handClass]))
+/** The "top X %" slider's step, in %. */
+const TOP_STEP = 0.5
 
 /**
  * The Lab's Ranges (variant A of the prototype): the saved Ranges in a side
@@ -93,6 +96,8 @@ export function LabRangesPage() {
   const [saveFailure, setSaveFailure] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [brush, setBrush] = useState<number>(100)
+  /** The "top X %" last set with the slider, and the Combos it set; once they're painted over, the slider follows the Range. */
+  const [lastTop, setLastTop] = useState<{ percent: number; combos: Range } | null>(null)
   /** Where the person was going when asked to discard their changes. */
   const [pendingLeave, setPendingLeave] = useState<{ go: () => void } | null>(null)
 
@@ -229,6 +234,14 @@ export function LabRangesPage() {
 
   const setCombos = (change: (combos: Range) => Range) => setDraft((current) => ({ ...current, combos: change(current.combos) }))
   const paint = (handClass: HandClass, frequency: number) => setCombos((combos) => withHandClass(combos, handClass, frequency))
+  const setTopPercent = (percent: number) => {
+    const combos = topRange(percent)
+    setLastTop({ percent, combos })
+    setCombos(() => combos)
+  }
+
+  const stats = rangeStats(draft.combos)
+  const topPercent = lastTop && sameRange(lastTop.combos, draft.combos) ? lastTop.percent : stats.percent
 
   return (
     <div className="lab">
@@ -279,8 +292,9 @@ export function LabRangesPage() {
             <div className="lab__canvas">
               <Brush brush={brush} onChange={setBrush} />
               <RangeMatrix range={draft.combos} brush={brush} onPaint={paint} />
+              <TopSlider percent={topPercent} onChange={setTopPercent} />
             </div>
-            <Stats stats={rangeStats(draft.combos)} />
+            <Stats stats={stats} />
           </div>
         </main>
       </div>
@@ -380,6 +394,32 @@ function Brush({ brush, onChange }: { brush: number; onChange: (frequency: numbe
         />
         <span aria-hidden="true">%</span>
       </label>
+    </div>
+  )
+}
+
+/**
+ * The "top X %": sets the Range to the strongest X % of all Combos. Painted by
+ * hand, the Range moves it to its own %, to the nearest step.
+ */
+function TopSlider({ percent, onChange }: { percent: number; onChange: (percent: number) => void }) {
+  const { t, formatNumber } = useI18n()
+  const value = Math.round(percent / TOP_STEP) * TOP_STEP
+  return (
+    <div className="lab__top" role="group" aria-label={t('lab.top')}>
+      <span className="lab__label">{t('lab.top')}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={TOP_STEP}
+        value={value}
+        aria-label={t('lab.top.slider')}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <output className="lab__top-value ro-mono">
+        {t('lab.stats.percent', { percent: formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
+      </output>
     </div>
   )
 }
