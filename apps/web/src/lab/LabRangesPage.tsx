@@ -101,6 +101,14 @@ const withTagChanged = (draft: Draft, tagId: string, name: string | null): Draft
   tags: sortedTags(draft.tags.flatMap((tag) => (tag.id !== tagId ? [tag] : name === null ? [] : [{ ...tag, name }]))),
 })
 
+/** The list's query to the server: `tag` for each Lab Tag chosen, and `search` unless it is blank. */
+const rangeFilterQuery = (tags: string[], search: string) => {
+  const query = new URLSearchParams(tags.map((tag) => ['tag', tag]))
+  if (search !== '') query.set('search', search)
+  const written = query.toString()
+  return written ? `?${written}` : ''
+}
+
 /** The brush's shortcuts; any other whole Frequency from 1 to 100 is typed in its field. */
 const BRUSH_PRESETS = [100, 75, 50, 25] as const
 
@@ -127,6 +135,12 @@ export function LabRangesPage() {
   const openId = labRangeIdFromPath(path)
   const [list, setList] = useState<RangeListLoad>(null)
   const [listRevision, setListRevision] = useState(0)
+  /** The Lab Tags whose Ranges the list shows (any of them); all Ranges when none. */
+  const [chosenTags, setChosenTags] = useState<string[]>([])
+  /** What the list's search box holds: the names listed hold it, ignoring case. */
+  const [search, setSearch] = useState('')
+  const trimmedSearch = search.trim()
+  const filtered = chosenTags.length > 0 || trimmedSearch !== ''
   /** The Account's Lab Tags; empty until they are read. */
   const [labTags, setLabTags] = useState<LabTag[]>([])
   const [baseline, setBaseline] = useState<Baseline>(NEW_BASELINE)
@@ -164,13 +178,13 @@ export function LabRangesPage() {
 
   useEffect(() => {
     let cancelled = false
-    api<RangeSummary[]>('/lab/ranges', { token })
+    api<RangeSummary[]>(`/lab/ranges${rangeFilterQuery(chosenTags, trimmedSearch)}`, { token })
       .then((ranges) => !cancelled && setList({ state: 'loaded', ranges }))
       .catch((error: unknown) => !cancelled && setList({ state: 'failed', reason: reasonOf(error) }))
     return () => {
       cancelled = true
     }
-  }, [token, listRevision])
+  }, [token, listRevision, chosenTags, trimmedSearch])
 
   // Read again with the list, since saving a Range changes how many carry each.
   useEffect(() => {
@@ -350,6 +364,7 @@ export function LabRangesPage() {
   const changeTag = async (tagId: string, tagName: string | null) => {
     if (tagName === null) {
       await api<void>(`/lab/tags/${encodeURIComponent(tagId)}`, { token, method: 'DELETE' })
+      setChosenTags((chosen) => chosen.filter((each) => each !== tagId))
     } else {
       await api<LabTag>(`/lab/tags/${encodeURIComponent(tagId)}`, { token, method: 'PATCH', body: { name: tagName } })
     }
@@ -384,8 +399,22 @@ export function LabRangesPage() {
             <Icon name="add" size={14} />
             {t('lab.ranges.new')}
           </Button>
+          <label className="lab__search">
+            <Icon name="search" size={14} />
+            <input
+              type="search"
+              value={search}
+              placeholder={t('lab.ranges.search')}
+              aria-label={t('lab.ranges.search')}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
           <LibraryTags
             tags={labTags}
+            chosen={chosenTags}
+            onToggle={(tagId) =>
+              setChosenTags((chosen) => (chosen.includes(tagId) ? chosen.filter((each) => each !== tagId) : [...chosen, tagId]))
+            }
             count={(tag) => tag.ranges}
             confirmDelete={(tag) =>
               t(tag.ranges === 1 ? 'lab.tag.confirmDelete.one' : 'lab.tag.confirmDelete.other', {
@@ -397,7 +426,19 @@ export function LabRangesPage() {
             onRename={(tagId, tagName) => changeTag(tagId, tagName)}
             onDelete={(tagId) => changeTag(tagId, null)}
           />
-          <RangeList list={list} openId={openId} onOpen={openRange} />
+          <RangeList
+            list={list}
+            openId={openId}
+            onOpen={openRange}
+            onClearFilters={
+              filtered
+                ? () => {
+                    setChosenTags([])
+                    setSearch('')
+                  }
+                : undefined
+            }
+          />
         </aside>
         <main className="lab__main">
           <div className="lab__titlebar">
@@ -520,21 +561,42 @@ function RangeList({
   list,
   openId,
   onOpen,
+  onClearFilters,
 }: {
   list: RangeListLoad
   openId: string | null
   onOpen: (event: MouseEvent<HTMLAnchorElement>, id: string) => void
+  /** Clears the search and the Tags; left out while the list is not filtered. */
+  onClearFilters?: () => void
 }) {
   const { t, formatNumber } = useI18n()
   return (
     <nav className="lab__ranges" aria-label={t('lab.ranges.saved')}>
       <span className="lab__label">{t('lab.ranges.saved')}</span>
       {list?.state === 'failed' && (
-        <p className="lab__failure" role="alert">
-          {t(`reason.${list.reason}`)}
-        </p>
+        <div className="lab__no-matches">
+          <p className="lab__failure" role="alert">
+            {t(`reason.${list.reason}`)}
+          </p>
+          {onClearFilters && (
+            <Button variant="secondary" size="compact" onClick={onClearFilters}>
+              {t('lab.ranges.clearFilters')}
+            </Button>
+          )}
+        </div>
       )}
-      {list?.state === 'loaded' && list.ranges.length === 0 && <p className="lab__none">{t('lab.ranges.none')}</p>}
+      {list?.state === 'loaded' &&
+        list.ranges.length === 0 &&
+        (onClearFilters ? (
+          <div className="lab__no-matches">
+            <p className="lab__none">{t('lab.ranges.noMatches')}</p>
+            <Button variant="secondary" size="compact" onClick={onClearFilters}>
+              {t('lab.ranges.clearFilters')}
+            </Button>
+          </div>
+        ) : (
+          <p className="lab__none">{t('lab.ranges.none')}</p>
+        ))}
       {list?.state === 'loaded' && list.ranges.length > 0 && (
         <ul className="lab__list">
           {list.ranges.map((range) => (

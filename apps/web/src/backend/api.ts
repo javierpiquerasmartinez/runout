@@ -45,6 +45,7 @@ export type RejectionReason =
   | 'range-name-taken'
   | 'invalid-range-combos'
   | 'invalid-range-tags'
+  | 'invalid-range-filter'
   | 'range-not-found'
 
 /** A refusal, or `network` when the server could not be reached at all. */

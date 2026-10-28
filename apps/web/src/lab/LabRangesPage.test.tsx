@@ -51,8 +51,15 @@ beforeEach(() => {
       const method = init?.method ?? 'GET'
       if (url.startsWith('/api/lab/tags')) return tagsReply(method, url, init)
       const id = /^\/api\/lab\/ranges\/(.+)$/.exec(url)?.[1]
-      if (method === 'GET' && url === '/api/lab/ranges') {
-        const summaries = stored.map(({ id, name, combos, tagIds }) => {
+      if (method === 'GET' && (url === '/api/lab/ranges' || url.startsWith('/api/lab/ranges?'))) {
+        const query = new URLSearchParams(url.split('?')[1])
+        const tags = query.getAll('tag')
+        const search = query.get('search')?.toLowerCase() ?? ''
+        const kept = stored.filter(
+          (range) =>
+            (tags.length === 0 || tags.some((tag) => range.tagIds?.includes(tag))) && range.name.toLowerCase().includes(search),
+        )
+        const summaries = kept.map(({ id, name, combos, tagIds }) => {
           const comboCount = Object.values(combos).reduce((sum, value) => sum + value, 0) / 100
           return { id, name, comboCount, percent: (comboCount / 1326) * 100, tags: tagsOf(tagIds) }
         })
@@ -1204,5 +1211,137 @@ describe("LabRangesPage · the side column's Tags", () => {
     await userEvent.click(within(side()).getByRole('button', { name: 'Borrar BTN' }))
 
     expect(within(side()).getByRole('button', { name: 'Borrar BTN de 1 rango' })).toBeTruthy()
+  })
+})
+
+describe('LabRangesPage · finding a Range', () => {
+  beforeEach(() => {
+    storedTags = [
+      { id: 't1', name: 'OR' },
+      { id: 't2', name: '3B' },
+    ]
+    stored = [
+      { id: 'r1', name: 'OR BTN vs BB', combos: aces, tagIds: ['t1'] },
+      { id: 'r2', name: 'OR CO', combos: {}, tagIds: ['t1'] },
+      { id: 'r3', name: '3B BB vs CO', combos: {}, tagIds: ['t2'] },
+      { id: 'r4', name: 'Untagged', combos: {} },
+    ]
+  })
+
+  /** The names the list shows, in order: each link's text starts with its Range's name. */
+  const listedNames = () => {
+    const names = stored.map((range) => range.name)
+    return within(ranges())
+      .queryAllByRole('link')
+      .map((link) => names.find((name) => link.textContent?.startsWith(name)))
+  }
+  const sideTag = (name: string) => within(sideTags()).getByRole('button', { name: new RegExp(`^${name}`) })
+
+  it('shows only the Ranges carrying any of the Tags chosen, and all of them once none is', async () => {
+    renderLab()
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+
+    await userEvent.click(sideTag('OR'))
+    await waitFor(() => expect(listedNames()).toEqual(['OR BTN vs BB', 'OR CO']))
+    expect(pressed(sideTag('OR'))).toBe(true)
+
+    await userEvent.click(sideTag('3B'))
+    await waitFor(() => expect(listedNames()).toEqual(['3B BB vs CO', 'OR BTN vs BB', 'OR CO']))
+
+    await userEvent.click(sideTag('OR'))
+    await userEvent.click(sideTag('3B'))
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+  })
+
+  const searchBox = () => screen.getByRole<HTMLInputElement>('searchbox', { name: 'Search ranges' })
+
+  it('narrows the list by name as the person types, ignoring case', async () => {
+    renderLab()
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+
+    await userEvent.type(searchBox(), 'bb')
+    await waitFor(() => expect(listedNames()).toEqual(['3B BB vs CO', 'OR BTN vs BB']))
+
+    await userEvent.type(searchBox(), ' vs c')
+    await waitFor(() => expect(listedNames()).toEqual(['3B BB vs CO']))
+
+    await userEvent.clear(searchBox())
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+  })
+
+  it('combines the search with the Tags chosen', async () => {
+    renderLab()
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+
+    await userEvent.click(sideTag('OR'))
+    await userEvent.type(searchBox(), 'bb')
+
+    await waitFor(() => expect(listedNames()).toEqual(['OR BTN vs BB']))
+  })
+
+  it('says when nothing matches, and clears the search and the Tags from there', async () => {
+    renderLab()
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+    await userEvent.click(sideTag('3B'))
+    await userEvent.type(searchBox(), 'btn')
+
+    await waitFor(() => expect(within(ranges()).getByText('No ranges match these filters.')).toBeTruthy())
+    expect(within(ranges()).queryByText('No saved ranges yet.')).toBeNull()
+
+    await userEvent.click(within(ranges()).getByRole('button', { name: 'Clear filters' }))
+
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+    expect(searchBox().value).toBe('')
+    expect(pressed(sideTag('3B'))).toBe(false)
+  })
+
+  it('keeps the open Range open when the filter hides it from the list', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(nameField().value).toBe('OR BTN vs BB'))
+
+    await userEvent.click(sideTag('3B'))
+
+    await waitFor(() => expect(listedNames()).toEqual(['3B BB vs CO']))
+    expect(nameField().value).toBe('OR BTN vs BB')
+    expect(statsText()).toContain('6.0 of 1326 combos')
+    expect(window.location.pathname).toBe('/lab/ranges/r1')
+  })
+
+  it('drops a deleted Tag from the filter', async () => {
+    renderLab()
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+    await userEvent.click(sideTag('3B'))
+    await waitFor(() => expect(listedNames()).toEqual(['3B BB vs CO']))
+
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Edit tags' }))
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Delete 3B' }))
+    await userEvent.click(within(sideTags()).getByRole('button', { name: 'Delete 3B from 1 range' }))
+
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+  })
+
+  it('names the search and the empty result in Spanish', async () => {
+    renderLab('es')
+    const list = () => screen.getByRole('navigation', { name: 'Rangos guardados' })
+    await waitFor(() => expect(within(list()).getAllByRole('link')).toHaveLength(4))
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar rangos' }), 'zzz')
+
+    await waitFor(() => expect(within(list()).getByText('Ningún rango cumple estos filtros.')).toBeTruthy())
+    expect(within(list()).getByRole('button', { name: 'Limpiar filtros' })).toBeTruthy()
+  })
+
+  it('offers to clear the filters when the server cannot read them', async () => {
+    renderLab()
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
+    await userEvent.click(sideTag('OR'))
+    await waitFor(() => expect(listedNames()).toHaveLength(2))
+    vi.mocked(fetch).mockImplementationOnce(async () => Response.json({ reason: 'invalid-range-filter' }, { status: 400 }))
+
+    await userEvent.type(searchBox(), 'x')
+
+    await waitFor(() => expect(within(ranges()).getByRole('alert').textContent).toBe("The server couldn't read these filters. Clear them and try again."))
+    await userEvent.click(within(ranges()).getByRole('button', { name: 'Clear filters' }))
+    await waitFor(() => expect(listedNames()).toHaveLength(4))
   })
 })

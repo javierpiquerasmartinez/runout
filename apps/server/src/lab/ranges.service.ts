@@ -13,6 +13,7 @@ import type { Identity, Preferences } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { COMBOS, type Combos } from './combos.js';
 import { LabTagsService, type RangeTag } from './lab-tags.service.js';
+import { rangeFilterWhere, type RangeFilter } from './range-filter.js';
 
 /** A Range as its owner opens it. */
 export interface Range {
@@ -84,12 +85,12 @@ export class RangesService {
     private readonly tags: LabTagsService,
   ) {}
 
-  /** The Account's Ranges, sorted by name ignoring case. */
-  async list(account: Identity): Promise<RangeSummary[]> {
+  /** The Account's Ranges the filter keeps, sorted by name ignoring case. */
+  async list(account: Identity, filter: RangeFilter): Promise<RangeSummary[]> {
     const rows = await this.db
       .select(selection)
       .from(ranges)
-      .where(eq(ranges.identityId, account.id))
+      .where(rangeFilterWhere(account.id, filter))
       .orderBy(asc(sql`lower(${ranges.name})`), asc(ranges.name));
     return rows.map(({ id, name, combos, tags }) => {
       const comboCount = weightedCount(combos);
