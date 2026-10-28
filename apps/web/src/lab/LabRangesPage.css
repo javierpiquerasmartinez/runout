@@ -428,6 +428,18 @@
   .lab__main {
     padding: 18px 16px;
   }
+  /* The name takes its own line, with the actions wrapping under it. */
+  .lab__titlebar {
+    flex-wrap: wrap;
+  }
+  .lab__name {
+    flex-basis: 100%;
+  }
+  /* The matrix takes the whole width, with the stats wrapping under it. */
+  .lab__canvas {
+    flex-basis: 100%;
+    min-width: 0;
+  }
   .lab__readout {
     width: 100%;
   }

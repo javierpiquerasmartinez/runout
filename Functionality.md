@@ -77,7 +77,7 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Eight epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands.
+Nine epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |
@@ -89,6 +89,7 @@ Eight epics cover the product. Five are essential for a session to work end to e
 | E6 · Notes and Marks | Record the group's conclusion on a Hand and flag Hands to find again | Partial in MVP |
 | E7 · Library and Results | Keep, find, classify and measure your own Hands, and bring them to a Room | Second release |
 | E8 · Accounts and preferences | Sign in, read the table your own way, and be recognised in Hand Histories | Partial in MVP |
+| E9 · Lab | Build, measure, name and find your own preflop Ranges | After the second release |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
 
@@ -500,7 +501,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
 
-- The Library, a Library Hand, **Salas** and Settings share the same header: the brand, **Biblioteca** and **Salas** with the current one marked, **Nueva sala** and the avatar menu.
+- The Library, a Library Hand, **Salas**, the Lab and Settings share the same header: the brand, **Biblioteca**, **Salas** and **Laboratorio** with the current one marked, **Nueva sala** and the avatar menu.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
 - An anonymous Participant who steps out to Settings sees only the brand and a way back, and their Room carries on behind it. Without any identity, Settings sends me to `/login`.
@@ -512,6 +513,70 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 - The colours the lines have always had are the defaults; **Restaurar colores** puts every line back on its own.
 - Like the other Preferences, the choice is personal, applies at once and is kept with my identity.
 
+## E9 · Lab
+
+The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes no equity against a Range. Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
+
+**H9.1 — Open the Lab.** As a player, I want a place to build Ranges, so I can study preflop where I already review my Hands.
+
+- **Laboratorio** sits in the shared header after **Biblioteca** and **Salas**, and is marked while I am in the Lab (H8.9).
+- `/lab` takes me to `/lab/ranges`, which always opens on an empty 13×13 matrix, ready to paint, with my saved Ranges listed beside it.
+- The matrix is laid out the usual way: pairs on the diagonal, suited above it, offsuit below, aces top-left. Each cell is labelled with its Hand Class, and pairs, suited and offsuit cells have slightly different backgrounds.
+- Without an Account, `/lab`, `/lab/ranges` and `/lab/ranges/:id` send me to `/login`. An anonymous Participant has no way into the Lab.
+
+**H9.2 — Save and reopen a Range.** As a player, I want to keep a Range under a name, so I can come back to it.
+
+- I name the Range in a field above the matrix and keep it with **Guardar**. Saving a new Range without a name asks me for one.
+- Names are up to 60 characters and unique among my Ranges, ignoring case. A name I already use is refused, saying which.
+- The list shows each Range's name, its % of all Combos and its Tags, and marks the one open. A saved Range has its own address, `/lab/ranges/:id`, so reloading or going back reopens it. One that is not mine or no longer exists says it is not available and leaves me on the empty matrix.
+- An empty Range can be saved. With no saved Ranges, the list says so.
+- **Sin guardar** shows while the open Range differs from what is saved. Leaving it (to another Range, to **Nuevo rango** or off the Lab) asks whether to discard the changes; closing the tab uses the browser's own prompt.
+- A failed save says so and keeps my edits on screen.
+
+**H9.3 — Paint the matrix.** As a player, I want to paint cells at a Frequency, so I can build a Range by hand.
+
+- The **Brocha** carries a Frequency: 100, 75, 50 or 25 % in one click, or any whole number from 1 to 100 typed in.
+- Clicking a cell sets it to the brush's Frequency; clicking one already at it takes it out. Pressing and dragging paints every cell crossed, however fast, and keeps doing what its first cell did.
+- A cell fills from the left in proportion to its Frequency, and shows the number when it is not 100 %. Hovering tells its Hand Class, its Combos and its Frequency.
+- A cell whose Combos have different Frequencies (only an import can make one) is marked as mixed, with its average. Painting it gives all its Combos the brush's Frequency.
+- **Limpiar** empties the matrix.
+
+**H9.4 — See how wide a Range is.** As a player, I want the Range's numbers next to the matrix, so I see its width and shape as I paint.
+
+- The Combos the Range holds, weighted by Frequency, and its share of all 1326 Combos, both to one decimal.
+- The split between pairs, suited and offsuit, each as Combos out of its total (78, 312, 936) and as a share of the Range.
+- They update as I paint or move the slider.
+
+**H9.5 — Start from the top X %.** As a player, I want a slider that sets the Range to the strongest X % of Combos, so I can build an opening Range in one move.
+
+- It runs from 0 to 100 % in steps of 0.5, filling whole Hand Classes in order of all-in equity against any two cards, as PokerStove and Equilab do, and snapping to the total nearest X %.
+- Moving it replaces what was painted with that top X % at 100 %. Painting by hand moves it to the Range's current %.
+
+**H9.6 — Bring a Range in and out as text.** As a player, I want to paste and copy Ranges in the notation other tools use, so they move between Runout and those tools.
+
+- **Importar** reads Flopzilla, Equilab, GTO Wizard, PioSolver and GTO+ notation: `AA`, `AKs`, `AKo`, `AK`, `77+`, `A2s+`, `K9s-K6s`, `99-66`, exact Combos like `AhKh`, Frequencies written `:0.5` or `:50`, and `[50]…[/50]` blocks. It replaces the matrix with what was pasted.
+- A piece it does not understand refuses the whole import and names that piece, so I never get half a Range.
+- The Range is always shown as text in PioSolver / GTO Wizard notation, shortened with `+` and `-`, and **Copiar rango** copies it. A mixed cell's Combos are written one by one, so nothing is lost on the way back.
+
+**H9.7 — Duplicate and delete a Range.** As a player, I want to start a Range from another and drop the ones I no longer use.
+
+- **Duplicar** saves a copy of the open Range, with its Combos and Tags, named "<name> (copia)", then "(copia 2)" and so on, and opens it. With unsaved changes it asks first, since the copy is made from what is saved.
+- Deleting the open Range asks for confirmation and takes me back to the empty matrix.
+- A failed duplicate or delete says so and keeps my edits on screen.
+
+**H9.8 — Tag my Ranges and find them.** As a player, I want to group Ranges and find one among many.
+
+- A Range can have several Tags. The Tag field under its name suggests my Lab Tags and creates a new one when I type a new name.
+- My Lab Tags are separate from my Library Tags: neither set shows among the other's. Their names are unique, ignoring case.
+- The side column lists my Lab Tags as filters. As in the Library (H7.6), the pencil renames a Tag on every Range at once, or deletes it from every Range without touching the Ranges.
+- Filtering by Tags keeps Ranges with any of them, a search box narrows by name, and both combine. Filters that leave nothing say so and offer to clear them.
+- My Ranges and Lab Tags are seen by nobody else.
+
+**H9.9 — Check a Range on a phone.** As a player away from my desk, I want to look at a Range and touch it up on my phone.
+
+- The Lab is built for desktop. On a narrow screen the side column stacks above the work area, the stats and the text box go below the matrix, and nothing scrolls sideways.
+- A tap paints one cell. Dragging is not offered on touch: a finger that moves scrolls the page.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.
@@ -519,6 +584,8 @@ The MVP is one complete Tuesday-night session, start to finish, and nothing more
 In the first version: create a Room and join by code or link, the Room lifecycle and the Master role, import from the three main Trackers, the shared Queue with its metadata, the full player stepping Action by Action and Street by Street, synchronisation with its indicator, Notes, the table-reading preferences and the interface in Spanish and English. The MVP had no Library and no Accounts.
 
 The second release adds what lets Runout replace the Tracker as the place each person keeps their Hands: Accounts with Google and anonymous identities that last one Room (H8.7, H8.8), the Library with its import, filters, Tags, Notes and removal, the Results Graph, and Library Hands in Rooms (E7). Room Hands are discarded when their Room closes. All data from the MVP is wiped rather than migrated.
+
+After it, the Lab (E9) gives each Account somewhere to build, measure, Tag and keep their preflop Ranges, with the text notation other tools use. It stays apart from Rooms and the Library for now.
 
 Deliberately out, with the reason:
 
@@ -529,7 +596,7 @@ Deliberately out, with the reason:
 | Automatic playback | The conversation sets the pace; the Master steps every Action |
 | Guests navigating on their own | Everyone must see the same Playback; that is the product |
 | Requesting the Master role in the app | The group asks out loud and the Master hands it over |
-| Equity or range calculation as a study tool | Turns the tool into a solver, which is not what is missing. All-in EV computes equity only to take luck out of the Results Graph |
+| Equity calculation as a study tool | Turns the tool into a solver, which is not what is missing. All-in EV computes equity only to take luck out of the Results Graph, and the Lab (E9) only orders its "top X %" by a fixed equity table |
 | Text chat in the Room | Conversation goes over voice; Notes cover what must be kept |
 | Automatic import from the Tracker | Requires installing something on each desktop |
 | Background import of whole Tracker databases beyond 20 MB per upload | A separate component; several uploads cover it for now |
