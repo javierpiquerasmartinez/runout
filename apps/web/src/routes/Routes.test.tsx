@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -226,6 +226,43 @@ describe('Routes · the Rooms screen, only for an Account', () => {
     expect(await login()).toBeTruthy()
     expect(window.location.pathname).toBe('/login')
     expect(screen.queryByRole('heading', { name: 'Rooms' })).toBeNull()
+  })
+})
+
+describe('Routes · the Lab, only for an Account', () => {
+  const lab = () => screen.findByRole('group', { name: 'Range matrix' })
+
+  it('shows /lab/ranges to an Account, with Lab marked in the header', async () => {
+    renderAt('/lab/ranges', account())
+
+    expect(await lab()).toBeTruthy()
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    expect(within(nav).getByRole('link', { name: 'Lab' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('sends an Account from /lab to /lab/ranges, in place of /lab', async () => {
+    window.history.replaceState(null, '', '/')
+    window.history.pushState(null, '', '/lab')
+    const entries = window.history.length
+    renderAt('/lab', account())
+
+    expect(await lab()).toBeTruthy()
+    expect(window.location.pathname).toBe('/lab/ranges')
+    expect(window.history.length).toBe(entries)
+  })
+
+  it.each([
+    ['/lab', 'no identity', visitor],
+    ['/lab', 'an anonymous identity', anonymous],
+    ['/lab/ranges', 'no identity', visitor],
+    ['/lab/ranges', 'an anonymous identity', anonymous],
+    ['/lab/ranges/some-range', 'no identity', visitor],
+    ['/lab/ranges/some-range', 'an anonymous identity', anonymous],
+  ])('sends %s with %s to /login', async (path, _, session) => {
+    renderAt(path, session())
+
+    expect(await login()).toBeTruthy()
+    expect(window.location.pathname).toBe('/login')
   })
 })
 

@@ -1,0 +1,168 @@
+/*
+ * The Lab's Ranges, variant A of the prototype: the Library's 220 px side
+ * column, then the matrix (up to 600 px) with the stats to its right.
+ */
+
+.lab {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-canvas);
+  color: var(--text-primary);
+}
+
+.lab__body {
+  flex-grow: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.lab__side {
+  width: 220px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 18px 12px;
+  border-right: 1px solid var(--color-panel-border);
+  background: var(--color-panel);
+}
+
+.lab__main {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 32px;
+}
+
+.lab__titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lab__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 400;
+}
+.lab__spacer {
+  flex-grow: 1;
+}
+
+.lab__work {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+/* ---- The matrix ---- */
+.lab__matrix {
+  flex: 1 1 420px;
+  max-width: 600px;
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 2px;
+  user-select: none;
+}
+.lab__cell {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--color-control);
+  color: var(--text-secondary);
+  font-size: clamp(9px, 1.05vw, 13px);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+.lab__cell[data-kind='pair'] {
+  background: var(--color-selected);
+}
+.lab__cell[data-kind='offsuit'] {
+  background: var(--color-panel);
+}
+.lab__cell:hover {
+  border-color: var(--color-border-hover);
+}
+.lab__cell-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--range-fill);
+}
+.lab__cell-label {
+  position: relative;
+}
+.lab__cell[data-in] {
+  color: var(--on-range-fill);
+  font-weight: 600;
+}
+
+/* ---- Stats ---- */
+.lab__stats {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.lab__headline {
+  display: flex;
+  gap: 28px;
+}
+.lab__figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lab__figure-value {
+  font-size: 28px;
+  font-weight: 500;
+}
+.lab__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.lab__muted {
+  color: var(--text-muted);
+}
+.lab__breakdown {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lab__breakdown-row {
+  display: grid;
+  grid-template-columns: 70px auto 1fr;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+.lab__breakdown-row dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .lab__body {
+    flex-direction: column;
+  }
+  .lab__side {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-panel-border);
+  }
+  .lab__main {
+    padding: 18px 16px;
+  }
+}
