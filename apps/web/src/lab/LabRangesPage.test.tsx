@@ -384,6 +384,30 @@ describe('LabRangesPage · dragging', () => {
     expect(pressed(cell('AA'))).toBe(true)
     expect(pressed(cell('AKs'))).toBe(false)
   })
+
+  it('paints only the tapped cell on touch, however the finger moves', () => {
+    renderLab()
+    layOutMatrix()
+    const touch = (row: number, column: number) => ({ ...at(row, column), pointerType: 'touch' })
+
+    fireEvent.pointerDown(cell('AA'), touch(0, 0))
+    fireEvent.pointerMove(cell('ATs'), touch(0, 4))
+    fireEvent.pointerUp(cell('AA'), touch(0, 0))
+    fireEvent.click(cell('AA'), { detail: 1 })
+
+    expect(['AA', 'AKs', 'AQs', 'AJs', 'ATs'].map((name) => pressed(cell(name)))).toEqual([true, false, false, false, false])
+  })
+
+  it('paints nothing when a touch on the matrix turns into a scroll', () => {
+    renderLab()
+    layOutMatrix()
+
+    // The browser takes over the gesture to scroll: the press is cancelled and no click follows.
+    fireEvent.pointerDown(cell('AA'), { ...at(0, 0), pointerType: 'touch' })
+    fireEvent.pointerCancel(cell('AA'), { ...at(0, 0), pointerType: 'touch' })
+
+    expect(pressed(cell('AA'))).toBe(false)
+  })
 })
 
 const topSlider = () => screen.getByRole<HTMLInputElement>('slider', { name: 'Top % of combos' })

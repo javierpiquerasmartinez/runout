@@ -778,7 +778,9 @@ function TopSlider({ percent, onChange }: { percent: number; onChange: (percent:
 /**
  * The 13×13 matrix, each cell labelled with its Hand Class and filled from the
  * left by its Frequency. Pressing a cell starts a stroke that paints, or takes
- * out, every cell the pointer then crosses until it is released anywhere.
+ * out, every cell the pointer then crosses until it is released anywhere. A
+ * touch has no stroke: a tap paints the one cell, and a finger that moves
+ * scrolls the page instead.
  */
 function RangeMatrix({
   range,
@@ -792,6 +794,8 @@ function RangeMatrix({
   const { t } = useI18n()
   /** The stroke under way: the Frequency its first cell decided, where the pointer last was and the Hand Class last painted. */
   const stroke = useRef<{ frequency: number; x: number; y: number; lastHandClass: string } | null>(null)
+  /** Whether the last press was a finger's, which paints on its click instead. */
+  const pressedByTouch = useRef(false)
   // Read by the window's listeners, which outlive this render.
   const onPaintRef = useRef(onPaint)
   useEffect(() => {
@@ -834,7 +838,9 @@ function RangeMatrix({
   const frequencyFrom = (handClass: HandClass) => strokeFrequency(range, handClass, brush)
 
   const start = (event: PointerEvent, handClass: HandClass) => {
-    if (event.button !== 0) return
+    pressedByTouch.current = event.pointerType === 'touch'
+    // Painting on press would paint the cell under every scroll that starts on the matrix.
+    if (pressedByTouch.current || event.button !== 0) return
     const frequency = frequencyFrom(handClass)
     stroke.current = { frequency, x: event.clientX, y: event.clientY, lastHandClass: handClass.name }
     onPaint(handClass, frequency)
@@ -865,8 +871,8 @@ function RangeMatrix({
               frequency: value,
             })}
             onPointerDown={(event) => start(event, handClass)}
-            // A pointer paints on press; a click from the keyboard (no pointer, detail 0) paints here.
-            onClick={(event) => event.detail === 0 && onPaint(handClass, frequencyFrom(handClass))}
+            // A mouse or pen paints on press; a tap, or a click from the keyboard (no pointer, detail 0), paints here.
+            onClick={(event) => (event.detail === 0 || pressedByTouch.current) && onPaint(handClass, frequencyFrom(handClass))}
           >
             <span className="lab__cell-fill" style={{ width: `${value}%` }} />
             <span className="lab__cell-label">{handClass.name}</span>
