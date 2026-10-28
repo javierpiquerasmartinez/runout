@@ -168,6 +168,160 @@ describe('LabRangesPage · toggling cells', () => {
   })
 })
 
+const brush = () => screen.getByRole('group', { name: 'Brush' })
+const preset = (percent: number) => within(brush()).getByRole('radio', { name: `${percent} %` })
+/** Which of the shortcuts 100, 75, 50 and 25 % are chosen, in that order. */
+const checkedPresets = () => [100, 75, 50, 25].map((percent) => preset(percent).getAttribute('aria-checked') === 'true')
+const brushField = () => within(brush()).getByRole<HTMLInputElement>('spinbutton', { name: 'Brush frequency' })
+const pressed = (button: HTMLElement) => button.getAttribute('aria-pressed') === 'true'
+
+describe('LabRangesPage · the brush', () => {
+  it('starts at 100 %, and marks the shortcut chosen', async () => {
+    renderLab()
+    expect(checkedPresets()).toEqual([true, false, false, false])
+    expect(brushField().value).toBe('100')
+
+    await userEvent.click(preset(50))
+
+    expect(checkedPresets()).toEqual([false, false, true, false])
+    expect(brushField().value).toBe('50')
+  })
+
+  it('takes any whole number from 1 to 100 typed in its field, marking no shortcut', async () => {
+    renderLab()
+
+    await userEvent.clear(brushField())
+    await userEvent.type(brushField(), '35')
+    await userEvent.click(cell('AKo'))
+
+    expect(checkedPresets()).toEqual([false, false, false, false])
+    expect(cell('AKo').title).toBe('AKo · 12 combos · 35 %')
+  })
+
+  it('keeps its Frequency while the field holds something outside 1–100, and shows it again on leaving', async () => {
+    renderLab()
+    await userEvent.click(preset(75))
+
+    // Set whole: typed key by key, 101 would pass through 10.
+    for (const typed of ['', '0', '101', '2.5']) {
+      fireEvent.change(brushField(), { target: { value: typed } })
+      await userEvent.click(cell('AA'))
+      expect(cell('AA').title).toBe('AA · 6 combos · 75 %')
+      await userEvent.click(cell('AA'))
+    }
+    fireEvent.blur(brushField())
+    expect(brushField().value).toBe('75')
+  })
+})
+
+describe('LabRangesPage · painting', () => {
+  it("sets a cell to the brush's Frequency with a click, filled in proportion and showing the number", async () => {
+    renderLab()
+    await userEvent.click(preset(50))
+
+    await userEvent.click(cell('AKo'))
+
+    expect(pressed(cell('AKo'))).toBe(true)
+    expect(cell('AKo').textContent).toBe('AKo50')
+    expect(cell('AKo').title).toBe('AKo · 12 combos · 50 %')
+    expect(statsText()).toContain('6.0 of 1326 combos')
+  })
+
+  it('shows no number on a cell at 100 %, and tells its Frequency on hover', async () => {
+    renderLab()
+
+    expect(cell('AKs').title).toBe('AKs · 4 combos · 0 %')
+    await userEvent.click(cell('AKs'))
+
+    expect(cell('AKs').textContent).toBe('AKs')
+    expect(cell('AKs').title).toBe('AKs · 4 combos · 100 %')
+  })
+
+  it("repaints a cell at another Frequency, and takes out one already at the brush's", async () => {
+    renderLab()
+    await userEvent.click(cell('QQ'))
+
+    await userEvent.click(preset(25))
+    await userEvent.click(cell('QQ'))
+    expect(cell('QQ').title).toBe('QQ · 6 combos · 25 %')
+
+    await userEvent.click(cell('QQ'))
+    expect(pressed(cell('QQ'))).toBe(false)
+    expect(statsText()).toContain('0.0 of 1326 combos')
+  })
+})
+
+/** Lays the cells out as a grid of 40 px squares, as `document.elementFromPoint` sees them. */
+function layOutMatrix() {
+  const cells = within(matrix()).getAllByRole('button')
+  document.elementFromPoint = (x: number, y: number) => {
+    const column = Math.floor(x / 40)
+    const row = Math.floor(y / 40)
+    return column >= 0 && column < 13 && row >= 0 && row < 13 ? cells[row * 13 + column] : document.body
+  }
+}
+/** The middle of the cell at this row and column of the grid `layOutMatrix` draws. */
+const at = (row: number, column: number) => ({ clientX: column * 40 + 20, clientY: row * 40 + 20 })
+
+describe('LabRangesPage · dragging', () => {
+  afterEach(() => {
+    // jsdom has no layout, so no elementFromPoint of its own.
+    delete (document as Partial<Document>).elementFromPoint
+  })
+
+  it('paints every cell a fast drag crosses, with one move', () => {
+    renderLab()
+    layOutMatrix()
+
+    fireEvent.pointerDown(cell('AA'), at(0, 0))
+    fireEvent.pointerMove(cell('ATs'), at(0, 4))
+    fireEvent.pointerUp(cell('ATs'), at(0, 4))
+
+    expect(['AA', 'AKs', 'AQs', 'AJs', 'ATs', 'A9s'].map((name) => pressed(cell(name)))).toEqual([true, true, true, true, true, false])
+  })
+
+  it('keeps taking cells out when the stroke started by taking one out', async () => {
+    renderLab()
+    await userEvent.click(cell('KK'))
+    await userEvent.click(preset(50))
+    await userEvent.click(cell('QQ'))
+    layOutMatrix()
+
+    // KK and QQ are in, JJ is out; the stroke starts on QQ, at the brush's 50 %.
+    fireEvent.pointerDown(cell('QQ'), at(2, 2))
+    fireEvent.pointerMove(cell('KK'), at(1, 1))
+    fireEvent.pointerMove(cell('JJ'), at(3, 3))
+    fireEvent.pointerUp(window, at(3, 3))
+
+    expect(['KK', 'QQ', 'JJ'].map((name) => pressed(cell(name)))).toEqual([false, false, false])
+  })
+
+  it('paints only what the pointer crosses when it leaves the matrix and comes back elsewhere', () => {
+    renderLab()
+    layOutMatrix()
+
+    fireEvent.pointerDown(cell('AA'), at(0, 0))
+    fireEvent.pointerMove(document.body, { clientX: -100, clientY: 20 })
+    fireEvent.pointerMove(document.body, { clientX: -100, clientY: 300 })
+    fireEvent.pointerMove(cell('A7o'), at(7, 0))
+    fireEvent.pointerUp(cell('A7o'), at(7, 0))
+
+    expect(['AA', 'AKo', 'A9o', 'A8o', 'A7o'].map((name) => pressed(cell(name)))).toEqual([true, false, false, false, true])
+  })
+
+  it('ends the stroke when the pointer is released anywhere', () => {
+    renderLab()
+    layOutMatrix()
+
+    fireEvent.pointerDown(cell('AA'), at(0, 0))
+    fireEvent.pointerUp(document.body, { clientX: 900, clientY: 900 })
+    fireEvent.pointerMove(cell('AKs'), at(0, 1))
+
+    expect(pressed(cell('AA'))).toBe(true)
+    expect(pressed(cell('AKs'))).toBe(false)
+  })
+})
+
 describe('LabRangesPage · the list of saved Ranges', () => {
   it('lists them by name, with their %', async () => {
     renderLab()
@@ -260,6 +414,23 @@ describe('LabRangesPage · saving', () => {
     expect(writes[0]).toMatch(/^PUT \/api\/lab\/ranges\/r2 \{"name":"3B BB vs CO","combos":\{"AsKh":100,/)
     expect(window.location.pathname).toBe('/lab/ranges/r2')
     expect(await within(ranges()).findByRole('link', { name: /^3B BB vs CO/ })).toBeTruthy()
+  })
+
+  it('saves partial Frequencies, and reopens them intact', async () => {
+    renderLab()
+    await userEvent.click(preset(25))
+    await userEvent.click(cell('AKo'))
+    await name('Thin')
+    await save()
+    await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges/r3'))
+    expect(stored.find((range) => range.id === 'r3')!.combos.AhKd).toBe(25)
+
+    await userEvent.click(screen.getByRole('button', { name: 'New range' }))
+    await userEvent.click(listed('Thin'))
+
+    await waitFor(() => expect(cell('AKo').title).toBe('AKo · 12 combos · 25 %'))
+    expect(statsText()).toContain('3.0 of 1326 combos')
+    expect(unsaved()).toBeNull()
   })
 })
 
@@ -442,6 +613,12 @@ describe('LabRangesPage · in Spanish', () => {
 
     expect(screen.getByRole('button', { name: 'Nuevo rango' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Limpiar' })).toBeTruthy()
+    const brocha = screen.getByRole('group', { name: 'Brocha' })
+    expect(within(brocha).getByRole('radio', { name: '50 %' })).toBeTruthy()
+    expect(within(brocha).getByRole('spinbutton', { name: 'Frecuencia de la brocha' })).toBeTruthy()
+    expect(within(screen.getByRole('group', { name: 'Matriz del rango' })).getByRole('button', { name: 'AA' }).title).toBe(
+      'AA · 6 combos · 100 %',
+    )
     const text = textOf(screen.getByRole('region', { name: 'Estadísticas del rango' }))
     expect(text).toContain('0,5 % del total')
     expect(text).toContain('6,0 de 1326 combos')
