@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
@@ -7,6 +7,7 @@ import { RoomDialog } from '../room/RoomDialog'
 import { isPlainClick, navigate, setLeaveGuard, usePath } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
+import { SegmentedControl } from '../ui/SegmentedControl'
 import { labRangeIdFromPath, labRangePath, labRangesPath } from './lab'
 import {
   EMPTY_RANGE,
@@ -15,6 +16,7 @@ import {
   handClassFrequency,
   rangeStats,
   sameRange,
+  strokeFrequency,
   TOTAL_COMBOS,
   withHandClass,
   type HandClass,
@@ -62,12 +64,20 @@ const MAX_NAME_LENGTH = 60
 
 const draftOf = (range: SavedRange): Draft => ({ name: range.name, combos: range.combos })
 
+/** The brush's shortcuts; any other whole Frequency from 1 to 100 is typed in its field. */
+const BRUSH_PRESETS = [100, 75, 50, 25] as const
+
+/** How far apart, in px, a drag's path is sampled between two pointer events, so a fast one skips no cell. */
+const STROKE_STEP = 6
+
+const HAND_CLASS_BY_NAME = new Map(HAND_CLASSES.map((handClass) => [handClass.name, handClass]))
+
 /**
  * The Lab's Ranges (variant A of the prototype): the saved Ranges in a side
  * column, the matrix in the main column and the stats to its right. The path
  * says which Range is open: `/lab/ranges` is a new one, `/lab/ranges/:id` a
- * saved one. For now a click puts a Hand Class in the Range at 100 % or takes
- * it out. Leaving changes unsaved asks first.
+ * saved one. Cells are painted with a brush that carries a Frequency, by
+ * clicking or dragging. Leaving changes unsaved asks first.
  */
 export function LabRangesPage() {
   const { t } = useI18n()
@@ -82,6 +92,7 @@ export function LabRangesPage() {
   const [unopened, setUnopened] = useState<FailureReason | null>(null)
   const [saveFailure, setSaveFailure] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [brush, setBrush] = useState<number>(100)
   /** Where the person was going when asked to discard their changes. */
   const [pendingLeave, setPendingLeave] = useState<{ go: () => void } | null>(null)
 
@@ -217,8 +228,7 @@ export function LabRangesPage() {
   }
 
   const setCombos = (change: (combos: Range) => Range) => setDraft((current) => ({ ...current, combos: change(current.combos) }))
-  const toggle = (handClass: HandClass) =>
-    setCombos((combos) => withHandClass(combos, handClass, handClassFrequency(combos, handClass).value === 100 ? 0 : 100))
+  const paint = (handClass: HandClass, frequency: number) => setCombos((combos) => withHandClass(combos, handClass, frequency))
 
   return (
     <div className="lab">
@@ -266,7 +276,10 @@ export function LabRangesPage() {
             </p>
           )}
           <div className="lab__work">
-            <RangeMatrix range={draft.combos} onToggle={toggle} />
+            <div className="lab__canvas">
+              <Brush brush={brush} onChange={setBrush} />
+              <RangeMatrix range={draft.combos} brush={brush} onPaint={paint} />
+            </div>
             <Stats stats={rangeStats(draft.combos)} />
           </div>
         </main>
@@ -330,25 +343,135 @@ function RangeList({
   )
 }
 
-/** The 13×13 matrix, each cell labelled with its Hand Class and filled when it is in the Range. */
-function RangeMatrix({ range, onToggle }: { range: Range; onToggle: (handClass: HandClass) => void }) {
+/** The brush's Frequency: a shortcut, or a whole number from 1 to 100 typed in its field. */
+function Brush({ brush, onChange }: { brush: number; onChange: (frequency: number) => void }) {
   const { t } = useI18n()
+  /** The field while it is being typed in, which may not be a Frequency yet; null shows the brush's. */
+  const [typed, setTyped] = useState<string | null>(null)
+  const custom = !BRUSH_PRESETS.some((preset) => preset === brush)
+  return (
+    <div className="lab__brush" role="group" aria-label={t('lab.brush')}>
+      <span className="lab__label">{t('lab.brush')}</span>
+      <SegmentedControl
+        label={t('lab.brush')}
+        options={BRUSH_PRESETS.map((preset) => ({ value: String(preset), label: t('lab.brush.preset', { percent: preset }) }))}
+        value={String(brush)}
+        onChange={(value) => {
+          setTyped(null)
+          onChange(Number(value))
+        }}
+      />
+      <label className="lab__brush-field" data-active={custom || undefined}>
+        <input
+          className="ro-mono"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={100}
+          step={1}
+          value={typed ?? String(brush)}
+          aria-label={t('lab.brush.frequency')}
+          onChange={(event) => {
+            const value = event.target.value
+            setTyped(value)
+            if (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 100) onChange(Number(value))
+          }}
+          onBlur={() => setTyped(null)}
+        />
+        <span aria-hidden="true">%</span>
+      </label>
+    </div>
+  )
+}
+
+/**
+ * The 13×13 matrix, each cell labelled with its Hand Class and filled from the
+ * left by its Frequency. Pressing a cell starts a stroke that paints, or takes
+ * out, every cell the pointer then crosses until it is released anywhere.
+ */
+function RangeMatrix({
+  range,
+  brush,
+  onPaint,
+}: {
+  range: Range
+  brush: number
+  onPaint: (handClass: HandClass, frequency: number) => void
+}) {
+  const { t } = useI18n()
+  /** The stroke under way: the Frequency its first cell decided, where the pointer last was and the Hand Class last painted. */
+  const stroke = useRef<{ frequency: number; x: number; y: number; lastHandClass: string } | null>(null)
+  // Read by the window's listeners, which outlive this render.
+  const onPaintRef = useRef(onPaint)
+  useEffect(() => {
+    onPaintRef.current = onPaint
+  })
+
+  // Moves are followed on the whole window, so a pointer that leaves the
+  // matrix and comes back is walked from where it really was.
+  useEffect(() => {
+    // Pointer events come further apart than a cell on a fast drag: walk the path between them.
+    const move = (event: globalThis.PointerEvent) => {
+      const current = stroke.current
+      if (!current) return
+      const { x, y } = current
+      const steps = Math.ceil(Math.hypot(event.clientX - x, event.clientY - y) / STROKE_STEP)
+      for (let step = 1; step <= steps; step++) {
+        const point = document.elementFromPoint(x + ((event.clientX - x) * step) / steps, y + ((event.clientY - y) * step) / steps)
+        const name = point?.closest<HTMLElement>('[data-hand-class]')?.dataset.handClass
+        const handClass = name !== undefined ? HAND_CLASS_BY_NAME.get(name) : undefined
+        if (handClass && handClass.name !== current.lastHandClass) {
+          current.lastHandClass = handClass.name
+          onPaintRef.current(handClass, current.frequency)
+        }
+      }
+      current.x = event.clientX
+      current.y = event.clientY
+    }
+    const end = () => (stroke.current = null)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+    }
+  }, [])
+
+  /** What a stroke starting on this Hand Class sets every cell it crosses to. */
+  const frequencyFrom = (handClass: HandClass) => strokeFrequency(range, handClass, brush)
+
+  const start = (event: PointerEvent, handClass: HandClass) => {
+    if (event.button !== 0) return
+    const frequency = frequencyFrom(handClass)
+    stroke.current = { frequency, x: event.clientX, y: event.clientY, lastHandClass: handClass.name }
+    onPaint(handClass, frequency)
+  }
+
   return (
     <div className="lab__matrix" role="group" aria-label={t('lab.matrix')}>
       {HAND_CLASSES.map((handClass) => {
-        const { value } = handClassFrequency(range, handClass)
+        const value = Math.round(handClassFrequency(range, handClass).value)
         return (
           <button
             key={handClass.name}
             type="button"
             className="lab__cell ro-mono"
             data-kind={handClass.kind}
+            data-hand-class={handClass.name}
             data-in={value > 0 || undefined}
+            data-full={value === 100 || undefined}
             aria-pressed={value > 0}
-            onClick={() => onToggle(handClass)}
+            aria-label={handClass.name}
+            title={t('lab.cell.title', { handClass: handClass.name, combos: handClass.combos.length, frequency: value })}
+            onPointerDown={(event) => start(event, handClass)}
+            // A pointer paints on press; a click from the keyboard (no pointer, detail 0) paints here.
+            onClick={(event) => event.detail === 0 && onPaint(handClass, frequencyFrom(handClass))}
           >
             <span className="lab__cell-fill" style={{ width: `${value}%` }} />
             <span className="lab__cell-label">{handClass.name}</span>
+            {value > 0 && value < 100 && <span className="lab__cell-frequency">{value}</span>}
           </button>
         )
       })}

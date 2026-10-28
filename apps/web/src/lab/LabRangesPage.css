@@ -141,10 +141,49 @@
   color: var(--text-muted);
 }
 
-/* ---- The matrix ---- */
-.lab__matrix {
+/* ---- The brush, above the matrix ---- */
+.lab__canvas {
   flex: 1 1 420px;
   max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lab__brush {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.lab__brush-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.lab__brush-field input {
+  width: 56px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-control);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.lab__brush-field input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* A Frequency typed in, not one of the shortcuts, is marked as the brush's. */
+.lab__brush-field[data-active] input {
+  border-color: var(--brass);
+}
+
+/* ---- The matrix ---- */
+.lab__matrix {
   display: grid;
   grid-template-columns: repeat(13, 1fr);
   gap: 2px;
@@ -182,8 +221,20 @@
   position: relative;
 }
 .lab__cell[data-in] {
-  color: var(--on-range-fill);
+  color: var(--text-primary);
   font-weight: 600;
+}
+/* Only a full cell has the fill under all its text. */
+.lab__cell[data-full] {
+  color: var(--on-range-fill);
+}
+/* A partial Frequency, in the corner. */
+.lab__cell-frequency {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: 0.7em;
+  opacity: 0.8;
 }
 
 /* ---- Stats ---- */

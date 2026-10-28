@@ -70,6 +70,16 @@ export function withHandClass(range: Range, handClass: HandClass, frequency: num
   return next
 }
 
+/**
+ * What a stroke of the brush that starts on this Hand Class does to every Hand
+ * Class it crosses: the Frequency it sets them to. One already at exactly the
+ * brush's Frequency is taken out (0 %); a mixed one is painted, whatever its average.
+ */
+export function strokeFrequency(range: Range, handClass: HandClass, brush: number): number {
+  const { value, mixed } = handClassFrequency(range, handClass)
+  return !mixed && value === brush ? 0 : brush
+}
+
 /** Whether both Ranges hold the same Combos at the same Frequencies. */
 export function sameRange(a: Range, b: Range): boolean {
   const combos = Object.keys(a)

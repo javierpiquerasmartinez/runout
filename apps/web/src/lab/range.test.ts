@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { handClassFrequency, EMPTY_RANGE, HAND_CLASSES, MATRIX, rangeStats, sameRange, TOTAL_COMBOS, withHandClass } from './range'
+import {
+  handClassFrequency,
+  EMPTY_RANGE,
+  HAND_CLASSES,
+  MATRIX,
+  rangeStats,
+  sameRange,
+  strokeFrequency,
+  TOTAL_COMBOS,
+  withHandClass,
+} from './range'
 
 /** The Hand Class written as `name`. */
 const named = (name: string) => HAND_CLASSES.find((handClass) => handClass.name === name)!
@@ -67,6 +77,27 @@ describe('a Hand Class', () => {
     withHandClass(range, named('AA'), 50)
 
     expect(range).toEqual({ AsAh: 100 })
+  })
+})
+
+describe('a stroke of the brush', () => {
+  it("paints at the brush's Frequency a Hand Class out of the Range", () => {
+    expect(strokeFrequency(EMPTY_RANGE, named('AKo'), 50)).toBe(50)
+  })
+
+  it("paints at the brush's Frequency a Hand Class at another Frequency", () => {
+    expect(strokeFrequency(withHandClass(EMPTY_RANGE, named('AKo'), 100), named('AKo'), 50)).toBe(50)
+  })
+
+  it("takes out a Hand Class already at exactly the brush's Frequency", () => {
+    expect(strokeFrequency(withHandClass(EMPTY_RANGE, named('AKo'), 75), named('AKo'), 75)).toBe(0)
+  })
+
+  it("paints a mixed Hand Class whose average is the brush's Frequency, rather than taking it out", () => {
+    const range = { AsKs: 100, AhKh: 100 }
+
+    expect(handClassFrequency(range, named('AKs')).value).toBe(50)
+    expect(strokeFrequency(range, named('AKs'), 50)).toBe(50)
   })
 })
 
