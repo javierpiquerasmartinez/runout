@@ -152,3 +152,189 @@ export function rangeStats(range: Range): RangeStats {
   }
   return { combos, percent: (combos / TOTAL_COMBOS) * 100, byKind }
 }
+
+/** A text's Range, or the first piece of it that is not understood. */
+export type ParsedRange = { range: Range } | { unknown: string }
+
+/** The Hand Classes two ranks and a suitedness (`s`, `o`, or none for both) name, high card first; null if none. */
+function handClassesNamed(first: string, second: string, suits: string): HandClass[] | null {
+  if (first === second) return suits ? null : [HAND_CLASS_BY_NAME.get(first + second)!]
+  const [high, low] = RANKS.indexOf(first) < RANKS.indexOf(second) ? [first, second] : [second, first]
+  return (suits ? [suits] : ['s', 'o']).map((kind) => HAND_CLASS_BY_NAME.get(high + low + kind)!)
+}
+
+const RANK = '[AKQJT2-9]'
+const HAND_CLASS_NAME = `(${RANK})(${RANK})([so]?)`
+/** `AKs`, `AK`, `77`. */
+const ONE_HAND_CLASS = new RegExp(`^${HAND_CLASS_NAME}$`)
+/** `77+`, `A2s+`. */
+const AND_ABOVE = new RegExp(`^${HAND_CLASS_NAME}\\+$`)
+/** `99-66`, `K9s-K6s`. */
+const RUN = new RegExp(`^${HAND_CLASS_NAME}-${HAND_CLASS_NAME}$`)
+
+/** The ranks from one to the other, both included, from the highest down. */
+function ranksBetween(first: string, second: string): string[] {
+  const [from, to] = [RANKS.indexOf(first), RANKS.indexOf(second)].sort((a, b) => a - b)
+  return [...RANKS.slice(from, to + 1)]
+}
+
+/** The pairs from one rank to the other, both included, from the highest down. */
+const pairsBetween = (first: string, second: string) => ranksBetween(first, second).map((rank) => HAND_CLASS_BY_NAME.get(rank + rank)!)
+
+/** The Hand Classes a piece of text names, without its Frequency; null if it names none. */
+function handClassesOf(piece: string): HandClass[] | null {
+  const one = ONE_HAND_CLASS.exec(piece)
+  if (one) return handClassesNamed(one[1], one[2], one[3])
+
+  const andAbove = AND_ABOVE.exec(piece)
+  if (andAbove) {
+    const [, high, low, suits] = andAbove
+    // A pair and every pair above it: `77+`.
+    if (high === low) return suits ? null : pairsBetween('A', high)
+    // A kicker and every one above it, up to below the high card: `A2s+`.
+    if (RANKS.indexOf(high) > RANKS.indexOf(low)) return null
+    return ranksBetween(RANKS[RANKS.indexOf(high) + 1], low).flatMap((kicker) => handClassesNamed(high, kicker, suits)!)
+  }
+
+  const run = RUN.exec(piece)
+  if (run) {
+    const [, high, low, suits, otherHigh, otherLow, otherSuits] = run
+    // Pairs from one to the other: `99-66`.
+    if (high === low && otherHigh === otherLow && !suits && !otherSuits) return pairsBetween(high, otherHigh)
+    // Kickers of one high card from one to the other: `K9s-K6s`.
+    if (high !== otherHigh || suits !== otherSuits) return null
+    const kickers = ranksBetween(low, otherLow)
+    if (RANKS.indexOf(kickers[0]) <= RANKS.indexOf(high)) return null
+    return kickers.flatMap((kicker) => handClassesNamed(high, kicker, suits)!)
+  }
+  return null
+}
+
+/** A plain decimal number from 0 to 100, as `50`, `0.5` or `.5`; null if the text is none. */
+function numberOf(text: string): number | null {
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(text)) return null
+  const value = Number(text)
+  return value <= 100 ? value : null
+}
+
+/**
+ * A Frequency written after a colon, as a fraction up to 1 or a percentage
+ * above it, to a whole number; null if it is none. The fraction is scaled at a
+ * fixed precision first, so `0.145` rounds to 15 and not, by floating point, to 14.
+ */
+function frequencyOf(text: string): number | null {
+  const value = numberOf(text)
+  if (value === null) return null
+  return Math.round(value <= 1 ? +(value * 100).toFixed(6) : value)
+}
+
+/** Every Combo, as its Hand Class writes it. */
+const COMBOS: ReadonlySet<string> = new Set(HAND_CLASSES.flatMap((handClass) => handClass.combos))
+
+/** An exact Combo as its Hand Class writes it, from its two cards in either order; null if it is none. */
+function comboOf(piece: string): string | null {
+  if (!/^([AKQJT2-9][shdc]){2}$/.test(piece)) return null
+  const swapped = piece.slice(2) + piece.slice(0, 2)
+  return COMBOS.has(piece) ? piece : COMBOS.has(swapped) ? swapped : null
+}
+
+/** A GTO+ block: `[50]AKo,QQ[/50]` puts the pieces inside at that percentage. */
+const BLOCK = /\[([^\]]*)\]([^[]*)\[\/\1\]/g
+
+/** A piece of text, with the percentage of the GTO+ block around it, if any. */
+interface TextPiece {
+  piece: string
+  block?: string
+}
+
+/** The text's pieces in order. */
+function piecesOf(text: string): TextPiece[] {
+  const pieces: TextPiece[] = []
+  const split = (part: string, block?: string) => {
+    for (const piece of part.split(/[\s,]+/)) if (piece) pieces.push({ piece, block })
+  }
+  let end = 0
+  for (const match of text.matchAll(BLOCK)) {
+    split(text.slice(end, match.index))
+    split(match[2], match[1])
+    end = match.index + match[0].length
+  }
+  split(text.slice(end))
+  return pieces
+}
+
+/**
+ * A Range from the text other tools write: Flopzilla, Equilab, GTO Wizard,
+ * PioSolver or GTO+. Pieces apply in order, so a later one overrides an
+ * earlier one; any one not understood refuses the whole text.
+ */
+export function parseRange(text: string): ParsedRange {
+  let range: Range = EMPTY_RANGE
+  for (const { piece, block } of piecesOf(text)) {
+    // A block's number is always a percentage.
+    const blockPercent = block === undefined ? null : numberOf(block)
+    if (block !== undefined && blockPercent === null) return { unknown: `[${block}]` }
+    const [names, frequencyText, ...rest] = piece.split(':')
+    if (rest.length > 0) return { unknown: piece }
+    // Pieces inside a block carry no Frequency of their own.
+    const frequency =
+      blockPercent !== null
+        ? frequencyText === undefined
+          ? Math.round(blockPercent)
+          : null
+        : frequencyText === undefined
+          ? 100
+          : frequencyOf(frequencyText)
+    if (frequency === null) return { unknown: piece }
+    const combo = comboOf(names)
+    if (combo) {
+      const { [combo]: _, ...others } = range
+      range = frequency > 0 ? { ...others, [combo]: frequency } : others
+      continue
+    }
+    const handClasses = handClassesOf(names)
+    if (!handClasses) return { unknown: piece }
+    for (const handClass of handClasses) range = withHandClass(range, handClass, frequency)
+  }
+  return { range }
+}
+
+/** A Frequency as the text writes it after a piece: `:0.5`, nothing at 100 %. */
+const frequencySuffix = (frequency: number) => (frequency === 100 ? '' : `:${+(frequency / 100).toFixed(3)}`)
+
+/**
+ * One line of the matrix, from the top down (the pairs, or one high card's
+ * suited or offsuit kickers), in runs of one Frequency: `TT+` for a run from
+ * the top, `K9s-K6s` for one below it. Mixed Hand Classes are left out.
+ */
+function linePieces(line: readonly HandClass[], range: Range): string[] {
+  const pieces: string[] = []
+  const frequencies = line.map((handClass) => handClassFrequency(range, handClass))
+  for (let first = 0; first < line.length; ) {
+    const { value, mixed } = frequencies[first]
+    let last = first
+    while (!mixed && last + 1 < line.length && !frequencies[last + 1].mixed && frequencies[last + 1].value === value) last++
+    if (value > 0 && !mixed) {
+      const names = first === last ? line[first].name : first === 0 ? `${line[last].name}+` : `${line[first].name}-${line[last].name}`
+      pieces.push(names + frequencySuffix(value))
+    }
+    first = last + 1
+  }
+  return pieces
+}
+
+/**
+ * The Range as PioSolver and GTO Wizard write it: pairs, then suited, then
+ * offsuit, each by high card, with runs of one Frequency shortened, and the
+ * Combos of mixed Hand Classes one by one at the end. `parseRange` reads it back.
+ */
+export function formatRange(range: Range): string {
+  const diagonal = MATRIX.map((row, i) => row[i])
+  const highCards = MATRIX.slice(0, -1).map((_, high) => high)
+  const suited = highCards.map((high) => MATRIX[high].slice(high + 1))
+  const offsuit = highCards.map((high) => MATRIX.slice(high + 1).map((row) => row[high]))
+  const mixed = HAND_CLASSES.filter((handClass) => handClassFrequency(range, handClass).mixed).flatMap((handClass) =>
+    handClass.combos.filter((combo) => range[combo]).map((combo) => combo + frequencySuffix(range[combo])),
+  )
+  return [...[diagonal, ...suited, ...offsuit].flatMap((line) => linePieces(line, range)), ...mixed].join(',')
+}

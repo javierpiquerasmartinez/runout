@@ -6,15 +6,18 @@ import { useIdentity } from '../identity/context'
 import { RoomDialog } from '../room/RoomDialog'
 import { isPlainClick, navigate, setLeaveGuard, usePath } from '../routing'
 import { Button } from '../ui/Button'
+import { copyText } from '../ui/clipboard'
 import { Icon } from '../ui/Icon'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { labRangeIdFromPath, labRangePath, labRangesPath } from './lab'
 import {
   EMPTY_RANGE,
+  formatRange,
   HAND_CLASS_KINDS,
   HAND_CLASS_BY_NAME,
   HAND_CLASSES,
   handClassFrequency,
+  parseRange,
   rangeStats,
   sameRange,
   strokeFrequency,
@@ -74,6 +77,9 @@ const STROKE_STEP = 6
 
 /** The "top X %" slider's step, in %. */
 const TOP_STEP = 0.5
+
+/** How long the copy button says it copied. */
+const COPIED_FOR_MS = 2000
 
 /**
  * The Lab's Ranges (variant A of the prototype): the saved Ranges in a side
@@ -294,7 +300,10 @@ export function LabRangesPage() {
               <RangeMatrix range={draft.combos} brush={brush} onPaint={paint} />
               <TopSlider percent={topPercent} onChange={setTopPercent} />
             </div>
-            <Stats stats={stats} />
+            <div className="lab__readout">
+              <Stats stats={stats} />
+              <RangeText range={draft.combos} onImport={(combos) => setCombos(() => combos)} />
+            </div>
           </div>
         </main>
       </div>
@@ -492,7 +501,10 @@ function RangeMatrix({
   return (
     <div className="lab__matrix" role="group" aria-label={t('lab.matrix')}>
       {HAND_CLASSES.map((handClass) => {
-        const value = Math.round(handClassFrequency(range, handClass).value)
+        const frequency = handClassFrequency(range, handClass)
+        const { mixed } = frequency
+        // A mixed cell holds some Combos, however low its average rounds.
+        const value = mixed ? Math.max(1, Math.round(frequency.value)) : frequency.value
         return (
           <button
             key={handClass.name}
@@ -501,17 +513,28 @@ function RangeMatrix({
             data-kind={handClass.kind}
             data-hand-class={handClass.name}
             data-in={value > 0 || undefined}
-            data-full={value === 100 || undefined}
+            data-full={(value === 100 && !mixed) || undefined}
+            data-mixed={mixed || undefined}
             aria-pressed={value > 0}
             aria-label={handClass.name}
-            title={t('lab.cell.title', { handClass: handClass.name, combos: handClass.combos.length, frequency: value })}
+            title={t(mixed ? 'lab.cell.mixedTitle' : 'lab.cell.title', {
+              handClass: handClass.name,
+              combos: handClass.combos.length,
+              frequency: value,
+            })}
             onPointerDown={(event) => start(event, handClass)}
             // A pointer paints on press; a click from the keyboard (no pointer, detail 0) paints here.
             onClick={(event) => event.detail === 0 && onPaint(handClass, frequencyFrom(handClass))}
           >
             <span className="lab__cell-fill" style={{ width: `${value}%` }} />
             <span className="lab__cell-label">{handClass.name}</span>
-            {value > 0 && value < 100 && <span className="lab__cell-frequency">{value}</span>}
+            {(mixed || (value > 0 && value < 100)) && (
+              <span className="lab__cell-frequency">
+                {/* A mixed cell's number is its Combos' average. */}
+                {mixed && '≈'}
+                {value}
+              </span>
+            )}
           </button>
         )
       })}
@@ -551,6 +574,97 @@ function Stats({ stats }: { stats: RangeStats }) {
           )
         })}
       </dl>
+    </section>
+  )
+}
+
+/**
+ * The Range as text: a box to paste one from another tool and import it over
+ * the matrix, refused whole at the first piece not understood, and the Range
+ * in PioSolver / GTO Wizard notation, to copy.
+ */
+function RangeText({ range, onImport }: { range: Range; onImport: (range: Range) => void }) {
+  const { t } = useI18n()
+  const [pasted, setPasted] = useState('')
+  /** The piece that refused the last import, until the paste is edited. */
+  const [unknown, setUnknown] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(copiedTimer.current), [])
+  const exported = formatRange(range)
+
+  const importPasted = () => {
+    const parsed = parseRange(pasted)
+    if ('unknown' in parsed) {
+      setUnknown(parsed.unknown)
+      return
+    }
+    onImport(parsed.range)
+    setPasted('')
+  }
+
+  const copy = () =>
+    void copyText(exported).then((done) => {
+      // If copying is impossible the text stays on screen to copy by hand.
+      if (!done) return
+      setCopied(true)
+      clearTimeout(copiedTimer.current)
+      copiedTimer.current = setTimeout(() => setCopied(false), COPIED_FOR_MS)
+    })
+
+  return (
+    <section className="lab__text" aria-label={t('lab.text')}>
+      <span className="lab__label">{t('lab.text')}</span>
+      <textarea
+        className="lab__text-field ro-mono"
+        rows={3}
+        spellCheck={false}
+        value={pasted}
+        placeholder={t('lab.text.placeholder')}
+        aria-label={t('lab.text.paste')}
+        onChange={(event) => {
+          setPasted(event.target.value)
+          setUnknown(null)
+        }}
+      />
+      {unknown !== null && (
+        <p className="lab__failure" role="alert">
+          {t('lab.text.unknown', { piece: unknown })}
+        </p>
+      )}
+      <div className="lab__text-actions">
+        <Button
+          variant="secondary"
+          size="compact"
+          aria-label={t('lab.text.import')}
+          disabledReason={pasted.trim() ? undefined : t('lab.text.nothingToImport')}
+          onClick={importPasted}
+        >
+          <Icon name="import" size={14} />
+          {t('lab.text.import')}
+        </Button>
+      </div>
+      <textarea
+        className="lab__text-field lab__text-export ro-mono"
+        rows={3}
+        readOnly
+        spellCheck={false}
+        value={exported}
+        placeholder="—"
+        aria-label={t('lab.text')}
+      />
+      <div className="lab__text-actions">
+        <Button
+          variant="secondary"
+          size="compact"
+          aria-label={t(copied ? 'lab.text.copied' : 'lab.text.copy')}
+          disabledReason={exported ? undefined : t('lab.text.nothingToCopy')}
+          onClick={copy}
+        >
+          <Icon name={copied ? 'success' : 'copy'} size={14} />
+          {t(copied ? 'lab.text.copied' : 'lab.text.copy')}
+        </Button>
+      </div>
     </section>
   )
 }
