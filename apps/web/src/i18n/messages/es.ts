@@ -747,6 +747,8 @@ export const es = {
   'lab.stats.kind.suited': 'Suited',
   'lab.stats.kind.offsuit': 'Offsuit',
   'lab.stats.shareOfRange': '{percent} % del rango',
+  'lab.top': 'Top',
+  'lab.top.slider': 'Top % de los combos',
 
   'settings.account.title': 'Cuenta',
   'settings.account.signedIn': 'Sesión iniciada con Google como {email}',

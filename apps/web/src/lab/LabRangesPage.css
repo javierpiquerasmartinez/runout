@@ -182,6 +182,26 @@
   border-color: var(--brass);
 }
 
+/* ---- The "top X %" slider ---- */
+.lab__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lab__top input {
+  flex-grow: 1;
+  accent-color: var(--range-fill);
+}
+.lab__top input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.lab__top-value {
+  min-width: 56px;
+  text-align: right;
+  font-size: 13px;
+}
+
 /* ---- The matrix ---- */
 .lab__matrix {
   display: grid;
