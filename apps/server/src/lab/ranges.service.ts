@@ -5,7 +5,7 @@ import { DATABASE, type Database } from '../database/database.js';
 import { ranges } from '../database/schema.js';
 import { isUniqueViolation } from '../database/unique-violation.js';
 import { isUuid } from '../database/uuid.js';
-import type { Identity } from '../identity/identity.service.js';
+import type { Identity, Preferences } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { COMBOS, type Combos } from './combos.js';
 
@@ -34,6 +34,12 @@ export interface RangeBody {
 
 /** How long a Range's name may be, in characters, once trimmed. */
 const MAX_NAME_LENGTH = 60;
+
+/** The word a copy's name ends in, in the Account's language. */
+const COPY_WORD: Record<Preferences['language'], string> = {
+  es: 'copia',
+  en: 'copy',
+};
 
 const selection = { id: ranges.id, name: ranges.name, combos: ranges.combos };
 
@@ -121,6 +127,58 @@ export class RangesService {
     if (!saved) throw new Rejected('range-not-found');
     return saved;
   }
+
+  /**
+   * A copy of one of the Account's Ranges, with its Combos, named after it
+   * with the first free "(copia)", "(copia 2)", … in `language`.
+   */
+  async duplicate(
+    account: Identity,
+    rangeId: string,
+    language: Preferences['language'],
+  ): Promise<Range> {
+    const original = await this.get(account, rangeId);
+    const held = await this.db
+      .select({ name: ranges.name })
+      .from(ranges)
+      .where(eq(ranges.identityId, account.id));
+    const taken = new Set(held.map(({ name }) => name.toLowerCase()));
+    const now = this.clock.now();
+    for (let n = 1; ; n++) {
+      const name = copyName(original.name, COPY_WORD[language], n);
+      if (taken.has(name.toLowerCase())) continue;
+      const [created] = await this.db
+        .insert(ranges)
+        .values({
+          identityId: account.id,
+          name,
+          combos: original.combos,
+          createdAt: now,
+          updatedAt: now,
+        })
+        // Taken meanwhile: on to the next number.
+        .onConflictDoNothing()
+        .returning(selection);
+      if (created) return created;
+    }
+  }
+
+  /** Deletes one of the Account's Ranges. */
+  async delete(account: Identity, rangeId: string): Promise<void> {
+    await this.get(account, rangeId);
+    await this.db
+      .delete(ranges)
+      .where(and(eq(ranges.id, rangeId), eq(ranges.identityId, account.id)));
+  }
+}
+
+/**
+ * The `n`th copy's name, "<name> (copia)" then "(copia 2)", with `name` cut
+ * short when that would pass the longest name allowed.
+ */
+function copyName(name: string, word: string, n: number): string {
+  const suffix = n === 1 ? ` (${word})` : ` (${word} ${n})`;
+  return name.slice(0, MAX_NAME_LENGTH - suffix.length).trimEnd() + suffix;
 }
 
 /** A Range's name, trimmed; `invalid-range-name` when empty or too long. */

@@ -99,13 +99,19 @@ export function LabRangesPage() {
   const [draft, setDraft] = useState<Draft>(NEW_DRAFT)
   /** Why the Range at this address could not be opened. */
   const [unopened, setUnopened] = useState<FailureReason | null>(null)
-  const [saveFailure, setSaveFailure] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  /** Why the last save, duplicate or delete failed. */
+  const [failure, setFailure] = useState<string | null>(null)
+  /** The save, duplicate or delete under way; one at a time. */
+  const [busy, setBusy] = useState<'saving' | 'duplicating' | 'deleting' | null>(null)
   const [brush, setBrush] = useState<number>(100)
   /** The "top X %" last set with the slider, and the Combos it set; once they're painted over, the slider follows the Range. */
   const [lastTop, setLastTop] = useState<{ percent: number; combos: Range } | null>(null)
   /** Where the person was going when asked to discard their changes. */
   const [pendingLeave, setPendingLeave] = useState<{ go: () => void } | null>(null)
+  /** Asking whether to duplicate what was saved, leaving the changes behind. */
+  const [confirmingDuplicate, setConfirmingDuplicate] = useState(false)
+  /** Asking whether to delete the open Range. */
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   // Saving trims the name, so spaces around it are no change.
   const dirty = draft.name.trim() !== baseline.draft.name || !sameRange(draft.combos, baseline.draft.combos)
@@ -131,7 +137,7 @@ export function LabRangesPage() {
 
   /** Back to an empty matrix with nothing to compare it with. */
   const resetToNew = () => {
-    setSaveFailure(null)
+    setFailure(null)
     setUnopened(null)
     setBaseline(NEW_BASELINE)
     setDraft(NEW_DRAFT)
@@ -201,13 +207,13 @@ export function LabRangesPage() {
   const save = async () => {
     const name = draft.name.trim()
     if (!name) {
-      setSaveFailure(t('lab.ranges.nameRequired'))
+      setFailure(t('lab.ranges.nameRequired'))
       return
     }
     const sent = draft
     const { id } = baseline
-    setSaveFailure(null)
-    setSaving(true)
+    setFailure(null)
+    setBusy('saving')
     try {
       const range = await api<SavedRange>(id ? `/lab/ranges/${encodeURIComponent(id)}` : '/lab/ranges', {
         token,
@@ -226,7 +232,7 @@ export function LabRangesPage() {
       }
     } catch (error) {
       const reason = reasonOf(error)
-      setSaveFailure(
+      setFailure(
         reason === 'range-name-taken'
           ? t('lab.ranges.nameTaken', { name })
           : reason === 'invalid-range-name'
@@ -234,9 +240,58 @@ export function LabRangesPage() {
             : t('lab.ranges.saveFailed'),
       )
     } finally {
-      setSaving(false)
+      setBusy(null)
     }
   }
+
+  /** Copies the saved Range under a name the server picks, and opens the copy. */
+  const duplicate = async () => {
+    const { id } = baseline
+    if (!id) return
+    setConfirmingDuplicate(false)
+    setFailure(null)
+    setBusy('duplicating')
+    try {
+      const copy = await api<SavedRange>(`/lab/ranges/${encodeURIComponent(id)}/copies`, { token, method: 'POST' })
+      // Opened here, so its address has nothing left to fetch.
+      baselineRef.current = { id: copy.id, draft: draftOf(copy) }
+      setBaseline(baselineRef.current)
+      setDraft(draftOf(copy))
+      setListRevision((revision) => revision + 1)
+      dirtyRef.current = false
+      navigate(labRangePath(copy.id))
+    } catch {
+      setFailure(t('lab.ranges.duplicateFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** Deletes the open Range and goes back to an empty matrix. */
+  const remove = async () => {
+    const { id } = baseline
+    if (!id) return
+    setConfirmingDelete(false)
+    setFailure(null)
+    setBusy('deleting')
+    try {
+      await api<void>(`/lab/ranges/${encodeURIComponent(id)}`, { token, method: 'DELETE' }).catch((error: unknown) => {
+        // Deleted elsewhere already: gone either way.
+        if (reasonOf(error) !== 'range-not-found') throw error
+      })
+      resetToNew()
+      setListRevision((revision) => revision + 1)
+      dirtyRef.current = false
+      navigate(labRangesPath)
+    } catch {
+      setFailure(t('lab.ranges.deleteFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // Unsaved changes stay behind: the copy is made from what was saved.
+  const startDuplicate = () => (dirty ? setConfirmingDuplicate(true) : void duplicate())
 
   const setCombos = (change: (combos: Range) => Range) => setDraft((current) => ({ ...current, combos: change(current.combos) }))
   const paint = (handClass: HandClass, frequency: number) => setCombos((combos) => withHandClass(combos, handClass, frequency))
@@ -246,6 +301,7 @@ export function LabRangesPage() {
     setCombos(() => combos)
   }
 
+  const busyReason = opening ? t('lab.ranges.opening') : busy ? t(`lab.ranges.${busy}`) : undefined
   const stats = rangeStats(draft.combos)
   const topPercent = lastTop && sameRange(lastTop.combos, draft.combos) ? lastTop.percent : stats.percent
 
@@ -272,21 +328,39 @@ export function LabRangesPage() {
             />
             {dirty && <span className="lab__unsaved">{t('lab.ranges.unsaved')}</span>}
             <span className="lab__spacer" />
+            {baseline.id !== null && (
+              <>
+                <Button variant="secondary" size="compact" disabledReason={busyReason} onClick={startDuplicate}>
+                  <Icon name="copy" size={14} />
+                  {t('lab.ranges.duplicate')}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  aria-label={t('lab.ranges.delete')}
+                  title={t('lab.ranges.delete')}
+                  disabledReason={busyReason}
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Icon name="delete" size={14} />
+                </Button>
+              </>
+            )}
             <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
               {t('lab.ranges.clear')}
             </Button>
             <Button
               variant="primary"
               size="compact"
-              disabledReason={opening ? t('lab.ranges.opening') : saving ? t('lab.ranges.saving') : undefined}
+              disabledReason={busyReason}
               onClick={() => void save()}
             >
               {t('lab.ranges.save')}
             </Button>
           </div>
-          {saveFailure && (
+          {failure && (
             <p className="lab__failure" role="alert">
-              {saveFailure}
+              {failure}
             </p>
           )}
           {unopened && (
@@ -315,6 +389,30 @@ export function LabRangesPage() {
           actions={
             <Button variant="destructive" onClick={discard}>
               {t('lab.leave.discard')}
+            </Button>
+          }
+        />
+      )}
+      {confirmingDuplicate && (
+        <RoomDialog
+          title={t('lab.duplicate.title')}
+          body={t('lab.duplicate.body')}
+          onClose={() => setConfirmingDuplicate(false)}
+          actions={
+            <Button variant="primary" onClick={() => void duplicate()}>
+              {t('lab.duplicate.confirm')}
+            </Button>
+          }
+        />
+      )}
+      {confirmingDelete && (
+        <RoomDialog
+          title={t('lab.delete.title', { name: baseline.draft.name })}
+          body={t('lab.delete.body')}
+          onClose={() => setConfirmingDelete(false)}
+          actions={
+            <Button variant="destructive" onClick={() => void remove()}>
+              {t('lab.ranges.delete')}
             </Button>
           }
         />

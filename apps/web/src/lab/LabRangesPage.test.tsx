@@ -52,6 +52,17 @@ beforeEach(() => {
       }
       writes.push(`${method} ${url} ${String(init?.body)}`)
       if (writeReply) return writeReply()
+      if (method === 'DELETE') {
+        stored = stored.filter((each) => each.id !== id)
+        return new Response(null, { status: 204 })
+      }
+      const copied = /^(.+)\/copies$/.exec(id ?? '')?.[1]
+      if (copied) {
+        const original = stored.find((each) => each.id === copied)!
+        const copy = { id: `r${stored.length + 1}`, name: `${original.name} (copy)`, combos: original.combos }
+        stored = [...stored, copy]
+        return Response.json(copy, { status: 201 })
+      }
       const body = JSON.parse(String(init?.body)) as Omit<StoredRange, 'id'>
       const name = body.name.trim()
       if (stored.some((each) => each.id !== id && each.name.toLowerCase() === name.toLowerCase())) {
@@ -754,6 +765,137 @@ describe('LabRangesPage · exporting text', () => {
 
     expect(writeText).toHaveBeenCalledWith('AA')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
+  })
+})
+
+describe('LabRangesPage · duplicating and deleting', () => {
+  const duplicateButton = () => screen.queryByRole('button', { name: /^Duplicate/ })
+  const deleteButton = () => screen.queryByRole('button', { name: /^Delete range/ })
+  const duplicateDialog = () => screen.queryByRole('dialog', { name: 'Duplicate without your changes?' })
+  const deleteDialog = () => screen.queryByRole('dialog', { name: 'Delete “OR BTN”?' })
+
+  async function open() {
+    renderLab('en', '/lab/ranges/r1')
+    await waitFor(() => expect(nameField().value).toBe('OR BTN'))
+  }
+
+  it('offers neither on a Range never saved', async () => {
+    renderLab()
+    await screen.findByRole('link', { name: /^OR BTN/ })
+
+    expect(duplicateButton()).toBeNull()
+    expect(deleteButton()).toBeNull()
+  })
+
+  it('duplicates a saved Range and opens the copy at its own address', async () => {
+    await open()
+
+    await userEvent.click(duplicateButton()!)
+
+    expect(writes).toEqual(['POST /api/lab/ranges/r1/copies undefined'])
+    await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges/r3'))
+    expect(nameField().value).toBe('OR BTN (copy)')
+    expect(cell('AA').getAttribute('aria-pressed')).toBe('true')
+    expect(unsaved()).toBeNull()
+    await waitFor(() => expect(listed('OR BTN \\(copy\\)').getAttribute('aria-current')).toBe('page'))
+  })
+
+  it('asks before duplicating over unsaved changes, and copies what was saved', async () => {
+    await open()
+    await userEvent.click(cell('KK'))
+
+    await userEvent.click(duplicateButton()!)
+    expect(writes).toEqual([])
+    await userEvent.click(within(duplicateDialog()!).getByRole('button', { name: 'Cancel' }))
+    expect(cell('KK').getAttribute('aria-pressed')).toBe('true')
+
+    await userEvent.click(duplicateButton()!)
+    await userEvent.click(within(duplicateDialog()!).getByRole('button', { name: 'Duplicate without them' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges/r3'))
+    expect(nameField().value).toBe('OR BTN (copy)')
+    expect(cell('KK').getAttribute('aria-pressed')).toBe('false')
+    expect(leaveDialog()).toBeNull()
+  })
+
+  it('says a duplicate failed and keeps the screen as it was', async () => {
+    await open()
+    await userEvent.click(cell('KK'))
+    writeReply = () => Response.json({ reason: 'range-not-found' }, { status: 404 })
+
+    await userEvent.click(duplicateButton()!)
+    await userEvent.click(within(duplicateDialog()!).getByRole('button', { name: 'Duplicate without them' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe("Couldn't duplicate the range.")
+    expect(window.location.pathname).toBe('/lab/ranges/r1')
+    expect(cell('KK').getAttribute('aria-pressed')).toBe('true')
+    expect(unsaved()).toBeTruthy()
+  })
+
+  it('deletes a Range once confirmed, back to the empty matrix', async () => {
+    await open()
+    await userEvent.click(cell('KK'))
+
+    await userEvent.click(deleteButton()!)
+    expect(writes).toEqual([])
+    await userEvent.click(within(deleteDialog()!).getByRole('button', { name: 'Delete range' }))
+
+    expect(writes).toEqual(['DELETE /api/lab/ranges/r1 undefined'])
+    await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges'))
+    expect(nameField().value).toBe('')
+    expect(cell('AA').getAttribute('aria-pressed')).toBe('false')
+    expect(leaveDialog()).toBeNull()
+    await waitFor(() => expect(within(ranges()).queryByRole('link', { name: /^OR BTN/ })).toBeNull())
+    expect(listed('3B BB')).toBeTruthy()
+  })
+
+  it('keeps the Range when deleting is cancelled', async () => {
+    await open()
+
+    await userEvent.click(deleteButton()!)
+    await userEvent.click(within(deleteDialog()!).getByRole('button', { name: 'Cancel' }))
+
+    expect(writes).toEqual([])
+    expect(window.location.pathname).toBe('/lab/ranges/r1')
+    expect(nameField().value).toBe('OR BTN')
+  })
+
+  it('says a delete failed and keeps the screen as it was', async () => {
+    await open()
+    await userEvent.click(cell('KK'))
+    writeReply = () => new Response('', { status: 500 })
+
+    await userEvent.click(deleteButton()!)
+    await userEvent.click(within(deleteDialog()!).getByRole('button', { name: 'Delete range' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe("Couldn't delete the range. It's still here.")
+    expect(deleteDialog()).toBeNull()
+    expect(window.location.pathname).toBe('/lab/ranges/r1')
+    expect(cell('KK').getAttribute('aria-pressed')).toBe('true')
+    expect(listed('OR BTN')).toBeTruthy()
+  })
+
+  it('treats a Range already deleted elsewhere as deleted', async () => {
+    await open()
+    writeReply = () => Response.json({ reason: 'range-not-found' }, { status: 404 })
+
+    await userEvent.click(deleteButton()!)
+    await userEvent.click(within(deleteDialog()!).getByRole('button', { name: 'Delete range' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/lab/ranges'))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(nameField().value).toBe('')
+  })
+
+  it('names duplicating and deleting in Spanish', async () => {
+    renderLab('es', '/lab/ranges/r1')
+    await waitFor(() => expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Nombre del rango' }).value).toBe('OR BTN'))
+
+    expect(screen.getByRole('button', { name: /^Duplicar/ })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: /^Borrar rango/ }))
+
+    const dialog = screen.getByRole('dialog', { name: '¿Borrar «OR BTN»?' })
+    expect(within(dialog).getByRole('button', { name: 'Borrar rango' })).toBeTruthy()
   })
 })
 

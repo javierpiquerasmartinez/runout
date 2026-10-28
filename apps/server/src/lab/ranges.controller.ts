@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -68,6 +71,31 @@ export class RangesController {
   ): Promise<Range> {
     const account = await this.authenticate(authorization);
     return this.ranges.save(account, id, body);
+  }
+
+  /**
+   * Copies one of the Account's Ranges, with its Combos, under a name the
+   * server picks: "<name> (copia)", in the Account's language.
+   */
+  @Post(':id/copies')
+  async duplicate(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<Range> {
+    const account = await this.authenticate(authorization);
+    const { language } = await this.identities.preferences(account.id);
+    return this.ranges.duplicate(account, id, language);
+  }
+
+  /** Deletes one of the Account's Ranges. */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<void> {
+    const account = await this.authenticate(authorization);
+    await this.ranges.delete(account, id);
   }
 
   private authenticate(authorization: string | undefined) {
