@@ -10,6 +10,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
@@ -19,6 +20,7 @@ import {
   type RangeBody,
   type RangeSummary,
 } from './ranges.service.js';
+import { parseRangeFilter } from './range-filter.js';
 
 /**
  * An Account's Ranges, kept in its Lab. An anonymous identity has no Lab:
@@ -31,14 +33,18 @@ export class RangesController {
     private readonly ranges: RangesService,
   ) {}
 
-  /** The Account's Ranges, each with how wide it is but not its Combos. */
+  /**
+   * The Account's Ranges the filter keeps, each with how wide it is but not
+   * its Combos. The filter is read as `parseRangeFilter` describes.
+   */
   @Get()
   @Header('Cache-Control', 'private, no-cache')
   async list(
     @Headers('authorization') authorization: string | undefined,
+    @Query() query: Record<string, unknown>,
   ): Promise<RangeSummary[]> {
     const account = await this.authenticate(authorization);
-    return this.ranges.list(account);
+    return this.ranges.list(account, parseRangeFilter(query));
   }
 
   /** One of the Account's Ranges, with its Combos. */
