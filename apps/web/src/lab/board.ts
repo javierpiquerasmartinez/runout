@@ -230,6 +230,25 @@ function rowsOf<Category extends string>(
   })
 }
 
+/** Rows picked from the Categories tables, studied as one part of the Range. */
+export interface Selection {
+  /** Its Combos, each counted once by its Frequency, however many of its rows hold it. */
+  combos: number
+  /** That, as a share of the live Combos, from 0 to 100; 0 when none are live. */
+  share: number
+  /** Its Combos at their Frequencies: the Range it saves as. */
+  range: Range
+}
+
+/** The selection these rows of the Range on the Board make. */
+export function selectionOf(range: Range, board: readonly string[], rows: readonly Pick<CategoryRow<string>, 'members'>[]): Selection {
+  const selected: Range = {}
+  for (const row of rows) for (const combo of row.members) selected[combo] = range[combo]
+  const combos = liveCombos(selected, board)
+  const live = liveCombos(range, board)
+  return { combos, share: live > 0 ? (combos / live) * 100 : 0, range: selected }
+}
+
 /**
  * How the Range hits the Board, as the Made Hands that can happen on it, best
  * first: one that no Combo left in the deck can make is left out. None preflop,

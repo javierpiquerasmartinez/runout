@@ -7,7 +7,7 @@ import { redirect, useSearch } from '../routing'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
 import { Toggle } from '../ui/Toggle'
-import { combinationDraws, draws, FLOP_CARDS, liveCombos, madeHands, removedCombos } from './board'
+import { combinationDraws, draws, FLOP_CARDS, liveCombos, madeHands, removedCombos, selectionOf } from './board'
 import { BoardPicker } from './BoardPicker'
 import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
 import { CategoriesTable } from './CategoriesTable'
@@ -29,6 +29,17 @@ interface RangeSummary {
   id: string
   name: string
 }
+
+/** The Categories picked, on the Range and Board they were picked on: a change to either clears them. */
+interface PickedCategories {
+  range: Range
+  board: readonly string[]
+  categories: ReadonlySet<string>
+  /** The name the selection was last saved under, until it changes. */
+  savedUnder?: string
+}
+
+const NO_CATEGORIES: ReadonlySet<string> = new Set()
 
 /** How long the address waits after the last change before it is written: browsers limit how often it may be replaced. */
 const ADDRESS_DELAY_MS = 250
@@ -94,8 +105,14 @@ export function LabAnalysisPage() {
   })
   /** Why the last load, or reading the source, failed; until the Range changes. */
   const [failure, setFailure] = useState<FailureReason | null>(null)
-  /** Asking for the name to save the Range under. */
-  const [savingAs, setSavingAs] = useState(false)
+  /** Asking for the name to save the Range, or the selection, under. */
+  const [savingAs, setSavingAs] = useState<'range' | 'selection' | null>(null)
+  const [picked, setPicked] = useState<PickedCategories | null>(null)
+  /**
+   * The Category under the pointer or the focus, lit up without being selected,
+   * on the Range and Board it was hovered on: a row that leaves with them sends no leave event.
+   */
+  const [hover, setHover] = useState<{ range: Range; board: readonly string[]; category: string } | null>(null)
   /** Whether the Draws show the one-card backdoor flush draw: off by default, as in Flopzilla. */
   const [oneCardBackdoors, setOneCardBackdoors] = useState(false)
 
@@ -147,12 +164,17 @@ export function LabAnalysisPage() {
     }
   }
 
+  /** A Range just saved joins those to load. */
+  const remember = (range: SavedRange) => {
+    setSavingAs(null)
+    setSaved((ranges) => [...ranges, range].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())))
+  }
+
   /** Once saved as a new Range, the Analysis goes on from it: its name shows, and nothing has changed yet. */
   const savedAs = (range: SavedRange) => {
-    setSavingAs(false)
+    remember(range)
     sourceRef.current = range
     setSource(range)
-    setSaved((ranges) => [...ranges, range].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())))
     change((state) => ({ ...state, sourceId: range.id }))
   }
 
@@ -160,6 +182,23 @@ export function LabAnalysisPage() {
   const madeHandRows = useMemo(() => madeHands(range, board), [range, board])
   const drawRows = useMemo(() => draws(range, board, { oneCardBackdoors }), [range, board, oneCardBackdoors])
   const combinationDrawRows = useMemo(() => combinationDraws(range, board), [range, board])
+
+  const rows = [...madeHandRows, ...drawRows, ...combinationDrawRows]
+  const selected = picked !== null && picked.range === range && picked.board === board ? picked.categories : NO_CATEGORIES
+  const hovered = hover !== null && hover.range === range && hover.board === board ? hover.category : null
+  const selection = selectionOf(range, board, rows.filter((row) => selected.has(row.category)))
+  // A hovered row lights up with the selection, as it would once clicked.
+  const highlighted = selectionOf(range, board, rows.filter((row) => selected.has(row.category) || row.category === hovered)).range
+  const toggle = (category: string) => {
+    const categories = new Set(selected)
+    if (!categories.delete(category)) categories.add(category)
+    setPicked({ range, board, categories })
+  }
+  const categoriesTable = {
+    selected,
+    onToggle: toggle,
+    onHover: (category: string | null) => setHover(category === null ? null : { range, board, category }),
+  }
 
   const shownSource = source !== null && source.id === sourceId ? source : null
   const changed = shownSource !== null && !sameRange(range, shownSource.combos)
@@ -201,7 +240,7 @@ export function LabAnalysisPage() {
                 <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
                   {t('lab.ranges.clear')}
                 </Button>
-                <Button variant="secondary" size="compact" onClick={() => setSavingAs(true)}>
+                <Button variant="secondary" size="compact" onClick={() => setSavingAs('range')}>
                   {t('lab.analysis.saveAs')}
                 </Button>
               </div>
@@ -210,7 +249,13 @@ export function LabAnalysisPage() {
                   {failure === 'range-not-found' ? t('lab.ranges.unavailable') : t(`reason.${failure}`)}
                 </p>
               )}
-              <RangeMatrix range={range} brush={brush} onPaint={paint} removed={(handClass) => removedCombos(handClass, board)} />
+              <RangeMatrix
+                range={range}
+                brush={brush}
+                onPaint={paint}
+                removed={(handClass) => removedCombos(handClass, board)}
+                highlighted={highlighted}
+              />
               <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, board)) })}</p>
               <Stats stats={rangeStats(range)} />
               <RangeText range={range} onImport={(combos) => setCombos(() => combos)} />
@@ -219,12 +264,39 @@ export function LabAnalysisPage() {
           {/* The Board and how the Range hits it, in one column beside the matrix, so all of it is in view at once. */}
           <div className="analysis__panel">
             <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
+            {selected.size > 0 && (
+              <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
+                <span className="lab__label">{t('lab.analysis.selection')}</span>
+                <p className="analysis__selection-share ro-mono">
+                  {t('lab.analysis.selection.share', { combos: oneDecimal(selection.combos), percent: oneDecimal(selection.share) })}
+                </p>
+                <div className="analysis__selection-actions">
+                  <Button variant="secondary" size="compact" onClick={() => setPicked(null)}>
+                    {t('lab.analysis.selection.clear')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="compact"
+                    disabledReason={selection.combos > 0 ? undefined : t('lab.analysis.selection.empty')}
+                    onClick={() => setSavingAs('selection')}
+                  >
+                    {t('lab.analysis.selection.save')}
+                  </Button>
+                </div>
+                {picked?.savedUnder !== undefined && (
+                  <p className="analysis__selection-saved" role="status">
+                    {t('lab.analysis.selection.saved', { name: picked.savedUnder })}
+                  </p>
+                )}
+              </section>
+            )}
             {madeHandRows.length > 0 && (
               <CategoriesTable
                 title={t('lab.analysis.madeHands')}
                 heading={t('lab.analysis.madeHands.category')}
                 rows={madeHandRows}
                 nameOf={(madeHand) => t(`lab.analysis.madeHand.${madeHand}`)}
+                {...categoriesTable}
               />
             )}
             {drawRows.length > 0 && (
@@ -234,6 +306,7 @@ export function LabAnalysisPage() {
                   heading={t('lab.analysis.draws.category')}
                   rows={drawRows}
                   nameOf={(draw) => t(`lab.analysis.draw.${draw}`)}
+                  {...categoriesTable}
                 />
                 {/* Backdoors are only drawn on the flop. */}
                 {board.length === FLOP_CARDS && (
@@ -252,12 +325,34 @@ export function LabAnalysisPage() {
                 heading={t('lab.analysis.combinationDraws.category')}
                 rows={combinationDrawRows}
                 nameOf={(combinationDraw) => t(`lab.analysis.combinationDraw.${combinationDraw}`)}
+                {...categoriesTable}
               />
             )}
           </div>
         </div>
       </main>
-      {savingAs && <SaveAsDialog combos={range} onClose={() => setSavingAs(false)} onSaved={savedAs} />}
+      {savingAs === 'range' && (
+        <SaveAsDialog
+          combos={range}
+          title={t('lab.analysis.saveAs.title')}
+          body={t('lab.analysis.saveAs.body')}
+          onClose={() => setSavingAs(null)}
+          onSaved={savedAs}
+        />
+      )}
+      {savingAs === 'selection' && (
+        <SaveAsDialog
+          combos={selection.range}
+          title={t('lab.analysis.selection.save.title')}
+          body={t('lab.analysis.selection.save.body')}
+          onClose={() => setSavingAs(null)}
+          // The Analysis stays as it is, the selection too.
+          onSaved={(range) => {
+            remember(range)
+            setPicked((current) => current && { ...current, savedUnder: range.name })
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -265,10 +360,14 @@ export function LabAnalysisPage() {
 /** Asks for a name and keeps the Combos as a new Range, with the name rules and refusals of any Range. */
 function SaveAsDialog({
   combos,
+  title,
+  body,
   onClose,
   onSaved,
 }: {
   combos: Range
+  title: string
+  body: string
   onClose: () => void
   onSaved: (range: SavedRange) => void
 }) {
@@ -296,8 +395,8 @@ function SaveAsDialog({
 
   return (
     <RoomDialog
-      title={t('lab.analysis.saveAs.title')}
-      body={t('lab.analysis.saveAs.body')}
+      title={title}
+      body={body}
       onClose={onClose}
       actions={
         <Button variant="primary" disabledReason={busy ? t('lab.ranges.saving') : undefined} onClick={() => void save()}>

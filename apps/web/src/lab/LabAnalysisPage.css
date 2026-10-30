@@ -238,3 +238,58 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+
+/* A row of the Categories is picked by clicking it anywhere. */
+.analysis__categories tbody tr {
+  cursor: pointer;
+}
+.analysis__categories tbody tr:hover {
+  background: var(--color-control);
+}
+.analysis__categories tbody tr[data-selected] {
+  background: var(--color-selected);
+}
+.analysis__categories tbody tr[data-selected] .analysis__category {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.analysis__category {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.analysis__category:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* ---- The selection: its share and what to do with it, above the Categories ---- */
+.analysis__selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--range-highlight);
+  border-radius: var(--radius-sm);
+}
+.analysis__selection-share {
+  margin: 0;
+  font-size: 13px;
+}
+.analysis__selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.analysis__selection-saved {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
