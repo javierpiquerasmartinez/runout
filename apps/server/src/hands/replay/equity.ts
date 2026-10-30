@@ -1,4 +1,4 @@
-import { cardCode, strength } from './evaluator.js';
+import { cardCode, strength } from '@runout/poker';
 
 /**
  * A player's share of each pot, worked out over every board left to deal
