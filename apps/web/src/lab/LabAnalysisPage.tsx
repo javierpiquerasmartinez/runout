@@ -6,11 +6,12 @@ import { useIdentity } from '../identity/context'
 import { redirect, useSearch } from '../routing'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
-import { liveCombos, madeHands, removedCombos } from './board'
+import { Toggle } from '../ui/Toggle'
+import { combinationDraws, draws, FLOP_CARDS, liveCombos, madeHands, removedCombos } from './board'
 import { BoardPicker } from './BoardPicker'
 import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
+import { CategoriesTable } from './CategoriesTable'
 import { LabNav } from './LabNav'
-import { MadeHandsTable } from './MadeHandsTable'
 import { EMPTY_RANGE, rangeStats, sameRange, withHandClass, type HandClass, type Range } from './range'
 import { Brush, RangeMatrix, RangeText, Stats } from './RangeControls'
 import './LabRangesPage.css'
@@ -95,6 +96,8 @@ export function LabAnalysisPage() {
   const [failure, setFailure] = useState<FailureReason | null>(null)
   /** Asking for the name to save the Range under. */
   const [savingAs, setSavingAs] = useState(false)
+  /** Whether the Draws show the one-card backdoor flush draw: off by default, as in Flopzilla. */
+  const [oneCardBackdoors, setOneCardBackdoors] = useState(false)
 
   const change = (next: (state: AnalysisState) => AnalysisState) => {
     setFailure(null)
@@ -153,8 +156,10 @@ export function LabAnalysisPage() {
     change((state) => ({ ...state, sourceId: range.id }))
   }
 
-  // Every Combo of the deck is classified to tell which Made Hands can happen: not on every render.
+  // Every Combo of the deck is classified to tell which Categories can happen: not on every render.
   const madeHandRows = useMemo(() => madeHands(range, board), [range, board])
+  const drawRows = useMemo(() => draws(range, board, { oneCardBackdoors }), [range, board, oneCardBackdoors])
+  const combinationDrawRows = useMemo(() => combinationDraws(range, board), [range, board])
 
   const shownSource = source !== null && source.id === sourceId ? source : null
   const changed = shownSource !== null && !sameRange(range, shownSource.combos)
@@ -214,7 +219,41 @@ export function LabAnalysisPage() {
           {/* The Board and how the Range hits it, in one column beside the matrix, so all of it is in view at once. */}
           <div className="analysis__panel">
             <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
-            {madeHandRows.length > 0 && <MadeHandsTable rows={madeHandRows} />}
+            {madeHandRows.length > 0 && (
+              <CategoriesTable
+                title={t('lab.analysis.madeHands')}
+                heading={t('lab.analysis.madeHands.category')}
+                rows={madeHandRows}
+                nameOf={(madeHand) => t(`lab.analysis.madeHand.${madeHand}`)}
+              />
+            )}
+            {drawRows.length > 0 && (
+              <div className="analysis__draws">
+                <CategoriesTable
+                  title={t('lab.analysis.draws')}
+                  heading={t('lab.analysis.draws.category')}
+                  rows={drawRows}
+                  nameOf={(draw) => t(`lab.analysis.draw.${draw}`)}
+                />
+                {/* Backdoors are only drawn on the flop. */}
+                {board.length === FLOP_CARDS && (
+                  <Toggle
+                    label={t('lab.analysis.draws.oneCardBackdoors')}
+                    checked={oneCardBackdoors}
+                    onChange={setOneCardBackdoors}
+                    showLabel
+                  />
+                )}
+              </div>
+            )}
+            {combinationDrawRows.length > 0 && (
+              <CategoriesTable
+                title={t('lab.analysis.combinationDraws')}
+                heading={t('lab.analysis.combinationDraws.category')}
+                rows={combinationDrawRows}
+                nameOf={(combinationDraw) => t(`lab.analysis.combinationDraw.${combinationDraw}`)}
+              />
+            )}
           </div>
         </div>
       </main>

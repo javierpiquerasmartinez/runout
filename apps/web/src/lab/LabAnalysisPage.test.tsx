@@ -529,3 +529,60 @@ describe('LabAnalysisPage · the Made Hands', () => {
     expect(within(table).getByRole('cell', { name: '6,0' })).toBeTruthy()
   })
 })
+
+describe('LabAnalysisPage · the Draws', () => {
+  const table = (name: string) => screen.queryByRole('table', { name })
+  const rows = (name: string) =>
+    within(table(name)!)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => [...row.children].map((cell) => cell.textContent))
+  const oneCardSwitch = () => screen.queryByRole('switch', { name: 'Show one-card backdoor flush draws' })
+
+  it('show under the Made Hands the Draws and combination Draws on the flop, leaving out what cannot happen', () => {
+    renderAnalysis('en', '/lab/analysis?range=AKs&board=QhJh2c')
+
+    expect(rows('Draws')).toEqual([
+      ['Flush draw', '1.0', '25.0 %'],
+      ['Open-ended straight draw (2 cards)', '0.0', '0.0 %'],
+      ['Gutshot (2 cards)', '4.0', '100.0 %'],
+      ['Overcards', '4.0', '100.0 %'],
+      ['Backdoor flush draw (2 cards)', '1.0', '25.0 %'],
+    ])
+    expect(rows('Combination draws')).toEqual([
+      ['Flush draw + pair', '0.0', '0.0 %'],
+      ['Flush draw + open-ended', '0.0', '0.0 %'],
+      ['Flush draw + gutshot', '1.0', '25.0 %'],
+      ['Flush draw + overcards', '1.0', '25.0 %'],
+    ])
+  })
+
+  it('add the one-card backdoor flush draw only when switched on', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AKs&board=QhJh2c')
+    expect(rows('Draws').map(([category]) => category)).not.toContain('Backdoor flush draw (1 card)')
+
+    await userEvent.click(oneCardSwitch()!)
+
+    expect(rows('Draws').at(-1)).toEqual(['Backdoor flush draw (1 card)', '0.0', '0.0 %'])
+  })
+
+  it('show no backdoors on the turn, and no Draws on the river', () => {
+    renderAnalysis('en', '/lab/analysis?range=AKs&board=QhJh2c3d')
+    expect(rows('Draws').map(([category]) => category)).not.toContain('Backdoor flush draw (2 cards)')
+    expect(oneCardSwitch()).toBeNull()
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?range=AKs&board=QhJh2c3d9s')
+    expect(table('Made hands')).not.toBeNull()
+    expect(table('Draws')).toBeNull()
+    expect(table('Combination draws')).toBeNull()
+  })
+
+  it('are in Spanish too', () => {
+    renderAnalysis('es', '/lab/analysis?range=AKs&board=QhJh2c')
+
+    expect(within(table('Proyectos')!).getByRole('rowheader', { name: 'Proyecto de color' })).toBeTruthy()
+    expect(within(table('Proyectos combinados')!).getByRole('rowheader', { name: 'Proyecto de color + overcards' })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Mostrar proyectos de color backdoor de una carta' })).toBeTruthy()
+  })
+})
