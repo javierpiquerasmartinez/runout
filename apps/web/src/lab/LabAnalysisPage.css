@@ -203,6 +203,11 @@
 }
 
 /* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
+.analysis__draws {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .analysis__categories {
   width: 100%;
   border-collapse: collapse;

@@ -601,6 +601,14 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - A pair or two pair the Board makes alone does not count: on K♠K♦7♣, AQ is ace high, 7x bottom pair, 88 a pocket pair below the top card, Kx trips, 77 a full house and KK quads. A straight or a flush counts however it is made. The pair rungs are counted over the Board's distinct ranks.
 - Preflop, or while the flop is half picked, there is no table.
 
+**H9.13 — See what the Range is drawing to.** As a player, I want the Range's Draws on a flop or a turn, so I see how much of it is still drawing.
+
+- Under the Made Hands, a table of **Proyectos** lists: flush draw, open-ended straight draw with two cards and with one, gutshot with two cards and with one, overcards, and the two-card backdoor flush draw. A switch adds the one-card backdoor flush draw, off by default.
+- A table of **Proyectos combinados** lists: flush draw + pair, + open-ended, + gutshot and + overcards; open-ended + pair; gutshot + pair. "+ pair" means a one-pair Made Hand.
+- Draws overlap each other and the Made Hands: top pair with a flush draw counts in top pair, in flush draw and in flush draw + pair. Each row shows its Combos, weighted by Frequency, and its % of the live Combos, and rows the Board does not allow are left out.
+- A Draw always uses one of the Combo's cards, so A2 on 9-8-7 draws to no straight, and never draws to what the Combo already makes, though a made straight can draw to a flush. A straight draw with two ranks to come counts as open-ended, a double gutshot included.
+- There are no Draws on the river, and no backdoors on the turn.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.

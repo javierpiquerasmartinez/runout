@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  combinationDraws,
   DECK,
+  draws,
   formatBoard,
   liveCombos,
   madeHands,
@@ -270,5 +272,141 @@ describe('Made Hands', () => {
 
   it('share nothing when no Combo is live', () => {
     expect(madeHands({ KdQc: 100 }, ['Kd', '7c', '2h']).every((row) => row.combos === 0 && row.share === 0)).toBe(true)
+  })
+})
+
+/** The Draws a lone Combo has on this Board, as `AhKd` on `Ks Kd 7c`, in the table's order. */
+function drawsOfCombo(combo: string, board: string, options?: { oneCardBackdoors: boolean }): string[] {
+  return draws({ [combo]: 100 }, board.split(' '), options)
+    .filter((row) => row.combos > 0)
+    .map((row) => row.category)
+}
+
+describe('Draws', () => {
+  it('count four to a flush with one or both of the Combo\'s cards as a flush draw', () => {
+    expect(drawsOfCombo('AhKh', 'Qh 7h 2c')).toContain('flush-draw')
+    expect(drawsOfCombo('AhKd', 'Qh 7h 2h')).toContain('flush-draw')
+    expect(drawsOfCombo('AsKd', 'Qh 7h 2h 3h')).not.toContain('flush-draw')
+  })
+
+  it('never count a draw to what the Combo already makes, though a made straight can be a flush draw', () => {
+    // A flush on the turn, with a fifth heart.
+    expect(drawsOfCombo('AhKh', 'Qh 7h 2h 3c')).not.toContain('flush-draw')
+    expect(drawsOfCombo('Jh9h', 'Th 8h 7c')).toContain('flush-draw')
+  })
+
+  it('tell an open-ended straight draw, eight outs, from a gutshot, four, by how many of the Combo\'s cards it needs', () => {
+    expect(drawsOfCombo('9s8d', 'Th 7c 2d')).toEqual(['open-ended-two-cards'])
+    expect(drawsOfCombo('As8d', 'Th 9c 7d')).toEqual(['open-ended-one-card'])
+    expect(drawsOfCombo('9s7d', 'Jh 8c 2d')).toEqual(['gutshot-two-cards'])
+    expect(drawsOfCombo('As7d', 'Jh 9c 8d')).toEqual(['gutshot-one-card'])
+    // A wheel draw counts the ace low.
+    expect(drawsOfCombo('As3d', 'Kh 5c 4d')).toEqual(['gutshot-two-cards'])
+    // A double gutshot has eight outs too.
+    expect(drawsOfCombo('Js8d', '9h 7c 5d')).toEqual(['open-ended-two-cards'])
+  })
+
+  it('always use one of the Combo\'s cards: A2 on 9-8-7 draws to no straight', () => {
+    expect(drawsOfCombo('As2d', '9h 8c 7d')).toEqual([])
+    // The turn makes 9-8-7-6: the 5 and the ten are the Board's outs, not the Combo's.
+    expect(drawsOfCombo('Ks2d', '9h 8c 7d 6s')).toEqual([])
+    expect(drawsOfCombo('Ts2d', '9h 8c 7d 3s')).toEqual(['open-ended-one-card'])
+    // The 5 gives 4-5-6-7-8, but the Board and the 5 make 5-9 for everyone: no draw.
+    expect(drawsOfCombo('4c2d', '6h 7s 8d 9c')).toEqual([])
+    expect(drawsOfCombo('3c2d', '5h 6s 7d 8c')).toEqual([])
+    // The 9 gives the ten a higher straight than the Board's.
+    expect(drawsOfCombo('Tc2d', '5h 6s 7d 8c')).toEqual(['gutshot-one-card'])
+  })
+
+  it('draw to no straight with one made, though a better one could come', () => {
+    expect(drawsOfCombo('9s8d', 'Th 7c 6d')).toEqual([])
+  })
+
+  it('count overcards: both of the Combo\'s cards above the Board\'s highest, with no pair', () => {
+    expect(drawsOfCombo('AsKd', 'Qh 7c 2d')).toEqual(['overcards'])
+    expect(drawsOfCombo('AsQd', 'Qh 7c 2d')).toEqual([])
+    expect(drawsOfCombo('AsAd', 'Qh 7c 2d')).toEqual([])
+    expect(drawsOfCombo('AsJd', 'Qh 7c 2d')).toEqual([])
+  })
+
+  it('count a two-card backdoor flush draw on the flop, and the one-card one only when switched on', () => {
+    expect(drawsOfCombo('As5s', 'Kh 7s 2d')).toEqual(['backdoor-two-cards'])
+    expect(drawsOfCombo('As5d', 'Kh 7s 2s')).toEqual([])
+    expect(drawsOfCombo('As5d', 'Kh 7s 2s', { oneCardBackdoors: true })).toEqual(['backdoor-one-card'])
+    // A flush draw is past a backdoor one.
+    expect(drawsOfCombo('As5s', 'Ks 7s 2d', { oneCardBackdoors: true })).toEqual(['flush-draw'])
+  })
+
+  it('are none on the river, and no backdoors on the turn', () => {
+    expect(draws({ AhKh: 100 }, ['Qh', '7h', '2c', '3d', '9s'])).toEqual([])
+    expect(drawsOfCombo('As5s', 'Kh 7s 2d 9c', { oneCardBackdoors: true })).toEqual([])
+    expect(draws({}, ['Kh', '7s', '2d', '9c'], { oneCardBackdoors: true }).map((row) => row.category)).not.toContain(
+      'backdoor-two-cards',
+    )
+  })
+})
+
+/** The combination Draws a lone Combo has on this Board. */
+function combinationDrawsOfCombo(combo: string, board: string): string[] {
+  return combinationDraws({ [combo]: 100 }, board.split(' '))
+    .filter((row) => row.combos > 0)
+    .map((row) => row.category)
+}
+
+describe('Draws on a Board', () => {
+  const categories = (rows: { category: string }[]) => rows.map((row) => row.category)
+
+  it('leave out those the Board does not allow, keeping those the Range misses', () => {
+    // No flush draw on a rainbow flop, and the one-card backdoor only when switched on.
+    expect(categories(draws({}, ['Th', '9s', '7d']))).toEqual([
+      'open-ended-two-cards',
+      'open-ended-one-card',
+      'gutshot-two-cards',
+      'gutshot-one-card',
+      'overcards',
+      'backdoor-two-cards',
+    ])
+    // K-7-2 rainbow is too far apart for a straight draw, and nothing but aces is above a king.
+    expect(categories(draws({}, ['Kh', '7s', '2d']))).toEqual(['backdoor-two-cards'])
+    // A monotone flop leaves no room for a backdoor with both cards.
+    expect(categories(draws({}, ['Kh', '7h', '2h'], { oneCardBackdoors: true }))).not.toContain('backdoor-two-cards')
+    // Nothing is above an ace.
+    expect(categories(draws({}, ['Ah', '7s', '2d']))).not.toContain('overcards')
+  })
+
+  it('weight Combos by Frequency and share them over the live Combos, a Combo counting in each it has', () => {
+    const range = { AhKh: 100, AhKd: 50, QhJh: 50, AsAh: 100 }
+    const rows = draws(range, ['Th', '7h', '2c'])
+    const row = (category: string) => rows.find((each) => each.category === category)
+
+    expect(row('flush-draw')).toEqual({ category: 'flush-draw', combos: 1.5, share: 50, members: ['AhKh', 'QhJh'] })
+    expect(row('overcards')).toEqual({ category: 'overcards', combos: 2, share: (2 / 3) * 100, members: ['AhKh', 'AhKd', 'QhJh'] })
+    expect(combinationDraws(range, ['Th', '7h', '2c']).find((each) => each.category === 'flush-draw-overcards')?.combos).toBe(1.5)
+  })
+})
+
+describe('combination Draws', () => {
+  it('count a pair with a flush draw in its pair, in flush draw and in flush draw + pair', () => {
+    expect(madeHandOfCombo('Ah2h', 'Kh 7h 2c')).toBe('bottom-pair')
+    expect(drawsOfCombo('Ah2h', 'Kh 7h 2c')).toEqual(['flush-draw'])
+    expect(combinationDrawsOfCombo('Ah2h', 'Kh 7h 2c')).toEqual(['flush-draw-pair'])
+  })
+
+  it('combine a flush draw with a straight draw or overcards, and a straight draw with a pair', () => {
+    expect(combinationDrawsOfCombo('Jh8h', 'Th 9h 2c')).toEqual(['flush-draw-open-ended'])
+    expect(combinationDrawsOfCombo('Th7h', 'Jh 9h 2c')).toEqual(['flush-draw-gutshot'])
+    expect(combinationDrawsOfCombo('AhKh', 'Th 7h 2c')).toEqual(['flush-draw-overcards'])
+    expect(combinationDrawsOfCombo('Ts9s', '9h 8c 7d')).toEqual(['open-ended-pair'])
+    expect(combinationDrawsOfCombo('9s8s', 'Jh 8c 7d')).toEqual(['gutshot-pair'])
+  })
+
+  it('take "+ pair" as a one-pair Made Hand, not two pair or a set', () => {
+    expect(combinationDrawsOfCombo('7h2h', 'Kh 7c 2d 5h')).toEqual([])
+    expect(combinationDrawsOfCombo('7s7h', 'Kh 7c 2h 5h')).toEqual([])
+    expect(combinationDrawsOfCombo('AsAh', 'Kh 7c 2h 5h')).toEqual(['flush-draw-pair'])
+  })
+
+  it('are none on the river', () => {
+    expect(combinationDraws({ Ah2h: 100 }, ['Kh', '7h', '2c', '9s', '3d'])).toEqual([])
   })
 })
