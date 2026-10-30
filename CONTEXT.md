@@ -235,3 +235,31 @@ _Avoid_: Hand, starting hand, cell (outside the UI)
 **Frequency**:
 How much of a Combo a Range holds, from 0 to 100 %: AKo at 50 % counts as six of its twelve Combos. A Combo at 0 % is not in the Range.
 _Avoid_: Weight, percentage (alone), mix
+
+**Analysis**:
+The Lab's screen where a person puts a Range on a Board, and later two Ranges against each other, to see how each one hits it. Nothing about it is kept: the Ranges and the Board it shows live in its address, and editing a Range there never changes the saved one unless it is saved as a new Range.
+_Avoid_: Análisis (UI only), simulation, Flopzilla
+
+**Board**:
+The community cards a person picks or deals at random in an Analysis: none, a flop, a turn or a river. It removes the Combos that hold any of its cards. Unrelated to the board dealt in a Hand, though the word is the same.
+_Avoid_: Flop (for the whole Board), runout
+
+**Dead Cards**:
+Up to two cards a person takes out of the deck in an Analysis of one Range without putting them on the Board, usually their own hole cards. Like the Board, they remove every Combo that holds one, and no Board is completed with them. When there are two, they are the person's own Combo, measured against the Range. An Analysis of two Ranges has none.
+_Avoid_: Blockers, removed cards, muertas (UI only)
+
+**Category**:
+One row of how a Range hits a Board: how many of its live Combos, weighted by Frequency, fall into it. Each is either a Made Hand or a Draw.
+_Avoid_: Bucket, hit, hand type
+
+**Made Hand**:
+A Category for what a Combo already makes on the Board, from straight flush down to nothing. Each live Combo is in exactly one: the best it makes.
+_Avoid_: Hand (alone), made
+
+**Draw**:
+A Category for what a Combo can still become on later cards (flush draw, open-ended straight draw, gutshot, backdoor flush draw, overcards…). A Combo can be in several Draws, and in a Made Hand as well. Some Draws are combinations (a flush draw with a pair, with an open-ended straight draw…), and a Combo in one still counts in each Draw it combines. A Draw always uses at least one of the Combo's cards, and is never a draw to what the Combo already makes.
+_Avoid_: Project, proyecto (UI only)
+
+**Equity**:
+The share of the pot one Range wins against another over every way the Board can be completed, ties split. Combos that share a card with each other never meet.
+_Avoid_: EV, win rate, all-in EV
