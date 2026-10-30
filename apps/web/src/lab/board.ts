@@ -1,6 +1,6 @@
 /*
- * The Analysis's Board: a flop, a turn or a river, and the Combos of a Range
- * it removes. Pure: no React, no I/O, beside the range module. Cards are
+ * The Analysis's Board: a flop, a turn or a river, the Dead Cards beside it,
+ * and the Combos of a Range they remove. Pure: no React, no I/O, beside the range module. Cards are
  * written as the Lab writes Combos: rank then suit, tens as `T`, as `Th`.
  */
 
@@ -19,8 +19,11 @@ export const FLOP_CARDS = 3
 /** The most cards a Board holds. */
 export const MAX_BOARD_CARDS = 5
 
+/** Why a text names no cards: a piece that is not one, or one named twice. */
+type CardsProblem = { kind: 'unknown'; piece: string } | { kind: 'repeated'; card: string }
+
 /** Why a text is not a Board. */
-export type BoardProblem = { kind: 'unknown'; piece: string } | { kind: 'repeated'; card: string } | { kind: 'size'; count: number }
+export type BoardProblem = CardsProblem | { kind: 'size'; count: number } | { kind: 'dead'; card: string }
 
 /** A text's Board, or what is wrong with it. */
 export type ParsedBoard = { board: string[] } | { problem: BoardProblem }
@@ -29,7 +32,7 @@ export type ParsedBoard = { board: string[] } | { problem: BoardProblem }
 const CARD = /^(10|[2-9tjqka])([shdc])/i
 
 /** The cards a text names, in order, without checking how many there are. */
-function cardsOf(text: string): ParsedBoard {
+function cardsOf(text: string): { board: string[] } | { problem: CardsProblem } {
   const cards: string[] = []
   for (const chunk of text.split(/[\s,]+/)) {
     for (let rest = chunk; rest !== ''; ) {
@@ -44,12 +47,36 @@ function cardsOf(text: string): ParsedBoard {
   return { board: cards }
 }
 
-/** A Board from text such as `Ah7d2c`: known cards, none repeated, and none, three, four or five of them. */
-export function parseBoard(text: string): ParsedBoard {
+/**
+ * A Board from text such as `Ah7d2c`: known cards, none repeated, none of the
+ * Dead Cards, and none, three, four or five of them.
+ */
+export function parseBoard(text: string, dead: readonly string[] = []): ParsedBoard {
   const parsed = cardsOf(text)
   if ('problem' in parsed) return parsed
   const count = parsed.board.length
-  return BOARD_SIZES.includes(count) ? parsed : { problem: { kind: 'size', count } }
+  if (!BOARD_SIZES.includes(count)) return { problem: { kind: 'size', count } }
+  const isDead = parsed.board.find((card) => dead.includes(card))
+  return isDead ? { problem: { kind: 'dead', card: isDead } } : parsed
+}
+
+/** The most Dead Cards an Analysis takes: one Combo, usually the person's own hand. */
+export const MAX_DEAD_CARDS = 2
+
+/** Why a text is not the Dead Cards. */
+export type DeadCardsProblem = CardsProblem | { kind: 'size'; count: number } | { kind: 'on-board'; card: string }
+
+/** A text's Dead Cards, or what is wrong with them. */
+export type ParsedDeadCards = { dead: string[] } | { problem: DeadCardsProblem }
+
+/** Dead Cards from text such as `AhKh`: known cards, none repeated, at most two, none on the Board. */
+export function parseDeadCards(text: string, board: readonly string[]): ParsedDeadCards {
+  const parsed = cardsOf(text)
+  if ('problem' in parsed) return parsed
+  const dead = parsed.board
+  if (dead.length > MAX_DEAD_CARDS) return { problem: { kind: 'size', count: dead.length } }
+  const onBoard = dead.find((card) => board.includes(card))
+  return onBoard ? { problem: { kind: 'on-board', card: onBoard } } : { dead }
 }
 
 /**
@@ -61,7 +88,13 @@ export function readBoardCards(text: string): string[] {
   return 'board' in parsed && parsed.board.length <= MAX_BOARD_CARDS ? parsed.board : []
 }
 
-/** The cards as one text, as `Ah7d2c`; `parseBoard` reads it back. */
+/** The Dead Cards an address writes beside this Board; any it cannot take are none. */
+export function readDeadCards(text: string, board: readonly string[]): string[] {
+  const parsed = parseDeadCards(text, board)
+  return 'dead' in parsed ? parsed.dead : []
+}
+
+/** The cards as one text, as `Ah7d2c`; `parseBoard` and `parseDeadCards` read it back. */
 export function formatBoard(cards: readonly string[]): string {
   return cards.join('')
 }
@@ -70,6 +103,12 @@ export function formatBoard(cards: readonly string[]): string {
 export function toggleCard(cards: readonly string[], card: string): string[] {
   if (cards.includes(card)) return cards.filter((each) => each !== card)
   return cards.length < MAX_BOARD_CARDS ? [...cards, card] : [...cards]
+}
+
+/** The Dead Cards with this one taken off if it is among them, or else added while there is room. */
+export function toggleDeadCard(dead: readonly string[], card: string): string[] {
+  if (dead.includes(card)) return dead.filter((each) => each !== card)
+  return dead.length < MAX_DEAD_CARDS ? [...dead, card] : [...dead]
 }
 
 /** A card dealt at random from those not in use. */
@@ -92,19 +131,19 @@ export function withRandomCard(board: readonly string[], random: () => number, k
 }
 
 /** Whether a Combo, as `AhKd`, can still be dealt with these cards out of the deck. */
-function isLive(combo: string, board: readonly string[]): boolean {
-  return !board.includes(combo.slice(0, 2)) && !board.includes(combo.slice(2))
+function isLive(combo: string, out: readonly string[]): boolean {
+  return !out.includes(combo.slice(0, 2)) && !out.includes(combo.slice(2))
 }
 
-/** How many of a Hand Class's Combos hold one of the Board's cards. */
-export function removedCombos(handClass: HandClass, board: readonly string[]): number {
-  return handClass.combos.filter((combo) => !isLive(combo, board)).length
+/** How many of a Hand Class's Combos hold one of these cards out of the deck: the Board's and the Dead Cards. */
+export function removedCombos(handClass: HandClass, out: readonly string[]): number {
+  return handClass.combos.filter((combo) => !isLive(combo, out)).length
 }
 
-/** The Range's Combos the Board leaves possible, each counted by its Frequency. */
-export function liveCombos(range: Range, board: readonly string[]): number {
+/** The Range's Combos these cards out of the deck, the Board's and the Dead Cards, leave possible, each counted by its Frequency. */
+export function liveCombos(range: Range, out: readonly string[]): number {
   let combos = 0
-  for (const [combo, frequency] of Object.entries(range)) if (isLive(combo, board)) combos += frequency / 100
+  for (const [combo, frequency] of Object.entries(range)) if (isLive(combo, out)) combos += frequency / 100
   return combos
 }
 
@@ -153,9 +192,14 @@ const MADE_BY_EVALUATOR: Partial<Record<HandCategory, MadeHand>> = {
   straight: 'straight',
 }
 
-/** A card as the evaluator writes it: tens as `10`. */
+/** A card as the evaluator and the deck's sprites write it: tens as `10`, as `10h`. */
+export function tenAs10(card: string): string {
+  return card[0] === 'T' ? `10${card[1]}` : card
+}
+
+/** A card's code for the evaluator. */
 function evaluatorCode(card: string): number {
-  return cardCode(card[0] === 'T' ? `10${card[1]}` : card)
+  return cardCode(tenAs10(card))
 }
 
 /** How high a rank is: the deuce 0, the ace 12. */
@@ -195,24 +239,26 @@ function madeHandOf(combo: string, board: readonly string[]): MadeHand {
     if (rank === lowest) return 'bottom-pair'
     return 'middle-pair'
   }
-  return combo[0] === 'A' ? 'ace-high' : 'nothing'
+  return first === RANKS.length - 1 || second === RANKS.length - 1 ? 'ace-high' : 'nothing'
 }
 
 /**
- * The Range's rows for these Categories, in this order: each live Combo counts
- * in every Category `categoriesOf` gives it. One that no Combo left in the
+ * The Range's rows for these Categories, in this order: each Combo neither the
+ * Board nor the Dead Cards remove counts in every Category `categoriesOf` gives it. One that no Combo left in the
  * deck can be in is left out; one the Range misses shows at 0.
  */
 function rowsOf<Category extends string>(
   range: Range,
   board: readonly string[],
+  dead: readonly string[],
   order: readonly Category[],
   categoriesOf: (combo: string) => readonly Category[],
 ): CategoryRow<Category>[] {
+  const out = [...board, ...dead]
   const rows = new Map<Category, CategoryRow<Category>>()
   for (const handClass of HAND_CLASSES) {
     for (const combo of handClass.combos) {
-      if (!isLive(combo, board)) continue
+      if (!isLive(combo, out)) continue
       const frequency = range[combo] ?? 0
       for (const category of categoriesOf(combo)) {
         const row = rows.get(category) ?? { category, combos: 0, share: 0, members: [] }
@@ -223,7 +269,7 @@ function rowsOf<Category extends string>(
       }
     }
   }
-  const live = liveCombos(range, board)
+  const live = liveCombos(range, out)
   return order.flatMap((category) => {
     const row = rows.get(category)
     return row ? [{ ...row, share: live > 0 ? (row.combos / live) * 100 : 0 }] : []
@@ -240,12 +286,12 @@ export interface Selection {
   range: Range
 }
 
-/** The selection these rows of the Range on the Board make. */
-export function selectionOf(range: Range, board: readonly string[], rows: readonly Pick<CategoryRow<string>, 'members'>[]): Selection {
+/** The selection these rows of the Range make, with these cards out of the deck: the Board's and the Dead Cards. */
+export function selectionOf(range: Range, out: readonly string[], rows: readonly Pick<CategoryRow<string>, 'members'>[]): Selection {
   const selected: Range = {}
   for (const row of rows) for (const combo of row.members) selected[combo] = range[combo]
-  const combos = liveCombos(selected, board)
-  const live = liveCombos(range, board)
+  const combos = liveCombos(selected, out)
+  const live = liveCombos(range, out)
   return { combos, share: live > 0 ? (combos / live) * 100 : 0, range: selected }
 }
 
@@ -254,9 +300,9 @@ export function selectionOf(range: Range, board: readonly string[], rows: readon
  * first: one that no Combo left in the deck can make is left out. None preflop,
  * nor while the flop is still being picked.
  */
-export function madeHands(range: Range, board: readonly string[]): CategoryRow<MadeHand>[] {
+export function madeHands(range: Range, board: readonly string[], dead: readonly string[] = []): CategoryRow<MadeHand>[] {
   if (board.length < FLOP_CARDS) return []
-  return rowsOf(range, board, MADE_HANDS, (combo) => [madeHandOf(combo, board)])
+  return rowsOf(range, board, dead, MADE_HANDS, (combo) => [madeHandOf(combo, board)])
 }
 
 /**
@@ -365,10 +411,11 @@ function drawsOf(combo: string, board: readonly string[], options: DrawOptions):
 export function draws(
   range: Range,
   board: readonly string[],
+  dead: readonly string[] = [],
   options: DrawOptions = { oneCardBackdoors: false },
 ): CategoryRow<Draw>[] {
   if (board.length < FLOP_CARDS || board.length >= MAX_BOARD_CARDS) return []
-  return rowsOf(range, board, DRAWS, (combo) => drawsOf(combo, board, options))
+  return rowsOf(range, board, dead, DRAWS, (combo) => drawsOf(combo, board, options))
 }
 
 /** The combination Draws, in the table's order. A Combo in one still counts in each Draw it combines. */
@@ -416,7 +463,63 @@ function combinationDrawsOf(combo: string, board: readonly string[]): Combinatio
  * leaving out those no Combo left in the deck can have. None preflop, nor on
  * the river.
  */
-export function combinationDraws(range: Range, board: readonly string[]): CategoryRow<CombinationDraw>[] {
+export function combinationDraws(
+  range: Range,
+  board: readonly string[],
+  dead: readonly string[] = [],
+): CategoryRow<CombinationDraw>[] {
   if (board.length < FLOP_CARDS || board.length >= MAX_BOARD_CARDS) return []
-  return rowsOf(range, board, COMBINATION_DRAWS, (combo) => combinationDrawsOf(combo, board))
+  return rowsOf(range, board, dead, COMBINATION_DRAWS, (combo) => combinationDrawsOf(combo, board))
+}
+
+/** Part of the Range against the own Combo. */
+export interface Standing {
+  /** Its Combos, each counted by its Frequency. */
+  combos: number
+  /** That, as a share of the live Combos, from 0 to 100; 0 when none are live. */
+  share: number
+}
+
+/** The own Combo two Dead Cards make, and where it stands against the Range on the Board. */
+export interface OwnCombo {
+  madeHand: MadeHand
+  draws: Draw[]
+  /** The Range's live Combos it beats, ties with and loses to as the Board stands. */
+  ahead: Standing
+  tied: Standing
+  behind: Standing
+}
+
+/**
+ * The own Combo two Dead Cards make on a flop, a turn or a river, measured
+ * against the Range's live Combos; none with fewer Dead Cards or no flop yet.
+ */
+export function ownCombo(
+  range: Range,
+  board: readonly string[],
+  dead: readonly string[],
+  options: DrawOptions = { oneCardBackdoors: false },
+): OwnCombo | null {
+  if (dead.length < MAX_DEAD_CARDS || board.length < FLOP_CARDS) return null
+  const combo = dead.join('')
+  const boardCodes = board.map(evaluatorCode)
+  const mine = strength([...dead.map(evaluatorCode), ...boardCodes])
+  const out = [...board, ...dead]
+  let [ahead, tied, behind] = [0, 0, 0]
+  for (const [theirs, frequency] of Object.entries(range)) {
+    if (!isLive(theirs, out)) continue
+    const against = strength([evaluatorCode(theirs.slice(0, 2)), evaluatorCode(theirs.slice(2)), ...boardCodes])
+    if (mine > against) ahead += frequency / 100
+    else if (mine === against) tied += frequency / 100
+    else behind += frequency / 100
+  }
+  const live = ahead + tied + behind
+  const standing = (combos: number): Standing => ({ combos, share: live > 0 ? (combos / live) * 100 : 0 })
+  return {
+    madeHand: madeHandOf(combo, board),
+    draws: board.length < MAX_BOARD_CARDS ? drawsOf(combo, board, options) : [],
+    ahead: standing(ahead),
+    tied: standing(tied),
+    behind: standing(behind),
+  }
 }
