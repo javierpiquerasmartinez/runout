@@ -8,9 +8,11 @@ A web room where a group of poker players review the same hand together, synced 
 apps/
 ├── web/      Frontend · React + Vite
 └── server/   Backend · Node + NestJS (HTTP + WebSocket)
+packages/
+└── poker/    @runout/poker · the hand evaluator both apps share
 ```
 
-The two apps are isolated: they share no code and no dependencies. The monorepo only orchestrates them through pnpm workspaces.
+The two apps share one package and nothing else: `@runout/poker` holds the hold'em hand evaluator (best five-card hand, its category, comparable strength, card codes), so the server's All-in EV and the web's Lab never disagree on who wins a showdown (ADR 0007). It builds to `dist/` on `pnpm install` (its `prepare` script); after changing it, run `pnpm --filter @runout/poker build`. Everything else, DTOs included, is defined once in each app.
 
 ## Getting started
 
@@ -68,7 +70,7 @@ The visual system (tokens, fonts, icon sprite and components from the design-sys
 | Script | What it does |
 | --- | --- |
 | `pnpm dev` | Runs web and server in parallel |
-| `pnpm build` | Builds both apps |
-| `pnpm test` | Unit tests (Vitest) for both apps |
-| `pnpm lint` | Oxlint for both apps |
+| `pnpm build` | Builds the shared package, then both apps |
+| `pnpm test` | Unit tests (Vitest) for both apps and the shared package |
+| `pnpm lint` | Oxlint for both apps and the shared package |
 | `pnpm --filter @runout/server test:e2e` | Backend end-to-end tests (HTTP + WS) |

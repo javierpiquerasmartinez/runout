@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - packages/*
 allowBuilds:
   # Restores the symlinks of the bundled Postgres binaries used by the server's e2e harness.
   '@embedded-postgres/darwin-arm64': true

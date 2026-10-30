@@ -1,6 +1,6 @@
 # 0001 · Initial stack: monorepo with two isolated apps
 
-Date: 2026-09-18 · Status: accepted (authentication stance amended by ADR 0003)
+Date: 2026-09-18 · Status: accepted (authentication stance amended by ADR 0003; the hand evaluator is shared since ADR 0007)
 
 ## Context
 
@@ -11,7 +11,7 @@ Runout needs a rich frontend (the table, the queue, the player) and a backend th
 - Monorepo with **pnpm workspaces**, no extra orchestration tool for now.
 - `apps/web`: **React + Vite** (SPA; no need for SEO or SSR). The reference design is already built in React.
 - `apps/server`: **Node + NestJS** with `@nestjs/platform-ws` (native WebSocket, no Socket.IO). HTTP prefix `/api`, WebSocket at `/ws`.
-- The two apps are **isolated**: they share no packages or code.
+- The two apps are **isolated**: they share no packages or code. (Amended by ADR 0007: they share the hand evaluator, `@runout/poker`, and nothing else.)
 - Tests with **Vitest** and linting with **Oxlint** in both (what the official scaffolds ship with).
 - **No database or authentication** for now. When persistence is needed it will be **Postgres (Neon) + Drizzle**.
 

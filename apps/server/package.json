@@ -30,6 +30,7 @@
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/platform-ws": "^12.0.3",
     "@nestjs/websockets": "^12.0.3",
+    "@runout/poker": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
     "google-auth-library": "^11.3.1",

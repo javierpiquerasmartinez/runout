@@ -1,5 +1,5 @@
 import type { Action, Hand, Street } from '../hand.js';
-import { bestHand, type MadeHand } from './evaluator.js';
+import { bestHand, type MadeHand } from '@runout/poker';
 import { positions, type Position } from './positions.js';
 
 /**

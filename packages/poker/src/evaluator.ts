@@ -1,7 +1,8 @@
 /*
- * Replay's own hold'em hand evaluator: the best five-card hand a player
- * makes from their hole cards and the board. Made-hand labels come from here
- * as categories the web localises, never from the Hand History's own text.
+ * The hold'em hand evaluator both apps share (ADR 0007): the best five-card
+ * hand a player makes from their hole cards and the board. Made-hand labels
+ * come from here as categories the web localises, never from the Hand
+ * History's own text.
  */
 
 export type HandCategory =

@@ -1,9 +1,11 @@
+import type { HandCategory } from '@runout/poker'
 import { api } from '../backend/api'
 
 /*
  * A Hand with its Timeline, as the server's `GET /hands/:id` sends it. The
  * server computes everything; the web only indexes into it by Action. Shapes
- * mirror the server's (ADR 0001: no shared code).
+ * mirror the server's (ADR 0001), except the evaluator's, which both apps
+ * take from @runout/poker (ADR 0007).
  */
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river'
@@ -16,16 +18,7 @@ export type Action = { street: Street; screenName: string; allIn: boolean } & (
   | { type: 'raise'; amount: number; to: number }
 )
 
-export type HandCategory =
-  | 'high-card'
-  | 'pair'
-  | 'two-pair'
-  | 'three-of-a-kind'
-  | 'straight'
-  | 'flush'
-  | 'full-house'
-  | 'four-of-a-kind'
-  | 'straight-flush'
+export type { HandCategory }
 
 export type Rank = 'A' | 'K' | 'Q' | 'J' | '10' | '9' | '8' | '7' | '6' | '5' | '4' | '3' | '2'
 
