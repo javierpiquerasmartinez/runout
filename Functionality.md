@@ -590,7 +590,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 **H9.11 — Put the Range on a Board.** As a player, I want to pick a flop, turn and river in the Analysis, so I see which of the Range's Combos can still exist there.
 
 - I pick the Board's cards in order from a grid of 52, and pick one again to take it off; it holds no cards, a flop, a turn or a river, and asks for the rest of the flop while one is half picked. I can also type it, as `Ah7d2c`: an unknown card, a repeated one or a count other than 3, 4 or 5 is refused with what is wrong, and the Board I had stays.
-- **Flop aleatorio** deals a new flop; **Carta aleatoria** adds the turn, then the river. Neither deals a card already on the Board.
+- **Flop aleatorio** deals a new flop; **Carta aleatoria** adds the turn, then the river. Neither deals a card already on the Board, nor a Dead Card (H9.15).
 - Combos holding a Board card are switched off in the matrix, each cell dimmed by its share of them, and the Analysis counts the live Combos left, weighted by Frequency.
 - The address holds the Board too, so reloading keeps it.
 
@@ -613,8 +613,15 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 - Clicking a row toggles it in the selection; hovering a row lights it up without selecting it. The selected rows' Combos light up in the matrix, each cell in proportion to its Combos in the selection, at their Frequencies.
 - Above the tables, the selection shows its Combos and its % of the live Combos, counting each Combo once however many selected rows hold it.
-- **Limpiar selección** clears it in one click; changing the Range or the Board clears it too.
+- **Limpiar selección** clears it in one click; changing the Range, the Board or the Dead Cards (H9.15) clears it too.
 - **Guardar selección como rango** asks for a name, with the same rules and refusals as any Range (H9.2), and keeps the selected Combos at their Frequencies as a new Range without Tags. The Analysis stays as it was, its source and selection included.
+
+**H9.15 — Take my own hand out of the deck.** As a player, I want to set up to two Dead Cards, usually my own hand, so the Range counts only what my opponent can hold and I see where my hand stands.
+
+- A switch turns the Board's grid to **Cartas muertas**, where I pick up to two cards and pick one again to take it off. I can also type them, as `AhKh`: an unknown card, a repeated one, more than two or a card on the Board is refused with what is wrong, and the Dead Cards I had stay. A card is never both on the Board and dead: the grid locks it on the other side, and a Board typed with a Dead Card is refused.
+- Dead Cards switch off the Combos holding them, like the Board, and the live Combos, the Categories and their shares count only what is left. **Flop aleatorio** and **Carta aleatoria** never deal one.
+- With two Dead Cards and at least a flop, **Tu mano** shows their Made Hand and Draws on the Board, and how many of the Range's live Combos, weighted by Frequency, they are ahead of, tied with and behind as the Board stands, in Combos and %.
+- Changing the Dead Cards clears the selection. The address holds them too, so reloading keeps them.
 
 ## MVP scope and out of scope
 

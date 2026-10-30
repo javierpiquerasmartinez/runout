@@ -6,7 +6,11 @@ import {
   formatBoard,
   liveCombos,
   madeHands,
+  ownCombo,
   parseBoard,
+  parseDeadCards,
+  readDeadCards,
+  toggleDeadCard,
   readBoardCards,
   removedCombos,
   selectionOf,
@@ -278,7 +282,7 @@ describe('Made Hands', () => {
 
 /** The Draws a lone Combo has on this Board, as `AhKd` on `Ks Kd 7c`, in the table's order. */
 function drawsOfCombo(combo: string, board: string, options?: { oneCardBackdoors: boolean }): string[] {
-  return draws({ [combo]: 100 }, board.split(' '), options)
+  return draws({ [combo]: 100 }, board.split(' '), [], options)
     .filter((row) => row.combos > 0)
     .map((row) => row.category)
 }
@@ -341,7 +345,7 @@ describe('Draws', () => {
   it('are none on the river, and no backdoors on the turn', () => {
     expect(draws({ AhKh: 100 }, ['Qh', '7h', '2c', '3d', '9s'])).toEqual([])
     expect(drawsOfCombo('As5s', 'Kh 7s 2d 9c', { oneCardBackdoors: true })).toEqual([])
-    expect(draws({}, ['Kh', '7s', '2d', '9c'], { oneCardBackdoors: true }).map((row) => row.category)).not.toContain(
+    expect(draws({}, ['Kh', '7s', '2d', '9c'], [], { oneCardBackdoors: true }).map((row) => row.category)).not.toContain(
       'backdoor-two-cards',
     )
   })
@@ -370,7 +374,7 @@ describe('Draws on a Board', () => {
     // K-7-2 rainbow is too far apart for a straight draw, and nothing but aces is above a king.
     expect(categories(draws({}, ['Kh', '7s', '2d']))).toEqual(['backdoor-two-cards'])
     // A monotone flop leaves no room for a backdoor with both cards.
-    expect(categories(draws({}, ['Kh', '7h', '2h'], { oneCardBackdoors: true }))).not.toContain('backdoor-two-cards')
+    expect(categories(draws({}, ['Kh', '7h', '2h'], [], { oneCardBackdoors: true }))).not.toContain('backdoor-two-cards')
     // Nothing is above an ace.
     expect(categories(draws({}, ['Ah', '7s', '2d']))).not.toContain('overcards')
   })
@@ -432,5 +436,109 @@ describe('a selection of Categories', () => {
 
   it('is nothing when no row is selected', () => {
     expect(selectionOf(range, board, [])).toEqual({ combos: 0, share: 0, range: {} })
+  })
+})
+
+describe('Dead Cards as text', () => {
+  it('reads up to two cards, as AhKh, in any case and with tens as 10', () => {
+    expect(parseDeadCards('AhKh', [])).toEqual({ dead: ['Ah', 'Kh'] })
+    expect(parseDeadCards(' 10c ', [])).toEqual({ dead: ['Tc'] })
+    expect(parseDeadCards('', [])).toEqual({ dead: [] })
+  })
+
+  it('refuses an unknown card, a repeated one, more than two, or a card on the Board', () => {
+    expect(parseDeadCards('Ahx', [])).toEqual({ problem: { kind: 'unknown', piece: 'x' } })
+    expect(parseDeadCards('AhAh', [])).toEqual({ problem: { kind: 'repeated', card: 'Ah' } })
+    expect(parseDeadCards('AhKhQh', [])).toEqual({ problem: { kind: 'size', count: 3 } })
+    expect(parseDeadCards('AhKh', ['Kh', '7d', '2c'])).toEqual({ problem: { kind: 'on-board', card: 'Kh' } })
+  })
+})
+
+describe('Dead Cards and the Board', () => {
+  it('never share a card: a Board typed with a Dead Card is refused, naming it', () => {
+    expect(parseBoard('Ah7d2c', ['7d', 'Ks'])).toEqual({ problem: { kind: 'dead', card: '7d' } })
+    expect(parseBoard('Ah7d2c', ['Ks', 'Qs'])).toEqual({ board: ['Ah', '7d', '2c'] })
+  })
+
+  it('are read from an address only when they can be the Dead Cards beside its Board', () => {
+    expect(readDeadCards('AhKh', ['7d', '2c', '3s'])).toEqual(['Ah', 'Kh'])
+    expect(readDeadCards('AhKhQh', [])).toEqual([])
+    expect(readDeadCards('Ah7d', ['7d', '2c', '3s'])).toEqual([])
+    expect(readDeadCards('nonsense', [])).toEqual([])
+  })
+
+  it('are picked from the grid up to two, a card picked again taken off', () => {
+    expect(toggleDeadCard([], 'Ah')).toEqual(['Ah'])
+    expect(toggleDeadCard(['Ah'], 'Kh')).toEqual(['Ah', 'Kh'])
+    expect(toggleDeadCard(['Ah', 'Kh'], 'Qh')).toEqual(['Ah', 'Kh'])
+    expect(toggleDeadCard(['Ah', 'Kh'], 'Ah')).toEqual(['Kh'])
+  })
+})
+
+describe('Combos the Dead Cards remove', () => {
+  const range = { AhKh: 100, AsKs: 100, QhQd: 50, JcTc: 100 }
+  const board = ['Th', '7h', '2c']
+
+  it('are left out of every Category, as the Board leaves its own out', () => {
+    const rows = madeHands(range, board, ['As', 'Qd'])
+
+    expect(rows.flatMap((row) => row.members).sort()).toEqual(['AhKh', 'JcTc'])
+    const flushDraw = (dead: string[]) => draws(range, board, dead).find((row) => row.category === 'flush-draw')?.combos
+    expect(flushDraw([])).toBe(1)
+    expect(flushDraw(['Ah', '3d'])).toBe(0)
+    const drawing = (dead: string[]) => combinationDraws({ Jh9h: 100 }, board, dead).flatMap((row) => row.members)
+    expect(drawing([])).toEqual(['Jh9h'])
+    expect(drawing(['Jh', '3d'])).toEqual([])
+  })
+
+  it('leave the shares over the Combos still live', () => {
+    const rows = madeHands(range, board, ['As', 'Qd'])
+
+    expect(rows.find((row) => row.category === 'ace-high')).toMatchObject({ combos: 1, share: 50 })
+    expect(rows.find((row) => row.category === 'overpair')).toMatchObject({ combos: 0, share: 0 })
+  })
+
+  it('leave out what only Combos holding them could make', () => {
+    // Trips on A-A-7 needs one of the other two aces: with both dead, no Combo can make it.
+    expect(madeHands({}, ['Ah', 'Ad', '7c'], ['As', 'Ac']).map((row) => row.category)).not.toContain('trips')
+  })
+})
+
+describe('the own Combo two Dead Cards make', () => {
+  const board = ['Th', '7h', '2c']
+
+  it('has its Made Hand and Draws on the Board, whichever card was picked first', () => {
+    expect(ownCombo({}, board, ['Ah', 'Kh'])).toMatchObject({ madeHand: 'ace-high', draws: ['flush-draw', 'overcards'] })
+    expect(ownCombo({}, board, ['Kh', 'Ah'])).toMatchObject({ madeHand: 'ace-high', draws: ['flush-draw', 'overcards'] })
+    expect(ownCombo({}, ['Th', '7h', '2c', '3d', '9s'], ['Ah', 'Kh'])).toMatchObject({ madeHand: 'ace-high', draws: [] })
+  })
+
+  it('shows the one-card backdoor flush draw only when switched on', () => {
+    expect(ownCombo({}, ['Kh', '7h', '2d'], ['Ah', 'Qc'])?.draws).toEqual([])
+    expect(ownCombo({}, ['Kh', '7h', '2d'], ['Ah', 'Qc'], { oneCardBackdoors: true })?.draws).toEqual(['backdoor-one-card'])
+  })
+
+  it("is ahead of, tied with and behind the Range's live Combos as the Board stands, weighted by Frequency", () => {
+    // AhKh: ahead of Q high, tied with the other AK, behind the overpairs; AhQs holds a Dead Card.
+    const range = { AsAd: 100, KsKd: 100, QsJs: 100, AdKd: 50, AhQs: 100 }
+    const own = ownCombo(range, board, ['Ah', 'Kh'])!
+
+    expect(own.ahead).toEqual({ combos: 1, share: (1 / 3.5) * 100 })
+    expect(own.tied).toEqual({ combos: 0.5, share: (0.5 / 3.5) * 100 })
+    expect(own.behind).toEqual({ combos: 2, share: (2 / 3.5) * 100 })
+  })
+
+  it('is at 0 against a Range with nothing live', () => {
+    expect(ownCombo({ AhAd: 100 }, board, ['Ah', 'Kh'])).toMatchObject({
+      ahead: { combos: 0, share: 0 },
+      tied: { combos: 0, share: 0 },
+      behind: { combos: 0, share: 0 },
+    })
+  })
+
+  it('is none without two Dead Cards, or without a flop', () => {
+    expect(ownCombo({}, board, ['Ah'])).toBeNull()
+    expect(ownCombo({}, [], ['Ah', 'Kh'])).toBeNull()
+    expect(ownCombo({}, ['Th', '7h'], ['Ah', 'Kh'])).toBeNull()
   })
 })

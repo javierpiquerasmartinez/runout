@@ -440,8 +440,8 @@ describe('LabAnalysisPage · the Board', () => {
 
     await typeBoard('As7d2c')
 
-    expect(cell('AA').getAttribute('title')).toBe('AA · 6 combos · 100 % · 3 removed by the board')
-    expect(cell('AKs').getAttribute('title')).toBe('AKs · 4 combos · 50 % · 1 removed by the board')
+    expect(cell('AA').getAttribute('title')).toBe('AA · 6 combos · 100 % · 3 removed by the board or the dead cards')
+    expect(cell('AKs').getAttribute('title')).toBe('AKs · 4 combos · 50 % · 1 removed by the board or the dead cards')
     expect(cell('KQo').getAttribute('title')).toBe('KQo · 12 combos · 0 %')
     expect(live()).toBe('4.5 live combos')
   })
@@ -472,6 +472,140 @@ describe('LabAnalysisPage · the Board', () => {
 
     expect(within(board()).getByRole('button', { name: 'Flop aleatorio' })).toBeTruthy()
     expect(within(board()).getByRole('button', { name: /^Carta aleatoria/ })).toBeTruthy()
+  })
+})
+
+describe('LabAnalysisPage · the Dead Cards', () => {
+  const board = () => screen.getByRole('region', { name: 'Board' })
+  const picker = () => within(board()).getByRole('group', { name: "Pick the board's cards" })
+  const card = (name: string | RegExp) => within(picker()).getByRole('button', { name })
+  const pressed = () =>
+    within(picker())
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.getAttribute('aria-label'))
+  const pickFor = (target: 'Board' | 'Dead cards') => userEvent.click(within(board()).getByRole('radio', { name: target }))
+  const deadField = () => within(board()).getByRole<HTMLInputElement>('textbox', { name: 'Dead cards as text' })
+  const boardField = () => within(board()).getByRole<HTMLInputElement>('textbox', { name: 'Board as text' })
+  const typeInto = async (field: HTMLInputElement, text: string) => {
+    await userEvent.clear(field)
+    await userEvent.type(field, `${text}{Enter}`)
+  }
+  const live = () => screen.getByText(/live combos/).textContent
+  const ownCombo = () => screen.queryByRole('region', { name: 'Your hand' })
+
+  it('are picked from the same grid, switched to Dead cards, up to two', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Th7h2c')
+
+    await pickFor('Dead cards')
+    expect(pressed()).toEqual([])
+    await userEvent.click(card('A of hearts'))
+    await userEvent.click(card('K of hearts'))
+    expect(pressed()).toEqual(['A of hearts', 'K of hearts'])
+    expect(deadField().value).toBe('AhKh')
+    expect(card(/^Q of hearts/).getAttribute('aria-label')).toBe('Q of hearts. There are already two dead cards.')
+
+    await userEvent.click(card('K of hearts'))
+    expect(deadField().value).toBe('Ah')
+
+    await pickFor('Board')
+    expect(pressed()).toEqual(['10 of hearts', '7 of hearts', '2 of clubs'])
+  })
+
+  it('never share a card with the Board', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Th7h2c&dead=Ah')
+
+    expect(card(/^A of hearts/).getAttribute('aria-label')).toBe('A of hearts. It is a dead card.')
+    await pickFor('Dead cards')
+    expect(card(/^10 of hearts/).getAttribute('aria-label')).toBe('10 of hearts. It is on the board.')
+  })
+
+  it('are typed as text, refused whole with what is wrong', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Th7h2c&dead=Ah')
+
+    await typeInto(deadField(), 'AhKhQh')
+    expect(within(board()).getByRole('alert').textContent).toBe('There are at most 2 dead cards, not 3. They were left as they were.')
+    await typeInto(deadField(), 'AhTh')
+    expect(within(board()).getByRole('alert').textContent).toBe('Th is on the board. The dead cards were left as they were.')
+    await typeInto(deadField(), 'Ahx')
+    expect(within(board()).getByRole('alert').textContent).toBe('“x” isn’t a card. The dead cards were left as they were.')
+    expect(deadField().value).toBe('Ahx')
+
+    await typeInto(deadField(), 'as kd')
+    expect(deadField().value).toBe('AsKd')
+    expect(within(board()).queryByRole('alert')).toBeNull()
+  })
+
+  it('refuse a Board typed with one of them', async () => {
+    renderAnalysis('en', '/lab/analysis?dead=Ah')
+
+    await typeInto(boardField(), 'Ah7d2c')
+
+    expect(within(board()).getByRole('alert').textContent).toBe('Ah is a dead card. The board was left as it was.')
+    expect(boardField().value).toBe('Ah7d2c')
+    expect(address()).toEqual({ dead: 'Ah' })
+  })
+
+  it('switch off the Combos holding them, leaving the shares over what is left', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKK&board=Th7h2c')
+    expect(live()).toBe('12.0 live combos')
+
+    await typeInto(deadField(), 'AhKs')
+
+    expect(cell('AA').getAttribute('title')).toBe('AA · 6 combos · 100 % · 3 removed by the board or the dead cards')
+    expect(live()).toBe('6.0 live combos')
+    const overpair = within(screen.getByRole('table', { name: 'Made hands' }))
+      .getAllByRole('row')
+      .map((row) => [...row.children].map((each) => each.textContent))
+      .find((cells) => cells[0] === 'Overpair')
+    expect(overpair).toEqual(['Overpair', '6.0', '100.0 %'])
+  })
+
+  it('are never dealt onto the Board', async () => {
+    // The first card left in the deck, every time.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    renderAnalysis('en', '/lab/analysis?dead=AsQs')
+
+    await userEvent.click(within(board()).getByRole('button', { name: 'Random flop' }))
+    expect(boardField().value).toBe('KsJsTs')
+    await userEvent.click(within(board()).getByRole('button', { name: /^Random card/ }))
+    expect(boardField().value).toBe('KsJsTs9s')
+  })
+
+  it('make, when two, the own Combo: its Made Hand and Draws, and where it stands against the Range', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CQJs&board=Th7h2c&dead=AhKh')
+
+    expect(ownCombo()!.textContent).toContain('Ace high · Flush draw, Overcards')
+    expect(within(ownCombo()!).getByText(/^Ahead/).textContent).toBe('Ahead of 4.0 combos · 57.1 %')
+    expect(within(ownCombo()!).getByText(/^Tied/).textContent).toBe('Tied with 0.0 combos · 0.0 %')
+    expect(within(ownCombo()!).getByText(/^Behind/).textContent).toBe('Behind 3.0 combos · 42.9 %')
+  })
+
+  it('make no own Combo with one Dead Card, nor before the flop', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&board=Th7h2c&dead=Ah')
+    expect(ownCombo()).toBeNull()
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?range=AA&dead=AhKh')
+    expect(ownCombo()).toBeNull()
+  })
+
+  it('are kept in the address, replacing it, and restored from it', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Th7h2c')
+
+    await typeInto(deadField(), 'AhKh')
+    await waitFor(() => expect(address()).toEqual({ board: 'Th7h2c', dead: 'AhKh' }))
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?board=Th7h2c&dead=AhKh')
+    expect(deadField().value).toBe('AhKh')
+  })
+
+  it('are in Spanish too', async () => {
+    renderAnalysis('es', '/lab/analysis?range=AA&board=Th7h2c&dead=AhKh')
+
+    expect(within(board()).getByRole('radio', { name: 'Cartas muertas' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Tu mano' }).textContent).toContain('As alto')
   })
 })
 
@@ -608,8 +742,8 @@ describe('LabAnalysisPage · selecting Categories', () => {
     expect(selected()).toEqual(['Overpair', 'Top pair'])
     expect(selectionText()).toBe('9.0 combos · 75.0 % of the live combos')
     expect(title('AA')).toBe('AA · 6 combos · 100 % · 6 in the selection')
-    expect(title('KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board · 3 in the selection')
-    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board')
+    expect(title('KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
+    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board or the dead cards')
 
     await userEvent.click(row('Overpair'))
 
@@ -634,12 +768,12 @@ describe('LabAnalysisPage · selecting Categories', () => {
     renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
 
     await userEvent.hover(row('Set'))
-    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board · 3 in the selection')
+    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board or the dead cards · 3 in the selection')
     expect(selected()).toEqual([])
     expect(selection()).toBeNull()
 
     await userEvent.unhover(row('Set'))
-    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board')
+    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board or the dead cards')
   })
 
   it('clears in one click', async () => {

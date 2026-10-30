@@ -6,8 +6,9 @@ import { useIdentity } from '../identity/context'
 import { redirect, useSearch } from '../routing'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
+import { Card } from '../ui/Card'
 import { Toggle } from '../ui/Toggle'
-import { combinationDraws, draws, FLOP_CARDS, liveCombos, madeHands, removedCombos, selectionOf } from './board'
+import { combinationDraws, draws, FLOP_CARDS, liveCombos, madeHands, ownCombo, removedCombos, selectionOf, tenAs10, type OwnCombo } from './board'
 import { BoardPicker } from './BoardPicker'
 import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
 import { CategoriesTable } from './CategoriesTable'
@@ -30,10 +31,11 @@ interface RangeSummary {
   name: string
 }
 
-/** The Categories picked, on the Range and Board they were picked on: a change to either clears them. */
+/** The Categories picked, on the Range, Board and Dead Cards they were picked on: a change to any clears them. */
 interface PickedCategories {
   range: Range
   board: readonly string[]
+  dead: readonly string[]
   categories: ReadonlySet<string>
   /** The name the selection was last saved under, until it changes. */
   savedUnder?: string
@@ -92,7 +94,7 @@ function useAnalysisState(): [AnalysisState, (next: (state: AnalysisState) => An
 export function LabAnalysisPage() {
   const { t, formatNumber } = useI18n()
   const { token } = useIdentity()
-  const [{ range, sourceId, board }, changeState] = useAnalysisState()
+  const [{ range, sourceId, board, dead }, changeState] = useAnalysisState()
   const [brush, setBrush] = useState<number>(100)
   /** The Account's saved Ranges, to load one; empty until they are read. */
   const [saved, setSaved] = useState<RangeSummary[]>([])
@@ -110,9 +112,11 @@ export function LabAnalysisPage() {
   const [picked, setPicked] = useState<PickedCategories | null>(null)
   /**
    * The Category under the pointer or the focus, lit up without being selected,
-   * on the Range and Board it was hovered on: a row that leaves with them sends no leave event.
+   * on the Range, Board and Dead Cards it was hovered on: a row that leaves with them sends no leave event.
    */
-  const [hover, setHover] = useState<{ range: Range; board: readonly string[]; category: string } | null>(null)
+  const [hover, setHover] = useState<{ range: Range; board: readonly string[]; dead: readonly string[]; category: string } | null>(
+    null,
+  )
   /** Whether the Draws show the one-card backdoor flush draw: off by default, as in Flopzilla. */
   const [oneCardBackdoors, setOneCardBackdoors] = useState(false)
 
@@ -179,25 +183,30 @@ export function LabAnalysisPage() {
   }
 
   // Every Combo of the deck is classified to tell which Categories can happen: not on every render.
-  const madeHandRows = useMemo(() => madeHands(range, board), [range, board])
-  const drawRows = useMemo(() => draws(range, board, { oneCardBackdoors }), [range, board, oneCardBackdoors])
-  const combinationDrawRows = useMemo(() => combinationDraws(range, board), [range, board])
+  const madeHandRows = useMemo(() => madeHands(range, board, dead), [range, board, dead])
+  const drawRows = useMemo(() => draws(range, board, dead, { oneCardBackdoors }), [range, board, dead, oneCardBackdoors])
+  const combinationDrawRows = useMemo(() => combinationDraws(range, board, dead), [range, board, dead])
+  const own = useMemo(() => ownCombo(range, board, dead, { oneCardBackdoors }), [range, board, dead, oneCardBackdoors])
+  /** The cards out of the deck: the Board's and the Dead Cards. */
+  const out = useMemo(() => [...board, ...dead], [board, dead])
 
   const rows = [...madeHandRows, ...drawRows, ...combinationDrawRows]
-  const selected = picked !== null && picked.range === range && picked.board === board ? picked.categories : NO_CATEGORIES
-  const hovered = hover !== null && hover.range === range && hover.board === board ? hover.category : null
-  const selection = selectionOf(range, board, rows.filter((row) => selected.has(row.category)))
+  const pickedHere = (on: { range: Range; board: readonly string[]; dead: readonly string[] }) =>
+    on.range === range && on.board === board && on.dead === dead
+  const selected = picked !== null && pickedHere(picked) ? picked.categories : NO_CATEGORIES
+  const hovered = hover !== null && pickedHere(hover) ? hover.category : null
+  const selection = selectionOf(range, out, rows.filter((row) => selected.has(row.category)))
   // A hovered row lights up with the selection, as it would once clicked.
-  const highlighted = selectionOf(range, board, rows.filter((row) => selected.has(row.category) || row.category === hovered)).range
+  const highlighted = selectionOf(range, out, rows.filter((row) => selected.has(row.category) || row.category === hovered)).range
   const toggle = (category: string) => {
     const categories = new Set(selected)
     if (!categories.delete(category)) categories.add(category)
-    setPicked({ range, board, categories })
+    setPicked({ range, board, dead, categories })
   }
   const categoriesTable = {
     selected,
     onToggle: toggle,
-    onHover: (category: string | null) => setHover(category === null ? null : { range, board, category }),
+    onHover: (category: string | null) => setHover(category === null ? null : { range, board, dead, category }),
   }
 
   const shownSource = source !== null && source.id === sourceId ? source : null
@@ -253,17 +262,23 @@ export function LabAnalysisPage() {
                 range={range}
                 brush={brush}
                 onPaint={paint}
-                removed={(handClass) => removedCombos(handClass, board)}
+                removed={(handClass) => removedCombos(handClass, out)}
                 highlighted={highlighted}
               />
-              <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, board)) })}</p>
+              <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, out)) })}</p>
               <Stats stats={rangeStats(range)} />
               <RangeText range={range} onImport={(combos) => setCombos(() => combos)} />
             </section>
           </div>
           {/* The Board and how the Range hits it, in one column beside the matrix, so all of it is in view at once. */}
           <div className="analysis__panel">
-            <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
+            <BoardPicker
+              board={board}
+              dead={dead}
+              onChange={(cards) => change((state) => ({ ...state, board: cards }))}
+              onDeadChange={(cards) => change((state) => ({ ...state, dead: cards }))}
+            />
+            {own && <OwnComboSummary own={own} dead={dead} />}
             {selected.size > 0 && (
               <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
                 <span className="lab__label">{t('lab.analysis.selection')}</span>
@@ -354,6 +369,36 @@ export function LabAnalysisPage() {
         />
       )}
     </div>
+  )
+}
+
+/** The own Combo two Dead Cards make: its Made Hand and Draws, and where it stands against the Range on the Board. */
+function OwnComboSummary({ own, dead }: { own: OwnCombo; dead: readonly string[] }) {
+  const { t, formatNumber } = useI18n()
+  const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const description = [
+    t(`lab.analysis.madeHand.${own.madeHand}`),
+    own.draws.map((draw) => t(`lab.analysis.draw.${draw}`)).join(', '),
+  ].filter((part) => part !== '')
+  return (
+    <section className="analysis__own" aria-label={t('lab.analysis.own')}>
+      <span className="lab__label">{t('lab.analysis.own')}</span>
+      <div className="analysis__own-hand">
+        <span className="analysis__own-cards" aria-hidden="true">
+          {dead.map((card) => (
+            <Card key={card} card={tenAs10(card)} size="list" />
+          ))}
+        </span>
+        <p className="analysis__own-name">{description.join(' · ')}</p>
+      </div>
+      <ul className="analysis__own-standing ro-mono">
+        {(['ahead', 'tied', 'behind'] as const).map((side) => (
+          <li key={side}>
+            {t(`lab.analysis.own.${side}`, { combos: oneDecimal(own[side].combos), percent: oneDecimal(own[side].share) })}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
