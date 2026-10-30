@@ -520,9 +520,10 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 **H9.1 — Open the Lab.** As a player, I want a place to build Ranges, so I can study preflop where I already review my Hands.
 
 - **Laboratorio** sits in the shared header after **Biblioteca** and **Salas**, and is marked while I am in the Lab (H8.9).
-- `/lab` takes me to `/lab/ranges`, which always opens on an empty 13×13 matrix, ready to paint, with my saved Ranges listed beside it.
+- `/lab` takes me to the Analysis, `/lab/analysis` (H9.10). A sub-navigation **Análisis | Rangos** sits on top of both Lab screens and marks the one I am on.
+- `/lab/ranges` always opens on an empty 13×13 matrix, ready to paint, with my saved Ranges listed beside it.
 - The matrix is laid out the usual way: pairs on the diagonal, suited above it, offsuit below, aces top-left. Each cell is labelled with its Hand Class, and pairs, suited and offsuit cells have slightly different backgrounds.
-- Without an Account, `/lab`, `/lab/ranges` and `/lab/ranges/:id` send me to `/login`. An anonymous Participant has no way into the Lab.
+- Without an Account, `/lab`, `/lab/analysis`, `/lab/ranges` and `/lab/ranges/:id` send me to `/login`. An anonymous Participant has no way into the Lab.
 
 **H9.2 — Save and reopen a Range.** As a player, I want to keep a Range under a name, so I can come back to it.
 
@@ -576,6 +577,15 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 - The Lab is built for desktop. On a narrow screen the side column stacks above the work area, the stats and the text box go below the matrix, and nothing scrolls sideways.
 - A tap paints one cell. Dragging is not offered on touch: a finger that moves scrolls the page.
+
+**H9.10 — Study a Range in the Analysis.** As a player, I want to bring a Range into the Analysis and work on it without touching the saved one.
+
+- The Analysis holds one Range in a compact matrix. I load one of my saved Ranges from a list, paste one as text (refused whole at the first piece not understood, as in H9.6), paint it with the same brush as on **Rangos**, or **Limpiar** it.
+- It shows the Range's width as on **Rangos** (H9.4), updating as I paint.
+- It shows the name of the saved Range it came from, or that it is unsaved, and **Modificado** once its Combos differ from that saved Range. Nothing I do in the Analysis writes the saved Range.
+- **Guardar como rango** asks for a name, with the same rules and refusals as any Range (H9.2), keeps it as a new Range without Tags, and leaves me in the Analysis with the new Range as its source.
+- **Analizar** on **Rangos** opens the Analysis with the open Range as it stands on screen, unsaved changes included, without asking to discard them.
+- The address holds the Range as text and the saved Range's id, and is replaced rather than added to on every change, so reloading or going back keeps it. A saved Range that is no longer mine is dropped from the address, keeping its Combos.
 
 ## MVP scope and out of scope
 

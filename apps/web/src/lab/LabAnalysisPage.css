@@ -1,0 +1,102 @@
+/*
+ * The Lab's Analysis: one side, its Range's matrix more compact than on
+ * Rangos, with its numbers and text under it. Laid out for a second side
+ * beside it, and the Board, to come.
+ */
+
+/* The sub-navigation already says where this is; the title is for screen readers. */
+.analysis__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.analysis__sides {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.analysis__side {
+  flex: 1 1 360px;
+  max-width: 440px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.analysis__side-name {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.analysis__side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.analysis__source {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.analysis__load {
+  height: var(--control-compact);
+  max-width: 180px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-control);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+}
+.analysis__load:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Compact: the cells' labels shrink with the matrix. */
+.analysis__side .lab__cell {
+  font-size: clamp(8px, 0.8vw, 11px);
+}
+.analysis__side .lab__figure-value {
+  font-size: 22px;
+}
+
+.analysis__save-name {
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-control);
+  color: var(--text-primary);
+  font: 500 14px var(--font-sans);
+}
+.analysis__save-name:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+@media (max-width: 760px) {
+  .analysis__side {
+    max-width: none;
+  }
+  .analysis__side .lab__cell {
+    font-size: clamp(7px, 2.4vw, 11px);
+  }
+}

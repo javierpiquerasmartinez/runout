@@ -241,20 +241,30 @@ describe('Routes · the Lab, only for an Account', () => {
     expect(within(nav).getByRole('link', { name: 'Lab' }).getAttribute('aria-current')).toBe('page')
   })
 
-  it('sends an Account from /lab to /lab/ranges, in place of /lab', async () => {
+  it('shows /lab/analysis to an Account, with Lab marked in the header', async () => {
+    renderAt('/lab/analysis', account())
+
+    expect(await screen.findByRole('heading', { name: 'Analysis' })).toBeTruthy()
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    expect(within(nav).getByRole('link', { name: 'Lab' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('sends an Account from /lab to /lab/analysis, in place of /lab', async () => {
     window.history.replaceState(null, '', '/')
     window.history.pushState(null, '', '/lab')
     const entries = window.history.length
     renderAt('/lab', account())
 
-    expect(await lab()).toBeTruthy()
-    expect(window.location.pathname).toBe('/lab/ranges')
+    expect(await screen.findByRole('heading', { name: 'Analysis' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/lab/analysis')
     expect(window.history.length).toBe(entries)
   })
 
   it.each([
     ['/lab', 'no identity', visitor],
     ['/lab', 'an anonymous identity', anonymous],
+    ['/lab/analysis', 'no identity', visitor],
+    ['/lab/analysis', 'an anonymous identity', anonymous],
     ['/lab/ranges', 'no identity', visitor],
     ['/lab/ranges', 'an anonymous identity', anonymous],
     ['/lab/ranges/some-range', 'no identity', visitor],
