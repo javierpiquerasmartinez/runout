@@ -515,7 +515,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 ## E9 · Lab
 
-The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes no equity against a Range. Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
+The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, then studies them on a Board in the Analysis, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes no equity against a Range. Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
 
 **H9.1 — Open the Lab.** As a player, I want a place to build Ranges, so I can study preflop where I already review my Hands.
 
