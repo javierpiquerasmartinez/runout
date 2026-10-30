@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
@@ -6,10 +6,11 @@ import { useIdentity } from '../identity/context'
 import { redirect, useSearch } from '../routing'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
-import { liveCombos, removedCombos } from './board'
+import { liveCombos, madeHands, removedCombos } from './board'
 import { BoardPicker } from './BoardPicker'
 import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
 import { LabNav } from './LabNav'
+import { MadeHandsTable } from './MadeHandsTable'
 import { EMPTY_RANGE, rangeStats, sameRange, withHandClass, type HandClass, type Range } from './range'
 import { Brush, RangeMatrix, RangeText, Stats } from './RangeControls'
 import './LabRangesPage.css'
@@ -152,6 +153,9 @@ export function LabAnalysisPage() {
     change((state) => ({ ...state, sourceId: range.id }))
   }
 
+  // Every Combo of the deck is classified to tell which Made Hands can happen: not on every render.
+  const madeHandRows = useMemo(() => madeHands(range, board), [range, board])
+
   const shownSource = source !== null && source.id === sourceId ? source : null
   const changed = shownSource !== null && !sameRange(range, shownSource.combos)
   const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -209,6 +213,7 @@ export function LabAnalysisPage() {
           </div>
           <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
         </div>
+        {madeHandRows.length > 0 && <MadeHandsTable rows={madeHandRows} />}
       </main>
       {savingAs && <SaveAsDialog combos={range} onClose={() => setSavingAs(false)} onSaved={savedAs} />}
     </div>

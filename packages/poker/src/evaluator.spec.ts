@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestHand, cardCode, strength } from './index.js';
+import { bestHand, cardCode, categoryOf, strength } from './index.js';
 
 describe('bestHand', () => {
   it('names a full house by its trips, then its pair', () => {
@@ -96,6 +96,12 @@ describe('strength', () => {
   it('agrees with bestHand on the category of every hand in the ladder', () => {
     for (const [category, cards] of ladder) {
       expect(bestHand(cards).category, cards.join(' ')).toBe(category);
+    }
+  });
+
+  it('names the category of every hand in the ladder', () => {
+    for (const [category, cards] of ladder) {
+      expect(categoryOf(of(cards)), cards.join(' ')).toBe(category);
     }
   });
 
