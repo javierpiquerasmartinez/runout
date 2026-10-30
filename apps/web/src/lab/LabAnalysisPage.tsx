@@ -211,9 +211,12 @@ export function LabAnalysisPage() {
               <RangeText range={range} onImport={(combos) => setCombos(() => combos)} />
             </section>
           </div>
-          <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
+          {/* The Board and how the Range hits it, in one column beside the matrix, so all of it is in view at once. */}
+          <div className="analysis__panel">
+            <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
+            {madeHandRows.length > 0 && <MadeHandsTable rows={madeHandRows} />}
+          </div>
         </div>
-        {madeHandRows.length > 0 && <MadeHandsTable rows={madeHandRows} />}
       </main>
       {savingAs && <SaveAsDialog combos={range} onClose={() => setSavingAs(false)} onSaved={savedAs} />}
     </div>

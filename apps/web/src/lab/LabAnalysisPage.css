@@ -90,6 +90,15 @@
   color: var(--text-secondary);
 }
 
+/* The Board, with the Categories under it: beside the matrix, so neither needs scrolling to. */
+.analysis__panel {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 /* ---- The Board: its cards, the 52 to pick from, its text and the random deals ---- */
 .analysis__board {
   flex: 0 1 auto;
@@ -193,23 +202,21 @@
   }
 }
 
-/* ---- The Categories: how the Range hits the Board ---- */
+/* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
 .analysis__categories {
   width: 100%;
-  max-width: 440px;
-  margin-top: 32px;
   border-collapse: collapse;
   font-size: 13px;
 }
 .analysis__categories-title {
-  padding-bottom: 10px;
+  padding-bottom: 6px;
   text-align: left;
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: 18px;
 }
 .analysis__categories th,
 .analysis__categories td {
-  padding: 6px 0;
+  padding: 4px 0;
   border-bottom: 1px solid var(--color-border);
   text-align: right;
   font-weight: 400;
