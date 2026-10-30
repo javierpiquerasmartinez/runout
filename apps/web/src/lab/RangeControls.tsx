@@ -79,16 +79,20 @@ export function Brush({ brush, onChange }: { brush: number; onChange: (frequency
  * left by its Frequency. Pressing a cell starts a stroke that paints, or takes
  * out, every cell the pointer then crosses until it is released anywhere. A
  * touch has no stroke: a tap paints the one cell, and a finger that moves
- * scrolls the page instead.
+ * scrolls the page instead. Combos `removed` from the deck, by a Board,
+ * switch off their share of the cell.
  */
 export function RangeMatrix({
   range,
   brush,
   onPaint,
+  removed,
 }: {
   range: Range
   brush: number
   onPaint: (handClass: HandClass, frequency: number) => void
+  /** How many of a Hand Class's Combos can no longer be dealt. */
+  removed?: (handClass: HandClass) => number
 }) {
   const { t } = useI18n()
   /** The stroke under way: the Frequency its first cell decided, where the pointer last was and the Hand Class last painted. */
@@ -152,6 +156,12 @@ export function RangeMatrix({
         const { mixed } = frequency
         // A mixed cell holds some Combos, however low its average rounds.
         const value = mixed ? Math.max(1, Math.round(frequency.value)) : frequency.value
+        const removedCount = removed?.(handClass) ?? 0
+        const title = t(mixed ? 'lab.cell.mixedTitle' : 'lab.cell.title', {
+          handClass: handClass.name,
+          combos: handClass.combos.length,
+          frequency: value,
+        })
         return (
           <button
             key={handClass.name}
@@ -164,16 +174,15 @@ export function RangeMatrix({
             data-mixed={mixed || undefined}
             aria-pressed={value > 0}
             aria-label={handClass.name}
-            title={t(mixed ? 'lab.cell.mixedTitle' : 'lab.cell.title', {
-              handClass: handClass.name,
-              combos: handClass.combos.length,
-              frequency: value,
-            })}
+            title={removedCount > 0 ? t('lab.cell.removed', { title, removed: removedCount }) : title}
             onPointerDown={(event) => start(event, handClass)}
             // A mouse or pen paints on press; a tap, or a click from the keyboard (no pointer, detail 0), paints here.
             onClick={(event) => (event.detail === 0 || pressedByTouch.current) && onPaint(handClass, frequencyFrom(handClass))}
           >
             <span className="lab__cell-fill" style={{ width: `${value}%` }} />
+            {removedCount > 0 && (
+              <span className="lab__cell-removed" style={{ width: `${(removedCount / handClass.combos.length) * 100}%` }} />
+            )}
             <span className="lab__cell-label">{handClass.name}</span>
             {(mixed || (value > 0 && value < 100)) && (
               <span className="lab__cell-frequency">

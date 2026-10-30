@@ -6,6 +6,8 @@ import { useIdentity } from '../identity/context'
 import { redirect, useSearch } from '../routing'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
+import { liveCombos, removedCombos } from './board'
+import { BoardPicker } from './BoardPicker'
 import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
 import { LabNav } from './LabNav'
 import { EMPTY_RANGE, rangeStats, sameRange, withHandClass, type HandClass, type Range } from './range'
@@ -75,9 +77,9 @@ function useAnalysisState(): [AnalysisState, (next: (state: AnalysisState) => An
  * or going back keeps it.
  */
 export function LabAnalysisPage() {
-  const { t } = useI18n()
+  const { t, formatNumber } = useI18n()
   const { token } = useIdentity()
-  const [{ range, sourceId }, changeState] = useAnalysisState()
+  const [{ range, sourceId, board }, changeState] = useAnalysisState()
   const [brush, setBrush] = useState<number>(100)
   /** The Account's saved Ranges, to load one; empty until they are read. */
   const [saved, setSaved] = useState<RangeSummary[]>([])
@@ -135,7 +137,7 @@ export function LabAnalysisPage() {
       const range = await api<SavedRange>(`/lab/ranges/${encodeURIComponent(id)}`, { token })
       sourceRef.current = range
       setSource(range)
-      change(() => ({ range: range.combos, sourceId: range.id }))
+      change((state) => ({ ...state, range: range.combos, sourceId: range.id }))
     } catch (error) {
       setFailure(reasonOf(error))
     }
@@ -152,6 +154,7 @@ export function LabAnalysisPage() {
 
   const shownSource = source !== null && source.id === sourceId ? source : null
   const changed = shownSource !== null && !sameRange(range, shownSource.combos)
+  const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
   return (
     <div className="lab">
@@ -160,47 +163,51 @@ export function LabAnalysisPage() {
       <main className="lab__main">
         <h1 className="analysis__title">{t('lab.analysis')}</h1>
         <Brush brush={brush} onChange={setBrush} />
-        <div className="analysis__sides">
-          <section className="analysis__side" aria-label={t('lab.analysis.side')}>
-            <div className="analysis__side-name">
-              <h2 className="analysis__source">
-                {sourceId === null ? t('lab.analysis.unsaved') : (shownSource?.name ?? '…')}
-              </h2>
-              {changed && <span className="lab__unsaved">{t('lab.analysis.changed')}</span>}
-            </div>
-            <div className="analysis__side-actions">
-              <select
-                className="analysis__load"
-                value=""
-                aria-label={t('lab.analysis.load')}
-                onChange={(event) => void load(event.target.value)}
-              >
-                <option value="" disabled>
-                  {t('lab.analysis.loadPlaceholder')}
-                </option>
-                {saved.map((each) => (
-                  <option key={each.id} value={each.id}>
-                    {each.name}
+        <div className="analysis__body">
+          <div className="analysis__sides">
+            <section className="analysis__side" aria-label={t('lab.analysis.side')}>
+              <div className="analysis__side-name">
+                <h2 className="analysis__source">
+                  {sourceId === null ? t('lab.analysis.unsaved') : (shownSource?.name ?? '…')}
+                </h2>
+                {changed && <span className="lab__unsaved">{t('lab.analysis.changed')}</span>}
+              </div>
+              <div className="analysis__side-actions">
+                <select
+                  className="analysis__load"
+                  value=""
+                  aria-label={t('lab.analysis.load')}
+                  onChange={(event) => void load(event.target.value)}
+                >
+                  <option value="" disabled>
+                    {t('lab.analysis.loadPlaceholder')}
                   </option>
-                ))}
-              </select>
-              <span className="lab__spacer" />
-              <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
-                {t('lab.ranges.clear')}
-              </Button>
-              <Button variant="secondary" size="compact" onClick={() => setSavingAs(true)}>
-                {t('lab.analysis.saveAs')}
-              </Button>
-            </div>
-            {failure && (
-              <p className="lab__failure" role="alert">
-                {failure === 'range-not-found' ? t('lab.ranges.unavailable') : t(`reason.${failure}`)}
-              </p>
-            )}
-            <RangeMatrix range={range} brush={brush} onPaint={paint} />
-            <Stats stats={rangeStats(range)} />
-            <RangeText range={range} onImport={(combos) => setCombos(() => combos)} />
-          </section>
+                  {saved.map((each) => (
+                    <option key={each.id} value={each.id}>
+                      {each.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="lab__spacer" />
+                <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
+                  {t('lab.ranges.clear')}
+                </Button>
+                <Button variant="secondary" size="compact" onClick={() => setSavingAs(true)}>
+                  {t('lab.analysis.saveAs')}
+                </Button>
+              </div>
+              {failure && (
+                <p className="lab__failure" role="alert">
+                  {failure === 'range-not-found' ? t('lab.ranges.unavailable') : t(`reason.${failure}`)}
+                </p>
+              )}
+              <RangeMatrix range={range} brush={brush} onPaint={paint} removed={(handClass) => removedCombos(handClass, board)} />
+              <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, board)) })}</p>
+              <Stats stats={rangeStats(range)} />
+              <RangeText range={range} onImport={(combos) => setCombos(() => combos)} />
+            </section>
+          </div>
+          <BoardPicker board={board} onChange={(cards) => change((state) => ({ ...state, board: cards }))} />
         </div>
       </main>
       {savingAs && <SaveAsDialog combos={range} onClose={() => setSavingAs(false)} onSaved={savedAs} />}

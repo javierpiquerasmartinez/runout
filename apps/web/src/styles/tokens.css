@@ -69,6 +69,8 @@
   /* Range fill: a Hand Class in the Range, on the Lab's matrix, with the label written over it */
   --range-fill: #a98be8;
   --on-range-fill: #0b0f0e;
+  /* Combos a Board removes: their share of the cell, switched off over the fill */
+  --range-removed: rgb(11 15 14 / 72%);
 
   /* Disabled (locked) */
   --disabled-bg: #0f1413;
@@ -263,6 +265,7 @@
 
   --range-fill: #7d5fd0;
   --on-range-fill: #ffffff;
+  --range-removed: rgb(255 255 255 / 75%);
 
   --graph-violet: #6a4bb5;
   --graph-pink: #b2366f;

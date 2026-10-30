@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -59,6 +59,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   window.history.replaceState(null, '', '/')
 })
 
@@ -332,5 +333,144 @@ describe('LabAnalysisPage · saving as a new Range', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar como rango' }))
 
     expect(screen.getByRole('dialog', { name: 'Guardar como un rango nuevo' })).toBeTruthy()
+  })
+})
+
+describe('LabAnalysisPage · the Board', () => {
+  const board = () => screen.getByRole('region', { name: 'Board' })
+  const picker = () => within(board()).getByRole('group', { name: "Pick the board's cards" })
+  const card = (name: string | RegExp) => within(picker()).getByRole('button', { name })
+  const onBoard = () =>
+    within(picker())
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.getAttribute('aria-label'))
+  const boardField = () => within(board()).getByRole<HTMLInputElement>('textbox', { name: 'Board as text' })
+  const typeBoard = async (text: string) => {
+    await userEvent.clear(boardField())
+    await userEvent.type(boardField(), `${text}{Enter}`)
+  }
+  const live = () => screen.getByText(/live combos/).textContent
+
+  it('opens empty, with all 52 cards to pick from', () => {
+    renderAnalysis()
+
+    expect(within(picker()).getAllByRole('button')).toHaveLength(52)
+    expect(onBoard()).toEqual([])
+    expect(boardField().value).toBe('')
+  })
+
+  it('fills in order from the grid, asking for the rest of the flop, and takes a card off when it is picked again', async () => {
+    renderAnalysis()
+
+    await userEvent.click(card('A of hearts'))
+    await userEvent.click(card('7 of diamonds'))
+    expect(within(board()).getByText('Pick 1 more card for the flop.')).toBeTruthy()
+    await userEvent.click(card('2 of clubs'))
+    await userEvent.click(card('10 of spades'))
+
+    expect(boardField().value).toBe('Ah7d2cTs')
+    expect(onBoard()).toEqual(['10 of spades', 'A of hearts', '7 of diamonds', '2 of clubs'])
+    expect(within(board()).queryByText(/more card/)).toBeNull()
+
+    await userEvent.click(card('7 of diamonds'))
+    expect(boardField().value).toBe('Ah2cTs')
+  })
+
+  it('takes no sixth card', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Ah7d2cTs9h')
+
+    expect(card(/^8 of hearts/).getAttribute('aria-disabled')).toBe('true')
+    expect(card(/^8 of hearts/).getAttribute('aria-label')).toBe('8 of hearts. The board already has five cards.')
+    expect(card('A of hearts').getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('is typed as text', async () => {
+    renderAnalysis()
+
+    await typeBoard('ah 7d 10c')
+
+    expect(onBoard()).toEqual(['A of hearts', '7 of diamonds', '10 of clubs'])
+    expect(boardField().value).toBe('Ah7dTc')
+  })
+
+  it('refuses an invalid Board as text, saying what is wrong and keeping the one it had', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Ah7d2c')
+
+    await typeBoard('Ah7x2c')
+    expect(within(board()).getByRole('alert').textContent).toBe('“7x” isn’t a card. The board was left as it was.')
+    await typeBoard('Ah7dAh')
+    expect(within(board()).getByRole('alert').textContent).toBe('Ah is on the board twice. The board was left as it was.')
+    await typeBoard('Ah7d')
+    expect(within(board()).getByRole('alert').textContent).toBe('A board has 3, 4 or 5 cards, not 2. The board was left as it was.')
+
+    expect(onBoard()).toEqual(['A of hearts', '7 of diamonds', '2 of clubs'])
+    expect(address()).toEqual({ board: 'Ah7d2c' })
+  })
+
+  it('deals a random flop, then the turn and the river, never a card in use', async () => {
+    // The first card left in the deck, every time.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    renderAnalysis()
+    const randomCard = () => within(board()).getByRole('button', { name: /^Random card/ })
+
+    expect(randomCard().getAttribute('aria-label')).toBe('Random card. Deal or pick a flop first.')
+    await userEvent.click(within(board()).getByRole('button', { name: 'Random flop' }))
+    expect(boardField().value).toBe('AsKsQs')
+    await userEvent.click(randomCard())
+    await userEvent.click(randomCard())
+    expect(boardField().value).toBe('AsKsQsJsTs')
+    expect(randomCard().getAttribute('aria-label')).toBe('Random card. The board already has five cards.')
+
+    await userEvent.click(within(board()).getByRole('button', { name: 'Random flop' }))
+    expect(boardField().value).toBe('AsKsQs')
+  })
+
+  it('clears', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Ah7d2c')
+
+    await userEvent.click(within(board()).getByRole('button', { name: 'Clear board' }))
+
+    expect(onBoard()).toEqual([])
+  })
+
+  it('switches off the Combos holding its cards, in proportion within their cell, and counts the live ones', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CAKs%3A0.5')
+    expect(live()).toBe('8.0 live combos')
+
+    await typeBoard('As7d2c')
+
+    expect(cell('AA').getAttribute('title')).toBe('AA · 6 combos · 100 % · 3 removed by the board')
+    expect(cell('AKs').getAttribute('title')).toBe('AKs · 4 combos · 50 % · 1 removed by the board')
+    expect(cell('KQo').getAttribute('title')).toBe('KQo · 12 combos · 0 %')
+    expect(live()).toBe('4.5 live combos')
+  })
+
+  it('is kept in the address, replacing it, and restored from it', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA')
+
+    await typeBoard('Ah7d2c')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', board: 'Ah7d2c' }))
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?range=AA&board=Ah7d2c')
+    expect(onBoard()).toEqual(['A of hearts', '7 of diamonds', '2 of clubs'])
+    expect(live()).toBe('3.0 live combos')
+  })
+
+  it('stays when a saved Range is loaded', async () => {
+    renderAnalysis('en', '/lab/analysis?board=Kh7d2c')
+
+    await waitFor(() => expect(screen.getByRole('option', { name: 'OR BTN' })).toBeTruthy())
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Load a saved range' }), 'OR BTN')
+
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', source: 'r1', board: 'Kh7d2c' }))
+  })
+
+  it('is in Spanish too', () => {
+    renderAnalysis('es')
+
+    expect(within(board()).getByRole('button', { name: 'Flop aleatorio' })).toBeTruthy()
+    expect(within(board()).getByRole('button', { name: /^Carta aleatoria/ })).toBeTruthy()
   })
 })

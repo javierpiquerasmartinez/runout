@@ -5,7 +5,8 @@
 
 /** Ranks from the highest down: the matrix's rows and columns, in that order. */
 export const RANKS = 'AKQJT98765432'
-const SUITS = 'shdc'
+/** Suits in the order Combos are listed: spades, hearts, diamonds, clubs. */
+export const SUITS = 'shdc'
 
 /** Every Combo of two cards from one deck. */
 export const TOTAL_COMBOS = 1326
