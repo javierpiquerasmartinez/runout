@@ -105,7 +105,7 @@ describe('AppHeader · getting around', () => {
     const nav = screen.getByRole('navigation', { name: 'Sections' })
     const links = within(nav).getAllByRole('link')
     expect(links.map((link) => link.textContent)).toEqual(['Library', 'Rooms', 'Lab'])
-    expect(links[2].getAttribute('href')).toBe('/lab/ranges')
+    expect(links[2].getAttribute('href')).toBe('/lab/analysis')
     expect(links[2].getAttribute('aria-current')).toBe('page')
     expect(links[0].getAttribute('aria-current')).toBeNull()
   })

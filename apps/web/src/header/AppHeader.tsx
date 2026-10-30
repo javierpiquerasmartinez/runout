@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useSignOut } from '../identity/useSignOut'
-import { labRangesPath } from '../lab/lab'
+import { labAnalysisPath } from '../lab/lab'
 import { libraryPath } from '../library/library'
 import { roomPath } from '../room/roomCode'
 import { requestNewRoom, roomsPath } from '../rooms/rooms'
@@ -55,7 +55,7 @@ function SectionNav({ current }: { current?: Section }) {
   const sections: { section: Section; href: string; label: string }[] = [
     { section: 'library', href: libraryPath, label: t('header.nav.library') },
     { section: 'rooms', href: roomsPath, label: t('header.nav.rooms') },
-    { section: 'lab', href: labRangesPath, label: t('header.nav.lab') },
+    { section: 'lab', href: labAnalysisPath, label: t('header.nav.lab') },
   ]
   return (
     <nav className="app-header__nav" aria-label={t('header.nav')}>

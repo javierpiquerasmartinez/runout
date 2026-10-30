@@ -175,6 +175,18 @@ describe('LabRangesPage · entering the Lab', () => {
     expect(cells.every((button) => button.getAttribute('aria-pressed') === 'false')).toBe(true)
   })
 
+  it('shows the Lab sub-navigation with Ranges marked, on a saved Range too', async () => {
+    renderLab('en', '/lab/ranges/r1')
+
+    const nav = screen.getByRole('navigation', { name: 'Lab' })
+    const links = within(nav).getAllByRole('link')
+    expect(links.map((link) => [link.textContent, link.getAttribute('aria-current')])).toEqual([
+      ['Analysis', null],
+      ['Ranges', 'page'],
+    ])
+    expect(await screen.findByDisplayValue('OR BTN')).toBeTruthy()
+  })
+
   it('offers a new Range in the side column', () => {
     renderLab()
 
@@ -188,6 +200,54 @@ describe('LabRangesPage · entering the Lab', () => {
       '0.0 % of all combos 0.0 of 1326 combos ' +
         'Pairs 0.0 / 78 — Suited 0.0 / 312 — Offsuit 0.0 / 936 —',
     )
+  })
+})
+
+describe('LabRangesPage · Analyse', () => {
+  const analyze = () => userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
+  const address = () => Object.fromEntries(new URLSearchParams(window.location.search))
+
+  it('opens the Analysis with the open Range as it stands on screen, without asking to discard it', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    expect(await screen.findByDisplayValue('OR BTN')).toBeTruthy()
+
+    await userEvent.click(cell('KK'))
+    await analyze()
+
+    expect(leaveDialog()).toBeNull()
+    expect(window.location.pathname).toBe('/lab/analysis')
+    expect(address()).toEqual({ range: 'KK+', source: 'r1' })
+    expect(writes).toEqual([])
+  })
+
+  it('asks before leaving unsaved name changes behind, which do not travel to the Analysis', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    expect(await screen.findByDisplayValue('OR BTN')).toBeTruthy()
+
+    await name('OR CO')
+    await analyze()
+    expect(leaveDialog()).toBeTruthy()
+    expect(window.location.pathname).toBe('/lab/ranges/r1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+    expect(window.location.pathname).toBe('/lab/analysis')
+    expect(address()).toEqual({ range: 'AA', source: 'r1' })
+  })
+
+  it('opens a Range never saved without a source', async () => {
+    renderLab()
+
+    await userEvent.click(cell('AKs'))
+    await analyze()
+
+    expect(window.location.pathname).toBe('/lab/analysis')
+    expect(address()).toEqual({ range: 'AKs' })
+  })
+
+  it('is in Spanish too', () => {
+    renderLab('es')
+
+    expect(screen.getByRole('button', { name: 'Analizar' })).toBeTruthy()
   })
 })
 
