@@ -354,6 +354,13 @@
 .lab__cell[data-mixed] .lab__cell-fill {
   opacity: 0.6;
 }
+/* Combos in a selection of Categories: their share of the cell, lit up from the left, over the fill. */
+.lab__cell-highlight {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--range-highlight);
+  pointer-events: none;
+}
 /* Combos a Board removed: their share of the cell, switched off from the right, over the fill. */
 .lab__cell-removed {
   position: absolute;

@@ -586,3 +586,157 @@ describe('LabAnalysisPage · the Draws', () => {
     expect(screen.getByRole('switch', { name: 'Mostrar proyectos de color backdoor de una carta' })).toBeTruthy()
   })
 })
+
+describe('LabAnalysisPage · selecting Categories', () => {
+  const row = (category: string) => screen.getByRole('button', { name: category })
+  const selected = () =>
+    screen
+      .getAllByRole('button')
+      .filter((button) => button.closest('table') && button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.textContent)
+  const selection = () => screen.queryByRole('region', { name: 'Selection' })
+  const selectionText = () => selection()?.querySelector('p')?.textContent
+  const title = (name: string) => cell(name).getAttribute('title')
+
+  it('toggles rows, lighting up their Combos in the matrix in proportion and adding up their share', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+    expect(selection()).toBeNull()
+
+    await userEvent.click(row('Overpair'))
+    await userEvent.click(row('Top pair'))
+
+    expect(selected()).toEqual(['Overpair', 'Top pair'])
+    expect(selectionText()).toBe('9.0 combos · 75.0 % of the live combos')
+    expect(title('AA')).toBe('AA · 6 combos · 100 % · 6 in the selection')
+    expect(title('KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board · 3 in the selection')
+    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board')
+
+    await userEvent.click(row('Overpair'))
+
+    expect(selected()).toEqual(['Top pair'])
+    expect(selectionText()).toBe('3.0 combos · 25.0 % of the live combos')
+    // Still under the pointer, it stays lit until the pointer leaves.
+    expect(title('AA')).toBe('AA · 6 combos · 100 % · 6 in the selection')
+    await userEvent.unhover(row('Overpair'))
+    expect(title('AA')).toBe('AA · 6 combos · 100 %')
+  })
+
+  it('counts each Combo once, though several selected rows hold it', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AKs&board=QhJh2c')
+
+    await userEvent.click(row('Flush draw'))
+    await userEvent.click(row('Overcards'))
+
+    expect(selectionText()).toBe('4.0 combos · 100.0 % of the live combos')
+  })
+
+  it('lights up a row on hover without selecting it', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+
+    await userEvent.hover(row('Set'))
+    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board · 3 in the selection')
+    expect(selected()).toEqual([])
+    expect(selection()).toBeNull()
+
+    await userEvent.unhover(row('Set'))
+    expect(title('77')).toBe('77 · 6 combos · 100 % · 3 removed by the board')
+  })
+
+  it('clears in one click', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+    await userEvent.click(row('Overpair'))
+    await userEvent.click(row('Set'))
+
+    await userEvent.click(within(selection()!).getByRole('button', { name: 'Clear selection' }))
+
+    expect(selected()).toEqual([])
+    expect(selection()).toBeNull()
+    expect(title('AA')).toBe('AA · 6 combos · 100 %')
+  })
+
+  it('clears when the Board or the Range changes', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+    await userEvent.click(row('Overpair'))
+
+    await userEvent.click(cell('AKs'))
+    expect(selected()).toEqual([])
+
+    await userEvent.click(row('Overpair'))
+    const boardField = within(screen.getByRole('region', { name: 'Board' })).getByRole('textbox', { name: 'Board as text' })
+    await userEvent.clear(boardField)
+    await userEvent.type(boardField, 'Kd7c4h5s{Enter}')
+    expect(selected()).toEqual([])
+    expect(selection()).toBeNull()
+  })
+
+  it('is in Spanish too', async () => {
+    renderAnalysis('es', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
+
+    const region = screen.getByRole('region', { name: 'Selección' })
+    expect(region.querySelector('p')?.textContent).toBe('6,0 combos · 50,0 % de los combos vivos')
+    expect(within(region).getByRole('button', { name: 'Limpiar selección' })).toBeTruthy()
+    expect(within(region).getByRole('button', { name: 'Guardar selección como rango' })).toBeTruthy()
+  })
+})
+
+describe('LabAnalysisPage · saving a selection as a Range', () => {
+  const dialog = () => screen.getByRole('dialog', { name: 'Save the selection as a new range' })
+  const nameField = () => within(dialog()).getByRole<HTMLInputElement>('textbox', { name: 'Range name' })
+  const confirm = () => userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
+  const selectAndSave = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Top pair' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save selection as range' }))
+  }
+
+  it('asks for a name, saves the selected Combos at their Frequencies and stays in the Analysis as it was', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%3A0.5%2C77&source=r1&board=Kd7c4h')
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR BTN'))
+
+    await selectAndSave()
+    await userEvent.type(nameField(), ' Overpairs and top pair ')
+    await confirm()
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes).toHaveLength(1)
+    const body = JSON.parse(writes[0].slice('POST /api/lab/ranges '.length)) as Omit<StoredRange, 'id'>
+    expect(body.name).toBe('Overpairs and top pair')
+    // KdQd holds a Board card.
+    expect(body.combos).toEqual({ ...aces, KsQs: 50, KhQh: 50, KcQc: 50 })
+    expect(window.location.pathname).toBe('/lab/analysis')
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR BTN')
+    expect(within(screen.getByRole('region', { name: 'Selection' })).getByRole('status').textContent).toBe(
+      'Saved as “Overpairs and top pair”.',
+    )
+    expect(
+      within(screen.getByRole('combobox', { name: 'Load a saved range' })).getByRole('option', { name: 'Overpairs and top pair' }),
+    ).toBeTruthy()
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,KQs:0.5,77', source: 'r1', board: 'Kd7c4h' }))
+  })
+
+  it('follows the name rules of any Range', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+
+    await selectAndSave()
+    expect(nameField().maxLength).toBe(60)
+    await confirm()
+    expect(within(dialog()).getByRole('alert').textContent).toBe('Name the range to save it.')
+    await userEvent.type(nameField(), 'or btn')
+    await confirm()
+
+    expect(await within(dialog()).findByRole('alert')).toHaveProperty('textContent', 'You already have a range called “or btn”.')
+    // Only the refused one reached the server.
+    expect(writes).toHaveLength(1)
+  })
+
+  it('is in Spanish too', async () => {
+    renderAnalysis('es', '/lab/analysis?range=AA&board=Kd7c4h')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar selección como rango' }))
+
+    expect(screen.getByRole('dialog', { name: 'Guardar la selección como un rango nuevo' })).toBeTruthy()
+  })
+})

@@ -71,6 +71,8 @@
   --on-range-fill: #0b0f0e;
   /* Combos a Board removes: their share of the cell, switched off over the fill */
   --range-removed: rgb(11 15 14 / 72%);
+  /* Combos in a selection of Categories: their share of the cell, lit up over the fill */
+  --range-highlight: #e8c15a;
 
   /* Disabled (locked) */
   --disabled-bg: #0f1413;
@@ -266,6 +268,7 @@
   --range-fill: #7d5fd0;
   --on-range-fill: #ffffff;
   --range-removed: rgb(255 255 255 / 75%);
+  --range-highlight: #b8860b;
 
   --graph-violet: #6a4bb5;
   --graph-pink: #b2366f;

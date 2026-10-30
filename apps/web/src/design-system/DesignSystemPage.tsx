@@ -115,6 +115,7 @@ const accents: { key: MessageKey; token: string }[] = [
   { key: 'design.color.sync', token: '--sync' },
   { key: 'design.color.alert', token: '--alert' },
   { key: 'design.color.rangeFill', token: '--range-fill' },
+  { key: 'design.color.rangeHighlight', token: '--range-highlight' },
 ]
 
 /** Shows the token's value in the active theme; the page re-renders when the theme changes. */

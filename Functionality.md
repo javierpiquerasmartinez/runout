@@ -609,6 +609,13 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - A Draw always uses one of the Combo's cards, so A2 on 9-8-7 draws to no straight, and never draws to what the Combo already makes, though a made straight can draw to a flush. A straight draw with two ranks to come counts as open-ended, a double gutshot included.
 - There are no Draws on the river, and no backdoors on the turn.
 
+**H9.14 — Select part of the Range.** As a player, I want to pick rows of Made Hands and Draws and see them as one part of the Range, so I can build my continuation Range from them.
+
+- Clicking a row toggles it in the selection; hovering a row lights it up without selecting it. The selected rows' Combos light up in the matrix, each cell in proportion to its Combos in the selection, at their Frequencies.
+- Above the tables, the selection shows its Combos and its % of the live Combos, counting each Combo once however many selected rows hold it.
+- **Limpiar selección** clears it in one click; changing the Range or the Board clears it too.
+- **Guardar selección como rango** asks for a name, with the same rules and refusals as any Range (H9.2), and keeps the selected Combos at their Frequencies as a new Range without Tags. The Analysis stays as it was, its source and selection included.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.

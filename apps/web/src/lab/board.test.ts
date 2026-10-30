@@ -9,6 +9,7 @@ import {
   parseBoard,
   readBoardCards,
   removedCombos,
+  selectionOf,
   withRandomCard,
   randomFlop,
   toggleCard,
@@ -408,5 +409,28 @@ describe('combination Draws', () => {
 
   it('are none on the river', () => {
     expect(combinationDraws({ Ah2h: 100 }, ['Kh', '7h', '2c', '9s', '3d'])).toEqual([])
+  })
+})
+
+describe('a selection of Categories', () => {
+  const range = { AhKh: 100, AhKd: 50, QhJh: 50, AsAh: 100 }
+  const board = ['Th', '7h', '2c']
+  const row = (category: string) => [...draws(range, board), ...madeHands(range, board)].find((each) => each.category === category)!
+
+  it('adds up its share of the live Combos, counting each Combo once though several rows hold it', () => {
+    // AhKh and QhJh are flush draws and overcards too.
+    const selection = selectionOf(range, board, [row('flush-draw'), row('overcards')])
+
+    expect(selection.combos).toBe(2)
+    expect(selection.share).toBeCloseTo((2 / 3) * 100)
+  })
+
+  it('makes a Range of its Combos, each at its Frequency', () => {
+    expect(selectionOf(range, board, [row('flush-draw'), row('overcards')]).range).toEqual({ AhKh: 100, AhKd: 50, QhJh: 50 })
+    expect(selectionOf(range, board, [row('overpair')]).range).toEqual({ AsAh: 100 })
+  })
+
+  it('is nothing when no row is selected', () => {
+    expect(selectionOf(range, board, [])).toEqual({ combos: 0, share: 0, range: {} })
   })
 })
