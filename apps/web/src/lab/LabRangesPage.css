@@ -354,6 +354,13 @@
 .lab__cell[data-mixed] .lab__cell-fill {
   opacity: 0.6;
 }
+/* Combos a Board removed: their share of the cell, switched off from the right, over the fill. */
+.lab__cell-removed {
+  position: absolute;
+  inset: 0 0 0 auto;
+  background: var(--range-removed);
+  pointer-events: none;
+}
 /* A partial Frequency, or a mixed cell's average, in the corner. */
 .lab__cell-frequency {
   position: absolute;

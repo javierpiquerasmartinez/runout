@@ -1,7 +1,7 @@
 /*
  * The Lab's Analysis: one side, its Range's matrix more compact than on
- * Rangos, with its numbers and text under it. Laid out for a second side
- * beside it, and the Board, to come.
+ * Rangos, with its numbers and text under it, and the Board beside it. Laid
+ * out for a second side beside the first, to come.
  */
 
 /* The sub-navigation already says where this is; the title is for screen readers. */
@@ -12,6 +12,13 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.analysis__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 32px;
 }
 
 .analysis__sides {
@@ -77,6 +84,88 @@
   font-size: 22px;
 }
 
+.analysis__live {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ---- The Board: its cards, the 52 to pick from, its text and the random deals ---- */
+.analysis__board {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.analysis__board-cards {
+  display: flex;
+  gap: 6px;
+}
+/* The turn and the river stand a little apart from the flop. */
+.analysis__board-cards > :nth-child(4) {
+  margin-left: 8px;
+}
+.analysis__board-hint {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.analysis__deck {
+  display: grid;
+  grid-template-columns: repeat(13, max-content);
+  gap: 3px;
+}
+.analysis__deck-card {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.analysis__deck-card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* A card on the Board leaves the deck: drawn faded, with its place outlined. */
+.analysis__deck-card[aria-pressed='true'] {
+  outline: 2px solid var(--range-fill);
+  outline-offset: 1px;
+}
+.analysis__deck-card[aria-pressed='true'] .ro-card {
+  opacity: 0.35;
+}
+.analysis__deck-card[data-locked] {
+  cursor: not-allowed;
+}
+.analysis__deck-card[data-locked] .ro-card {
+  opacity: 0.55;
+}
+
+.analysis__board-field {
+  height: var(--control-compact);
+  box-sizing: border-box;
+  max-width: 200px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-control);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.analysis__board-field:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.analysis__board-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .analysis__save-name {
   height: 36px;
   box-sizing: border-box;
@@ -95,6 +184,9 @@
 @media (max-width: 760px) {
   .analysis__side {
     max-width: none;
+  }
+  .analysis__deck {
+    gap: 2px;
   }
   .analysis__side .lab__cell {
     font-size: clamp(7px, 2.4vw, 11px);

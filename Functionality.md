@@ -587,6 +587,13 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - **Analizar** on **Rangos** opens the Analysis with the open Range as it stands on screen, unsaved Combos included. Only an unsaved name or Tags, which do not travel, make it ask to discard them first.
 - The address holds the Range as text and the saved Range's id, and is replaced rather than added to on every change, so reloading or going back keeps it. A saved Range that is no longer mine is dropped from the address, keeping its Combos.
 
+**H9.11 — Put the Range on a Board.** As a player, I want to pick a flop, turn and river in the Analysis, so I see which of the Range's Combos can still exist there.
+
+- I pick the Board's cards in order from a grid of 52, and pick one again to take it off; it holds no cards, a flop, a turn or a river, and asks for the rest of the flop while one is half picked. I can also type it, as `Ah7d2c`: an unknown card, a repeated one or a count other than 3, 4 or 5 is refused with what is wrong, and the Board I had stays.
+- **Flop aleatorio** deals a new flop; **Carta aleatoria** adds the turn, then the river. Neither deals a card already on the Board.
+- Combos holding a Board card are switched off in the matrix, each cell dimmed by its share of them, and the Analysis counts the live Combos left, weighted by Frequency.
+- The address holds the Board too, so reloading keeps it.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.

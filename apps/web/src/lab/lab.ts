@@ -1,5 +1,6 @@
 import type { FailureReason } from '../backend/api'
 import type { I18n } from '../i18n/context'
+import { formatBoard, readBoardCards } from './board'
 import { EMPTY_RANGE, formatRange, parseRange, type Range } from './range'
 
 /** The Lab ("Laboratorio"): an Account's study tools. It opens on the Analysis. */
@@ -37,26 +38,33 @@ export function labRangeIdFromPath(path: string): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
-/** What the Analysis's address holds: its Range, and the saved Range it came from, if any. */
+/** What the Analysis's address holds: its Range, the saved Range it came from, if any, and its Board. */
 export interface AnalysisState {
   range: Range
   /** The saved Range it was loaded from, for its name and the changed mark. */
   sourceId: string | null
+  /** The Board's cards in the order picked: a Board, or a flop still being filled. */
+  board: readonly string[]
 }
 
 /** The Analysis's address for this state. Its Range is text in the Lab's notation, so edits survive a reload. */
-export function labAnalysisAddress({ range, sourceId }: AnalysisState): string {
+export function labAnalysisAddress({ range, sourceId, board }: AnalysisState): string {
   const query = new URLSearchParams()
   const text = formatRange(range)
   if (text !== '') query.set('range', text)
   if (sourceId !== null) query.set('source', sourceId)
+  if (board.length > 0) query.set('board', formatBoard(board))
   const written = query.toString()
   return written ? `${labAnalysisPath}?${written}` : labAnalysisPath
 }
 
-/** The state an Analysis address holds; a Range it cannot read is an empty one. */
+/** The state an Analysis address holds; a Range or Board it cannot read is an empty one. */
 export function analysisStateFromSearch(search: string): AnalysisState {
   const query = new URLSearchParams(search)
   const parsed = parseRange(query.get('range') ?? '')
-  return { range: 'range' in parsed ? parsed.range : EMPTY_RANGE, sourceId: query.get('source') }
+  return {
+    range: 'range' in parsed ? parsed.range : EMPTY_RANGE,
+    sourceId: query.get('source'),
+    board: readBoardCards(query.get('board') ?? ''),
+  }
 }
