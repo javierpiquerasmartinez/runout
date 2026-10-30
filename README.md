@@ -12,7 +12,7 @@ packages/
 └── poker/    @runout/poker · the hand evaluator both apps share
 ```
 
-The two apps share one package and nothing else: `@runout/poker` holds the hold'em hand evaluator (best five-card hand, its category, comparable strength, card codes), so the server's All-in EV and the web's Lab never disagree on who wins a showdown (ADR 0007). It builds to `dist/` on `pnpm install` (its `prepare` script); after changing it, run `pnpm --filter @runout/poker build`. Everything else, DTOs included, is defined once in each app.
+The two apps share one package and nothing else: `@runout/poker` holds the hold'em hand evaluator (best five-card hand, its category, comparable strength, card codes), so the server's All-in EV and the web's Lab never disagree on who wins a showdown (ADR 0007). It builds to `dist/` on `pnpm install` (its `prepare` script) and again at the start of each app's `build`, so a deploy whose install was skipped by a build cache still finds it; after changing it, run `pnpm --filter @runout/poker build`. Everything else, DTOs included, is defined once in each app.
 
 ## Getting started
 
