@@ -4,7 +4,8 @@
  * written as the Lab writes Combos: rank then suit, tens as `T`, as `Th`.
  */
 
-import { RANKS, SUITS, type HandClass, type Range } from './range'
+import { cardCode, categoryOf, strength, type HandCategory } from '@runout/poker'
+import { HAND_CLASSES, RANKS, SUITS, type HandClass, type Range } from './range'
 
 /** The 52 cards in the picker's order: one row per suit, from aces down. */
 export const DECK: readonly string[] = [...SUITS].flatMap((suit) => [...RANKS].map((rank) => rank + suit))
@@ -105,4 +106,121 @@ export function liveCombos(range: Range, board: readonly string[]): number {
   let combos = 0
   for (const [combo, frequency] of Object.entries(range)) if (isLive(combo, board)) combos += frequency / 100
   return combos
+}
+
+/**
+ * The Made Hands, best first: Flopzilla Pro's, plus classic Flopzilla's ace
+ * high. Each live Combo is in exactly one, its best.
+ */
+export const MADE_HANDS = [
+  'straight-flush',
+  'quads',
+  'full-house',
+  'flush',
+  'straight',
+  'set',
+  'trips',
+  'two-pair',
+  'overpair',
+  'top-pair',
+  'below-top-card',
+  'middle-pair',
+  'below-second-card',
+  'bottom-pair',
+  'below-board',
+  'ace-high',
+  'nothing',
+] as const
+export type MadeHand = (typeof MADE_HANDS)[number]
+
+/** A Category's row: the Combos of the Range in it. */
+export interface CategoryRow<Category> {
+  category: Category
+  /** Its Combos, each counted by its Frequency. */
+  combos: number
+  /** That, as a share of the live Combos, from 0 to 100; 0 when none are live. */
+  share: number
+  /** The Range's live Combos in it, as `AhKd`. */
+  members: string[]
+}
+
+/** The Made Hands the evaluator names whatever the Combo's cards add. */
+const MADE_BY_EVALUATOR: Partial<Record<HandCategory, MadeHand>> = {
+  'straight-flush': 'straight-flush',
+  'four-of-a-kind': 'quads',
+  'full-house': 'full-house',
+  flush: 'flush',
+  straight: 'straight',
+}
+
+/** A card as the evaluator writes it: tens as `10`. */
+function evaluatorCode(card: string): number {
+  return cardCode(card[0] === 'T' ? `10${card[1]}` : card)
+}
+
+/** How high a rank is: the deuce 0, the ace 12. */
+function rankValue(card: string): number {
+  return RANKS.length - 1 - RANKS.indexOf(card[0])
+}
+
+/**
+ * A Combo's Made Hand on a Board of three to five cards. A pair or two pair the
+ * Board makes alone does not count: below a straight, only what the Combo's
+ * own cards pair counts.
+ */
+function madeHandOf(combo: string, board: readonly string[]): MadeHand {
+  const cards = [combo.slice(0, 2), combo.slice(2), ...board]
+  const byEvaluator = MADE_BY_EVALUATOR[categoryOf(strength(cards.map(evaluatorCode)))]
+  if (byEvaluator) return byEvaluator
+
+  const [first, second] = [rankValue(cards[0]), rankValue(cards[1])]
+  const onBoard = (rank: number) => board.filter((card) => rankValue(card) === rank).length
+  // The Board's distinct ranks, from the highest down.
+  const ranks = [...new Set(board.map(rankValue))].sort((a, b) => b - a)
+  const [top, lowest] = [ranks[0], ranks[ranks.length - 1]]
+
+  if (first === second) {
+    if (onBoard(first) > 0) return 'set'
+    if (first > top) return 'overpair'
+    if (ranks.length > 1 && first > ranks[1]) return 'below-top-card'
+    if (first > lowest) return 'below-second-card'
+    return 'below-board'
+  }
+  const paired = [first, second].filter((rank) => onBoard(rank) > 0)
+  if (paired.length === 2) return 'two-pair'
+  if (paired.length === 1) {
+    const [rank] = paired
+    if (onBoard(rank) > 1) return 'trips'
+    if (rank === top) return 'top-pair'
+    if (rank === lowest) return 'bottom-pair'
+    return 'middle-pair'
+  }
+  return combo[0] === 'A' ? 'ace-high' : 'nothing'
+}
+
+/**
+ * How the Range hits the Board, as the Made Hands that can happen on it, best
+ * first: one that no Combo left in the deck can make is left out. None preflop,
+ * nor while the flop is still being picked.
+ */
+export function madeHands(range: Range, board: readonly string[]): CategoryRow<MadeHand>[] {
+  if (board.length < FLOP_CARDS) return []
+  const rows = new Map<MadeHand, CategoryRow<MadeHand>>()
+  for (const handClass of HAND_CLASSES) {
+    for (const combo of handClass.combos) {
+      if (!isLive(combo, board)) continue
+      const madeHand = madeHandOf(combo, board)
+      const row = rows.get(madeHand) ?? { category: madeHand, combos: 0, share: 0, members: [] }
+      rows.set(madeHand, row)
+      const frequency = range[combo] ?? 0
+      if (frequency === 0) continue
+      row.combos += frequency / 100
+      row.members.push(combo)
+    }
+  }
+  const live = liveCombos(range, board)
+  return MADE_HANDS.flatMap((madeHand) => {
+    const row = rows.get(madeHand)
+    return row ? [{ ...row, share: live > 0 ? (row.combos / live) * 100 : 0 }] : []
+  })
 }

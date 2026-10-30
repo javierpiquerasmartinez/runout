@@ -474,3 +474,58 @@ describe('LabAnalysisPage · the Board', () => {
     expect(within(board()).getByRole('button', { name: /^Carta aleatoria/ })).toBeTruthy()
   })
 })
+
+describe('LabAnalysisPage · the Made Hands', () => {
+  const madeHands = () => screen.queryByRole('table', { name: 'Made hands' })
+  const rows = () =>
+    within(madeHands()!)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => [...row.children].map((cell) => cell.textContent))
+
+  it('show nothing preflop, nor on a flop still being picked', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA')
+    expect(madeHands()).toBeNull()
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?range=AA&board=Kd7c')
+    expect(madeHands()).toBeNull()
+  })
+
+  it("show how the Range hits the flop, each row's Combos and % of the live Combos, leaving out what cannot happen", () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
+
+    expect(rows()).toEqual([
+      ['Set', '3.0', '25.0 %'],
+      ['Two pair', '0.0', '0.0 %'],
+      ['Overpair', '6.0', '50.0 %'],
+      ['Top pair', '3.0', '25.0 %'],
+      ['Pocket pair below top card', '0.0', '0.0 %'],
+      ['Middle pair', '0.0', '0.0 %'],
+      ['Pocket pair below second card', '0.0', '0.0 %'],
+      ['Bottom pair', '0.0', '0.0 %'],
+      ['Pocket pair below the board', '0.0', '0.0 %'],
+      ['Ace high', '0.0', '0.0 %'],
+      ['No made hand', '0.0', '0.0 %'],
+    ])
+  })
+
+  it('follow the Board as it changes', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&board=Kd7c4h')
+
+    const boardField = within(screen.getByRole('region', { name: 'Board' })).getByRole('textbox', { name: 'Board as text' })
+    await userEvent.clear(boardField)
+    await userEvent.type(boardField, 'AhAd7c{Enter}')
+
+    expect(rows()[0]).toEqual(['Quads', '1.0', '100.0 %'])
+  })
+
+  it('are in Spanish too', () => {
+    renderAnalysis('es', '/lab/analysis?range=AA&board=Kd7c4h')
+
+    const table = screen.getByRole('table', { name: 'Manos hechas' })
+    expect(within(table).getByRole('rowheader', { name: 'Overpair' })).toBeTruthy()
+    expect(within(table).getByRole('rowheader', { name: 'Sin mano hecha' })).toBeTruthy()
+    expect(within(table).getByRole('cell', { name: '6,0' })).toBeTruthy()
+  })
+})

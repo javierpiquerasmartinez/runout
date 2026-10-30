@@ -280,6 +280,11 @@ export function strength(codes: readonly number[]): number {
   return scoreOf('high-card', highest(ranks, 5, []));
 }
 
+/** The category a `strength` stands for. */
+export function categoryOf(strength: number): HandCategory {
+  return CATEGORIES[strength >> 20];
+}
+
 /** The category, then each rank that breaks a tie, four bits apiece. */
 function scoreOf(category: HandCategory, tiebreak: number[]): number {
   let score = CATEGORIES.indexOf(category);
