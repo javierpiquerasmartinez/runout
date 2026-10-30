@@ -596,7 +596,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 **H9.12 — See how the Range hits the Board.** As a player, I want the Range's Made Hands on a flop, turn or river, so I see how its strength is spread.
 
-- Under the matrix, a table of **Manos hechas** lists, best first: straight flush, quads, full house, flush, straight, set, trips, two pair, overpair, top pair, pocket pair below the top card, middle pair, pocket pair below the second card, bottom pair, pocket pair below the Board, ace high and no made hand. Each live Combo counts in one row only, its best, so the rows add up to the live Combos.
+- Under the Board, beside the matrix so both are in view at once, a table of **Manos hechas** lists, best first: straight flush, quads, full house, flush, straight, set, trips, two pair, overpair, top pair, pocket pair below the top card, middle pair, pocket pair below the second card, bottom pair, pocket pair below the Board, ace high and no made hand. Each live Combo counts in one row only, its best, so the rows add up to the live Combos.
 - Each row shows its Combos, weighted by Frequency, and its % of the live Combos. A row that no Combo can make on this Board is left out; one the Range just misses shows at 0.
 - A pair or two pair the Board makes alone does not count: on K♠K♦7♣, AQ is ace high, 7x bottom pair, 88 a pocket pair below the top card, Kx trips, 77 a full house and KK quads. A straight or a flush counts however it is made. The pair rungs are counted over the Board's distinct ranks.
 - Preflop, or while the flop is half picked, there is no table.
