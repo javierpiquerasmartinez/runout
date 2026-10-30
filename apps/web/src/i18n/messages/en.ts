@@ -738,7 +738,7 @@ export const en: Messages = {
   'lab.tag.confirmDelete.one': 'Delete {name} from {count} range',
   'lab.tag.confirmDelete.other': 'Delete {name} from {count} ranges',
   'lab.ranges.search': 'Search ranges',
-  'lab.ranges.analyze': 'Analyse',
+  'lab.ranges.analyse': 'Analyse',
   'lab.ranges.clear': 'Clear',
   'lab.ranges.saved': 'Saved ranges',
   'lab.ranges.none': 'No saved ranges yet.',

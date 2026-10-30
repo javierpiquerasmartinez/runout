@@ -220,6 +220,20 @@ describe('LabRangesPage · Analyse', () => {
     expect(writes).toEqual([])
   })
 
+  it('asks before leaving unsaved name changes behind, which do not travel to the Analysis', async () => {
+    renderLab('en', '/lab/ranges/r1')
+    expect(await screen.findByDisplayValue('OR BTN')).toBeTruthy()
+
+    await name('OR CO')
+    await analyze()
+    expect(leaveDialog()).toBeTruthy()
+    expect(window.location.pathname).toBe('/lab/ranges/r1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+    expect(window.location.pathname).toBe('/lab/analysis')
+    expect(address()).toEqual({ range: 'AA', source: 'r1' })
+  })
+
   it('opens a Range never saved without a source', async () => {
     renderLab()
 

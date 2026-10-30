@@ -1,9 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import type { Locale } from '../i18n/catalogue'
 import { SessionContext } from '../identity/context'
+import { navigate } from '../routing'
 import { fakeSession } from '../test/fakeSession'
 import { LabAnalysisPage } from './LabAnalysisPage'
 
@@ -136,7 +137,7 @@ describe('LabAnalysisPage · painting the Range', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
 
     expect(pressed()).toEqual([])
-    expect(address()).toEqual({})
+    await waitFor(() => expect(address()).toEqual({}))
   })
 })
 
@@ -148,9 +149,27 @@ describe('LabAnalysisPage · the address', () => {
     await userEvent.click(cell('AKs'))
     await userEvent.click(cell('AA'))
 
-    expect(address()).toEqual({ range: 'AA,AKs' })
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,AKs' }))
     expect(window.location.pathname).toBe('/lab/analysis')
     expect(window.history.length).toBe(entries)
+  })
+
+  it('writes the address once for a burst of painting, as browsers limit how often it may change', async () => {
+    renderAnalysis()
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+
+    for (const name of ['AA', 'KK', 'QQ', 'JJ', 'TT']) await userEvent.click(cell(name))
+
+    await waitFor(() => expect(address()).toEqual({ range: 'TT+' }))
+    expect(replaceState).toHaveBeenCalledTimes(1)
+  })
+
+  it('follows the address when it changes from outside, as the header link to the Lab does', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA')
+
+    act(() => navigate('/lab/analysis'))
+
+    expect(pressed()).toEqual([])
   })
 
   it('restores the Range from the address, as on a reload', () => {
@@ -179,7 +198,7 @@ describe('LabAnalysisPage · pasting a Range', () => {
     await paste('QQ+,AKs:0.5')
 
     expect(pressed()).toEqual(['AA', 'AKs', 'KK', 'QQ'])
-    expect(address()).toEqual({ range: 'QQ+,AKs:0.5' })
+    await waitFor(() => expect(address()).toEqual({ range: 'QQ+,AKs:0.5' }))
   })
 
   it('refuses the whole text, naming the first piece not understood', async () => {
@@ -205,7 +224,7 @@ describe('LabAnalysisPage · loading a saved Range', () => {
 
     await waitFor(() => expect(pressed()).toEqual(['AA']))
     expect(sourceName()).toBe('OR BTN')
-    expect(address()).toEqual({ range: 'AA', source: 'r1' })
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', source: 'r1' }))
     expect(changed()).toBeNull()
   })
 
@@ -262,7 +281,7 @@ describe('LabAnalysisPage · saving as a new Range', () => {
     expect(writes).toEqual(['POST /api/lab/ranges {"name":"OR CO","combos":{"KsKh":100,"KsKd":100,"KsKc":100,"KhKd":100,"KhKc":100,"KdKc":100},"tagIds":[]}'])
     expect(stored.find((range) => range.id === 'r1')!.combos).toEqual(aces)
     expect(window.location.pathname).toBe('/lab/analysis')
-    expect(address()).toEqual({ range: 'KK', source: 'r3' })
+    await waitFor(() => expect(address()).toEqual({ range: 'KK', source: 'r3' }))
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR CO')
     expect(screen.queryByText('Changed')).toBeNull()
     expect(within(screen.getByRole('combobox', { name: 'Load a saved range' })).getByRole('option', { name: 'OR CO' })).toBeTruthy()

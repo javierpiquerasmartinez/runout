@@ -737,7 +737,7 @@ export const es = {
   'lab.tag.confirmDelete.one': 'Borrar {name} de {count} rango',
   'lab.tag.confirmDelete.other': 'Borrar {name} de {count} rangos',
   'lab.ranges.search': 'Buscar rangos',
-  'lab.ranges.analyze': 'Analizar',
+  'lab.ranges.analyse': 'Analizar',
   'lab.ranges.clear': 'Limpiar',
   'lab.ranges.saved': 'Rangos guardados',
   'lab.ranges.none': 'Aún no tienes rangos guardados.',

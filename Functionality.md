@@ -584,7 +584,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - It shows the Range's width as on **Rangos** (H9.4), updating as I paint.
 - It shows the name of the saved Range it came from, or that it is unsaved, and **Modificado** once its Combos differ from that saved Range. Nothing I do in the Analysis writes the saved Range.
 - **Guardar como rango** asks for a name, with the same rules and refusals as any Range (H9.2), keeps it as a new Range without Tags, and leaves me in the Analysis with the new Range as its source.
-- **Analizar** on **Rangos** opens the Analysis with the open Range as it stands on screen, unsaved changes included, without asking to discard them.
+- **Analizar** on **Rangos** opens the Analysis with the open Range as it stands on screen, unsaved Combos included. Only an unsaved name or Tags, which do not travel, make it ask to discard them first.
 - The address holds the Range as text and the saved Range's id, and is replaced rather than added to on every change, so reloading or going back keeps it. A saved Range that is no longer mine is dropped from the address, keeping its Combos.
 
 ## MVP scope and out of scope

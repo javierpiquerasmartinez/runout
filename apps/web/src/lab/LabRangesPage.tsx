@@ -9,7 +9,7 @@ import { isPlainClick, navigate, setLeaveGuard, usePath } from '../routing'
 import { Button } from '../ui/Button'
 import { Chip } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
-import { labAnalysisAddress, labRangeIdFromPath, labRangePath, labRangesPath, MAX_RANGE_NAME_LENGTH } from './lab'
+import { labAnalysisAddress, labRangeIdFromPath, labRangePath, labRangesPath, MAX_RANGE_NAME_LENGTH, rangeSaveFailure } from './lab'
 import { LabNav } from './LabNav'
 import { EMPTY_RANGE, rangeStats, sameRange, topRange, withHandClass, type HandClass, type Range } from './range'
 import { Brush, RangeMatrix, RangeText, Stats } from './RangeControls'
@@ -265,14 +265,7 @@ export function LabRangesPage() {
         navigate(labRangePath(range.id))
       }
     } catch (error) {
-      const reason = reasonOf(error)
-      setFailure(
-        reason === 'range-name-taken'
-          ? t('lab.ranges.nameTaken', { name })
-          : reason === 'invalid-range-name'
-            ? t('reason.invalid-range-name')
-            : t('lab.ranges.saveFailed'),
-      )
+      setFailure(rangeSaveFailure(t, reasonOf(error), name))
     } finally {
       setBusy(null)
     }
@@ -346,10 +339,14 @@ export function LabRangesPage() {
     setListRevision((revision) => revision + 1)
   }
 
-  // The Range goes along as it stands, so leaving its changes behind here loses nothing.
-  const analyze = () => {
-    dirtyRef.current = false
-    navigate(labAnalysisAddress({ range: draft.combos, sourceId: baseline.id }))
+  /** Opens the Analysis with the Range as it stands; its Combos go along, but a changed name or Tags would be lost, so those still ask. */
+  const analyse = () => {
+    const go = () => {
+      dirtyRef.current = false
+      navigate(labAnalysisAddress({ range: draft.combos, sourceId: baseline.id }))
+    }
+    if (draft.name.trim() === baseline.draft.name && sameTags(draft.tags, baseline.draft.tags)) go()
+    else leave(go)
   }
 
   // Unsaved changes stay behind: the copy is made from what was saved.
@@ -448,8 +445,8 @@ export function LabRangesPage() {
                 </Button>
               </>
             )}
-            <Button variant="secondary" size="compact" onClick={analyze}>
-              {t('lab.ranges.analyze')}
+            <Button variant="secondary" size="compact" onClick={analyse}>
+              {t('lab.ranges.analyse')}
             </Button>
             <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
               {t('lab.ranges.clear')}

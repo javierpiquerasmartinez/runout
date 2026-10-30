@@ -1,3 +1,5 @@
+import type { FailureReason } from '../backend/api'
+import type { I18n } from '../i18n/context'
 import { EMPTY_RANGE, formatRange, parseRange, type Range } from './range'
 
 /** The Lab ("Laboratorio"): an Account's study tools. It opens on the Analysis. */
@@ -8,6 +10,13 @@ export const labAnalysisPath = '/lab/analysis'
 
 /** How long a Range's name may be, as the server allows it. */
 export const MAX_RANGE_NAME_LENGTH = 60
+
+/** Why saving a Range under `name` failed, in the words both Lab screens use. */
+export function rangeSaveFailure(t: I18n['t'], reason: FailureReason, name: string): string {
+  if (reason === 'range-name-taken') return t('lab.ranges.nameTaken', { name })
+  if (reason === 'invalid-range-name') return t('reason.invalid-range-name')
+  return t('lab.ranges.saveFailed')
+}
 
 /** The Lab's Ranges: the matrix, its stats and the Account's saved Ranges. */
 export const labRangesPath = '/lab/ranges'

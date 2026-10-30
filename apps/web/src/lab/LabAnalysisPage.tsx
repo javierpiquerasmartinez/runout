@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
@@ -6,7 +6,7 @@ import { useIdentity } from '../identity/context'
 import { redirect, useSearch } from '../routing'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
-import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, type AnalysisState } from './lab'
+import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
 import { LabNav } from './LabNav'
 import { EMPTY_RANGE, rangeStats, sameRange, withHandClass, type HandClass, type Range } from './range'
 import { Brush, RangeMatrix, RangeText, Stats } from './RangeControls'
@@ -26,18 +26,58 @@ interface RangeSummary {
   name: string
 }
 
-/** Reads the address afresh: a drag paints several cells before the screen renders again. */
-const currentState = () => analysisStateFromSearch(window.location.search)
+/** How long the address waits after the last change before it is written: browsers limit how often it may be replaced. */
+const ADDRESS_DELAY_MS = 250
+
+/**
+ * What the Analysis shows, and how to change it. Changes apply at once and
+ * reach the address a moment later, replacing it, so a drag across many
+ * cells writes it once. An address changed from outside, by a link or going
+ * back, is taken as it is.
+ */
+function useAnalysisState(): [AnalysisState, (next: (state: AnalysisState) => AnalysisState) => void] {
+  const search = useSearch()
+  const [state, setState] = useState(() => analysisStateFromSearch(search))
+  // Read afresh by every change: a drag paints several cells before the screen renders again.
+  const stateRef = useRef(state)
+  /** The query this screen last wrote; any other came from outside. */
+  const written = useRef(search)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  useEffect(() => {
+    if (search === written.current) return
+    written.current = search
+    clearTimeout(timer.current)
+    stateRef.current = analysisStateFromSearch(search)
+    setState(stateRef.current)
+  }, [search])
+
+  // Written after leaving, it would replace another screen's address.
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  // Only refs and setters: the same function every render.
+  const change = useCallback((next: (state: AnalysisState) => AnalysisState) => {
+    stateRef.current = next(stateRef.current)
+    setState(stateRef.current)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      const address = labAnalysisAddress(stateRef.current)
+      written.current = new URL(address, window.location.origin).search
+      redirect(address)
+    }, ADDRESS_DELAY_MS)
+  }, [])
+  return [state, change]
+}
 
 /**
  * The Lab's Analysis: one Range, loaded, pasted or painted, studied without
- * touching the saved one. Its address holds what is on screen, replaced on
- * every change, so reloading or going back keeps it.
+ * touching the saved one. Its address holds what is on screen, so reloading
+ * or going back keeps it.
  */
 export function LabAnalysisPage() {
   const { t } = useI18n()
   const { token } = useIdentity()
-  const { range, sourceId } = analysisStateFromSearch(useSearch())
+  const [{ range, sourceId }, changeState] = useAnalysisState()
   const [brush, setBrush] = useState<number>(100)
   /** The Account's saved Ranges, to load one; empty until they are read. */
   const [saved, setSaved] = useState<RangeSummary[]>([])
@@ -48,12 +88,15 @@ export function LabAnalysisPage() {
   useEffect(() => {
     sourceRef.current = source
   })
-  /** Why the last load failed. */
+  /** Why the last load, or reading the source, failed; until the Range changes. */
   const [failure, setFailure] = useState<FailureReason | null>(null)
   /** Asking for the name to save the Range under. */
   const [savingAs, setSavingAs] = useState(false)
 
-  const change = (next: (state: AnalysisState) => AnalysisState) => redirect(labAnalysisAddress(next(currentState())))
+  const change = (next: (state: AnalysisState) => AnalysisState) => {
+    setFailure(null)
+    changeState(next)
+  }
   const setCombos = (combos: (current: Range) => Range) => change((state) => ({ ...state, range: combos(state.range) }))
   const paint = (handClass: HandClass, frequency: number) => setCombos((combos) => withHandClass(combos, handClass, frequency))
 
@@ -75,15 +118,16 @@ export function LabAnalysisPage() {
     api<SavedRange>(`/lab/ranges/${encodeURIComponent(sourceId)}`, { token })
       .then((range) => !cancelled && setSource(range))
       .catch((error: unknown) => {
+        if (cancelled) return
+        const reason = reasonOf(error)
         // No longer this Account's: the Combos stay, without a name to compare them with.
-        if (!cancelled && reasonOf(error) === 'range-not-found') {
-          change((state) => (state.sourceId === sourceId ? { ...state, sourceId: null } : state))
-        }
+        if (reason === 'range-not-found') changeState((state) => (state.sourceId === sourceId ? { ...state, sourceId: null } : state))
+        else setFailure(reason)
       })
     return () => {
       cancelled = true
     }
-  }, [sourceId, token])
+  }, [sourceId, token, changeState])
 
   const load = async (id: string) => {
     setFailure(null)
@@ -191,14 +235,7 @@ function SaveAsDialog({
     try {
       onSaved(await api<SavedRange>('/lab/ranges', { token, method: 'POST', body: { name: trimmed, combos, tagIds: [] } }))
     } catch (error) {
-      const reason = reasonOf(error)
-      setFailure(
-        reason === 'range-name-taken'
-          ? t('lab.ranges.nameTaken', { name: trimmed })
-          : reason === 'invalid-range-name'
-            ? t('reason.invalid-range-name')
-            : t('lab.ranges.saveFailed'),
-      )
+      setFailure(rangeSaveFailure(t, reasonOf(error), trimmed))
       setBusy(false)
     }
   }
