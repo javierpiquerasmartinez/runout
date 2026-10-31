@@ -1,7 +1,7 @@
 /*
- * The Lab's Analysis: one side, its Range's matrix more compact than on
- * Rangos, with its numbers and text under it, and the Board beside it. Laid
- * out for a second side beside the first, to come.
+ * The Lab's Analysis: one side or two, each Range's matrix more compact than
+ * on Rangos, with its numbers and text under it, and the Board beside them.
+ * Two sides stand side by side, smaller still, and stack on a narrow screen.
  */
 
 /* The sub-navigation already says where this is; the title is for screen readers. */
@@ -12,6 +12,14 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.analysis__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .analysis__body {
@@ -74,6 +82,21 @@
 .analysis__load:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
+}
+
+/* Two sides: both matrices in view at once, each narrower, side by side over the Board and the Categories. */
+.analysis__body[data-sides='2'] {
+  flex-direction: column;
+}
+.analysis__body[data-sides='2'] .analysis__sides {
+  flex-wrap: nowrap;
+}
+.analysis__body[data-sides='2'] .analysis__side {
+  flex-basis: 300px;
+  max-width: 360px;
+}
+.analysis__body[data-sides='2'] .analysis__side .lab__cell {
+  font-size: clamp(7px, 0.65vw, 10px);
 }
 
 /* Compact: the cells' labels shrink with the matrix. */
@@ -209,6 +232,17 @@
   .analysis__side .lab__cell {
     font-size: clamp(7px, 2.4vw, 11px);
   }
+  /* Two sides stack, wrapping to the whole width each, their cells too small to name: the title still does. */
+  .analysis__body[data-sides='2'] .analysis__sides {
+    flex-wrap: wrap;
+  }
+  .analysis__body[data-sides='2'] .analysis__side {
+    max-width: none;
+  }
+  .analysis__body[data-sides='2'] .lab__cell-label,
+  .analysis__body[data-sides='2'] .lab__cell-frequency {
+    visibility: hidden;
+  }
 }
 
 /* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
@@ -246,6 +280,14 @@
 .analysis__categories thead th {
   color: var(--text-muted);
   font-size: 12px;
+}
+/* With two sides, each side's pair of columns under its name. */
+.analysis__categories thead .analysis__categories-side {
+  text-align: right;
+  color: var(--text-secondary);
+}
+.analysis__categories td[data-side-start] {
+  padding-left: 24px;
 }
 
 /* A row of the Categories is picked by clicking it anywhere. */
@@ -289,6 +331,15 @@
 }
 .analysis__selection-share {
   margin: 0;
+  font-size: 13px;
+}
+.analysis__selection-sides {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: 13px;
 }
 .analysis__selection-actions {

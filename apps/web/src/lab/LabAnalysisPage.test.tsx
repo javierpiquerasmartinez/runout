@@ -932,3 +932,161 @@ describe('LabAnalysisPage · saving a selection as a Range', () => {
     expect(screen.getByRole('dialog', { name: 'Guardar la selección como un rango nuevo' })).toBeTruthy()
   })
 })
+
+describe('LabAnalysisPage · the second side', () => {
+  const side = (name: string) => screen.getByRole('region', { name })
+  const pressedIn = (region: HTMLElement) =>
+    within(within(region).getByRole('group', { name: 'Range matrix' }))
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.getAttribute('aria-label'))
+
+  it('is added empty beside the first, kept in the address, and removed again', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&source=r1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add a second range' }))
+
+    expect(pressedIn(side('Range 1'))).toEqual(['AA'])
+    expect(pressedIn(side('Range 2'))).toEqual([])
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', source: 'r1', range2: '' }))
+
+    await userEvent.click(within(side('Range 2')).getByRole('button', { name: 'Remove range' }))
+
+    expect(screen.queryByRole('region', { name: 'Range 2' })).toBeNull()
+    expect(screen.getByRole('region', { name: 'Analysed range' })).toBeTruthy()
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', source: 'r1' }))
+  })
+
+  it('is restored from the address, with its source, as on a reload', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=KK&source2=r1')
+
+    expect(pressedIn(side('Range 1'))).toEqual(['AA'])
+    expect(pressedIn(side('Range 2'))).toEqual(['KK'])
+    await waitFor(() => expect(within(side('Range 2')).getByRole('heading', { level: 2 }).textContent).toBe('OR BTN'))
+    expect(within(side('Range 2')).getByText('Changed')).toBeTruthy()
+    expect(within(side('Range 1')).getByRole('heading', { level: 2 }).textContent).toBe('Unsaved range')
+  })
+
+  it('is loaded, painted, pasted, cleared and saved on its own, the brush painting whichever matrix is pressed', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=')
+    const second = side('Range 2')
+
+    await waitFor(() => expect(within(second).getAllByRole('option')).toHaveLength(3))
+    await userEvent.selectOptions(within(second).getByRole('combobox', { name: 'Load a saved range' }), 'OR BTN')
+    await waitFor(() => expect(within(second).getByRole('heading', { level: 2 }).textContent).toBe('OR BTN'))
+    await userEvent.click(within(within(second).getByRole('group', { name: 'Range matrix' })).getByRole('button', { name: 'KK' }))
+
+    expect(pressedIn(second)).toEqual(['AA', 'KK'])
+    expect(within(second).getByText('Changed')).toBeTruthy()
+    expect(pressedIn(side('Range 1'))).toEqual(['AA'])
+    expect(within(side('Range 1')).queryByText('Changed')).toBeNull()
+
+    await userEvent.type(within(side('Range 1')).getByRole('textbox', { name: 'Paste a range' }), 'QQ')
+    await userEvent.click(within(side('Range 1')).getByRole('button', { name: 'Import' }))
+    expect(pressedIn(side('Range 1'))).toEqual(['QQ'])
+    await waitFor(() => expect(address()).toEqual({ range: 'QQ', range2: 'KK+', source2: 'r1' }))
+
+    await userEvent.click(within(second).getByRole('button', { name: 'Clear' }))
+    expect(pressedIn(second)).toEqual([])
+    expect(pressedIn(side('Range 1'))).toEqual(['QQ'])
+
+    await userEvent.click(within(side('Range 1')).getByRole('button', { name: 'Save as range' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Range name' }), 'QQ only{Enter}')
+    await waitFor(() => expect(within(side('Range 1')).getByRole('heading', { level: 2 }).textContent).toBe('QQ only'))
+    expect(JSON.parse(writes[0].slice('POST /api/lab/ranges '.length))).toMatchObject({ name: 'QQ only', combos: { QsQh: 100 } })
+    expect(within(second).getByRole('heading', { level: 2 }).textContent).toBe('OR BTN')
+  })
+
+  it('has its Combos removed by the Board, like the first', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=KK&board=Ks7c2d')
+
+    expect(within(side('Range 1')).getByText(/live combos/).textContent).toBe('6.0 live combos')
+    expect(within(side('Range 2')).getByText(/live combos/).textContent).toBe('3.0 live combos')
+  })
+
+  it('takes the Dead Cards away when added, and offers none while it is there', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&dead=KsKh')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add a second range' }))
+
+    const board = screen.getByRole('region', { name: 'Board' })
+    expect(within(board).queryByRole('radio', { name: 'Dead cards' })).toBeNull()
+    expect(within(board).queryByRole('textbox', { name: 'Dead cards as text' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Your hand' })).toBeNull()
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', range2: '' }))
+  })
+
+  it('drops Dead Cards an address holds alongside it', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=KK&dead=QsQh')
+
+    expect(within(side('Range 1')).getByText(/live combos/).textContent).toBe('6.0 live combos')
+    expect(screen.queryByRole('textbox', { name: 'Dead cards as text' })).toBeNull()
+  })
+})
+
+describe('LabAnalysisPage · the Categories of two sides', () => {
+  const side = (name: string) => screen.getByRole('region', { name })
+  /** A table's rows as text, cell by cell. */
+  const tableRows = (caption: string) =>
+    Array.from(screen.getByRole('table', { name: caption }).querySelectorAll('tr'), (row) =>
+      Array.from(row.children, (each) => each.textContent).join(' | '),
+    )
+  const row = (category: string) => screen.getByRole('button', { name: category })
+  const title = (region: string, name: string) =>
+    within(within(side(region)).getByRole('group', { name: 'Range matrix' })).getByRole('button', { name }).getAttribute('title')
+
+  it("show a column per side, each over that side's own live Combos", () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+
+    const rows = tableRows('Made hands')
+    expect(rows.slice(0, 2)).toEqual([' | Range 1 | Range 2', 'Made hand | Combos | % | Combos | %'])
+    expect(rows).toContain('Set | 0.0 | 0.0 % | 3.0 | 50.0 %')
+    expect(rows).toContain('Overpair | 6.0 | 66.7 % | 0.0 | 0.0 %')
+    expect(rows).toContain('Top pair | 3.0 | 33.3 % | 3.0 | 50.0 %')
+  })
+
+  it('light up a selection in both matrices, with each side its combined %', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+
+    await userEvent.click(row('Top pair'))
+    await userEvent.click(row('Set'))
+
+    expect(Array.from(screen.getByRole('region', { name: 'Selection' }).querySelectorAll('li'), (each) => each.textContent)).toEqual([
+      'Range 1: 3.0 combos · 33.3 % of the live combos',
+      'Range 2: 6.0 combos · 100.0 % of the live combos',
+    ])
+    expect(title('Range 1', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
+    expect(title('Range 2', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
+    expect(title('Range 2', '77')).toBe('77 · 6 combos · 100 % · 3 removed by the board or the dead cards · 3 in the selection')
+    expect(title('Range 1', 'AA')).toBe('AA · 6 combos · 100 %')
+  })
+
+  it('ask which side a selection is saved from', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+    await userEvent.click(row('Set'))
+    await userEvent.click(row('Overpair'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save selection as range' }))
+    const dialog = screen.getByRole('dialog', { name: 'Save the selection as a new range' })
+    const choice = within(dialog).getByRole('radiogroup', { name: 'Save the combos of' })
+
+    expect(within(choice).getByRole('radio', { name: 'Range 1' }).getAttribute('aria-checked')).toBe('true')
+    await userEvent.click(within(choice).getByRole('radio', { name: 'Range 2' }))
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Range name' }), 'Sets{Enter}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(JSON.parse(writes[0].slice('POST /api/lab/ranges '.length))).toMatchObject({
+      name: 'Sets',
+      combos: { '7s7h': 100, '7s7d': 100, '7h7d': 100 },
+    })
+  })
+
+  it('are in Spanish too', async () => {
+    renderAnalysis('es', '/lab/analysis?range=AA&range2=KK&board=Kd7c4h')
+
+    expect(screen.getByRole('region', { name: 'Rango 1' })).toBeTruthy()
+    expect(within(screen.getByRole('region', { name: 'Rango 2' })).getByRole('button', { name: 'Quitar rango' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar selección como rango' }))
+    expect(screen.getByRole('radiogroup', { name: 'Guardar los combos de' })).toBeTruthy()
+  })
+})

@@ -31,17 +31,21 @@ import {
 export function BoardPicker({
   board,
   dead,
+  withDead,
   onChange,
   onDeadChange,
 }: {
   board: readonly string[]
   dead: readonly string[]
+  /** Whether Dead Cards are offered: not with two sides, where each side is a Range rather than an own Combo. */
+  withDead: boolean
   onChange: (board: string[]) => void
   onDeadChange: (dead: string[]) => void
 }) {
   const { t } = useI18n()
   /** Which cards the grid picks. */
-  const [target, setTarget] = useState<'board' | 'dead'>('board')
+  const [picking, setPicking] = useState<'board' | 'dead'>('board')
+  const target = withDead ? picking : 'board'
   /** The text field while it is being typed in; null shows the Board's. */
   const [typed, setTyped] = useState<string | null>(null)
   /** What was wrong with the last text, until it is edited or the Board changes. */
@@ -101,26 +105,30 @@ export function BoardPicker({
         {Array.from({ length: MAX_BOARD_CARDS }, (_, slot) =>
           board[slot] ? <Card key={slot} card={tenAs10(board[slot])} size="hero" /> : <CardSlot key={slot} size="hero" />,
         )}
-        <span className="analysis__dead-cards">
-          {Array.from({ length: MAX_DEAD_CARDS }, (_, slot) =>
-            dead[slot] ? <Card key={slot} card={tenAs10(dead[slot])} size="hero" /> : <CardSlot key={slot} size="hero" />,
-          )}
-        </span>
+        {withDead && (
+          <span className="analysis__dead-cards">
+            {Array.from({ length: MAX_DEAD_CARDS }, (_, slot) =>
+              dead[slot] ? <Card key={slot} card={tenAs10(dead[slot])} size="hero" /> : <CardSlot key={slot} size="hero" />,
+            )}
+          </span>
+        )}
       </div>
       {toFlop > 0 && (
         <p className="lab__muted analysis__board-hint">
           {t(toFlop === 1 ? 'lab.analysis.board.toFlop.one' : 'lab.analysis.board.toFlop.other', { count: toFlop })}
         </p>
       )}
-      <SegmentedControl
-        label={t('lab.analysis.pickFor')}
-        options={[
-          { value: 'board', label: t('lab.analysis.board') },
-          { value: 'dead', label: t('lab.analysis.dead') },
-        ]}
-        value={target}
-        onChange={setTarget}
-      />
+      {withDead && (
+        <SegmentedControl
+          label={t('lab.analysis.pickFor')}
+          options={[
+            { value: 'board', label: t('lab.analysis.board') },
+            { value: 'dead', label: t('lab.analysis.dead') },
+          ]}
+          value={target}
+          onChange={setPicking}
+        />
+      )}
       <div className="analysis__deck" role="group" aria-label={t('lab.analysis.board.picker')}>
         {DECK.map((card) => {
           const picked = (target === 'board' ? board : dead).includes(card)
@@ -171,34 +179,38 @@ export function BoardPicker({
                 : t('lab.analysis.board.size', { count: problem.count })}
         </p>
       )}
-      <input
-        className="analysis__board-field ro-mono"
-        value={typedDead ?? formatBoard(dead)}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder={t('lab.analysis.dead.placeholder')}
-        aria-label={t('lab.analysis.dead.text')}
-        onChange={(event) => {
-          setTypedDead(event.target.value)
-          setDeadProblem(null)
-        }}
-        onBlur={commitTypedDead}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter') return
-          event.preventDefault()
-          commitTypedDead()
-        }}
-      />
-      {deadProblem && (
-        <p className="lab__failure" role="alert">
-          {deadProblem.kind === 'unknown'
-            ? t('lab.analysis.dead.unknown', { piece: deadProblem.piece })
-            : deadProblem.kind === 'repeated'
-              ? t('lab.analysis.dead.repeated', { card: deadProblem.card })
-              : deadProblem.kind === 'on-board'
-                ? t('lab.analysis.dead.onBoardProblem', { card: deadProblem.card })
-                : t('lab.analysis.dead.size', { count: deadProblem.count })}
-        </p>
+      {withDead && (
+        <>
+          <input
+            className="analysis__board-field ro-mono"
+            value={typedDead ?? formatBoard(dead)}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={t('lab.analysis.dead.placeholder')}
+            aria-label={t('lab.analysis.dead.text')}
+            onChange={(event) => {
+              setTypedDead(event.target.value)
+              setDeadProblem(null)
+            }}
+            onBlur={commitTypedDead}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              commitTypedDead()
+            }}
+          />
+          {deadProblem && (
+            <p className="lab__failure" role="alert">
+              {deadProblem.kind === 'unknown'
+                ? t('lab.analysis.dead.unknown', { piece: deadProblem.piece })
+                : deadProblem.kind === 'repeated'
+                  ? t('lab.analysis.dead.repeated', { card: deadProblem.card })
+                  : deadProblem.kind === 'on-board'
+                    ? t('lab.analysis.dead.onBoardProblem', { card: deadProblem.card })
+                    : t('lab.analysis.dead.size', { count: deadProblem.count })}
+            </p>
+          )}
+        </>
       )}
       <div className="analysis__board-actions">
         <Button variant="secondary" size="compact" onClick={() => change(randomFlop(Math.random, dead))}>
