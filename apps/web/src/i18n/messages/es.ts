@@ -764,6 +764,7 @@ export const es = {
   'lab.analysis.own.tied': 'Empata con {combos} combos · {percent} %',
   'lab.analysis.own.behind': 'Por detrás de {combos} combos · {percent} %',
   'lab.analysis.equity': 'Equity',
+  'lab.analysis.equity.percent': '{percent} %',
   'lab.analysis.equity.side': '{side}: {equity}',
   'lab.analysis.equity.precision.exact': 'Exacta, sin muestreo',
   'lab.analysis.equity.precision.sampled': 'Muestreada · {margin}',
