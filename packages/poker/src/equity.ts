@@ -29,8 +29,18 @@ export interface SideEquity {
   tie: number;
 }
 
+/** One Hand Class's share of the pot against the other side, as `SideEquity` is the side's. */
+export interface HandClassEquity extends SideEquity {
+  /** Its share of the side's deals, from 0 to 100: the side's Equity is its Hand Classes' averaged by it. */
+  share: number;
+  /** As the result's margin, over this Hand Class's deals alone. */
+  margin: number;
+}
+
 export interface EquityResult {
   sides: [SideEquity, SideEquity];
+  /** Each side's Hand Classes that met the other side, by name (`AKs`). */
+  handClasses: [Record<string, HandClassEquity>, Record<string, HandClassEquity>];
   /** Whether every deal was counted: then the margin is 0. */
   exact: boolean;
   /** How far the Equity may be from the exact one, in points of %, at 95 % confidence. */
@@ -45,8 +55,21 @@ function codeOf(card: string): number {
 interface Combo {
   first: number;
   second: number;
+  /** Its Hand Class's name, as `AKs`. */
+  handClass: string;
   /** Its Frequency, from 0 to 1. */
   frequency: number;
+}
+
+const RANKS = 'AKQJT98765432';
+
+/** The Hand Class a Combo is of, as `AKs`, `AKo` or `AA`, whichever card is written first. */
+function handClassOf(combo: string): string {
+  const [high, low] = [combo[0], combo[2]].sort(
+    (a, b) => RANKS.indexOf(a) - RANKS.indexOf(b),
+  );
+  if (high === low) return high + low;
+  return high + low + (combo[1] === combo[3] ? 's' : 'o');
 }
 
 /** The Range's Combos that hold none of the cards out, as codes. */
@@ -56,7 +79,12 @@ function combosOf(range: EquityRange, out: ReadonlySet<number>): Combo[] {
     const first = codeOf(combo.slice(0, 2));
     const second = codeOf(combo.slice(2));
     if (frequency > 0 && !out.has(first) && !out.has(second)) {
-      combos.push({ first, second, frequency: frequency / 100 });
+      combos.push({
+        first,
+        second,
+        handClass: handClassOf(combo),
+        frequency: frequency / 100,
+      });
     }
   }
   return combos;
@@ -75,32 +103,119 @@ function holds(combo: Combo, cards: readonly number[]): boolean {
   return cards.includes(combo.first) || cards.includes(combo.second);
 }
 
-/** The first side's wins, ties and losses, each counted by its Frequency. */
+/** Wins, ties and losses, each counted by its Frequency. */
 interface Tally {
   win: number;
   tie: number;
   loss: number;
 }
 
-/** Counts one showdown, by how much stronger the first side is, `times` over. */
-function count(tally: Tally, difference: number, times: number): void {
-  if (difference > 0) tally.win += times;
-  else if (difference < 0) tally.loss += times;
-  else tally.tie += times;
+/**
+ * Each Combo's wins, ties and losses against the other side, from its own
+ * side's view: three numbers per Combo, in the order of its side's Combos.
+ */
+type Tallies = readonly [Float64Array, Float64Array];
+
+function talliesFor(sides: readonly [Combo[], Combo[]]): Tallies {
+  return [
+    new Float64Array(sides[0].length * 3),
+    new Float64Array(sides[1].length * 3),
+  ];
+}
+
+/**
+ * Counts one showdown between the first side's Combo `i` and the second's
+ * `j`, by how much stronger the first is, `times` over.
+ */
+function count(
+  [mine, theirs]: Tallies,
+  i: number,
+  j: number,
+  difference: number,
+  times: number,
+): void {
+  const [mineAt, theirsAt] =
+    difference > 0 ? [0, 2] : difference < 0 ? [2, 0] : [1, 1];
+  mine[i * 3 + mineAt] += times;
+  theirs[j * 3 + theirsAt] += times;
+}
+
+/** How many standard errors the margin spans: 95 % confidence. */
+const Z_95 = 1.96;
+
+/**
+ * How far a sampled share of the pot may be from the exact one, in points of
+ * %, when each of its deals counts once: each is worth 1, ½ or 0 of the pot.
+ */
+function marginOf({ win, tie, loss }: Tally): number {
+  const n = win + tie + loss;
+  const mean = (win + tie / 2) / n;
+  const meanSquare = (win + tie / 4) / n;
+  const variance = Math.max(0, meanSquare - mean * mean);
+  return Z_95 * Math.sqrt(variance / n) * 100;
+}
+
+function shareOf({ win, tie, loss }: Tally): SideEquity {
+  const total = win + tie + loss;
+  return {
+    equity: ((win + tie / 2) / total) * 100,
+    win: (win / total) * 100,
+    tie: (tie / total) * 100,
+  };
+}
+
+/** A side's Combos' tallies, added up by Hand Class. */
+function byHandClass(combos: Combo[], tallies: Float64Array): Map<string, Tally> {
+  const classes = new Map<string, Tally>();
+  combos.forEach(({ handClass }, i) => {
+    const tally = classes.get(handClass) ?? { win: 0, tie: 0, loss: 0 };
+    tally.win += tallies[i * 3];
+    tally.tie += tallies[i * 3 + 1];
+    tally.loss += tallies[i * 3 + 2];
+    classes.set(handClass, tally);
+  });
+  return classes;
 }
 
 function resultOf(
-  { win, tie, loss }: Tally,
+  sides: readonly [Combo[], Combo[]],
+  tallies: Tallies,
   exact: boolean,
-  margin: number,
 ): EquityResult {
-  const total = win + tie + loss;
-  const side = (wins: number): SideEquity => ({
-    equity: ((wins + tie / 2) / total) * 100,
-    win: (wins / total) * 100,
-    tie: (tie / total) * 100,
+  const classes = [
+    byHandClass(sides[0], tallies[0]),
+    byHandClass(sides[1], tallies[1]),
+  ] as const;
+  const total: Tally = { win: 0, tie: 0, loss: 0 };
+  for (const { win, tie, loss } of classes[0].values()) {
+    total.win += win;
+    total.tie += tie;
+    total.loss += loss;
+  }
+  const deals = total.win + total.tie + total.loss;
+  const handClasses = classes.map((side) => {
+    const equities: Record<string, HandClassEquity> = {};
+    for (const [name, tally] of side) {
+      const met = tally.win + tally.tie + tally.loss;
+      // A Hand Class whose every Combo was blocked never met the other side.
+      if (met === 0) continue;
+      equities[name] = {
+        ...shareOf(tally),
+        share: (met / deals) * 100,
+        margin: exact ? 0 : marginOf(tally),
+      };
+    }
+    return equities;
   });
-  return { sides: [side(win), side(loss)], exact, margin };
+  return {
+    sides: [
+      shareOf(total),
+      shareOf({ win: total.loss, tie: total.tie, loss: total.win }),
+    ],
+    handClasses: [handClasses[0], handClasses[1]],
+    exact,
+    margin: exact ? 0 : marginOf(total),
+  };
 }
 
 /** Every way to pick `size` of `items`. */
@@ -121,8 +236,8 @@ function enumerate(
   sides: readonly [Combo[], Combo[]],
   board: readonly number[],
   deck: readonly number[],
-): Tally {
-  const tally: Tally = { win: 0, tie: 0, loss: 0 };
+): Tallies {
+  const tallies = talliesFor(sides);
   // A Combo's cards, then the Board's and the completion's.
   const codes = [0, 0, ...board];
   const strengths = sides.map((combos) => new Int32Array(combos.length));
@@ -143,14 +258,16 @@ function enumerate(
         if (holds(theirs[j], completion) || sharesCard(mine[i], theirs[j]))
           continue;
         count(
-          tally,
+          tallies,
+          i,
+          j,
           strengths[0][i] - strengths[1][j],
           mine[i].frequency * theirs[j].frequency,
         );
       }
     }
   }
-  return tally;
+  return tallies;
 }
 
 /** All 52 cards as codes. */
@@ -167,9 +284,6 @@ export const EXACT_BUDGET = 4_000_000;
 
 /** Deals sampled between two running results. */
 const BATCH_DEALS = 10_000;
-
-/** How many standard errors the margin spans: 95 % confidence. */
-const Z_95 = 1.96;
 
 /** How many ways there are to pick `size` of `count`. */
 function choose(count: number, size: number): number {
@@ -197,8 +311,8 @@ function seeded(seed: number): () => number {
   };
 }
 
-/** Draws a side's Combo at random, each as likely as its Frequency. */
-function picker(combos: Combo[], random: () => number): () => Combo {
+/** Draws a side's Combo at random, each as likely as its Frequency, as its index. */
+function picker(combos: Combo[], random: () => number): () => number {
   const cumulative: number[] = [];
   let total = 0;
   for (const combo of combos) cumulative.push((total += combo.frequency));
@@ -210,7 +324,7 @@ function picker(combos: Combo[], random: () => number): () => Combo {
       if (cumulative[middle] > target) high = middle;
       else low = middle + 1;
     }
-    return combos[low];
+    return low;
   };
 }
 
@@ -227,13 +341,14 @@ function* sample(
 ): Generator<EquityResult> {
   const random = seeded(seed);
   const [pickMine, pickTheirs] = sides.map((combos) => picker(combos, random));
-  const tally: Tally = { win: 0, tie: 0, loss: 0 };
+  const tallies = talliesFor(sides);
   const mine = [0, 0, ...board];
   const theirs = [0, 0, ...board];
   for (;;) {
     for (let deals = 0; deals < BATCH_DEALS;) {
-      const a = pickMine();
-      const b = pickTheirs();
+      const i = pickMine();
+      const j = pickTheirs();
+      const [a, b] = [sides[0][i], sides[1][j]];
       if (sharesCard(a, b)) continue;
       const used = [a.first, a.second, b.first, b.second];
       mine.length = theirs.length = 2 + board.length;
@@ -246,15 +361,10 @@ function* sample(
       }
       [mine[0], mine[1]] = [a.first, a.second];
       [theirs[0], theirs[1]] = [b.first, b.second];
-      count(tally, strength(mine) - strength(theirs), 1);
+      count(tallies, i, j, strength(mine) - strength(theirs), 1);
       deals++;
     }
-    const n = tally.win + tally.tie + tally.loss;
-    // Each deal is worth 1, ½ or 0 of the pot to the first side.
-    const mean = (tally.win + tally.tie / 2) / n;
-    const meanSquare = (tally.win + tally.tie / 4) / n;
-    const variance = Math.max(0, meanSquare - mean * mean);
-    yield resultOf(tally, false, Z_95 * Math.sqrt(variance / n) * 100);
+    yield resultOf(sides, tallies, false);
   }
 }
 
@@ -278,7 +388,7 @@ export function* equity(
   const completions = choose(deck.length, 5 - board.length);
   const work = completions * (pairs + sides[0].length + sides[1].length);
   if (board.length === 5 || work <= EXACT_BUDGET) {
-    yield resultOf(enumerate(sides, boardCodes, deck), true, 0);
+    yield resultOf(sides, enumerate(sides, boardCodes, deck), true);
     return;
   }
   yield* sample(sides, boardCodes, deck, seed);
