@@ -765,6 +765,7 @@ export const en: Messages = {
   'lab.analysis.own.tied': 'Tied with {combos} combos · {percent} %',
   'lab.analysis.own.behind': 'Behind {combos} combos · {percent} %',
   'lab.analysis.equity': 'Equity',
+  'lab.analysis.equity.percent': '{percent} %',
   'lab.analysis.equity.side': '{side}: {equity}',
   'lab.analysis.equity.precision.exact': 'Exact, not sampled',
   'lab.analysis.equity.precision.sampled': 'Sampled · {margin}',
