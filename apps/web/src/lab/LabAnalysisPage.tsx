@@ -389,8 +389,13 @@ function EquityBar({ equity, labels, hovered }: { equity: EquityResult; labels: 
   }
   return (
     <section className="analysis__equity" aria-label={t('lab.analysis.equity')}>
-      <div className="analysis__equity-bar" aria-hidden="true">
-        <span className="analysis__equity-fill" style={{ width: `${equity.sides[0].equity}%` }} />
+      {/* Each side's share at its own end, so the colours need no legend; the lines below read it out. */}
+      <div className="analysis__equity-meter ro-mono" aria-hidden="true">
+        <span className="analysis__equity-end">{t('lab.analysis.equity.percent', { percent: text.oneDecimal(equity.sides[0].equity) })}</span>
+        <div className="analysis__equity-bar">
+          <span className="analysis__equity-fill" style={{ width: `${equity.sides[0].equity}%` }} />
+        </div>
+        <span className="analysis__equity-end">{t('lab.analysis.equity.percent', { percent: text.oneDecimal(equity.sides[1].equity) })}</span>
       </div>
       <ul className="analysis__equity-sides ro-mono">
         {equity.sides.map((sideEquity, index) => (

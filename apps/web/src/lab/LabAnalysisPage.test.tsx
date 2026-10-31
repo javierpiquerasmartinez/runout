@@ -1112,6 +1112,14 @@ describe('LabAnalysisPage · the Equity between two Ranges', () => {
     ])
   })
 
+  it("marks each side's Equity at its end of the bar", () => {
+    renderAnalysis('en', river)
+
+    // Read out by the lines below it: the ends are for the eye alone.
+    expect(within(equityBar()!).getByText('75.0 %')).toBeTruthy()
+    expect(within(equityBar()!).getByText('25.0 %')).toBeTruthy()
+  })
+
   it('shows it preflop too, sampled, with the margin it reached', () => {
     renderAnalysis('en', '/lab/analysis?range=AA&range2=KK')
 
