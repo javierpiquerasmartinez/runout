@@ -1,3 +1,4 @@
+import { equity, type EquityRequest } from '@runout/poker'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +22,27 @@ let writes: string[]
 
 const aces = { AsAh: 100, AsAd: 100, AsAc: 100, AhAd: 100, AhAc: 100, AdAc: 100 }
 
+/** How many batches the fake worker streams before it stops, unless the Equity is exact. */
+const FAKE_BATCHES = 3
+
+/**
+ * The Equity worker, run in place: each request's batches are posted before
+ * `postMessage` returns, tagged as the real one tags them.
+ */
+class SyncEquityWorker {
+  onmessage: ((event: MessageEvent) => void) | null = null
+  postMessage({ id, request }: { id: number; request: EquityRequest }) {
+    let batch = 0
+    for (const result of equity(request, { seed: 1 })) {
+      this.onmessage?.({ data: { id, result } } as MessageEvent)
+      if (result.exact || ++batch === FAKE_BATCHES) break
+    }
+  }
+  terminate() {}
+}
+
 beforeEach(() => {
+  vi.stubGlobal('Worker', SyncEquityWorker)
   stored = [
     { id: 'r1', name: 'OR BTN', combos: aces },
     { id: 'r2', name: '3B BB', combos: {} },
@@ -581,12 +602,49 @@ describe('LabAnalysisPage · the Dead Cards', () => {
     expect(within(ownCombo()!).getByText(/^Behind/).textContent).toBe('Behind 3.0 combos · 42.9 %')
   })
 
-  it('make no own Combo with one Dead Card, nor before the flop', () => {
+  it('make no own Combo with one Dead Card', () => {
     renderAnalysis('en', '/lab/analysis?range=AA&board=Th7h2c&dead=Ah')
+
+    expect(ownCombo()).toBeNull()
+  })
+
+  const equityLine = () => within(ownCombo()!).getByText(/^Equity/).textContent
+
+  it('give, when two, their exact Equity against the Range on a river, with win and tie shares', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CAK%2CKQ&board=Ks7d2c9h4s&dead=AhKh')
+
+    // Live: 3 AA ahead of A♥K♥, 6 AK tied with it, 8 KQ behind it.
+    expect(equityLine()).toBe('Equity 64.7 % · exact · Win 47.1 % · Tie 35.3 %')
+  })
+
+  it('give, when two, their Equity preflop too, sampled, with the margin it reached', () => {
+    renderAnalysis('en', '/lab/analysis?range=KK&dead=AhAd')
+
+    expect(ownCombo()!.textContent).not.toContain('Ahead')
+    expect(equityLine()).toMatch(/^Equity 8\d\.\d % · ± 0\.\d+ % · Win 8\d\.\d % · Tie 0\.\d %$/)
+  })
+
+  it('restart their Equity when the Board changes, never showing the old one', async () => {
+    renderAnalysis('en', '/lab/analysis?range=QQ&board=Th7h2c3s&dead=AhKh')
+    const before = equityLine()
+
+    await typeInto(boardField(), 'Th7h2c3s9h')
+
+    expect(equityLine()).toBe('Equity 100.0 % · exact · Win 100.0 % · Tie 0.0 %')
+    expect(before).not.toBe(equityLine())
+  })
+
+  it('show no Equity while the flop is being picked, nor against a Range with nothing live', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&board=Th7h&dead=AhKh')
     expect(ownCombo()).toBeNull()
     cleanup()
 
-    renderAnalysis('en', '/lab/analysis?range=AA&dead=AhKh')
+    renderAnalysis('en', '/lab/analysis?board=Th7h2c&dead=AhKh')
+    expect(within(ownCombo()!).queryByText(/^Equity/)).toBeNull()
+    cleanup()
+
+    // Preflop there is nothing else to show.
+    renderAnalysis('en', '/lab/analysis?dead=AhKh')
     expect(ownCombo()).toBeNull()
   })
 

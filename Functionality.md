@@ -515,7 +515,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 ## E9 · Lab
 
-The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, then studies them on a Board in the Analysis, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes no equity against a Range. Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
+The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, then studies them on a Board in the Analysis, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes the Equity of one hand against a Range (H9.15), not yet of one Range against another. Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
 
 **H9.1 — Open the Lab.** As a player, I want a place to build Ranges, so I can study preflop where I already review my Hands.
 
@@ -621,6 +621,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - A switch turns the Board's grid to **Cartas muertas**, where I pick up to two cards and pick one again to take it off. I can also type them, as `AhKh`: an unknown card, a repeated one, more than two or a card on the Board is refused with what is wrong, and the Dead Cards I had stay. A card is never both on the Board and dead: the grid locks it on the other side, and a Board typed with a Dead Card is refused.
 - Dead Cards switch off the Combos holding them, like the Board, and the live Combos, the Categories and their shares count only what is left. **Flop aleatorio** and **Carta aleatoria** never deal one.
 - With two Dead Cards and at least a flop, **Tu mano** shows their Made Hand and Draws on the Board, and how many of the Range's live Combos, weighted by Frequency, they are ahead of, tied with and behind as the Board stands, in Combos and %.
+- With two Dead Cards, preflop or on a flop, turn or river, **Tu mano** also shows their Equity against the Range, with win and tie shares, weighting each Combo by its Frequency and never matching it with a Combo that shares a card. It appears at once and sharpens while I look, showing the margin it reached (it stops under ±0.1 % or after a time cap), and says **exacta** when every deal was counted, as on the river and on smaller turns. Changing the Range, the Board or the Dead Cards starts it over, and a number for what is no longer on screen is never shown. The screen keeps responding meanwhile.
 - Changing the Dead Cards clears the selection. The address holds them too, so reloading keeps them.
 
 ## MVP scope and out of scope

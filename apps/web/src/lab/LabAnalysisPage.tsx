@@ -8,8 +8,22 @@ import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Toggle } from '../ui/Toggle'
-import { combinationDraws, draws, FLOP_CARDS, liveCombos, madeHands, ownCombo, removedCombos, selectionOf, tenAs10, type OwnCombo } from './board'
+import type { EquityRequest, EquityResult } from '@runout/poker'
+import {
+  combinationDraws,
+  draws,
+  FLOP_CARDS,
+  liveCombos,
+  madeHands,
+  MAX_DEAD_CARDS,
+  ownCombo,
+  removedCombos,
+  selectionOf,
+  tenAs10,
+  type OwnCombo,
+} from './board'
 import { BoardPicker } from './BoardPicker'
+import { useEquity } from './equity'
 import { analysisStateFromSearch, labAnalysisAddress, MAX_RANGE_NAME_LENGTH, rangeSaveFailure, type AnalysisState } from './lab'
 import { CategoriesTable } from './CategoriesTable'
 import { LabNav } from './LabNav'
@@ -187,6 +201,15 @@ export function LabAnalysisPage() {
   const drawRows = useMemo(() => draws(range, board, dead, { oneCardBackdoors }), [range, board, dead, oneCardBackdoors])
   const combinationDrawRows = useMemo(() => combinationDraws(range, board, dead), [range, board, dead])
   const own = useMemo(() => ownCombo(range, board, dead, { oneCardBackdoors }), [range, board, dead, oneCardBackdoors])
+  /** Two Dead Cards are the own Combo, a Range of one, against the Range: preflop or on a flop, turn or river. */
+  const ownEquityRequest = useMemo<EquityRequest | null>(
+    () =>
+      dead.length === MAX_DEAD_CARDS && (board.length === 0 || board.length >= FLOP_CARDS)
+        ? { ranges: [{ [dead.join('')]: 100 }, range], board }
+        : null,
+    [range, board, dead],
+  )
+  const ownEquity = useEquity(ownEquityRequest)
   /** The cards out of the deck: the Board's and the Dead Cards. */
   const out = useMemo(() => [...board, ...dead], [board, dead])
 
@@ -278,7 +301,7 @@ export function LabAnalysisPage() {
               onChange={(cards) => change((state) => ({ ...state, board: cards }))}
               onDeadChange={(cards) => change((state) => ({ ...state, dead: cards }))}
             />
-            {own && <OwnComboSummary own={own} dead={dead} />}
+            {(own || ownEquity) && <OwnComboSummary own={own} equity={ownEquity} dead={dead} />}
             {selected.size > 0 && (
               <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
                 <span className="lab__label">{t('lab.analysis.selection')}</span>
@@ -372,14 +395,20 @@ export function LabAnalysisPage() {
   )
 }
 
-/** The own Combo two Dead Cards make: its Made Hand and Draws, and where it stands against the Range on the Board. */
-function OwnComboSummary({ own, dead }: { own: OwnCombo; dead: readonly string[] }) {
+/**
+ * The own Combo two Dead Cards make: on a Board, its Made Hand and Draws and
+ * where it stands against the Range; preflop too, its Equity against the Range
+ * once worked out.
+ */
+function OwnComboSummary({ own, equity, dead }: { own: OwnCombo | null; equity: EquityResult | null; dead: readonly string[] }) {
   const { t, formatNumber } = useI18n()
   const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-  const description = [
-    t(`lab.analysis.madeHand.${own.madeHand}`),
-    own.draws.map((draw) => t(`lab.analysis.draw.${draw}`)).join(', '),
-  ].filter((part) => part !== '')
+  const description = own
+    ? [t(`lab.analysis.madeHand.${own.madeHand}`), own.draws.map((draw) => t(`lab.analysis.draw.${draw}`)).join(', ')].filter(
+        (part) => part !== '',
+      )
+    : []
+  const mine = equity?.sides[0]
   return (
     <section className="analysis__own" aria-label={t('lab.analysis.own')}>
       <span className="lab__label">{t('lab.analysis.own')}</span>
@@ -391,13 +420,28 @@ function OwnComboSummary({ own, dead }: { own: OwnCombo; dead: readonly string[]
         </span>
         <p className="analysis__own-name">{description.join(' · ')}</p>
       </div>
-      <ul className="analysis__own-standing ro-mono">
-        {(['ahead', 'tied', 'behind'] as const).map((side) => (
-          <li key={side}>
-            {t(`lab.analysis.own.${side}`, { combos: oneDecimal(own[side].combos), percent: oneDecimal(own[side].share) })}
-          </li>
-        ))}
-      </ul>
+      {equity && mine && (
+        <p className="analysis__own-equity ro-mono">
+          {[
+            t('lab.analysis.own.equity', { percent: oneDecimal(mine.equity) }),
+            equity.exact
+              ? t('lab.analysis.own.equity.exact')
+              : t('lab.analysis.own.equity.margin', {
+                  margin: formatNumber(equity.margin, { minimumFractionDigits: 1, maximumFractionDigits: 2 }),
+                }),
+            t('lab.analysis.own.equity.shares', { win: oneDecimal(mine.win), tie: oneDecimal(mine.tie) }),
+          ].join(' · ')}
+        </p>
+      )}
+      {own && (
+        <ul className="analysis__own-standing ro-mono">
+          {(['ahead', 'tied', 'behind'] as const).map((side) => (
+            <li key={side}>
+              {t(`lab.analysis.own.${side}`, { combos: oneDecimal(own[side].combos), percent: oneDecimal(own[side].share) })}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
