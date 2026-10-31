@@ -81,7 +81,8 @@ export function Brush({ brush, onChange }: { brush: number; onChange: (frequency
  * touch has no stroke: a tap paints the one cell, and a finger that moves
  * scrolls the page instead. Combos `removed` from the deck, by a Board,
  * switch off their share of the cell, and those `highlighted` light it up in
- * proportion, as their Frequencies fill it.
+ * proportion, as their Frequencies fill it. The cell under the pointer or
+ * the focus is told to `onHover`, and null once it leaves.
  */
 export function RangeMatrix({
   range,
@@ -89,6 +90,7 @@ export function RangeMatrix({
   onPaint,
   removed,
   highlighted,
+  onHover,
 }: {
   range: Range
   brush: number
@@ -97,6 +99,7 @@ export function RangeMatrix({
   removed?: (handClass: HandClass) => number
   /** The Combos lit up, at their Frequencies, as a selection of Categories makes them. */
   highlighted?: Range
+  onHover?: (handClass: HandClass | null) => void
 }) {
   const { t } = useI18n()
   /** The stroke under way: the Frequency its first cell decided, where the pointer last was and the Hand Class last painted. */
@@ -184,6 +187,10 @@ export function RangeMatrix({
             aria-label={handClass.name}
             title={title}
             onPointerDown={(event) => start(event, handClass)}
+            onMouseEnter={() => onHover?.(handClass)}
+            onMouseLeave={() => onHover?.(null)}
+            onFocus={() => onHover?.(handClass)}
+            onBlur={() => onHover?.(null)}
             // A mouse or pen paints on press; a tap, or a click from the keyboard (no pointer, detail 0), paints here.
             onClick={(event) => (event.detail === 0 || pressedByTouch.current) && onPaint(handClass, frequencyFrom(handClass))}
           >

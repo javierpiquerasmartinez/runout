@@ -177,3 +177,67 @@ describe('equity preflop', () => {
     expect(results[9].sides[0].equity).toBeLessThan(83);
   });
 });
+
+describe('equity by Hand Class', () => {
+  const board = ['Ah', 'Kd', '7c', '4s', '2h'];
+
+  it('gives each Hand Class of a side its Equity against the other, with its share of the side', () => {
+    const result = exactly({
+      ranges: [{ QsQd: 100, JsJd: 100 }, { KcQh: 100, TcTd: 100 }],
+      board,
+    });
+
+    // QQ beats TT and loses to KQ; JJ beats TT and loses to KQ.
+    expect(result.handClasses[0].QQ.equity).toBeCloseTo(50);
+    expect(result.handClasses[0].QQ.share).toBeCloseTo(50);
+    // KQ wins against both pairs, TT loses to both.
+    expect(result.handClasses[1].KQo.equity).toBeCloseTo(100);
+    expect(result.handClasses[1].KQo.win).toBeCloseTo(100);
+    expect(result.handClasses[1].TT.equity).toBeCloseTo(0);
+    expect(Object.keys(result.handClasses[1]).sort()).toEqual(['KQo', 'TT']);
+  });
+
+  it('names a Combo’s Hand Class whatever order its cards are written in', () => {
+    const result = exactly({
+      ranges: [{ KsAs: 100 }, { QcJc: 100 }],
+      board,
+    });
+
+    expect(Object.keys(result.handClasses[0])).toEqual(['AKs']);
+    expect(Object.keys(result.handClasses[1])).toEqual(['QJs']);
+  });
+
+  /** A side's Equity, rebuilt from its Hand Classes' Equities weighted by their shares. */
+  const summed = (result: EquityResult, side: 0 | 1) =>
+    Object.values(result.handClasses[side]).reduce(
+      (sum, handClass) => sum + (handClass.equity * handClass.share) / 100,
+      0,
+    );
+
+  it('sums back to the side’s Equity when exact, Frequencies and blocked pairs included', () => {
+    const result = exactly({
+      ranges: [
+        { AsKs: 100, AcKd: 50, QsQd: 100, Th9h: 25 },
+        { KcQh: 100, JcJd: 50, QcQh: 100, AdKc: 100 },
+      ],
+      board: ['Ah', 'Kh', '7c', '4s'],
+    });
+
+    expect(summed(result, 0)).toBeCloseTo(result.sides[0].equity);
+    expect(summed(result, 1)).toBeCloseTo(result.sides[1].equity);
+  });
+
+  it('sums back to the side’s Equity when sampled, each Hand Class with its own margin', () => {
+    const [, last] = batches(
+      { ranges: [{ ...pairOf('A'), ...pairOf('2') }, pairOf('K')], board: [] },
+      2,
+    );
+
+    expect(last.exact).toBe(false);
+    expect(summed(last, 0)).toBeCloseTo(last.sides[0].equity);
+    expect(summed(last, 1)).toBeCloseTo(last.sides[1].equity);
+    expect(last.handClasses[0].AA.equity).toBeGreaterThan(75);
+    expect(last.handClasses[0]['22'].equity).toBeLessThan(25);
+    expect(last.handClasses[0].AA.margin).toBeGreaterThan(last.margin);
+  });
+});

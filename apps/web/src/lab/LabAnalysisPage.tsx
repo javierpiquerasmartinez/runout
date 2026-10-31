@@ -7,7 +7,7 @@ import { redirect, useSearch } from '../routing'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Toggle } from '../ui/Toggle'
-import type { EquityRequest, EquityResult } from '@runout/poker'
+import type { EquityRequest, EquityResult, SideEquity } from '@runout/poker'
 import {
   combinationDraws,
   draws,
@@ -26,7 +26,7 @@ import { useEquity } from './equity'
 import { analysisStateFromSearch, EMPTY_SIDE, labAnalysisAddress, MAX_ANALYSIS_SIDES, type AnalysisSide, type AnalysisState } from './lab'
 import { CategoriesTable } from './CategoriesTable'
 import { LabNav } from './LabNav'
-import type { Range } from './range'
+import type { HandClass, Range } from './range'
 import { Brush } from './RangeControls'
 import './LabRangesPage.css'
 import './LabAnalysisPage.css'
@@ -46,6 +46,12 @@ interface PickedCategories extends PickedOn {
 }
 
 const NO_CATEGORIES: ReadonlySet<string> = new Set()
+
+/** A cell of one side's matrix, under the pointer or the focus. */
+interface HoveredCell {
+  side: number
+  handClass: HandClass
+}
 
 /** How long the address waits after the last change before it is written: browsers limit how often it may be replaced. */
 const ADDRESS_DELAY_MS = 250
@@ -112,6 +118,8 @@ export function LabAnalysisPage() {
   const [hover, setHover] = useState<(PickedOn & { category: string }) | null>(null)
   /** Whether the Draws show the one-card backdoor flush draw: off by default, as in Flopzilla. */
   const [oneCardBackdoors, setOneCardBackdoors] = useState(false)
+  /** The matrix cell under the pointer or the focus, to show its Hand Class's Equity. */
+  const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null)
 
   const two = sides.length > 1
   const changeSide = (index: number) => (next: (side: AnalysisSide) => AnalysisSide) =>
@@ -155,6 +163,13 @@ export function LabAnalysisPage() {
     [range, board, dead],
   )
   const ownEquity = useEquity(ownEquityRequest)
+  const otherRange = sides[1]?.range
+  /** Two sides, each Range against the other: preflop or on a flop, turn or river. */
+  const sidesEquityRequest = useMemo<EquityRequest | null>(
+    () => (otherRange !== undefined && (board.length === 0 || board.length >= FLOP_CARDS) ? { ranges: [range, otherRange], board } : null),
+    [range, otherRange, board],
+  )
+  const sidesEquity = useEquity(sidesEquityRequest)
   /** The cards out of the deck: the Board's and the Dead Cards. */
   const out = useMemo(() => [...board, ...dead], [board, dead])
 
@@ -205,6 +220,14 @@ export function LabAnalysisPage() {
             </Button>
           )}
         </div>
+        {sidesEquity && (
+          <EquityBar
+            equity={sidesEquity}
+            labels={[sideLabel(0), sideLabel(1)]}
+            // A cell of a side taken away is no longer on screen.
+            hovered={hoveredCell !== null && hoveredCell.side < sides.length ? hoveredCell : null}
+          />
+        )}
         <div className="analysis__body" data-sides={sides.length}>
           <div className="analysis__sides">
             {sides.map((side, index) => (
@@ -221,6 +244,7 @@ export function LabAnalysisPage() {
                 onChange={changeSide(index)}
                 onSaved={remember}
                 onRemove={index > 0 ? removeSide : undefined}
+                onHover={(handClass) => setHoveredCell(handClass && { side: index, handClass })}
               />
             ))}
           </div>
@@ -327,14 +351,75 @@ export function LabAnalysisPage() {
   )
 }
 
+
+/** The pieces the Analysis writes an Equity with: `Equity 64.7 %`, `± 0.08 %`, `Win 47.1 % · Tie 35.3 %`. */
+function useEquityText() {
+  const { t, formatNumber } = useI18n()
+  const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  return {
+    oneDecimal,
+    value: (percent: number) => t('lab.analysis.equity.value', { percent: oneDecimal(percent) }),
+    margin: (margin: number) =>
+      t('lab.analysis.equity.margin', { margin: formatNumber(margin, { minimumFractionDigits: 1, maximumFractionDigits: 2 }) }),
+    winAndTie: ({ win, tie }: SideEquity) => t('lab.analysis.equity.shares', { win: oneDecimal(win), tie: oneDecimal(tie) }),
+  }
+}
+
+/**
+ * Each side's Equity against the other, above both matrices, with how precise
+ * it is; and the Equity of the Hand Class under the pointer against the other
+ * side.
+ */
+function EquityBar({ equity, labels, hovered }: { equity: EquityResult; labels: readonly [string, string]; hovered: HoveredCell | null }) {
+  const { t } = useI18n()
+  const text = useEquityText()
+  const hoveredLine = () => {
+    if (hovered === null) return null
+    const { side, handClass } = hovered
+    const named = { handClass: handClass.name, side: labels[side], other: labels[1 - side] }
+    const handClassEquity = equity.handClasses[side][handClass.name]
+    // Not in the Range, taken out by the Board, or blocked by every Combo of the other side.
+    if (!handClassEquity) return t('lab.analysis.equity.handClass.none', named)
+    return [
+      t('lab.analysis.equity.handClass', { ...named, percent: text.oneDecimal(handClassEquity.equity) }),
+      // Fewer deals than its side's: its own margin, wider.
+      ...(equity.exact ? [] : [text.margin(handClassEquity.margin)]),
+      text.winAndTie(handClassEquity),
+    ].join(' · ')
+  }
+  return (
+    <section className="analysis__equity" aria-label={t('lab.analysis.equity')}>
+      <div className="analysis__equity-bar" aria-hidden="true">
+        <span className="analysis__equity-fill" style={{ width: `${equity.sides[0].equity}%` }} />
+      </div>
+      <ul className="analysis__equity-sides ro-mono">
+        {equity.sides.map((sideEquity, index) => (
+          <li key={index}>
+            {t('lab.analysis.equity.side', {
+              side: labels[index],
+              equity: [text.value(sideEquity.equity), text.winAndTie(sideEquity)].join(' · '),
+            })}
+          </li>
+        ))}
+      </ul>
+      <p className="analysis__equity-precision">
+        {equity.exact ? t('lab.analysis.equity.precision.exact') : t('lab.analysis.equity.precision.sampled', { margin: text.margin(equity.margin) })}
+      </p>
+      {/* Always there, empty until a cell is hovered, so the matrices under it never jump. */}
+      <p className="analysis__equity-hovered ro-mono">{hoveredLine()}</p>
+    </section>
+  )
+}
+
 /**
  * The own Combo two Dead Cards make: on a Board, its Made Hand and Draws and
  * where it stands against the Range; preflop too, its Equity against the Range
  * once worked out.
  */
 function OwnComboSummary({ own, equity, dead }: { own: OwnCombo | null; equity: EquityResult | null; dead: readonly string[] }) {
-  const { t, formatNumber } = useI18n()
-  const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const { t } = useI18n()
+  const text = useEquityText()
+  const { oneDecimal } = text
   const description = own
     ? [t(`lab.analysis.madeHand.${own.madeHand}`), own.draws.map((draw) => t(`lab.analysis.draw.${draw}`)).join(', ')].filter(
         (part) => part !== '',
@@ -355,13 +440,9 @@ function OwnComboSummary({ own, equity, dead }: { own: OwnCombo | null; equity: 
       {equity && mine && (
         <p className="analysis__own-equity ro-mono">
           {[
-            t('lab.analysis.own.equity', { percent: oneDecimal(mine.equity) }),
-            equity.exact
-              ? t('lab.analysis.own.equity.exact')
-              : t('lab.analysis.own.equity.margin', {
-                  margin: formatNumber(equity.margin, { minimumFractionDigits: 1, maximumFractionDigits: 2 }),
-                }),
-            t('lab.analysis.own.equity.shares', { win: oneDecimal(mine.win), tie: oneDecimal(mine.tie) }),
+            text.value(mine.equity),
+            equity.exact ? t('lab.analysis.equity.exact') : text.margin(equity.margin),
+            text.winAndTie(mine),
           ].join(' · ')}
         </p>
       )}

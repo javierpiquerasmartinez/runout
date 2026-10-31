@@ -39,6 +39,7 @@ export function AnalysisSideSection({
   onChange,
   onSaved,
   onRemove,
+  onHover,
 }: {
   side: AnalysisSide
   /** What the side is called: the whole Analysis's Range, or "Range 1" or "Range 2" against another. */
@@ -57,6 +58,8 @@ export function AnalysisSideSection({
   onSaved: (range: SavedRange) => void
   /** Takes the side away; none for the first. */
   onRemove?: () => void
+  /** The Hand Class under the pointer or the focus in this side's matrix, and null once it leaves. */
+  onHover?: (handClass: HandClass | null) => void
 }) {
   const { t, formatNumber } = useI18n()
   const { token } = useIdentity()
@@ -167,6 +170,7 @@ export function AnalysisSideSection({
         onPaint={paint}
         removed={(handClass) => removedCombos(handClass, out)}
         highlighted={highlighted}
+        onHover={onHover}
       />
       <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, out)) })}</p>
       <Stats stats={rangeStats(range)} />

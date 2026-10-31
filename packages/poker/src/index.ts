@@ -11,5 +11,6 @@ export {
   type EquityRange,
   type EquityRequest,
   type EquityResult,
+  type HandClassEquity,
   type SideEquity,
 } from './equity.js';

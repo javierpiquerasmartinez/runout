@@ -1090,3 +1090,88 @@ describe('LabAnalysisPage · the Categories of two sides', () => {
     expect(screen.getByRole('radiogroup', { name: 'Guardar los combos de' })).toBeTruthy()
   })
 })
+
+describe('LabAnalysisPage · the Equity between two Ranges', () => {
+  const side = (name: string) => screen.getByRole('region', { name })
+  const equityBar = () => screen.queryByRole('region', { name: 'Equity' })
+  const lines = () =>
+    Array.from(equityBar()!.querySelectorAll('li, p'), (each) => each.textContent).filter((text) => text !== '')
+  const cellOf = (region: string, name: string) =>
+    within(within(side(region)).getByRole('group', { name: 'Range matrix' })).getByRole('button', { name })
+
+  // On K♠7♦2♣9♥4♠, AK ties AK and beats QQ: 72 meetings each.
+  const river = '/lab/analysis?range=AK&range2=AK%2CQQ&board=Ks7d2c9h4s'
+
+  it('shows each side its exact Equity against the other on a river, with win and tie shares', () => {
+    renderAnalysis('en', river)
+
+    expect(lines()).toEqual([
+      'Range 1: Equity 75.0 % · Win 50.0 % · Tie 50.0 %',
+      'Range 2: Equity 25.0 % · Win 0.0 % · Tie 50.0 %',
+      'Exact, not sampled',
+    ])
+  })
+
+  it('shows it preflop too, sampled, with the margin it reached', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=KK')
+
+    const [first, second, precision] = lines()
+    expect(first).toMatch(/^Range 1: Equity 8\d\.\d % · Win 8\d\.\d % · Tie 0\.\d %$/)
+    expect(second).toMatch(/^Range 2: Equity 1\d\.\d % · Win 1\d\.\d % · Tie 0\.\d %$/)
+    expect(precision).toMatch(/^Sampled · ± 0\.\d+ %$/)
+  })
+
+  it('shows nothing with one side, while the flop is being picked, or against an empty side', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA&board=Ks7d2c')
+    expect(equityBar()).toBeNull()
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=KK&board=Ks7d')
+    expect(equityBar()).toBeNull()
+    cleanup()
+
+    renderAnalysis('en', '/lab/analysis?range=AA&range2=')
+    expect(equityBar()).toBeNull()
+  })
+
+  it('starts over when a Range or the Board changes, never showing the old one', async () => {
+    renderAnalysis('en', river)
+    const boardField = within(screen.getByRole('region', { name: 'Board' })).getByRole<HTMLInputElement>('textbox', {
+      name: 'Board as text',
+    })
+
+    // On Q♠7♦2♣9♥4♠ the queens make a set: AK ties AK (144 meetings) and loses to QQ (48).
+    await userEvent.clear(boardField)
+    await userEvent.type(boardField, 'Qs7d2c9h4s{Enter}')
+    expect(lines()[0]).toBe('Range 1: Equity 37.5 % · Win 0.0 % · Tie 75.0 %')
+
+    await userEvent.click(cellOf('Range 2', 'QQ'))
+    expect(lines()[0]).toBe('Range 1: Equity 50.0 % · Win 0.0 % · Tie 100.0 %')
+  })
+
+  it("shows a hovered cell's Hand Class Equity against the other side", async () => {
+    renderAnalysis('en', river)
+
+    await userEvent.hover(cellOf('Range 2', 'QQ'))
+    expect(lines()).toContain('QQ (Range 2): Equity 0.0 % against Range 1 · Win 0.0 % · Tie 0.0 %')
+
+    await userEvent.hover(cellOf('Range 1', 'AKs'))
+    expect(lines()).toContain('AKs (Range 1): Equity 75.0 % against Range 2 · Win 50.0 % · Tie 50.0 %')
+
+    await userEvent.hover(cellOf('Range 1', 'KK'))
+    expect(lines()).toContain('KK (Range 1): meets no combo of Range 2')
+
+    await userEvent.unhover(cellOf('Range 1', 'KK'))
+    expect(lines()).toHaveLength(3)
+  })
+
+  it('is in Spanish too', () => {
+    renderAnalysis('es', river)
+
+    expect(lines()).toEqual([
+      'Rango 1: Equity 75,0 % · Gana 50,0 % · Empata 50,0 %',
+      'Rango 2: Equity 25,0 % · Gana 0,0 % · Empata 50,0 %',
+      'Exacta, sin muestreo',
+    ])
+  })
+})

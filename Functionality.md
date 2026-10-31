@@ -515,7 +515,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 ## E9 · Lab
 
-The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, then studies them on a Board in the Analysis, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes the Equity of one hand against a Range (H9.15), not yet of one Range against another. Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
+The Lab is where a player builds their preflop Ranges, sees how wide they are and keeps them under a name, then studies them on a Board in the Analysis, instead of in Flopzilla, Equilab, GTO Wizard or a spreadsheet. For now it is unrelated to Rooms and the Library: nothing in it comes from a Hand or goes into one. It computes Equity in the browser: of one hand against a Range (H9.15) and of one Range against another (H9.17). Ranges store a Frequency per Combo, while the screen edits Hand Classes (ADR 0006). The Lab needs an Account.
 
 **H9.1 — Open the Lab.** As a player, I want a place to build Ranges, so I can study preflop where I already review my Hands.
 
@@ -632,6 +632,13 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - The Board removes Combos from both sides. The Categories tables (H9.12, H9.13) show a pair of columns per side, Combos and %, each over that side's own live Combos, never changed by the other Range.
 - A selection (H9.14) lights up its Combos in both matrices and shows each side's Combos and %. **Guardar selección como rango** asks which side's Combos to keep.
 - The address holds both sides, each with its saved Range's id, so reloading keeps them.
+
+**H9.17 — See the Equity of one Range against another.** As a player, I want each side's Equity against the other, so I know how the pot splits on average and which hands carry it.
+
+- With two sides, preflop or on a flop, turn or river, an Equity bar above the matrices shows each side's Equity against the other, with win and tie shares, weighting each Combo by its Frequency and never matching Combos that share a card.
+- It appears at once and sharpens while I look, saying **Muestreada** with the margin it reached (it stops under ±0.1 % or after a time cap), or **Exacta** when every deal was counted, as on the river and on smaller turns. The screen keeps responding meanwhile.
+- Changing either Range or the Board starts it over, and a number for what is no longer on screen is never shown. With an empty side, while the flop is half picked, or when no Combo of one side can meet one of the other, there is no bar.
+- Hovering a cell of either matrix shows that Hand Class's Equity against the other side, with its win and tie shares and, while sampled, its own wider margin; a Hand Class that meets no Combo of the other side says so.
 
 ## MVP scope and out of scope
 
