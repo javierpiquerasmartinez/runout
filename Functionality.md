@@ -580,7 +580,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 **H9.10 — Study a Range in the Analysis.** As a player, I want to bring a Range into the Analysis and work on it without touching the saved one.
 
-- The Analysis holds one Range in a compact matrix. I load one of my saved Ranges from a list, paste one as text (refused whole at the first piece not understood, as in H9.6), paint it with the same brush as on **Rangos**, or **Limpiar** it.
+- The Analysis holds one Range in a compact matrix, or two (H9.16). I load one of my saved Ranges from a list, paste one as text (refused whole at the first piece not understood, as in H9.6), paint it with the same brush as on **Rangos**, or **Limpiar** it.
 - It shows the Range's width as on **Rangos** (H9.4), updating as I paint.
 - It shows the name of the saved Range it came from, or that it is unsaved, and **Modificado** once its Combos differ from that saved Range. Nothing I do in the Analysis writes the saved Range.
 - **Guardar como rango** asks for a name, with the same rules and refusals as any Range (H9.2), keeps it as a new Range without Tags, and leaves me in the Analysis with the new Range as its source.
@@ -623,6 +623,15 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - With two Dead Cards and at least a flop, **Tu mano** shows their Made Hand and Draws on the Board, and how many of the Range's live Combos, weighted by Frequency, they are ahead of, tied with and behind as the Board stands, in Combos and %.
 - With two Dead Cards, preflop or on a flop, turn or river, **Tu mano** also shows their Equity against the Range, with win and tie shares, weighting each Combo by its Frequency and never matching it with a Combo that shares a card. It appears at once and sharpens while I look, showing the margin it reached (it stops under ±0.1 % or after a time cap), and says **exacta** when every deal was counted, as on the river and on smaller turns. Changing the Range, the Board or the Dead Cards starts it over, and a number for what is no longer on screen is never shown. The screen keeps responding meanwhile.
 - Changing the Dead Cards clears the selection. The address holds them too, so reloading keeps them.
+- Dead Cards are for one Range: with two sides (H9.16) they are not offered.
+
+**H9.16 — Put two Ranges side by side.** As a player, I want a second Range in the Analysis, so I can study my Range and my opponent's on the same Board.
+
+- **Añadir un segundo rango** adds an empty second side, and **Quitar rango** on it takes it away. Adding it drops the Dead Cards.
+- Both matrices stay on screen, side by side and smaller, with the Board and the Categories under them; on a narrow screen they stack, without the cells' labels. Each side, **Rango 1** and **Rango 2**, is loaded, pasted, painted with the one brush, cleared and saved as a new Range on its own, with its own source name and **Modificado** mark (H9.10).
+- The Board removes Combos from both sides. The Categories tables (H9.12, H9.13) show a pair of columns per side, Combos and %, each over that side's own live Combos, never changed by the other Range.
+- A selection (H9.14) lights up its Combos in both matrices and shows each side's Combos and %. **Guardar selección como rango** asks which side's Combos to keep.
+- The address holds both sides, each with its saved Range's id, so reloading keeps them.
 
 ## MVP scope and out of scope
 

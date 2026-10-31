@@ -343,7 +343,7 @@ export function LabRangesPage() {
   const analyse = () => {
     const go = () => {
       dirtyRef.current = false
-      navigate(labAnalysisAddress({ range: draft.combos, sourceId: baseline.id, board: [], dead: [] }))
+      navigate(labAnalysisAddress({ sides: [{ range: draft.combos, sourceId: baseline.id }], board: [], dead: [] }))
     }
     if (draft.name.trim() === baseline.draft.name && sameTags(draft.tags, baseline.draft.tags)) go()
     else leave(go)
