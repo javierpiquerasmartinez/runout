@@ -237,7 +237,7 @@ How much of a Combo a Range holds, from 0 to 100 %: AKo at 50 % counts as six of
 _Avoid_: Weight, percentage (alone), mix
 
 **Analysis**:
-The Lab's screen where a person puts a Range on a Board, and later two Ranges against each other, to see how each one hits it. Nothing about it is kept: the Ranges and the Board it shows live in its address, and editing a Range there never changes the saved one unless it is saved as a new Range.
+The Lab's screen where a person loads a saved Range, or two against each other, onto a Board, to see how each one hits it and to narrow it Street by Street. It only reads Ranges: nothing in it is saved, and the Ranges, Board and Narrowings it shows live in its address.
 _Avoid_: Análisis (UI only), simulation, Flopzilla
 
 **Board**:
@@ -263,3 +263,11 @@ _Avoid_: Project, proyecto (UI only)
 **Equity**:
 The share of the pot one Range wins against another over every way the Board can be completed, ties split. Combos that share a card with each other never meet.
 _Avoid_: EV, win rate, all-in EV
+
+**Selection**:
+The Categories a person marks on one side of an Analysis on the current Street. It highlights their Combos, and when the next card is dealt it becomes that Street's Narrowing.
+_Avoid_: Filter, checked rows
+
+**Narrowing**:
+The Selection a side kept on a Street, which cuts its Range down to those Combos, at their Frequency, for every later Street of the Analysis. A Street with no Selection keeps the whole Range. Each side narrows on its own.
+_Avoid_: Filter (that is the list of Ranges), range reading, line
