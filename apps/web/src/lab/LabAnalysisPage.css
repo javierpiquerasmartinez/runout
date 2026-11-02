@@ -292,17 +292,21 @@
   padding-left: 24px;
 }
 
-/* A row of the Categories is picked by clicking it anywhere. */
-.analysis__categories tbody tr {
+/* A row of the Categories is picked by clicking it anywhere; with two sides, in a side's own cell. */
+.analysis__categories[data-sides='1'] tbody tr,
+.analysis__categories:not([data-sides='1']) tbody td {
   cursor: pointer;
 }
-.analysis__categories tbody tr:hover {
+.analysis__categories[data-sides='1'] tbody tr:hover,
+.analysis__categories:not([data-sides='1']) tbody td:hover {
   background: var(--color-control);
 }
-.analysis__categories tbody tr[data-selected] {
+.analysis__categories tbody tr[data-selected],
+.analysis__categories tbody td[data-selected] {
   background: var(--color-selected);
 }
-.analysis__categories tbody tr[data-selected] .analysis__category {
+.analysis__categories tbody tr[data-selected] .analysis__category,
+.analysis__categories tbody td[data-selected] .analysis__category {
   color: var(--text-primary);
   font-weight: 600;
 }
@@ -322,7 +326,8 @@
   height: 100%;
   background: var(--range-fill);
 }
-.analysis__categories tbody tr[data-selected] .analysis__share-bar > span {
+.analysis__categories tbody tr[data-selected] .analysis__share-bar > span,
+.analysis__categories tbody td[data-selected] .analysis__share-bar > span {
   background: var(--range-highlight);
 }
 .analysis__category {

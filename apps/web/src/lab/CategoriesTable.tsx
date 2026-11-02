@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import type { CategoryRow } from './board'
 
@@ -6,8 +5,10 @@ import type { CategoryRow } from './board'
  * How the Ranges hit the Board in one block of Categories: one row per
  * Category that can happen on it, with each side's Combos, weighted by
  * Frequency, and its % of that side's live Combos; against another side, only
- * the % of each, so the table fits beside the matrices. A row is toggled in the
- * selection by clicking it, and lights up its Combos while hovered or focused.
+ * the % of each, so the table fits beside the matrices. A row is toggled in a
+ * side's selection by clicking it, anywhere with one side, in that side's
+ * column with two; it lights up its Combos on every side while hovered or
+ * focused.
  */
 export function CategoriesTable<Category extends string>({
   title,
@@ -27,10 +28,10 @@ export function CategoriesTable<Category extends string>({
    * decides which can happen.
    */
   sides: readonly { label: string; rows: CategoryRow<Category>[] }[]
-  nameOf: (category: Category) => ReactNode
-  /** The Categories in the selection, of this table or any other. */
-  selected: ReadonlySet<string>
-  onToggle: (category: Category) => void
+  nameOf: (category: Category) => string
+  /** Each side's Categories in its selection, of this table or any other, in the order of `sides`. */
+  selected: readonly ReadonlySet<string>[]
+  onToggle: (category: Category, side: number) => void
   /** The row under the pointer or the focus, or null once it leaves. */
   onHover: (category: Category | null) => void
 }) {
@@ -40,7 +41,7 @@ export function CategoriesTable<Category extends string>({
   /** Against another side, a Category's Combos are left to the matrices' own. */
   const alone = sides.length === 1
   return (
-    <table className="analysis__categories">
+    <table className="analysis__categories" data-sides={sides.length}>
       <caption className="analysis__categories-title">{title}</caption>
       <thead>
         <tr>
@@ -64,37 +65,70 @@ export function CategoriesTable<Category extends string>({
           <tr
             key={row.category}
             className={sides.every((side) => side.rows[at].combos === 0) ? 'lab__muted' : undefined}
-            data-selected={selected.has(row.category) || undefined}
+            data-selected={(alone && selected[0].has(row.category)) || undefined}
             onMouseEnter={() => onHover(row.category)}
             onMouseLeave={() => onHover(null)}
-            // Anywhere on the row, its button included, and Enter or Space on the button.
-            onClick={() => onToggle(row.category)}
+            // With one side, anywhere on the row, its button included, and Enter or Space on the button.
+            onClick={alone ? () => onToggle(row.category, 0) : undefined}
           >
             <th scope="row">
-              <button
-                type="button"
-                className="analysis__category"
-                aria-pressed={selected.has(row.category)}
-                onFocus={() => onHover(row.category)}
-                onBlur={() => onHover(null)}
-              >
-                {nameOf(row.category)}
-              </button>
+              {alone ? (
+                <button
+                  type="button"
+                  className="analysis__category"
+                  aria-pressed={selected[0].has(row.category)}
+                  onFocus={() => onHover(row.category)}
+                  onBlur={() => onHover(null)}
+                >
+                  {nameOf(row.category)}
+                </button>
+              ) : (
+                nameOf(row.category)
+              )}
             </th>
-            {sides.map((side, index) => [
-              alone && (
-                <td key={`combos-${index}`} className="ro-mono">
-                  {oneDecimal(side.rows[at].combos)}
+            {sides.map((side, index) => {
+              const percent = t('lab.analysis.sharePercent', { percent: oneDecimal(side.rows[at].share) })
+              const share = (
+                <>
+                  {/* The share drawn beside its number, for the eye only: the number says it. */}
+                  <span className="analysis__share-bar" aria-hidden="true">
+                    <span style={{ width: `${side.rows[at].share}%` }} />
+                  </span>
+                  {percent}
+                </>
+              )
+              if (alone)
+                return [
+                  <td key={`combos-${index}`} className="ro-mono">
+                    {oneDecimal(side.rows[at].combos)}
+                  </td>,
+                  <td key={`share-${index}`} className="ro-mono">
+                    {share}
+                  </td>,
+                ]
+              const picked = selected[index].has(row.category)
+              return (
+                <td
+                  key={`share-${index}`}
+                  className="ro-mono"
+                  data-side-start={index > 0 || undefined}
+                  data-selected={picked || undefined}
+                  // Anywhere in the side's cell, its button included, and Enter or Space on the button.
+                  onClick={() => onToggle(row.category, index)}
+                >
+                  <button
+                    type="button"
+                    className="analysis__category"
+                    aria-pressed={picked}
+                    aria-label={t('lab.analysis.categoryOfSide', { category: nameOf(row.category), side: side.label, percent })}
+                    onFocus={() => onHover(row.category)}
+                    onBlur={() => onHover(null)}
+                  >
+                    {share}
+                  </button>
                 </td>
-              ),
-              <td key={`share-${index}`} className="ro-mono" data-side-start={index > 0 || undefined}>
-                {/* The share drawn beside its number, for the eye only: the number says it. */}
-                <span className="analysis__share-bar" aria-hidden="true">
-                  <span style={{ width: `${side.rows[at].share}%` }} />
-                </span>
-                {t('lab.analysis.sharePercent', { percent: oneDecimal(side.rows[at].share) })}
-              </td>,
-            ])}
+              )
+            })}
           </tr>
         ))}
       </tbody>
