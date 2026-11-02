@@ -241,6 +241,8 @@
 /* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
 /* Made Hands in one column; the Draws with the combination Draws in another. */
 .analysis__categories-column {
+  /* What it hides for screen readers stays inside it, and inside its scrolling. */
+  position: relative;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -403,17 +405,17 @@
   font-size: 13px;
 }
 
-/* ---- The Equity of two sides: above both matrices, the first side's share filling the bar from the left ---- */
+/* ---- The Equity of two sides: one line above both matrices, the first side's share filling the bar from the left ---- */
 .analysis__equity {
-  max-width: 752px;
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 20px;
+  align-items: center;
+  gap: 20px;
 }
 /* The bar between each side's share, the first's on the left as its fill. */
 .analysis__equity-meter {
-  flex-basis: 100%;
+  flex: 1;
+  max-width: 560px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -441,26 +443,26 @@
   background: var(--range-fill);
   transition: width 120ms ease-out;
 }
-.analysis__equity-sides {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 20px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-}
+/* How precise it is, or the hovered cell's Equity in its place; the line keeps its height either way. */
 .analysis__equity-precision {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-.analysis__equity-hovered {
-  flex-basis: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 1.4em;
   margin: 0;
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+/* Read out by screen readers, not drawn. */
+.analysis__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  list-style: none;
 }
 
 /*
@@ -470,16 +472,16 @@
  * shorter than the matrix scrolls the page. Narrower, the layout above wraps.
  */
 @media (min-width: 1280px) {
-  .lab:has(.analysis__body[data-sides='1']) {
+  .lab:has(.analysis__body[data-sides]) {
     height: 100vh;
   }
-  .lab__main:has(> .analysis__body[data-sides='1']) {
+  .lab__main:has(> .analysis__body[data-sides]) {
     min-height: 0;
     gap: 12px;
     padding-top: 16px;
     padding-bottom: 16px;
   }
-  .analysis__body[data-sides='1'] {
+  .analysis__body[data-sides] {
     flex: 1;
     min-height: 0;
     display: grid;
@@ -489,26 +491,26 @@
     align-items: start;
     gap: 28px;
   }
-  .analysis__body[data-sides='1'] .analysis__sides,
-  .analysis__body[data-sides='1'] .analysis__panel {
+  .analysis__body[data-sides] .analysis__sides,
+  .analysis__body[data-sides] .analysis__panel {
     display: contents;
   }
-  .analysis__body[data-sides='1'] .analysis__side {
+  .analysis__body[data-sides] .analysis__side {
     max-width: none;
     gap: 10px;
   }
-  .analysis__body[data-sides='1'] .lab__stats {
+  .analysis__body[data-sides] .lab__stats {
     gap: 12px;
   }
-  .analysis__body[data-sides='1'] .lab__breakdown {
+  .analysis__body[data-sides] .lab__breakdown {
     gap: 4px;
   }
-  .analysis__body[data-sides='1'] .analysis__categories-column {
+  .analysis__body[data-sides] .analysis__categories-column {
     gap: 20px;
   }
   /* The Board too, when the own Combo and the Selection make it taller than the window. */
-  .analysis__body[data-sides='1'] .analysis__categories-column,
-  .analysis__body[data-sides='1'] .analysis__board {
+  .analysis__body[data-sides] .analysis__categories-column,
+  .analysis__body[data-sides] .analysis__board {
     align-self: stretch;
     min-height: 0;
     overflow-y: auto;
@@ -518,41 +520,70 @@
   }
 
   /* The Board: its cards on top, then the deck upright with the fields, the deals and the Selection beside it. */
-  .analysis__body[data-sides='1'] .analysis__board {
+  .analysis__body[data-sides] .analysis__board {
     display: grid;
     grid-template-columns: max-content 220px;
     align-content: start;
     gap: 10px 14px;
   }
-  .analysis__body[data-sides='1'] .analysis__board > * {
+  .analysis__body[data-sides] .analysis__board > * {
     grid-column: 1 / -1;
   }
-  .analysis__body[data-sides='1'] .analysis__board > .analysis__deck {
+  .analysis__body[data-sides] .analysis__board > .analysis__deck {
     grid-column: 1;
   }
-  .analysis__body[data-sides='1'] .analysis__board > .analysis__board-controls {
+  .analysis__body[data-sides] .analysis__board > .analysis__board-controls {
     grid-column: 2;
   }
-  .analysis__body[data-sides='1'] .analysis__board-cards {
+  .analysis__body[data-sides] .analysis__board-cards {
     zoom: 0.8;
   }
   /* One column per suit, aces on top, smaller than on a narrow screen. */
-  .analysis__body[data-sides='1'] .analysis__deck {
+  .analysis__body[data-sides] .analysis__deck {
     grid-template-columns: none;
     grid-template-rows: repeat(13, max-content);
     grid-auto-flow: column;
     gap: 2px 3px;
     zoom: 0.8;
   }
-  .analysis__body[data-sides='1'] .analysis__board-field {
+  .analysis__body[data-sides] .analysis__board-field {
     max-width: none;
   }
-  .analysis__body[data-sides='1'] .analysis__board-actions {
+  .analysis__body[data-sides] .analysis__board-actions {
     flex-direction: column;
     align-items: stretch;
   }
-  .analysis__body[data-sides='1'] .analysis__board-actions .lab__spacer {
+  .analysis__body[data-sides] .analysis__board-actions .lab__spacer {
+    display: none;
+  }
+
+  /* Two Ranges: both matrices, then the Board, with the Made Hands over the Draws in the last column. */
+  .analysis__body[data-sides='2'] {
+    grid-template-columns: minmax(250px, 310px) minmax(250px, 310px) max-content minmax(220px, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .analysis__body[data-sides='2'] .analysis__side,
+  .analysis__body[data-sides='2'] .analysis__board {
+    grid-row: 1 / span 2;
+  }
+  .analysis__body[data-sides='2'] .analysis__categories-column {
+    grid-column: 4;
+  }
+  .analysis__body[data-sides='2'] .analysis__side .lab__cell {
+    font-size: clamp(7px, 0.6vw, 9px);
+  }
+  .analysis__body[data-sides='2'] .analysis__board {
+    grid-template-columns: max-content 150px;
+  }
+  /* Both matrices start at the same height: the load, Clear and Remove share one line. */
+  .analysis__body[data-sides='2'] .analysis__side-actions {
+    flex-wrap: nowrap;
+  }
+  .analysis__body[data-sides='2'] .analysis__load {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .analysis__body[data-sides='2'] .analysis__side-actions .lab__spacer {
     display: none;
   }
 }
-

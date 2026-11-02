@@ -893,14 +893,23 @@ describe('LabAnalysisPage · the Categories of two sides', () => {
   const title = (region: string, name: string) =>
     within(within(side(region)).getByRole('group', { name: 'Range matrix' })).getByRole('button', { name }).getAttribute('title')
 
-  it("show a column per side, each over that side's own live Combos", () => {
+  it("show a % column per side, each over that side's own live Combos", () => {
     renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
 
     const rows = tableRows('Made hands')
-    expect(rows.slice(0, 2)).toEqual([' | Range 1 | Range 2', 'Made hand | Combos | % | Combos | %'])
-    expect(rows).toContain('Set | 0.0 | 0.0 % | 3.0 | 50.0 %')
-    expect(rows).toContain('Overpair | 6.0 | 66.7 % | 0.0 | 0.0 %')
-    expect(rows).toContain('Top pair | 3.0 | 33.3 % | 3.0 | 50.0 %')
+    expect(rows[0]).toBe('Made hand | % Range 1 | % Range 2')
+    expect(rows).toContain('Set | 0.0 % | 50.0 %')
+    expect(rows).toContain('Overpair | 66.7 % | 0.0 %')
+    expect(rows).toContain('Top pair | 33.3 % | 50.0 %')
+  })
+
+  it("leave under each matrix only the side's live Combos", () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+
+    for (const name of ['Range 1', 'Range 2']) {
+      expect(within(side(name)).getByText(/live combos/)).toBeTruthy()
+      expect(within(side(name)).queryByRole('region', { name: 'Range stats' })).toBeNull()
+    }
   })
 
   it('light up a selection in both matrices, with each side its combined %', async () => {
@@ -1012,6 +1021,18 @@ describe('LabAnalysisPage · the Equity between two Ranges', () => {
 
     await userEvent.unhover(cellOf('Range 1', 'KK'))
     expect(lines()).toHaveLength(3)
+  })
+
+  it('shows a hovered cell on the precision line, in its place while it lasts', async () => {
+    renderAnalysis('en', river)
+    expect(lines()).toContain('Exact, not sampled')
+
+    await userEvent.hover(cellOf('Range 2', 'QQ'))
+    expect(lines()).not.toContain('Exact, not sampled')
+    expect(lines()).toContain('QQ (Range 2): Equity 0.0 % against Range 1 · Win 0.0 % · Tie 0.0 %')
+
+    await userEvent.unhover(cellOf('Range 2', 'QQ'))
+    expect(lines()).toContain('Exact, not sampled')
   })
 
   it('is in Spanish too', () => {
