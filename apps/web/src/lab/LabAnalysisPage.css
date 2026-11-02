@@ -289,6 +289,25 @@
   color: var(--text-primary);
   font-weight: 600;
 }
+/* A small bar before each share, filled to it; lit up on a selected row. */
+.analysis__share-bar {
+  display: inline-block;
+  width: 48px;
+  height: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-control);
+}
+.analysis__share-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--range-fill);
+}
+.analysis__categories tbody tr[data-selected] .analysis__share-bar > span {
+  background: var(--range-highlight);
+}
 .analysis__category {
   padding: 0;
   border: 0;
