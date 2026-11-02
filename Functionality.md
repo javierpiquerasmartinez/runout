@@ -627,8 +627,8 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 **H9.16 — Put two Ranges side by side.** As a player, I want a second Range in the Analysis, so I can study my Range and my opponent's on the same Board.
 
 - **Añadir un segundo rango** adds an empty second side, and **Quitar rango** on it takes it away. Adding it drops the Dead Cards.
-- Both matrices stay on screen, side by side and smaller, with the Board and the Categories under them; on a narrow screen they stack, without the cells' labels. Each side, **Rango 1** and **Rango 2**, is loaded, painted with the one brush and cleared on its own, with its own source name and **Modificado** mark (H9.10).
-- The Board removes Combos from both sides. The Categories tables (H9.12, H9.13) show a pair of columns per side, Combos and %, each over that side's own live Combos, never changed by the other Range.
+- On a screen 1280 px wide or more, the Analysis fits in the window without scrolling: the Equity (H9.17) on one line on top, then both matrices, the Board, and the Categories with the Made Hands over the Draws, which scroll on their own if they do not fit. Under each matrix only its live Combos remain. On a narrower screen the parts wrap, and on a phone they stack, without the cells' labels. Each side, **Rango 1** and **Rango 2**, is loaded, painted with the one brush and cleared on its own, with its own source name and **Modificado** mark (H9.10).
+- The Board removes Combos from both sides. The Categories tables (H9.12, H9.13) show one % column per side, each over that side's own live Combos, never changed by the other Range; the Combos are left to the matrices.
 - A selection (H9.14) lights up its Combos in both matrices and shows each side's Combos and %.
 - The address holds both sides, each with its saved Range's id, so reloading keeps them.
 

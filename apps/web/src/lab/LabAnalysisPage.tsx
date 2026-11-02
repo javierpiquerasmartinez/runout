@@ -229,7 +229,7 @@ export function LabAnalysisPage() {
                 key={index}
                 side={side}
                 label={sideLabel(index)}
-                numbered={two}
+                compact={two}
                 saved={saved}
                 brush={brush}
                 out={out}
@@ -362,7 +362,7 @@ function EquityBar({ equity, labels, hovered }: { equity: EquityResult; labels: 
   }
   return (
     <section className="analysis__equity" aria-label={t('lab.analysis.equity')}>
-      {/* Each side's share at its own end, so the colours need no legend; the lines below read it out. */}
+      {/* Each side's share at its own end, so the colours need no legend; the list below is for screen readers. */}
       <div className="analysis__equity-meter ro-mono" aria-hidden="true">
         <span className="analysis__equity-end">{t('lab.analysis.equity.percent', { percent: text.oneDecimal(equity.sides[0].equity) })}</span>
         <div className="analysis__equity-bar">
@@ -370,7 +370,7 @@ function EquityBar({ equity, labels, hovered }: { equity: EquityResult; labels: 
         </div>
         <span className="analysis__equity-end">{t('lab.analysis.equity.percent', { percent: text.oneDecimal(equity.sides[1].equity) })}</span>
       </div>
-      <ul className="analysis__equity-sides ro-mono">
+      <ul className="analysis__sr-only">
         {equity.sides.map((sideEquity, index) => (
           <li key={index}>
             {t('lab.analysis.equity.side', {
@@ -380,11 +380,11 @@ function EquityBar({ equity, labels, hovered }: { equity: EquityResult; labels: 
           </li>
         ))}
       </ul>
-      <p className="analysis__equity-precision">
-        {equity.exact ? t('lab.analysis.equity.precision.exact') : t('lab.analysis.equity.precision.sampled', { margin: text.margin(equity.margin) })}
+      {/* One line with the bar: the precision, which the hovered cell's Equity replaces while it is hovered. */}
+      <p className="analysis__equity-precision ro-mono">
+        {hoveredLine() ??
+          (equity.exact ? t('lab.analysis.equity.precision.exact') : t('lab.analysis.equity.precision.sampled', { margin: text.margin(equity.margin) }))}
       </p>
-      {/* Always there, empty until a cell is hovered, so the matrices under it never jump. */}
-      <p className="analysis__equity-hovered ro-mono">{hoveredLine()}</p>
     </section>
   )
 }

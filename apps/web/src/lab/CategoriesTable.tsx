@@ -5,7 +5,8 @@ import type { CategoryRow } from './board'
 /**
  * How the Ranges hit the Board in one block of Categories: one row per
  * Category that can happen on it, with each side's Combos, weighted by
- * Frequency, and its % of that side's live Combos. A row is toggled in the
+ * Frequency, and its % of that side's live Combos; against another side, only
+ * the % of each, so the table fits beside the matrices. A row is toggled in the
  * selection by clicking it, and lights up its Combos while hovered or focused.
  */
 export function CategoriesTable<Category extends string>({
@@ -36,28 +37,24 @@ export function CategoriesTable<Category extends string>({
   const { t, formatNumber } = useI18n()
   const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const [{ rows }] = sides
+  /** Against another side, a Category's Combos are left to the matrices' own. */
+  const alone = sides.length === 1
   return (
     <table className="analysis__categories">
       <caption className="analysis__categories-title">{title}</caption>
       <thead>
-        {sides.length > 1 && (
-          <tr>
-            <td />
-            {sides.map((side, index) => (
-              <th key={index} scope="colgroup" colSpan={2} className="analysis__categories-side">
-                {side.label}
-              </th>
-            ))}
-          </tr>
-        )}
         <tr>
           <th scope="col">{heading}</th>
-          {sides.map((_, index) => [
-            <th key={`combos-${index}`} scope="col">
-              {t('lab.analysis.combos')}
-            </th>,
+          {sides.map((side, index) => [
+            alone && (
+              <th key={`combos-${index}`} scope="col">
+                {t('lab.analysis.combos')}
+              </th>
+            ),
             <th key={`share-${index}`} scope="col">
               {t('lab.analysis.share')}
+              {/* The columns follow the matrices' order: heard as whose they are, not seen. */}
+              {!alone && <span className="analysis__sr-only"> {side.label}</span>}
             </th>,
           ])}
         </tr>
@@ -85,10 +82,12 @@ export function CategoriesTable<Category extends string>({
               </button>
             </th>
             {sides.map((side, index) => [
-              <td key={`combos-${index}`} className="ro-mono" data-side-start={index > 0 || undefined}>
-                {oneDecimal(side.rows[at].combos)}
-              </td>,
-              <td key={`share-${index}`} className="ro-mono">
+              alone && (
+                <td key={`combos-${index}`} className="ro-mono">
+                  {oneDecimal(side.rows[at].combos)}
+                </td>
+              ),
+              <td key={`share-${index}`} className="ro-mono" data-side-start={index > 0 || undefined}>
                 {/* The share drawn beside its number, for the eye only: the number says it. */}
                 <span className="analysis__share-bar" aria-hidden="true">
                   <span style={{ width: `${side.rows[at].share}%` }} />

@@ -23,14 +23,14 @@ export interface RangeSummary {
 
 /**
  * One side of the Analysis: its Range's matrix, with the saved Range it came
- * from, loading and clearing it, and its width. Its Combos are the Analysis's,
- * never written to the saved Range: Ranges are built and kept on the Rangos
- * screen.
+ * from, loading and clearing it, and its width (only when it is alone on the
+ * screen). Its Combos are the Analysis's, never written to the saved Range:
+ * Ranges are built and kept on the Rangos screen.
  */
 export function AnalysisSideSection({
   side,
   label,
-  numbered,
+  compact,
   saved,
   brush,
   out,
@@ -42,8 +42,8 @@ export function AnalysisSideSection({
   side: AnalysisSide
   /** What the side is called: the whole Analysis's Range, or "Range 1" or "Range 2" against another. */
   label: string
-  /** Whether the label shows, as it does with two sides. */
-  numbered: boolean
+  /** Whether it shares the screen with another side: no label above its matrix, and only its live Combos under it. */
+  compact: boolean
   /** The Account's saved Ranges, to load one. */
   saved: RangeSummary[]
   brush: number
@@ -116,7 +116,6 @@ export function AnalysisSideSection({
 
   return (
     <section className="analysis__side" aria-label={label}>
-      {numbered && <span className="lab__label">{label}</span>}
       <div className="analysis__side-name">
         <h2 className="analysis__source">{sourceId === null ? t('lab.analysis.unsaved') : (shownSource?.name ?? '…')}</h2>
         {changed && <span className="lab__unsaved">{t('lab.analysis.changed')}</span>}
@@ -156,7 +155,7 @@ export function AnalysisSideSection({
         onHover={onHover}
       />
       <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, out)) })}</p>
-      <Stats stats={rangeStats(range)} />
+      {!compact && <Stats stats={rangeStats(range)} />}
     </section>
   )
 }
