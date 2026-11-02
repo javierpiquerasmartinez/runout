@@ -89,6 +89,10 @@ export function CategoriesTable<Category extends string>({
                 {oneDecimal(side.rows[at].combos)}
               </td>,
               <td key={`share-${index}`} className="ro-mono">
+                {/* The share drawn beside its number, for the eye only: the number says it. */}
+                <span className="analysis__share-bar" aria-hidden="true">
+                  <span style={{ width: `${side.rows[at].share}%` }} />
+                </span>
                 {t('lab.analysis.sharePercent', { percent: oneDecimal(side.rows[at].share) })}
               </td>,
             ])}
