@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Card, CardSlot } from '../ui/Card'
@@ -26,7 +26,8 @@ import {
  * The Analysis's Board and Dead Cards: their cards picked from one grid of 52,
  * switched between the two, a card picked again taken off, or each typed as
  * text, refused whole with what is wrong. A card is never both. Random deals
- * never repeat a card in use nor deal a Dead Card.
+ * never repeat a card in use nor deal a Dead Card. What the Board is studied
+ * with comes after its buttons, beside the deck on a wide screen.
  */
 export function BoardPicker({
   board,
@@ -34,6 +35,7 @@ export function BoardPicker({
   withDead,
   onChange,
   onDeadChange,
+  children,
 }: {
   board: readonly string[]
   dead: readonly string[]
@@ -41,6 +43,7 @@ export function BoardPicker({
   withDead: boolean
   onChange: (board: string[]) => void
   onDeadChange: (dead: string[]) => void
+  children?: ReactNode
 }) {
   const { t } = useI18n()
   /** Which cards the grid picks. */
@@ -150,89 +153,93 @@ export function BoardPicker({
           )
         })}
       </div>
-      <input
-        className="analysis__board-field ro-mono"
-        value={typed ?? formatBoard(board)}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder={t('lab.analysis.board.placeholder')}
-        aria-label={t('lab.analysis.board.text')}
-        onChange={(event) => {
-          setTyped(event.target.value)
-          setProblem(null)
-        }}
-        onBlur={commitTyped}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter') return
-          event.preventDefault()
-          commitTyped()
-        }}
-      />
-      {problem && (
-        <p className="lab__failure" role="alert">
-          {problem.kind === 'unknown'
-            ? t('lab.analysis.board.unknown', { piece: problem.piece })
-            : problem.kind === 'repeated'
-              ? t('lab.analysis.board.repeated', { card: problem.card })
-              : problem.kind === 'dead'
-                ? t('lab.analysis.board.dead', { card: problem.card })
-                : t('lab.analysis.board.size', { count: problem.count })}
-        </p>
-      )}
-      {withDead && (
-        <>
-          <input
-            className="analysis__board-field ro-mono"
-            value={typedDead ?? formatBoard(dead)}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder={t('lab.analysis.dead.placeholder')}
-            aria-label={t('lab.analysis.dead.text')}
-            onChange={(event) => {
-              setTypedDead(event.target.value)
-              setDeadProblem(null)
-            }}
-            onBlur={commitTypedDead}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return
-              event.preventDefault()
-              commitTypedDead()
-            }}
-          />
-          {deadProblem && (
-            <p className="lab__failure" role="alert">
-              {deadProblem.kind === 'unknown'
-                ? t('lab.analysis.dead.unknown', { piece: deadProblem.piece })
-                : deadProblem.kind === 'repeated'
-                  ? t('lab.analysis.dead.repeated', { card: deadProblem.card })
-                  : deadProblem.kind === 'on-board'
-                    ? t('lab.analysis.dead.onBoardProblem', { card: deadProblem.card })
-                    : t('lab.analysis.dead.size', { count: deadProblem.count })}
-            </p>
-          )}
-        </>
-      )}
-      <div className="analysis__board-actions">
-        <Button variant="secondary" size="compact" onClick={() => change(randomFlop(Math.random, dead))}>
-          {t('lab.analysis.board.randomFlop')}
-        </Button>
-        <Button
-          variant="secondary"
-          size="compact"
-          disabledReason={board.length < FLOP_CARDS ? t('lab.analysis.board.flopFirst') : full ? t('lab.analysis.board.full') : undefined}
-          onClick={() => change(withRandomCard(board, Math.random, dead))}
-        >
-          {t('lab.analysis.board.randomCard')}
-        </Button>
-        <span className="lab__spacer" />
-        <Button
-          variant="secondary"
-          size="compact"
-          disabledReason={board.length === 0 ? t('lab.analysis.board.empty') : undefined}
-          onClick={() => change([])}
-        >
-          {t('lab.analysis.board.clear')}
-        </Button>
+      {/* The fields, the deals and what comes after them: beside the upright deck on a wide screen, under it otherwise. */}
+      <div className="analysis__board-controls">
+        <input
+          className="analysis__board-field ro-mono"
+          value={typed ?? formatBoard(board)}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder={t('lab.analysis.board.placeholder')}
+          aria-label={t('lab.analysis.board.text')}
+          onChange={(event) => {
+            setTyped(event.target.value)
+            setProblem(null)
+          }}
+          onBlur={commitTyped}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            commitTyped()
+          }}
+        />
+        {problem && (
+          <p className="lab__failure" role="alert">
+            {problem.kind === 'unknown'
+              ? t('lab.analysis.board.unknown', { piece: problem.piece })
+              : problem.kind === 'repeated'
+                ? t('lab.analysis.board.repeated', { card: problem.card })
+                : problem.kind === 'dead'
+                  ? t('lab.analysis.board.dead', { card: problem.card })
+                  : t('lab.analysis.board.size', { count: problem.count })}
+          </p>
+        )}
+        {withDead && (
+          <>
+            <input
+              className="analysis__board-field ro-mono"
+              value={typedDead ?? formatBoard(dead)}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder={t('lab.analysis.dead.placeholder')}
+              aria-label={t('lab.analysis.dead.text')}
+              onChange={(event) => {
+                setTypedDead(event.target.value)
+                setDeadProblem(null)
+              }}
+              onBlur={commitTypedDead}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return
+                event.preventDefault()
+                commitTypedDead()
+              }}
+            />
+            {deadProblem && (
+              <p className="lab__failure" role="alert">
+                {deadProblem.kind === 'unknown'
+                  ? t('lab.analysis.dead.unknown', { piece: deadProblem.piece })
+                  : deadProblem.kind === 'repeated'
+                    ? t('lab.analysis.dead.repeated', { card: deadProblem.card })
+                    : deadProblem.kind === 'on-board'
+                      ? t('lab.analysis.dead.onBoardProblem', { card: deadProblem.card })
+                      : t('lab.analysis.dead.size', { count: deadProblem.count })}
+              </p>
+            )}
+          </>
+        )}
+        <div className="analysis__board-actions">
+          <Button variant="secondary" size="compact" onClick={() => change(randomFlop(Math.random, dead))}>
+            {t('lab.analysis.board.randomFlop')}
+          </Button>
+          <Button
+            variant="secondary"
+            size="compact"
+            disabledReason={board.length < FLOP_CARDS ? t('lab.analysis.board.flopFirst') : full ? t('lab.analysis.board.full') : undefined}
+            onClick={() => change(withRandomCard(board, Math.random, dead))}
+          >
+            {t('lab.analysis.board.randomCard')}
+          </Button>
+          <span className="lab__spacer" />
+          <Button
+            variant="secondary"
+            size="compact"
+            disabledReason={board.length === 0 ? t('lab.analysis.board.empty') : undefined}
+            onClick={() => change([])}
+          >
+            {t('lab.analysis.board.clear')}
+          </Button>
+        </div>
+        {children}
       </div>
     </section>
   )

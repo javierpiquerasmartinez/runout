@@ -194,6 +194,7 @@ export function LabAnalysisPage() {
     onToggle: toggle,
     onHover: (category: string | null) => setHover(category === null ? null : { ranges, board, dead, category }),
   }
+  const anyDraws = drawRows[0].length > 0 || combinationDrawRows[0].length > 0
   const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const selectionShare = (index: number) =>
     t('lab.analysis.selection.share', { combos: oneDecimal(selections[index].combos), percent: oneDecimal(selections[index].share) })
@@ -239,7 +240,7 @@ export function LabAnalysisPage() {
               />
             ))}
           </div>
-          {/* The Board and how the Ranges hit it: beside one matrix, so all of it is in view at once; under two, which take the width. */}
+          {/* The Board and how the Ranges hit it: beside one matrix, each in its own column on a wide screen; under two, which take the width. */}
           <div className="analysis__panel">
             <BoardPicker
               // Dead Cards come and go with the second side: the grid starts over on the Board.
@@ -249,64 +250,72 @@ export function LabAnalysisPage() {
               withDead={!two}
               onChange={(cards) => change((state) => ({ ...state, board: cards }))}
               onDeadChange={(cards) => change((state) => ({ ...state, dead: cards }))}
-            />
-            {(own || ownEquity) && <OwnComboSummary own={own} equity={ownEquity} dead={dead} />}
-            {selected.size > 0 && (
-              <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
-                <span className="lab__label">{t('lab.analysis.selection')}</span>
-                {two ? (
-                  <ul className="analysis__selection-sides ro-mono">
-                    {sides.map((_, index) => (
-                      <li key={index}>{t('lab.analysis.selection.sideShare', { side: sideLabel(index), share: selectionShare(index) })}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="analysis__selection-share ro-mono">{selectionShare(0)}</p>
-                )}
-                <div className="analysis__selection-actions">
-                  <Button variant="secondary" size="compact" onClick={() => setPicked(null)}>
-                    {t('lab.analysis.selection.clear')}
-                  </Button>
-                </div>
-              </section>
-            )}
+            >
+              {(own || ownEquity) && <OwnComboSummary own={own} equity={ownEquity} dead={dead} />}
+              {selected.size > 0 && (
+                <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
+                  <span className="lab__label">{t('lab.analysis.selection')}</span>
+                  {two ? (
+                    <ul className="analysis__selection-sides ro-mono">
+                      {sides.map((_, index) => (
+                        <li key={index}>{t('lab.analysis.selection.sideShare', { side: sideLabel(index), share: selectionShare(index) })}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="analysis__selection-share ro-mono">{selectionShare(0)}</p>
+                  )}
+                  <div className="analysis__selection-actions">
+                    <Button variant="secondary" size="compact" onClick={() => setPicked(null)}>
+                      {t('lab.analysis.selection.clear')}
+                    </Button>
+                  </div>
+                </section>
+              )}
+            </BoardPicker>
+            {/* Each kind of Category in a column of its own, scrolling on its own when it is taller than the screen. */}
             {madeHandRows[0].length > 0 && (
-              <CategoriesTable
-                title={t('lab.analysis.madeHands')}
-                heading={t('lab.analysis.madeHands.category')}
-                sides={sidesOf(madeHandRows)}
-                nameOf={(madeHand) => t(`lab.analysis.madeHand.${madeHand}`)}
-                {...categoriesTable}
-              />
-            )}
-            {drawRows[0].length > 0 && (
-              <div className="analysis__draws">
+              <div className="analysis__categories-column">
                 <CategoriesTable
-                  title={t('lab.analysis.draws')}
-                  heading={t('lab.analysis.draws.category')}
-                  sides={sidesOf(drawRows)}
-                  nameOf={(draw) => t(`lab.analysis.draw.${draw}`)}
+                  title={t('lab.analysis.madeHands')}
+                  heading={t('lab.analysis.madeHands.category')}
+                  sides={sidesOf(madeHandRows)}
+                  nameOf={(madeHand) => t(`lab.analysis.madeHand.${madeHand}`)}
                   {...categoriesTable}
                 />
-                {/* Backdoors are only drawn on the flop. */}
-                {board.length === FLOP_CARDS && (
-                  <Toggle
-                    label={t('lab.analysis.draws.oneCardBackdoors')}
-                    checked={oneCardBackdoors}
-                    onChange={setOneCardBackdoors}
-                    showLabel
+              </div>
+            )}
+            {anyDraws && (
+              <div className="analysis__categories-column">
+                {drawRows[0].length > 0 && (
+                  <div className="analysis__draws">
+                    <CategoriesTable
+                      title={t('lab.analysis.draws')}
+                      heading={t('lab.analysis.draws.category')}
+                      sides={sidesOf(drawRows)}
+                      nameOf={(draw) => t(`lab.analysis.draw.${draw}`)}
+                      {...categoriesTable}
+                    />
+                    {/* Backdoors are only drawn on the flop. */}
+                    {board.length === FLOP_CARDS && (
+                      <Toggle
+                        label={t('lab.analysis.draws.oneCardBackdoors')}
+                        checked={oneCardBackdoors}
+                        onChange={setOneCardBackdoors}
+                        showLabel
+                      />
+                    )}
+                  </div>
+                )}
+                {combinationDrawRows[0].length > 0 && (
+                  <CategoriesTable
+                    title={t('lab.analysis.combinationDraws')}
+                    heading={t('lab.analysis.combinationDraws.category')}
+                    sides={sidesOf(combinationDrawRows)}
+                    nameOf={(combinationDraw) => t(`lab.analysis.combinationDraw.${combinationDraw}`)}
+                    {...categoriesTable}
                   />
                 )}
               </div>
-            )}
-            {combinationDrawRows[0].length > 0 && (
-              <CategoriesTable
-                title={t('lab.analysis.combinationDraws')}
-                heading={t('lab.analysis.combinationDraws.category')}
-                sides={sidesOf(combinationDrawRows)}
-                nameOf={(combinationDraw) => t(`lab.analysis.combinationDraw.${combinationDraw}`)}
-                {...categoriesTable}
-              />
             )}
           </div>
         </div>
