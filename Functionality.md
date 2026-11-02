@@ -580,10 +580,9 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 **H9.10 — Study a Range in the Analysis.** As a player, I want to bring a Range into the Analysis and work on it without touching the saved one.
 
-- The Analysis holds one Range in a compact matrix, or two (H9.16). I load one of my saved Ranges from a list, paste one as text (refused whole at the first piece not understood, as in H9.6), paint it with the same brush as on **Rangos**, or **Limpiar** it.
+- The Analysis holds one Range in a compact matrix, or two (H9.16). I load one of my saved Ranges from a list, paint it with the same brush as on **Rangos**, or **Limpiar** it, and nothing more: the Analysis is for studying Ranges, and building and keeping them is what **Rangos** is for. It has no Range as text, no import or copy, and no saving.
 - It shows the Range's width as on **Rangos** (H9.4), updating as I paint.
 - It shows the name of the saved Range it came from, or that it is unsaved, and **Modificado** once its Combos differ from that saved Range. Nothing I do in the Analysis writes the saved Range.
-- **Guardar como rango** asks for a name, with the same rules and refusals as any Range (H9.2), keeps it as a new Range without Tags, and leaves me in the Analysis with the new Range as its source.
 - **Analizar** on **Rangos** opens the Analysis with the open Range as it stands on screen, unsaved Combos included. Only an unsaved name or Tags, which do not travel, make it ask to discard them first.
 - The address holds the Range as text and the saved Range's id, and is replaced rather than added to on every change, so reloading or going back keeps it. A saved Range that is no longer mine is dropped from the address, keeping its Combos.
 
@@ -609,12 +608,12 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - A Draw always uses one of the Combo's cards, so A2 on 9-8-7 draws to no straight, and never draws to what the Combo already makes, though a made straight can draw to a flush. A straight draw with two ranks to come counts as open-ended, a double gutshot included.
 - There are no Draws on the river, and no backdoors on the turn.
 
-**H9.14 — Select part of the Range.** As a player, I want to pick rows of Made Hands and Draws and see them as one part of the Range, so I can build my continuation Range from them.
+**H9.14 — Select part of the Range.** As a player, I want to pick rows of Made Hands and Draws and see them as one part of the Range, so I can see my continuation Range among them.
 
 - Clicking a row toggles it in the selection; hovering a row lights it up without selecting it. The selected rows' Combos light up in the matrix, each cell in proportion to its Combos in the selection, at their Frequencies.
 - Above the tables, the selection shows its Combos and its % of the live Combos, counting each Combo once however many selected rows hold it.
 - **Limpiar selección** clears it in one click; changing the Range, the Board or the Dead Cards (H9.15) clears it too.
-- **Guardar selección como rango** asks for a name, with the same rules and refusals as any Range (H9.2), and keeps the selected Combos at their Frequencies as a new Range without Tags. The Analysis stays as it was, its source and selection included.
+- Nothing in the selection is saved: it lives in the Analysis only.
 
 **H9.15 — Take my own hand out of the deck.** As a player, I want to set up to two Dead Cards, usually my own hand, so the Range counts only what my opponent can hold and I see where my hand stands.
 
@@ -628,9 +627,9 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 **H9.16 — Put two Ranges side by side.** As a player, I want a second Range in the Analysis, so I can study my Range and my opponent's on the same Board.
 
 - **Añadir un segundo rango** adds an empty second side, and **Quitar rango** on it takes it away. Adding it drops the Dead Cards.
-- Both matrices stay on screen, side by side and smaller, with the Board and the Categories under them; on a narrow screen they stack, without the cells' labels. Each side, **Rango 1** and **Rango 2**, is loaded, pasted, painted with the one brush, cleared and saved as a new Range on its own, with its own source name and **Modificado** mark (H9.10).
+- Both matrices stay on screen, side by side and smaller, with the Board and the Categories under them; on a narrow screen they stack, without the cells' labels. Each side, **Rango 1** and **Rango 2**, is loaded, painted with the one brush and cleared on its own, with its own source name and **Modificado** mark (H9.10).
 - The Board removes Combos from both sides. The Categories tables (H9.12, H9.13) show a pair of columns per side, Combos and %, each over that side's own live Combos, never changed by the other Range.
-- A selection (H9.14) lights up its Combos in both matrices and shows each side's Combos and %. **Guardar selección como rango** asks which side's Combos to keep.
+- A selection (H9.14) lights up its Combos in both matrices and shows each side's Combos and %.
 - The address holds both sides, each with its saved Range's id, so reloading keeps them.
 
 **H9.17 — See the Equity of one Range against another.** As a player, I want each side's Equity against the other, so I know how the pot splits on average and which hands carry it.
