@@ -610,9 +610,9 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 **H9.14 — Select part of the Range.** As a player, I want to pick rows of Made Hands and Draws and see them as one part of the Range, so I can see my continuation Range among them.
 
-- Clicking a row toggles it in the selection; hovering a row lights it up without selecting it. The selected rows' Combos light up in the matrix, each cell in proportion to its Combos in the selection, at their Frequencies.
+- Clicking a row toggles it in the selection; hovering a row lights it up without selecting it. With two sides (H9.16) each side has its own selection: clicking a row in a side's column toggles it for that side only, from the keyboard too, and hovering a row lights it up on both. The selected rows' Combos light up in the matrix, each cell in proportion to its Combos in the selection, at their Frequencies.
 - Above the tables, the selection shows its Combos and its % of the live Combos, counting each Combo once however many selected rows hold it.
-- **Limpiar selección** clears it in one click; changing the Range, the Board or the Dead Cards (H9.15) clears it too.
+- **Limpiar selección** clears it in one click, on both sides; changing the Range, the Board or the Dead Cards (H9.15) clears it too.
 - Nothing in the selection is saved: it lives in the Analysis only.
 
 **H9.15 — Take my own hand out of the deck.** As a player, I want to set up to two Dead Cards, usually my own hand, so the Range counts only what my opponent can hold and I see where my hand stands.
@@ -629,7 +629,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - **Añadir un segundo rango** adds an empty second side, and **Quitar rango** on it takes it away. Adding it drops the Dead Cards.
 - On a screen 1280 px wide or more, the Analysis fits in the window without scrolling: the Equity (H9.17) on one line on top, then both matrices, the Board, and the Categories with the Made Hands over the Draws, which scroll on their own if they do not fit. Under each matrix only its live Combos remain. On a narrower screen the parts wrap, and on a phone they stack, without the cells' labels. Each side, **Rango 1** and **Rango 2**, is loaded, painted with the one brush and cleared on its own, with its own source name and **Modificado** mark (H9.10).
 - The Board removes Combos from both sides. The Categories tables (H9.12, H9.13) show one % column per side, each over that side's own live Combos, never changed by the other Range; the Combos are left to the matrices.
-- A selection (H9.14) lights up its Combos in both matrices and shows each side's Combos and %.
+- Each side's selection (H9.14) lights up its Combos in that side's matrix only, and the selection shows each side's Combos and % of its own.
 - The address holds both sides, each with its saved Range's id, so reloading keeps them.
 
 **H9.17 — See the Equity of one Range against another.** As a player, I want each side's Equity against the other, so I know how the pot splits on average and which hands carry it.

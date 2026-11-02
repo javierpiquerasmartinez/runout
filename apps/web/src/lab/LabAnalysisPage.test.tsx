@@ -889,7 +889,15 @@ describe('LabAnalysisPage · the Categories of two sides', () => {
     Array.from(screen.getByRole('table', { name: caption }).querySelectorAll('tr'), (row) =>
       Array.from(row.children, (each) => each.textContent).join(' | '),
     )
-  const row = (category: string) => screen.getByRole('button', { name: category })
+  /** A row's pick in one side's column, named by the row, the side and its %. */
+  const pick = (category: string, region: string) => screen.getByRole('button', { name: new RegExp(`^${category} · ${region} · `) })
+  const pressed = () =>
+    screen
+      .getAllByRole('button')
+      .filter((button) => button.closest('table') && button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.getAttribute('aria-label'))
+  const selectionLines = () =>
+    Array.from(screen.getByRole('region', { name: 'Selection' }).querySelectorAll('li'), (each) => each.textContent)
   const title = (region: string, name: string) =>
     within(within(side(region)).getByRole('group', { name: 'Range matrix' })).getByRole('button', { name }).getAttribute('title')
 
@@ -912,19 +920,71 @@ describe('LabAnalysisPage · the Categories of two sides', () => {
     }
   })
 
-  it('light up a selection in both matrices, with each side its combined %', async () => {
+  it("select a row for one side by clicking in that side's column, lighting up only that side's matrix", async () => {
     renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
 
-    await userEvent.click(row('Top pair'))
-    await userEvent.click(row('Set'))
+    await userEvent.click(pick('Top pair', 'Range 2'))
+    // A hovered row lights up on both sides: only the selection stays once the pointer leaves.
+    await userEvent.unhover(pick('Top pair', 'Range 2'))
 
-    expect(Array.from(screen.getByRole('region', { name: 'Selection' }).querySelectorAll('li'), (each) => each.textContent)).toEqual([
+    expect(pressed()).toEqual(['Top pair · Range 2 · 50.0 %'])
+    expect(selectionLines()).toEqual([
+      'Range 1: 0.0 combos · 0.0 % of the live combos',
+      'Range 2: 3.0 combos · 50.0 % of the live combos',
+    ])
+    expect(title('Range 2', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
+    expect(title('Range 1', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards')
+  })
+
+  it("select a row on both sides, each side with its own selection and combined %", async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+
+    await userEvent.click(pick('Top pair', 'Range 1'))
+    await userEvent.click(pick('Top pair', 'Range 2'))
+    await userEvent.click(pick('Set', 'Range 2'))
+
+    expect(selectionLines()).toEqual([
       'Range 1: 3.0 combos · 33.3 % of the live combos',
       'Range 2: 6.0 combos · 100.0 % of the live combos',
     ])
     expect(title('Range 1', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
-    expect(title('Range 2', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
     expect(title('Range 2', '77')).toBe('77 · 6 combos · 100 % · 3 removed by the board or the dead cards · 3 in the selection')
+    expect(title('Range 1', 'AA')).toBe('AA · 6 combos · 100 %')
+
+    await userEvent.click(pick('Top pair', 'Range 1'))
+    expect(pressed()).toEqual(['Set · Range 2 · 50.0 %', 'Top pair · Range 2 · 50.0 %'])
+  })
+
+  it('select a row for a side from the keyboard', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+
+    pick('Set', 'Range 2').focus()
+    await userEvent.keyboard('{Enter}')
+    pick('Overpair', 'Range 1').focus()
+    await userEvent.keyboard(' ')
+
+    expect(pressed()).toEqual(['Set · Range 2 · 50.0 %', 'Overpair · Range 1 · 66.7 %'])
+  })
+
+  it('light up a hovered row in both matrices', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+
+    await userEvent.hover(pick('Top pair', 'Range 1'))
+
+    expect(title('Range 1', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
+    expect(title('Range 2', 'KQs')).toBe('KQs · 4 combos · 100 % · 1 removed by the board or the dead cards · 3 in the selection')
+    expect(pressed()).toEqual([])
+  })
+
+  it('clear both sides in one click', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
+    await userEvent.click(pick('Overpair', 'Range 1'))
+    await userEvent.click(pick('Set', 'Range 2'))
+
+    await userEvent.click(within(screen.getByRole('region', { name: 'Selection' })).getByRole('button', { name: 'Clear selection' }))
+
+    expect(pressed()).toEqual([])
+    expect(screen.queryByRole('region', { name: 'Selection' })).toBeNull()
     expect(title('Range 1', 'AA')).toBe('AA · 6 combos · 100 %')
   })
 
@@ -933,7 +993,7 @@ describe('LabAnalysisPage · the Categories of two sides', () => {
 
     expect(screen.getByRole('region', { name: 'Rango 1' })).toBeTruthy()
     expect(within(screen.getByRole('region', { name: 'Rango 2' })).getByRole('button', { name: 'Quitar rango' })).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Overpair · Rango 1 · 100,0 %' }))
     expect(Array.from(screen.getByRole('region', { name: 'Selección' }).querySelectorAll('li'), (each) => each.textContent)).toEqual([
       'Rango 1: 6,0 combos · 100,0 % de los combos vivos',
       'Rango 2: 0,0 combos · 0,0 % de los combos vivos',

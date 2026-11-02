@@ -778,6 +778,7 @@ export const en: Messages = {
   'lab.analysis.combos': 'Combos',
   'lab.analysis.share': '%',
   'lab.analysis.sharePercent': '{percent} %',
+  'lab.analysis.categoryOfSide': '{category} · {side} · {percent}',
   'lab.analysis.madeHand.straight-flush': 'Straight flush',
   'lab.analysis.madeHand.quads': 'Quads',
   'lab.analysis.madeHand.full-house': 'Full house',

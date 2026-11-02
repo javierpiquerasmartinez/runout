@@ -777,6 +777,7 @@ export const es = {
   'lab.analysis.combos': 'Combos',
   'lab.analysis.share': '%',
   'lab.analysis.sharePercent': '{percent} %',
+  'lab.analysis.categoryOfSide': '{category} · {side} · {percent}',
   'lab.analysis.madeHand.straight-flush': 'Escalera de color',
   'lab.analysis.madeHand.quads': 'Póker',
   'lab.analysis.madeHand.full-house': 'Full',

@@ -38,9 +38,9 @@ interface PickedOn {
   dead: readonly string[]
 }
 
-/** The Categories picked, on what they were picked on. */
+/** Each side's Categories picked, in the order of the sides, on what they were picked on. */
 interface PickedCategories extends PickedOn {
-  categories: ReadonlySet<string>
+  categories: readonly ReadonlySet<string>[]
 }
 
 const NO_CATEGORIES: ReadonlySet<string> = new Set()
@@ -171,21 +171,23 @@ export function LabAnalysisPage() {
     on.dead === dead &&
     on.ranges.length === ranges.length &&
     on.ranges.every((each, index) => each === ranges[index])
-  const selected = picked !== null && pickedHere(picked) ? picked.categories : NO_CATEGORIES
+  const selected = picked !== null && pickedHere(picked) ? picked.categories : sides.map(() => NO_CATEGORIES)
   const hovered = hover !== null && pickedHere(hover) ? hover.category : null
   const rowsOfSide = (index: number) => [...madeHandRows[index], ...drawRows[index], ...combinationDrawRows[index]]
   const selections = sides.map((side, index) =>
-    selectionOf(side.range, out, rowsOfSide(index).filter((row) => selected.has(row.category))),
+    selectionOf(side.range, out, rowsOfSide(index).filter((row) => selected[index].has(row.category))),
   )
   // A hovered row lights up with the selection, as it would once clicked.
   const highlighted = sides.map(
     (side, index) =>
-      selectionOf(side.range, out, rowsOfSide(index).filter((row) => selected.has(row.category) || row.category === hovered)).range,
+      selectionOf(side.range, out, rowsOfSide(index).filter((row) => selected[index].has(row.category) || row.category === hovered))
+        .range,
   )
-  const toggle = (category: string) => {
-    const categories = new Set(selected)
+  const anySelected = selected.some((categories) => categories.size > 0)
+  const toggle = (category: string, side: number) => {
+    const categories = new Set(selected[side])
     if (!categories.delete(category)) categories.add(category)
-    setPicked({ ranges, board, dead, categories })
+    setPicked({ ranges, board, dead, categories: selected.map((each, index) => (index === side ? categories : each)) })
   }
   /** Each side's rows of one table, under what the side is called. */
   const sidesOf = <Category extends string>(rows: CategoryRow<Category>[][]) => rows.map((each, index) => ({ label: sideLabel(index), rows: each }))
@@ -252,7 +254,7 @@ export function LabAnalysisPage() {
               onDeadChange={(cards) => change((state) => ({ ...state, dead: cards }))}
             >
               {(own || ownEquity) && <OwnComboSummary own={own} equity={ownEquity} dead={dead} />}
-              {selected.size > 0 && (
+              {anySelected && (
                 <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
                   <span className="lab__label">{t('lab.analysis.selection')}</span>
                   {two ? (
