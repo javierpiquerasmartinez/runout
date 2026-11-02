@@ -207,6 +207,14 @@
   gap: 8px;
 }
 
+/* The fields, the deals and what the Board is studied with: under the deck, or beside it on a wide screen. */
+.analysis__board-controls {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 @media (max-width: 760px) {
   .analysis__side {
     max-width: none;
@@ -231,6 +239,13 @@
 }
 
 /* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
+/* Made Hands in one column; the Draws with the combination Draws in another. */
+.analysis__categories-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 .analysis__draws {
   display: flex;
   flex-direction: column;
@@ -447,3 +462,97 @@
   font-size: 12.5px;
   color: var(--text-secondary);
 }
+
+/*
+ * ---- One Range on one screen: matrix | Board | Made Hands | Draws ----
+ * On a wide screen the page is as tall as the window: the Categories columns,
+ * and the Board when it is taller, scroll on their own instead. Only a window
+ * shorter than the matrix scrolls the page. Narrower, the layout above wraps.
+ */
+@media (min-width: 1280px) {
+  .lab:has(.analysis__body[data-sides='1']) {
+    height: 100vh;
+  }
+  .lab__main:has(> .analysis__body[data-sides='1']) {
+    min-height: 0;
+    gap: 12px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .analysis__body[data-sides='1'] {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(280px, 330px) max-content minmax(220px, 1fr) minmax(220px, 1fr);
+    /* What is left of the window, or the matrix's height if it needs more. */
+    grid-template-rows: 1fr;
+    align-items: start;
+    gap: 28px;
+  }
+  .analysis__body[data-sides='1'] .analysis__sides,
+  .analysis__body[data-sides='1'] .analysis__panel {
+    display: contents;
+  }
+  .analysis__body[data-sides='1'] .analysis__side {
+    max-width: none;
+    gap: 10px;
+  }
+  .analysis__body[data-sides='1'] .lab__stats {
+    gap: 12px;
+  }
+  .analysis__body[data-sides='1'] .lab__breakdown {
+    gap: 4px;
+  }
+  .analysis__body[data-sides='1'] .analysis__categories-column {
+    gap: 20px;
+  }
+  /* The Board too, when the own Combo and the Selection make it taller than the window. */
+  .analysis__body[data-sides='1'] .analysis__categories-column,
+  .analysis__body[data-sides='1'] .analysis__board {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+    /* Room for the focus rings the scrolling would clip. */
+    margin: -4px;
+    padding: 4px 8px 4px 4px;
+  }
+
+  /* The Board: its cards on top, then the deck upright with the fields, the deals and the Selection beside it. */
+  .analysis__body[data-sides='1'] .analysis__board {
+    display: grid;
+    grid-template-columns: max-content 220px;
+    align-content: start;
+    gap: 10px 14px;
+  }
+  .analysis__body[data-sides='1'] .analysis__board > * {
+    grid-column: 1 / -1;
+  }
+  .analysis__body[data-sides='1'] .analysis__board > .analysis__deck {
+    grid-column: 1;
+  }
+  .analysis__body[data-sides='1'] .analysis__board > .analysis__board-controls {
+    grid-column: 2;
+  }
+  .analysis__body[data-sides='1'] .analysis__board-cards {
+    zoom: 0.8;
+  }
+  /* One column per suit, aces on top, smaller than on a narrow screen. */
+  .analysis__body[data-sides='1'] .analysis__deck {
+    grid-template-columns: none;
+    grid-template-rows: repeat(13, max-content);
+    grid-auto-flow: column;
+    gap: 2px 3px;
+    zoom: 0.8;
+  }
+  .analysis__body[data-sides='1'] .analysis__board-field {
+    max-width: none;
+  }
+  .analysis__body[data-sides='1'] .analysis__board-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .analysis__body[data-sides='1'] .analysis__board-actions .lab__spacer {
+    display: none;
+  }
+}
+
