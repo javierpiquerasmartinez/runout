@@ -20,7 +20,7 @@ import {
   type CategoryRow,
   type OwnCombo,
 } from './board'
-import { AnalysisSideSection, SaveAsDialog, type RangeSummary, type SavedRange } from './AnalysisSideSection'
+import { AnalysisSideSection, type RangeSummary } from './AnalysisSideSection'
 import { BoardPicker } from './BoardPicker'
 import { useEquity } from './equity'
 import { analysisStateFromSearch, EMPTY_SIDE, labAnalysisAddress, MAX_ANALYSIS_SIDES, type AnalysisSide, type AnalysisState } from './lab'
@@ -41,8 +41,6 @@ interface PickedOn {
 /** The Categories picked, on what they were picked on. */
 interface PickedCategories extends PickedOn {
   categories: ReadonlySet<string>
-  /** The name the selection was last saved under, until it changes. */
-  savedUnder?: string
 }
 
 const NO_CATEGORIES: ReadonlySet<string> = new Set()
@@ -97,8 +95,8 @@ function useAnalysisState(): [AnalysisState, (next: (state: AnalysisState) => An
 }
 
 /**
- * The Lab's Analysis: one Range, or two against each other, loaded, pasted or
- * painted, studied without touching the saved ones. Its address holds what is
+ * The Lab's Analysis: one Range, or two against each other, loaded or painted,
+ * studied without touching the saved ones. Its address holds what is
  * on screen, so reloading or going back keeps it.
  */
 export function LabAnalysisPage() {
@@ -108,8 +106,6 @@ export function LabAnalysisPage() {
   const [brush, setBrush] = useState<number>(100)
   /** The Account's saved Ranges, to load one; empty until they are read. */
   const [saved, setSaved] = useState<RangeSummary[]>([])
-  /** Asking for the name to save the selection under. */
-  const [savingSelection, setSavingSelection] = useState(false)
   const [picked, setPicked] = useState<PickedCategories | null>(null)
   /**
    * The Category under the pointer or the focus, lit up without being selected,
@@ -133,16 +129,12 @@ export function LabAnalysisPage() {
     let cancelled = false
     api<RangeSummary[]>('/lab/ranges', { token })
       .then((ranges) => !cancelled && setSaved(ranges))
-      // Loading is not offered without them; the Range can still be pasted or painted.
+      // Loading is not offered without them; the Range can still be painted.
       .catch(() => undefined)
     return () => {
       cancelled = true
     }
   }, [token])
-
-  /** A Range just saved joins those to load. */
-  const remember = (range: SavedRange) =>
-    setSaved((ranges) => [...ranges, range].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())))
 
   // Every Combo of the deck is classified to tell which Categories can happen: not on every render.
   // Each side's rows count only its own Range, whatever the other holds.
@@ -242,7 +234,6 @@ export function LabAnalysisPage() {
                 out={out}
                 highlighted={highlighted[index]}
                 onChange={changeSide(index)}
-                onSaved={remember}
                 onRemove={index > 0 ? removeSide : undefined}
                 onHover={(handClass) => setHoveredCell(handClass && { side: index, handClass })}
               />
@@ -276,20 +267,7 @@ export function LabAnalysisPage() {
                   <Button variant="secondary" size="compact" onClick={() => setPicked(null)}>
                     {t('lab.analysis.selection.clear')}
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="compact"
-                    disabledReason={selections.some((each) => each.combos > 0) ? undefined : t('lab.analysis.selection.empty')}
-                    onClick={() => setSavingSelection(true)}
-                  >
-                    {t('lab.analysis.selection.save')}
-                  </Button>
                 </div>
-                {picked?.savedUnder !== undefined && (
-                  <p className="analysis__selection-saved" role="status">
-                    {t('lab.analysis.selection.saved', { name: picked.savedUnder })}
-                  </p>
-                )}
               </section>
             )}
             {madeHandRows[0].length > 0 && (
@@ -333,20 +311,6 @@ export function LabAnalysisPage() {
           </div>
         </div>
       </main>
-      {savingSelection && (
-        <SaveAsDialog
-          choices={selections.map((selection, index) => ({ label: sideLabel(index), combos: selection.range }))}
-          title={t('lab.analysis.selection.save.title')}
-          body={t(two ? 'lab.analysis.selection.save.bodySides' : 'lab.analysis.selection.save.body')}
-          onClose={() => setSavingSelection(false)}
-          // The Analysis stays as it is, the selection too.
-          onSaved={(range) => {
-            setSavingSelection(false)
-            remember(range)
-            setPicked((current) => current && { ...current, savedUnder: range.name })
-          }}
-        />
-      )}
     </div>
   )
 }

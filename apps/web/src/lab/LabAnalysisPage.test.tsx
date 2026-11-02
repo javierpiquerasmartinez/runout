@@ -17,7 +17,7 @@ interface StoredRange {
 
 /** The Account's Ranges as the faked server keeps them. */
 let stored: StoredRange[]
-/** Writes, as `POST /api/lab/ranges {"name":"OR","combos":{},"tagIds":[]}`. */
+/** Writes, as `POST /api/lab/ranges {"name":"OR","combos":{},"tagIds":[]}`: the Analysis should make none. */
 let writes: string[]
 
 const aces = { AsAh: 100, AsAd: 100, AsAc: 100, AhAd: 100, AhAc: 100, AdAc: 100 }
@@ -64,16 +64,9 @@ beforeEach(() => {
         const range = stored.find((each) => each.id === id)
         return range ? Response.json({ ...range, tags: [] }) : Response.json({ reason: 'range-not-found' }, { status: 404 })
       }
+      // The Analysis never writes a Range: any write is recorded, and refused.
       writes.push(`${method} ${url} ${String(init?.body)}`)
-      const body = JSON.parse(String(init?.body)) as Omit<StoredRange, 'id'>
-      const name = body.name.trim()
-      if (name.length > 60) return Response.json({ reason: 'invalid-range-name' }, { status: 400 })
-      if (stored.some((each) => each.name.toLowerCase() === name.toLowerCase())) {
-        return Response.json({ reason: 'range-name-taken' }, { status: 409 })
-      }
-      const range = { id: `r${stored.length + 1}`, name, combos: body.combos }
-      stored = [...stored, range]
-      return Response.json({ ...range, tags: [] }, { status: 201 })
+      return Response.json({ reason: 'internal' }, { status: 500 })
     }),
   )
 })
@@ -208,28 +201,34 @@ describe('LabAnalysisPage · the address', () => {
   })
 })
 
-describe('LabAnalysisPage · pasting a Range', () => {
-  const paste = async (text: string) => {
-    await userEvent.type(screen.getByRole('textbox', { name: 'Paste a range' }), text)
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }))
-  }
+describe('LabAnalysisPage · only loading Ranges', () => {
+  /** Anything to paste, copy or save a Range with, on screen. */
+  const savingControls = () => [
+    ...screen.queryAllByRole('textbox', { name: /Paste a range|Range as text/ }),
+    ...screen.queryAllByRole('button', { name: /Import|Copy|Save/ }),
+  ]
 
-  it("replaces the Range with what was pasted, in the Lab's notation", async () => {
-    renderAnalysis('en', '/lab/analysis?range=72o')
+  it('offers no Range text, import, copy or save on either side', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
 
-    await paste('QQ+,AKs:0.5')
-
-    expect(pressed()).toEqual(['AA', 'AKs', 'KK', 'QQ'])
-    await waitFor(() => expect(address()).toEqual({ range: 'QQ+,AKs:0.5' }))
+    expect(savingControls()).toEqual([])
+    for (const name of ['Range 1', 'Range 2']) {
+      const side = screen.getByRole('region', { name })
+      expect(within(side).getByRole('combobox', { name: 'Load a saved range' })).toBeTruthy()
+      expect(within(side).getByRole('button', { name: 'Clear' })).toBeTruthy()
+    }
+    expect(writes).toEqual([])
   })
 
-  it('refuses the whole text, naming the first piece not understood', async () => {
-    renderAnalysis('en', '/lab/analysis?range=72o')
+  it('offers no save in the Selection, which still clears', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
 
-    await paste('AA,banana,KK')
+    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
 
-    expect(screen.getByRole('alert').textContent).toBe("“banana” isn't range notation Runout understands. Nothing was imported.")
-    expect(pressed()).toEqual(['72o'])
+    const selection = screen.getByRole('region', { name: 'Selection' })
+    expect(within(selection).getAllByRole('button').map((button) => button.textContent)).toEqual(['Clear selection'])
+    expect(savingControls()).toEqual([])
+    expect(writes).toEqual([])
   })
 })
 
@@ -282,78 +281,6 @@ describe('LabAnalysisPage · loading a saved Range', () => {
     await waitFor(() => expect(address()).toEqual({ range: 'KK' }))
     expect(sourceName()).toBe('Unsaved range')
     expect(pressed()).toEqual(['KK'])
-  })
-})
-
-describe('LabAnalysisPage · saving as a new Range', () => {
-  const saveAs = () => userEvent.click(screen.getByRole('button', { name: 'Save as range' }))
-  const dialog = () => screen.getByRole('dialog', { name: 'Save as a new range' })
-  const nameField = () => within(dialog()).getByRole<HTMLInputElement>('textbox', { name: 'Range name' })
-  const confirm = () => userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
-
-  it('asks for a name, saves a new Range with the Combos on screen and stays in the Analysis with it as the source', async () => {
-    renderAnalysis('en', '/lab/analysis?range=KK&source=r1')
-    await waitFor(() => expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR BTN'))
-
-    await saveAs()
-    await userEvent.type(nameField(), '  OR CO ')
-    await confirm()
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(writes).toEqual(['POST /api/lab/ranges {"name":"OR CO","combos":{"KsKh":100,"KsKd":100,"KsKc":100,"KhKd":100,"KhKc":100,"KdKc":100},"tagIds":[]}'])
-    expect(stored.find((range) => range.id === 'r1')!.combos).toEqual(aces)
-    expect(window.location.pathname).toBe('/lab/analysis')
-    await waitFor(() => expect(address()).toEqual({ range: 'KK', source: 'r3' }))
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR CO')
-    expect(screen.queryByText('Changed')).toBeNull()
-    expect(within(screen.getByRole('combobox', { name: 'Load a saved range' })).getByRole('option', { name: 'OR CO' })).toBeTruthy()
-  })
-
-  it('saves with Enter in the name field', async () => {
-    renderAnalysis('en', '/lab/analysis?range=KK')
-
-    await saveAs()
-    await userEvent.type(nameField(), 'OR CO{Enter}')
-
-    await waitFor(() => expect(writes).toHaveLength(1))
-  })
-
-  it('asks for a name before saving without one', async () => {
-    renderAnalysis('en', '/lab/analysis?range=KK')
-
-    await saveAs()
-    await userEvent.type(nameField(), '   ')
-    await confirm()
-
-    expect(within(dialog()).getByRole('alert').textContent).toBe('Name the range to save it.')
-    expect(writes).toEqual([])
-  })
-
-  it('takes names up to 60 characters', async () => {
-    renderAnalysis()
-
-    await saveAs()
-
-    expect(nameField().maxLength).toBe(60)
-  })
-
-  it('refuses a name already in use, saying which, and keeps the dialog open', async () => {
-    renderAnalysis('en', '/lab/analysis?range=KK')
-
-    await saveAs()
-    await userEvent.type(nameField(), 'or btn')
-    await confirm()
-
-    expect(await within(dialog()).findByRole('alert')).toHaveProperty('textContent', 'You already have a range called “or btn”.')
-    expect(address()).toEqual({ range: 'KK' })
-  })
-
-  it('is in Spanish too', async () => {
-    renderAnalysis('es')
-
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar como rango' }))
-
-    expect(screen.getByRole('dialog', { name: 'Guardar como un rango nuevo' })).toBeTruthy()
   })
 })
 
@@ -869,67 +796,6 @@ describe('LabAnalysisPage · selecting Categories', () => {
     const region = screen.getByRole('region', { name: 'Selección' })
     expect(region.querySelector('p')?.textContent).toBe('6,0 combos · 50,0 % de los combos vivos')
     expect(within(region).getByRole('button', { name: 'Limpiar selección' })).toBeTruthy()
-    expect(within(region).getByRole('button', { name: 'Guardar selección como rango' })).toBeTruthy()
-  })
-})
-
-describe('LabAnalysisPage · saving a selection as a Range', () => {
-  const dialog = () => screen.getByRole('dialog', { name: 'Save the selection as a new range' })
-  const nameField = () => within(dialog()).getByRole<HTMLInputElement>('textbox', { name: 'Range name' })
-  const confirm = () => userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
-  const selectAndSave = async () => {
-    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Top pair' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Save selection as range' }))
-  }
-
-  it('asks for a name, saves the selected Combos at their Frequencies and stays in the Analysis as it was', async () => {
-    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%3A0.5%2C77&source=r1&board=Kd7c4h')
-    await waitFor(() => expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR BTN'))
-
-    await selectAndSave()
-    await userEvent.type(nameField(), ' Overpairs and top pair ')
-    await confirm()
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(writes).toHaveLength(1)
-    const body = JSON.parse(writes[0].slice('POST /api/lab/ranges '.length)) as Omit<StoredRange, 'id'>
-    expect(body.name).toBe('Overpairs and top pair')
-    // KdQd holds a Board card.
-    expect(body.combos).toEqual({ ...aces, KsQs: 50, KhQh: 50, KcQc: 50 })
-    expect(window.location.pathname).toBe('/lab/analysis')
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('OR BTN')
-    expect(within(screen.getByRole('region', { name: 'Selection' })).getByRole('status').textContent).toBe(
-      'Saved as “Overpairs and top pair”.',
-    )
-    expect(
-      within(screen.getByRole('combobox', { name: 'Load a saved range' })).getByRole('option', { name: 'Overpairs and top pair' }),
-    ).toBeTruthy()
-    await waitFor(() => expect(address()).toEqual({ range: 'AA,KQs:0.5,77', source: 'r1', board: 'Kd7c4h' }))
-  })
-
-  it('follows the name rules of any Range', async () => {
-    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h')
-
-    await selectAndSave()
-    expect(nameField().maxLength).toBe(60)
-    await confirm()
-    expect(within(dialog()).getByRole('alert').textContent).toBe('Name the range to save it.')
-    await userEvent.type(nameField(), 'or btn')
-    await confirm()
-
-    expect(await within(dialog()).findByRole('alert')).toHaveProperty('textContent', 'You already have a range called “or btn”.')
-    // Only the refused one reached the server.
-    expect(writes).toHaveLength(1)
-  })
-
-  it('is in Spanish too', async () => {
-    renderAnalysis('es', '/lab/analysis?range=AA&board=Kd7c4h')
-
-    await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar selección como rango' }))
-
-    expect(screen.getByRole('dialog', { name: 'Guardar la selección como un rango nuevo' })).toBeTruthy()
   })
 })
 
@@ -967,7 +833,7 @@ describe('LabAnalysisPage · the second side', () => {
     expect(within(side('Range 1')).getByRole('heading', { level: 2 }).textContent).toBe('Unsaved range')
   })
 
-  it('is loaded, painted, pasted, cleared and saved on its own, the brush painting whichever matrix is pressed', async () => {
+  it('is loaded, painted and cleared on its own, the brush painting whichever matrix is pressed', async () => {
     renderAnalysis('en', '/lab/analysis?range=AA&range2=')
     const second = side('Range 2')
 
@@ -981,20 +847,12 @@ describe('LabAnalysisPage · the second side', () => {
     expect(pressedIn(side('Range 1'))).toEqual(['AA'])
     expect(within(side('Range 1')).queryByText('Changed')).toBeNull()
 
-    await userEvent.type(within(side('Range 1')).getByRole('textbox', { name: 'Paste a range' }), 'QQ')
-    await userEvent.click(within(side('Range 1')).getByRole('button', { name: 'Import' }))
-    expect(pressedIn(side('Range 1'))).toEqual(['QQ'])
-    await waitFor(() => expect(address()).toEqual({ range: 'QQ', range2: 'KK+', source2: 'r1' }))
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', range2: 'KK+', source2: 'r1' }))
 
     await userEvent.click(within(second).getByRole('button', { name: 'Clear' }))
     expect(pressedIn(second)).toEqual([])
-    expect(pressedIn(side('Range 1'))).toEqual(['QQ'])
-
-    await userEvent.click(within(side('Range 1')).getByRole('button', { name: 'Save as range' }))
-    await userEvent.type(screen.getByRole('textbox', { name: 'Range name' }), 'QQ only{Enter}')
-    await waitFor(() => expect(within(side('Range 1')).getByRole('heading', { level: 2 }).textContent).toBe('QQ only'))
-    expect(JSON.parse(writes[0].slice('POST /api/lab/ranges '.length))).toMatchObject({ name: 'QQ only', combos: { QsQh: 100 } })
-    expect(within(second).getByRole('heading', { level: 2 }).textContent).toBe('OR BTN')
+    expect(pressedIn(side('Range 1'))).toEqual(['AA'])
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', range2: '', source2: 'r1' }))
   })
 
   it('has its Combos removed by the Board, like the first', () => {
@@ -1061,33 +919,16 @@ describe('LabAnalysisPage · the Categories of two sides', () => {
     expect(title('Range 1', 'AA')).toBe('AA · 6 combos · 100 %')
   })
 
-  it('ask which side a selection is saved from', async () => {
-    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h')
-    await userEvent.click(row('Set'))
-    await userEvent.click(row('Overpair'))
-    await userEvent.click(screen.getByRole('button', { name: 'Save selection as range' }))
-    const dialog = screen.getByRole('dialog', { name: 'Save the selection as a new range' })
-    const choice = within(dialog).getByRole('radiogroup', { name: 'Save the combos of' })
-
-    expect(within(choice).getByRole('radio', { name: 'Range 1' }).getAttribute('aria-checked')).toBe('true')
-    await userEvent.click(within(choice).getByRole('radio', { name: 'Range 2' }))
-    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Range name' }), 'Sets{Enter}')
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(JSON.parse(writes[0].slice('POST /api/lab/ranges '.length))).toMatchObject({
-      name: 'Sets',
-      combos: { '7s7h': 100, '7s7d': 100, '7h7d': 100 },
-    })
-  })
-
   it('are in Spanish too', async () => {
     renderAnalysis('es', '/lab/analysis?range=AA&range2=KK&board=Kd7c4h')
 
     expect(screen.getByRole('region', { name: 'Rango 1' })).toBeTruthy()
     expect(within(screen.getByRole('region', { name: 'Rango 2' })).getByRole('button', { name: 'Quitar rango' })).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Overpair' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar selección como rango' }))
-    expect(screen.getByRole('radiogroup', { name: 'Guardar los combos de' })).toBeTruthy()
+    expect(Array.from(screen.getByRole('region', { name: 'Selección' }).querySelectorAll('li'), (each) => each.textContent)).toEqual([
+      'Rango 1: 6,0 combos · 100,0 % de los combos vivos',
+      'Rango 2: 0,0 combos · 0,0 % de los combos vivos',
+    ])
   })
 })
 
