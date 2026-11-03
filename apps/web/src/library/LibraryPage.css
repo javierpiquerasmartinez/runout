@@ -439,8 +439,30 @@
   cursor: pointer;
 }
 .library-table .library-table__mark {
-  width: 34px;
+  width: 70px;
   padding: 0 10px 0 0;
+  text-align: right;
+}
+/* Copying sits just before the Mark, out of sight until the row is hovered or focused, or it is in use. */
+.library-row__copy {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 2px;
+  opacity: 0;
+}
+.library-row:hover .library-row__copy,
+.library-row:focus-within .library-row__copy,
+.library-row__copy[data-open],
+.library-row__copy:has([data-copied], [data-failed]) {
+  opacity: 1;
+}
+.library-row__copy[data-open] {
+  z-index: 2;
+}
+.library-row__mark {
+  vertical-align: middle;
 }
 .library__empty-actions {
   display: flex;

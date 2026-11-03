@@ -908,6 +908,7 @@ export const es = {
   'library.marked': 'Marcadas',
   'library.markedTitle': 'Manos marcadas',
   'library.mark': 'Marcar {positions}, {hero}',
+  'library.copy': 'Copiar {positions}, {hero}',
   'library.select': 'Seleccionar {positions}, {hero}',
   'library.selectPage': 'Seleccionar todas las manos de esta página',
   'library.selected.one': '{count} seleccionada',

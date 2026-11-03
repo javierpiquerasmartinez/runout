@@ -4,6 +4,7 @@ import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { usePreferences } from '../preferences/context'
+import { CopyHandMenuButton } from '../room/CopyHand'
 import { ImportDialog } from '../room/ImportDialog'
 import { RoomDialog } from '../room/RoomDialog'
 import type { RoomSummary } from '../room/roomClient'
@@ -563,6 +564,12 @@ function HandTable({
                   </span>
                 </td>
                 <td className="library-table__mark">
+                  <CopyHandMenuButton
+                    handId={hand.id}
+                    hasHistory={hand.hasHistory}
+                    className="library-row__copy"
+                    label={t('library.copy', { positions, hero: hand.hero })}
+                  />
                   <IconButton
                     icon="mark"
                     size="compact"

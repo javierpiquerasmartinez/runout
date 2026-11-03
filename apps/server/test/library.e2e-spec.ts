@@ -110,6 +110,7 @@ describe('Importing into the Library and listing it (e2e)', () => {
       marked: false,
       tags: [],
       overview: expect.objectContaining({ finalStreet: expect.any(String) }),
+      hasHistory: true,
     });
   });
 

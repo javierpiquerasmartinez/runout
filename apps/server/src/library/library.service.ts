@@ -49,6 +49,8 @@ export interface LibraryHand {
   /** This person's Tags on it, sorted by name. Nobody else is ever told. */
   tags: Pick<Tag, 'id' | 'name'>[];
   overview: HandOverview;
+  /** Whether Runout kept its Hand History, so its "Original" can be copied. */
+  hasHistory: boolean;
 }
 
 /** One page of the Hands a filter keeps, newest first, with how many it keeps. */
@@ -180,6 +182,7 @@ export class LibraryService {
           content: hands.content,
           marked: sql<boolean>`${marked}`,
           tags: tagsOn(account.id),
+          hasHistory: sql<boolean>`${hands.handHistory} is not null`,
         })
         .from(libraryEntries)
         .innerJoin(hands, eq(hands.id, libraryEntries.handId))
@@ -195,19 +198,22 @@ export class LibraryService {
       total,
       page: number,
       pageSize: size,
-      hands: rows.map(({ id, result, content, marked, tags: handTags }) => ({
-        id,
-        site: content.site,
-        siteHandId: content.siteHandId,
-        hero: content.hero.screenName,
-        holeCards: content.hero.cards,
-        playedAt: content.playedAt,
-        stake: content.stake,
-        result,
-        marked,
-        tags: handTags,
-        overview: overview(content),
-      })),
+      hands: rows.map(
+        ({ id, result, content, marked, tags: handTags, hasHistory }) => ({
+          id,
+          site: content.site,
+          siteHandId: content.siteHandId,
+          hero: content.hero.screenName,
+          holeCards: content.hero.cards,
+          playedAt: content.playedAt,
+          stake: content.stake,
+          result,
+          marked,
+          tags: handTags,
+          overview: overview(content),
+          hasHistory,
+        }),
+      ),
       options: { ...options, tags: ownTags },
       counts,
     };
