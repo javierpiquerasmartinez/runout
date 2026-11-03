@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
+import { forgetHands } from './hand'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
@@ -93,7 +94,11 @@ export function ImportDialog({
       if (format) body.append('format', format)
     }
     api<ImportPreview>(`${importsPath(destination)}/previews`, { token, method: 'POST', body })
-      .then((preview) => dispatch({ type: 'read', key, preview }))
+      .then((preview) => {
+        // Into a Library, a duplicate can get its Original back already.
+        forgetHands()
+        dispatch({ type: 'read', key, preview })
+      })
       .catch((error: unknown) => dispatch({ type: 'failed', key, reason: reasonOf(error) }))
   }
 
@@ -150,6 +155,7 @@ export function ImportDialog({
       body: { previews: totals.previewIds },
     })
       .then(({ imported }) => {
+        forgetHands()
         onImported(imported, totals.discarded)
         onClose()
       })

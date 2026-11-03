@@ -110,6 +110,8 @@ export class ImportsService {
         result.hands,
         result.texts,
       ));
+      // A duplicate stored before Runout kept the text gets it back.
+      await this.library.fillHistories(importer, result.hands, histories);
       previews = kept.map((hand) => handPreview(hand));
     } else {
       const plan = await this.queue.planImport(

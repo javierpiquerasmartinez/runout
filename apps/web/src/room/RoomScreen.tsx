@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
+import { forgetHands } from './hand'
 import { useI18n, type MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
@@ -1216,7 +1217,10 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
         method: 'POST',
         body: { text },
       })
-        .then(({ imported, discarded }) => report({ state: 'done', imported, discarded: discarded.length }))
+        .then(({ imported, discarded }) => {
+          forgetHands()
+          report({ state: 'done', imported, discarded: discarded.length })
+        })
         .catch((error: unknown) => report({ state: 'failed', reason: reasonOf(error) }))
     }
     document.addEventListener('paste', onPaste)

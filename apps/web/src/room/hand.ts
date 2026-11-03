@@ -96,8 +96,17 @@ export interface HandWithTimeline {
   }
 }
 
-/** A Hand's content never changes, so each one is fetched once per page. */
+/**
+ * A Hand's content never changes, so each one is fetched once per page,
+ * until an import forgets them all: importing a Hand again can give it the
+ * Hand History it lacked (`hasHistory`).
+ */
 const cache = new Map<string, Promise<HandWithTimeline>>()
+
+/** After an import: the next fetch of any Hand goes to the server. */
+export function forgetHands(): void {
+  cache.clear()
+}
 
 export function fetchHand(id: string, token: string): Promise<HandWithTimeline> {
   let hand = cache.get(id)

@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
 import { hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
@@ -88,9 +88,32 @@ export async function storedIds(
 }
 
 /**
+ * Gives the stored Hands in `ids` (by key) their Hand History from
+ * `histories` (by key), when they have none. A Hand's text, once set, is
+ * never replaced: it stays the first text it was read from.
+ */
+export async function fillHistories(
+  db: Database | Transaction,
+  ids: ReadonlyMap<string, string>,
+  histories: ReadonlyMap<string, string>,
+): Promise<void> {
+  const rows = [...ids]
+    .filter(([key]) => histories.has(key))
+    .map(([key, id]) => sql`(${id}::uuid, ${histories.get(key)!})`);
+  if (rows.length === 0) return;
+  const filled = sql`filled`;
+  await db
+    .update(hands)
+    .set({ handHistory: sql`${filled}.text` })
+    .from(sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text)`)
+    .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)));
+}
+
+/**
  * Stores the Hands that aren't stored yet, with `importerId` as their
  * Importer and the Hand History in `histories` (by key) as their text, and
- * returns every Hand's id, in order.
+ * returns every Hand's id, in order. A Hand already stored without its text
+ * gets it (see `fillHistories`).
  */
 export async function storeHands(
   tx: Transaction,
@@ -101,6 +124,7 @@ export async function storeHands(
 ): Promise<string[]> {
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
+  await fillHistories(tx, ids, histories);
   const toStore = read.filter((hand) => !ids.has(keyOf(hand)));
   if (toStore.length > 0) {
     // Another import may have stored one of them a moment ago; the

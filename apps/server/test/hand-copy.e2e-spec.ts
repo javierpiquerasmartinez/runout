@@ -64,6 +64,19 @@ describe('Copying a Hand (e2e)', () => {
     return { code, socket };
   }
 
+  /** Stores the Hand without its text, as every Hand imported before Runout kept it. */
+  async function forgetHistory(handId: string): Promise<void> {
+    const db = new pg.Client(inject('databaseUrl'));
+    await db.connect();
+    try {
+      await db.query('update hands set hand_history = null where id = $1', [
+        handId,
+      ]);
+    } finally {
+      await db.end();
+    }
+  }
+
   /** The Hands of a Hand History text, each as its own block. */
   function blocksOf(text: string): string[] {
     return text
@@ -311,16 +324,7 @@ describe('Copying a Hand (e2e)', () => {
         owner.token,
         freshHandHistory('pokerstars-showdown.txt'),
       );
-      // As every Hand imported before Runout kept the text.
-      const db = new pg.Client(inject('databaseUrl'));
-      await db.connect();
-      try {
-        await db.query('update hands set hand_history = null where id = $1', [
-          handId,
-        ]);
-      } finally {
-        await db.end();
-      }
+      await forgetHistory(handId);
 
       const res = await copy(owner.token, handId, { as: 'history' }).expect(
         404,
@@ -332,6 +336,93 @@ describe('Copying a Hand (e2e)', () => {
 
       expect(res.body).toEqual({ reason: 'no-history' });
       expect(hand.body.hasHistory).toBe(false);
+    });
+
+    it('fills the text of a Hand stored without it when the same Library imports it again, still as a duplicate', async () => {
+      const owner = await newAccount(running.httpServer);
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      const handId = await importText(owner.token, text);
+      await forgetHistory(handId);
+
+      const preview = await request(running.httpServer)
+        .post('/api/library/imports/previews')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ text })
+        .expect(201);
+      const res = await copy(owner.token, handId, { as: 'history' }).expect(
+        200,
+      );
+      const hand = await request(running.httpServer)
+        .get(`/api/hands/${handId}`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .expect(200);
+
+      expect(preview.body.hands).toEqual([]);
+      expect(preview.body.discarded).toEqual([
+        { text: expect.any(String), reason: 'duplicate' },
+      ]);
+      expect(res.text).toBe(text.trim());
+      expect(hand.body.hasHistory).toBe(true);
+    });
+
+    it('fills the text of a Hand stored without it when it is imported into a Room', async () => {
+      const master = await newAccount(running.httpServer);
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      const handId = await importText(master.token, text);
+      await forgetHistory(handId);
+      const { code, socket } = await openRoom(master.token);
+
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text })
+        .expect(201);
+      const { entries } = await socket.next<{
+        entries: { handId: string }[];
+      }>('queue.entriesAdded');
+      const res = await copy(master.token, handId, { as: 'history' }).expect(
+        200,
+      );
+      const hand = await request(running.httpServer)
+        .get(`/api/hands/${handId}`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .expect(200);
+
+      expect(entries.map((entry) => entry.handId)).toEqual([handId]);
+      expect(res.text).toBe(text.trim());
+      expect(hand.body.hasHistory).toBe(true);
+    });
+
+    it('keeps the first text of a Hand when it is imported again with a different one', async () => {
+      const owner = await newAccount(running.httpServer);
+      const other = await newAccount(running.httpServer);
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      const retitled = text.replace("Table 'Yildun II'", "Table 'Yildun III'");
+      const handId = await importText(owner.token, text);
+      const { code, socket } = await openRoom(other.token);
+
+      // Into the same Library, as a duplicate.
+      await request(running.httpServer)
+        .post('/api/library/imports/previews')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ text: retitled })
+        .expect(201);
+      // Into a Room, where it is stored already.
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${other.token}`)
+        .send({ text: retitled })
+        .expect(201);
+      const { entries } = await socket.next<{
+        entries: { handId: string }[];
+      }>('queue.entriesAdded');
+      const res = await copy(owner.token, handId, { as: 'history' }).expect(
+        200,
+      );
+
+      expect(retitled).not.toBe(text);
+      expect(entries.map((entry) => entry.handId)).toEqual([handId]);
+      expect(res.text).toBe(text.trim());
     });
 
     it('refuses someone who cannot see the Hand the same way as the Hand itself', async () => {

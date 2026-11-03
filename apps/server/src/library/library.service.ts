@@ -14,7 +14,12 @@ import {
   tags,
 } from '../database/schema.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
-import { keyOf, storedIds, storeHands } from '../hands/hand-store.js';
+import {
+  fillHistories,
+  keyOf,
+  storedIds,
+  storeHands,
+} from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
@@ -311,14 +316,31 @@ export class LibraryService {
     return row;
   }
 
-  /** The keys of the Hands among `read` this Library already has. */
+  /**
+   * Gives the Hands among `read` this Library already has their Hand History
+   * from `histories` (see `historiesOf`), when they have none. Importing
+   * them again adds nothing else: they are duplicates.
+   */
+  async fillHistories(
+    account: Identity,
+    read: Hand[],
+    histories: ReadonlyMap<string, string>,
+  ): Promise<void> {
+    await fillHistories(
+      this.db,
+      await this.inLibrary(account, read),
+      histories,
+    );
+  }
+
+  /** The ids of the Hands among `read` this Library already has, by key. */
   async inLibrary(
     account: Identity,
     read: Hand[],
     db: Database | Transaction = this.db,
-  ): Promise<Set<string>> {
+  ): Promise<Map<string, string>> {
     const stored = await storedIds(db, read);
-    if (stored.size === 0) return new Set();
+    if (stored.size === 0) return new Map();
     const rows = await db
       .select({ handId: libraryEntries.handId })
       .from(libraryEntries)
@@ -329,9 +351,7 @@ export class LibraryService {
         ),
       );
     const held = new Set(rows.map((row) => row.handId));
-    return new Set(
-      [...stored].filter(([, id]) => held.has(id)).map(([key]) => key),
-    );
+    return new Map([...stored].filter(([, id]) => held.has(id)));
   }
 }
 
