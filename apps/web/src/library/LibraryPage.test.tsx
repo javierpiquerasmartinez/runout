@@ -22,6 +22,7 @@ const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryH
   marked: false,
   tags: [],
   overview: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+  hasHistory: true,
   ...overrides,
 })
 
@@ -61,6 +62,8 @@ let tagReply: () => Response
 let removeRequests: string[]
 /** What the server answers a removal with, unless the test says otherwise. */
 let removeReply: () => Response
+/** Copies, as `/api/hands/h1/copy?as=summary&language=en&timeZone=UTC`. */
+let copyRequests: string[]
 /** Hands added to a Room, as `POST /api/rooms/RNT4K9PX/library-hands {"handIds":["h1"]}`. */
 let addRequests: string[]
 /** What the server answers adding to a Room with, unless the test says otherwise. */
@@ -75,6 +78,7 @@ beforeEach(() => {
   removeRequests = []
   removeReply = () => Response.json({})
   addRequests = []
+  copyRequests = []
   addReply = () => Response.json({ added: 2 }, { status: 201 })
   results = {
     hands: 3,
@@ -90,6 +94,11 @@ beforeEach(() => {
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
+      if (url.startsWith('/api/hands/')) {
+        copyRequests.push(url)
+        const text = url.includes('as=history') ? 'PokerStars Hand #1' : 'NL10 · Hero BTN'
+        return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      }
       if (url.startsWith('/api/library/tags')) {
         tagRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
         return tagReply()
@@ -617,6 +626,95 @@ describe('LibraryPage', () => {
 
       expect(markRequests.at(-1)).toBe('DELETE /api/library/hands/h1/mark')
       await waitFor(() => expect(mark.getAttribute('aria-pressed')).toBe('false'))
+    })
+  })
+
+  describe('copying a Hand', () => {
+    let writeText: ReturnType<typeof vi.fn>
+    beforeEach(() => {
+      writeText = vi.fn(async () => {})
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    })
+
+    /** The first row, once the list is read. */
+    async function firstRow() {
+      const table = await screen.findByRole('table', { name: 'All hands' })
+      return within(table).getAllByRole('row')[1]
+    }
+
+    it('copies a Hand’s Summary from its row’s menu, without opening it', async () => {
+      renderLibrary()
+      const row = await firstRow()
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Copy BTN vs BB, iMapleAA' }))
+      await userEvent.click(within(within(row).getByRole('menu')).getByRole('menuitem', { name: 'Summary' }))
+
+      expect(writeText).toHaveBeenCalledWith('NL10 · Hero BTN')
+      expect(new URL(copyRequests[0], 'http://localhost').pathname).toBe('/api/hands/h1/copy')
+      expect(copyRequests[0]).toContain('as=summary')
+      await waitFor(() => expect(within(row).getByRole('status').textContent).toBe('Hand copied · Summary'))
+      expect(within(row).getByRole('button', { name: 'Hand copied · Summary' })).toBeTruthy()
+      expect(window.location.pathname).toBe('/library')
+      expect(within(row).queryByRole('menu')).toBeNull()
+    })
+
+    it('copies the Original from the keyboard', async () => {
+      renderLibrary()
+      const row = await firstRow()
+      const copy = within(row).getByRole('button', { name: 'Copy BTN vs BB, iMapleAA' })
+      copy.focus()
+
+      await userEvent.keyboard('{Enter}')
+      const summary = within(within(row).getByRole('menu')).getByRole('menuitem', { name: 'Summary' })
+      await waitFor(() => expect(document.activeElement).toBe(summary))
+      await userEvent.keyboard('{ArrowDown}{Enter}')
+
+      expect(writeText).toHaveBeenCalledWith('PokerStars Hand #1')
+      await waitFor(() => expect(within(row).getByRole('status').textContent).toBe('Hand copied · Original'))
+      expect(window.location.pathname).toBe('/library')
+    })
+
+    it('closes the menu on Escape, back on its button', async () => {
+      renderLibrary()
+      const row = await firstRow()
+      const copy = within(row).getByRole('button', { name: 'Copy BTN vs BB, iMapleAA' })
+      copy.focus()
+
+      await userEvent.keyboard('{ArrowDown}')
+      expect(within(row).getByRole('menu')).toBeTruthy()
+      await userEvent.keyboard('{Escape}')
+
+      expect(within(row).queryByRole('menu')).toBeNull()
+      expect(document.activeElement).toBe(copy)
+      expect(writeText).not.toHaveBeenCalled()
+    })
+
+    it('locks the Original, saying why, for a Hand Runout kept no text of', async () => {
+      pages['1'].hands[0] = { ...pages['1'].hands[0], hasHistory: false }
+      renderLibrary()
+      const row = await firstRow()
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Copy BTN vs BB, iMapleAA' }))
+      const original = within(within(row).getByRole('menu')).getByRole('menuitem', {
+        name: 'Original. Import the hand again to get the original',
+      })
+      expect(original.getAttribute('aria-disabled')).toBe('true')
+      await userEvent.click(original)
+
+      expect(writeText).not.toHaveBeenCalled()
+      expect(copyRequests).toEqual([])
+      expect(window.location.pathname).toBe('/library')
+    })
+
+    it('says so when the Hand couldn’t be copied', async () => {
+      writeText.mockRejectedValue(new Error('denied'))
+      renderLibrary()
+      const row = await firstRow()
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Copy BTN vs BB, iMapleAA' }))
+      await userEvent.click(within(within(row).getByRole('menu')).getByRole('menuitem', { name: 'Summary' }))
+
+      await waitFor(() => expect(within(row).getByRole('status').textContent).toBe('Couldn’t copy the hand'))
     })
   })
 

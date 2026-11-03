@@ -101,3 +101,20 @@
   color: var(--text-disabled);
   cursor: not-allowed;
 }
+
+/* The Library row's copy: an icon button that only opens the menu. */
+.copy-hand-menu {
+  position: relative;
+}
+.copy-hand-menu .copy-hand__menu {
+  text-align: left;
+}
+.copy-hand-menu__button {
+  color: var(--text-muted);
+}
+.copy-hand-menu__button[data-copied] {
+  color: var(--sync-ink);
+}
+.copy-hand-menu__button[data-failed] {
+  color: var(--alert-ink);
+}

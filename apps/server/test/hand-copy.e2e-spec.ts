@@ -425,6 +425,36 @@ describe('Copying a Hand (e2e)', () => {
       expect(res.text).toBe(text.trim());
     });
 
+    it('says in each Library row whether its Hand History was kept', async () => {
+      const owner = await newAccount(running.httpServer);
+      const [kept, lost] = freshHandHistory('pokerstars-session.txt').split(
+        /\n\n\n/,
+      );
+      const keptId = await importText(owner.token, kept);
+      await importText(owner.token, lost);
+      const lostId = (await libraryHands(owner.token)).find(
+        (row) => row.id !== keptId,
+      )!.id;
+      const db = new pg.Client(inject('databaseUrl'));
+      await db.connect();
+      try {
+        await db.query('update hands set hand_history = null where id = $1', [
+          lostId,
+        ]);
+      } finally {
+        await db.end();
+      }
+
+      const rows = (await libraryHands(owner.token)) as {
+        id: string;
+        hasHistory: boolean;
+      }[];
+
+      expect(
+        Object.fromEntries(rows.map((row) => [row.id, row.hasHistory])),
+      ).toEqual({ [keptId]: true, [lostId]: false });
+    });
+
     it('refuses someone who cannot see the Hand the same way as the Hand itself', async () => {
       const owner = await newAccount(running.httpServer);
       const stranger = await newAccount(running.httpServer);

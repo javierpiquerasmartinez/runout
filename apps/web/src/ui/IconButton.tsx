@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, Ref } from 'react'
 import { Icon, type IconName } from './Icon'
 import { guardLocked, lockedProps } from './locked'
 
@@ -11,6 +11,7 @@ export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'dis
   /** compact 34 · standard 44 · prominent 56 (round, brass). */
   size?: IconButtonSize
   disabledReason?: string
+  ref?: Ref<HTMLButtonElement>
 }
 
 const iconSizes: Record<IconButtonSize, number> = { compact: 16, standard: 18, prominent: 21 }

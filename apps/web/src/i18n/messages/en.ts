@@ -909,6 +909,7 @@ export const en: Messages = {
   'library.marked': 'Marked',
   'library.markedTitle': 'Marked hands',
   'library.mark': 'Mark {positions}, {hero}',
+  'library.copy': 'Copy {positions}, {hero}',
   'library.select': 'Select {positions}, {hero}',
   'library.selectPage': 'Select every hand on this page',
   'library.selected.one': '{count} selected',
