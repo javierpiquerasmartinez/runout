@@ -3,6 +3,7 @@ import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { usePreferences } from '../preferences/context'
+import { CopyHand } from '../room/CopyHand'
 import { NoteEditor } from '../room/NoteEditor'
 import { usePendingUndo } from '../room/pendingUndo'
 import { PlaybackBar } from '../room/PlaybackBar'
@@ -23,9 +24,9 @@ import '../room/RoomPage.css'
 import './LibraryHandPage.css'
 
 /**
- * A Hand opened from the Library, replayed alone: the same table, Street log
- * and Playback bar as in a Room, driven by this person only, with the Hand's
- * Notes beside it, which anyone who has the Hand may change.
+ * A Hand opened from the Library, replayed alone: the same table, Street log,
+ * Playback bar and "Copiar mano" as in a Room, driven by this person only,
+ * with the Hand's Notes beside it, which anyone who has the Hand may change.
  */
 export function LibraryHandPage({ handId }: { handId: string }) {
   const i18n = useI18n()
@@ -55,10 +56,13 @@ export function LibraryHandPage({ handId }: { handId: string }) {
     <LibraryFrame>
       <div className="library-hand">
         <main className="library-hand__stage room-stage">
-          <a href={openedFrom ?? libraryPath} className="library__back" onClick={back}>
-            <Icon name="chevron" size={14} className="library__back-icon" />
-            {t('library.back')}
-          </a>
+          <div className="library-hand__bar">
+            <a href={openedFrom ?? libraryPath} className="library__back" onClick={back}>
+              <Icon name="chevron" size={14} className="library__back-icon" />
+              {t('library.back')}
+            </a>
+            {load.state === 'loaded' && <CopyHand handId={handId} hasHistory={load.hand.hasHistory} />}
+          </div>
           {table ? (
             <>
               <div className="room-stage__play">

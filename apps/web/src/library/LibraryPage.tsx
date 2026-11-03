@@ -4,6 +4,7 @@ import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { usePreferences } from '../preferences/context'
+import { CopyHandMenuButton } from '../room/CopyHand'
 import { ImportDialog } from '../room/ImportDialog'
 import { RoomDialog } from '../room/RoomDialog'
 import type { RoomSummary } from '../room/roomClient'
@@ -385,7 +386,11 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       {importing && (
         <ImportDialog
           destination={{ kind: 'library' }}
-          onClose={() => setImporting(false)}
+          onClose={() => {
+            setImporting(false)
+            // An import that only found duplicates may still have given a Hand its Original back.
+            setRevision((n) => n + 1)
+          }}
           onImported={(imported) => {
             if (imported === 0) return
             // Back to the first page: the list is newest first by when each Hand was played.
@@ -505,7 +510,7 @@ function HandTable({
         <tbody>
           {hands.map((hand) => {
             const positions = positionsLabel(hand, i18n)
-            const pot = quantity(hand.summary.finalPot, hand.stake, displayUnit, i18n, { maximumFractionDigits: 2 })
+            const pot = quantity(hand.overview.finalPot, hand.stake, displayUnit, i18n, { maximumFractionDigits: 2 })
             const result = quantity(hand.result, hand.stake, displayUnit, i18n, {
               maximumFractionDigits: 2,
               signDisplay: 'exceptZero',
@@ -548,7 +553,7 @@ function HandTable({
                   {result.primary}
                 </td>
                 <td>
-                  <span className="library-row__street ro-mono" data-showdown={hand.summary.showdown || undefined}>
+                  <span className="library-row__street ro-mono" data-showdown={hand.overview.showdown || undefined}>
                     {streetLabel(hand, i18n)}
                   </span>
                 </td>
@@ -563,6 +568,12 @@ function HandTable({
                   </span>
                 </td>
                 <td className="library-table__mark">
+                  <CopyHandMenuButton
+                    handId={hand.id}
+                    hasHistory={hand.hasHistory}
+                    className="library-row__copy"
+                    label={t('library.copy', { positions, hero: hand.hero })}
+                  />
                   <IconButton
                     icon="mark"
                     size="compact"

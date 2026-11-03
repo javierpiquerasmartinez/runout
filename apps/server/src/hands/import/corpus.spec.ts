@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { Hand, SourceFormat } from '../hand.js';
-import { summarise } from '../replay/summary.js';
+import { overview } from '../replay/overview.js';
 import { timeline } from '../replay/timeline.js';
 import { importHandHistory, type DiscardReason } from './import.js';
 
@@ -63,6 +63,22 @@ const CORPUS: CorpusEntry[] = [
     file: 'pokerstars-all-ins.txt',
     format: 'pokerstars',
     hands: [{ siteHandId: '262140000101' }, { siteHandId: '262140000102' }],
+    discarded: [],
+  },
+  {
+    file: 'pokerstars-pot-limit.txt',
+    format: 'pokerstars',
+    hands: [
+      {
+        siteHandId: '262150000101',
+        stake: {
+          ...USD_05_10,
+          limit: 'pot-limit',
+          smallBlind: 25,
+          bigBlind: 50,
+        },
+      },
+    ],
     discarded: [],
   },
   {
@@ -349,7 +365,7 @@ describe('Hand History import: the fixture corpus', () => {
         hand.rake +
         (hand.splash ?? 0);
 
-      expect(paid).toBe(summarise(hand).finalPot);
+      expect(paid).toBe(overview(hand).finalPot);
     },
   );
 

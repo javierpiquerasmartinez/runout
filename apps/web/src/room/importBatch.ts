@@ -29,7 +29,7 @@ export function importsPath(destination: ImportDestination): string {
 }
 
 /** What the dialog shows of each Hand the server read. */
-export type HandPreview = Pick<QueueEntry, 'playedAt' | 'stake' | 'summary'> & {
+export type HandPreview = Pick<QueueEntry, 'playedAt' | 'stake' | 'overview'> & {
   /** The Hero's Screen Name, from the Hand History. */
   hero: string
   /** False when the Poker Site writes every Hero alike (`Hero`): no Screen Name can match it. */

@@ -1,9 +1,9 @@
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
 import { hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 import { heroResult } from './replay/hero-result.js';
-import { finalPot } from './replay/summary.js';
+import { finalPot } from './replay/overview.js';
 
 /*
  * Hands are stored once each (ADR 0002) and belong to no one (ADR 0004):
@@ -50,6 +50,30 @@ function rowKey(row: KeyRow): string {
   return handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat);
 }
 
+/** Hands read from Hand History text, with the Hand History each was read from, by key. */
+export interface HandsRead {
+  hands: Hand[];
+  histories: ReadonlyMap<string, string>;
+}
+
+/**
+ * The Hands with the Hand History each was read from, from texts in step
+ * with `hands` (null where it wasn't kept). A Hand read twice keeps the
+ * first text it was read from.
+ */
+export function withHistories(
+  hands: Hand[],
+  texts: readonly (string | null)[],
+): HandsRead {
+  const histories = new Map<string, string>();
+  hands.forEach((hand, index) => {
+    const text = texts[index];
+    const key = keyOf(hand);
+    if (text !== null && !histories.has(key)) histories.set(key, text);
+  });
+  return { hands, histories };
+}
+
 /** The ids of the Hands among `read` that are already stored, by key. */
 export async function storedIds(
   db: Database | Transaction,
@@ -69,17 +93,42 @@ export async function storedIds(
 }
 
 /**
+ * Gives the stored Hands in `ids` (by key) their Hand History from
+ * `histories` (by key), when they have none. A Hand's text, once set, is
+ * never replaced: it stays the first text it was read from.
+ */
+export async function fillHistories(
+  db: Database | Transaction,
+  ids: ReadonlyMap<string, string>,
+  histories: ReadonlyMap<string, string>,
+): Promise<void> {
+  const rows = [...ids]
+    .filter(([key]) => histories.has(key))
+    .map(([key, id]) => sql`(${id}::uuid, ${histories.get(key)!})`);
+  if (rows.length === 0) return;
+  const filled = sql`filled`;
+  await db
+    .update(hands)
+    .set({ handHistory: sql`${filled}.text` })
+    .from(sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text)`)
+    .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)));
+}
+
+/**
  * Stores the Hands that aren't stored yet, with `importerId` as their
- * Importer, and returns every Hand's id, in order.
+ * Importer and the Hand History each was read from as their text, and
+ * returns every Hand's id, in order. A Hand already stored without its text
+ * gets it (see `fillHistories`).
  */
 export async function storeHands(
   tx: Transaction,
   importerId: string,
-  read: Hand[],
+  { hands: read, histories }: HandsRead,
   now: Date,
 ): Promise<string[]> {
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
+  await fillHistories(tx, ids, histories);
   const toStore = read.filter((hand) => !ids.has(keyOf(hand)));
   if (toStore.length > 0) {
     // Another import may have stored one of them a moment ago; the
@@ -105,6 +154,7 @@ export async function storeHands(
             heroReachedShowdown: reachedShowdown,
             finalPot: finalPot(hand),
             content: hand,
+            handHistory: histories.get(keyOf(hand)) ?? null,
             importedAt: now,
           };
         }),

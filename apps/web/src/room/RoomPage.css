@@ -561,7 +561,10 @@
   background: var(--color-rule-strong);
 }
 
+/* Never wraps: the loader's line gives up its room first, as when Copiar mano widens. */
 .room-stage__title {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
 }

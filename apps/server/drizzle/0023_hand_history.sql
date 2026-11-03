@@ -1,0 +1,3 @@
+-- Each Hand now keeps its Hand History, the text it was read from, so it can be copied as it came in. Hands stored before stay null: there is no text to fill them from until they are imported again. Previews keep each Hand's Hand History until they are confirmed.
+ALTER TABLE "hands" ADD COLUMN "hand_history" text;--> statement-breakpoint
+ALTER TABLE "import_previews" ADD COLUMN "hand_histories" jsonb;

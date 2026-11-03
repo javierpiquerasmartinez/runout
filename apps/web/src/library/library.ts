@@ -99,7 +99,7 @@ export function roomCodeFromLibraryPath(path: string): string | null {
 }
 
 /** One Library row: what tells the spot apart at a glance. */
-export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 'stake' | 'summary'> & {
+export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 'stake' | 'overview'> & {
   id: string
   /** The Hero's Screen Name, from the Hand History. */
   hero: string
@@ -110,6 +110,8 @@ export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 
   marked: boolean
   /** This person's Tags on it, sorted by name. Nobody else is ever told. */
   tags: Pick<Tag, 'id' | 'name'>[]
+  /** Whether Runout kept its Hand History, so its "Original" can be copied. */
+  hasHistory: boolean
 }
 
 /** One of the Account's Tags, with how many Hands of its Library carry it. */

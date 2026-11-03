@@ -22,6 +22,7 @@ const hand: HandWithTimeline = {
   id: 'hand-1',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   tableSize: 6,
+  hasHistory: true,
   timeline: {
     seats: [
       { seat: 1, screenName: 'Alder239', position: 'SB', startingStack: 1136 },

@@ -83,6 +83,8 @@ export interface HandWithTimeline {
   id: string
   stake: { limit: 'no-limit' | 'pot-limit' | 'fixed-limit'; smallBlind: number; bigBlind: number; currency: string }
   tableSize: number
+  /** Whether Runout kept the Hand History the Hand was read from, to copy as its Original. */
+  hasHistory: boolean
   timeline: {
     seats: { seat: number; screenName: string; position: Position; startingStack: number }[]
     buttonSeat: number
@@ -94,8 +96,17 @@ export interface HandWithTimeline {
   }
 }
 
-/** A Hand's content never changes, so each one is fetched once per page. */
+/**
+ * A Hand's content never changes, so each one is fetched once per page,
+ * until an import forgets them all: importing a Hand again can give it the
+ * Hand History it lacked (`hasHistory`).
+ */
 const cache = new Map<string, Promise<HandWithTimeline>>()
+
+/** After an import: the next fetch of any Hand goes to the server. */
+export function forgetHands(): void {
+  cache.clear()
+}
 
 export function fetchHand(id: string, token: string): Promise<HandWithTimeline> {
   let hand = cache.get(id)

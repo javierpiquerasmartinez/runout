@@ -22,7 +22,7 @@ function hand(playedAt: string, hero = 'iMapleAA', heroMatched = false, heroName
     playedAt,
     stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
     board: [],
-    summary: { positions: ['BTN', 'BB'], finalPot: 25, finalStreet: 'preflop', showdown: false },
+    overview: { positions: ['BTN', 'BB'], finalPot: 25, finalStreet: 'preflop', showdown: false },
   }
 }
 

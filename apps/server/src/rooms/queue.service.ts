@@ -22,9 +22,16 @@ import {
   type PokerSite,
   type Stake,
 } from '../hands/hand.js';
-import { handKey, keyOf, storeHands } from '../hands/hand-store.js';
+import {
+  fillHistories,
+  handKey,
+  keyOf,
+  storeHands,
+  withHistories,
+  type HandsRead,
+} from '../hands/hand-store.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
-import { summarise, type HandSummary } from '../hands/replay/summary.js';
+import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { handSelection } from '../library/library-hand.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -50,7 +57,7 @@ export interface QueueEntry {
   siteHandId: string;
   playedAt: string;
   stake: Stake;
-  summary: HandSummary;
+  overview: HandOverview;
 }
 
 /** Who a Hand's Author would be, and whether its Hero matched their Screen Names. */
@@ -101,7 +108,12 @@ export class QueueService {
       result.texts,
     );
     const entries = await this.db.transaction((tx) =>
-      this.append(tx, room, importer, result.hands),
+      this.append(
+        tx,
+        room,
+        importer,
+        withHistories(result.hands, result.texts),
+      ),
     );
     return { room, entries, discarded: [...result.discarded, ...duplicates] };
   }
@@ -111,7 +123,8 @@ export class QueueService {
    * Queue and under which Author, and which are duplicates — already in this
    * Room's Queue, or read twice from the same text. A Hand stored from an
    * earlier Room is not imported again: the Queue Entry references it, with
-   * an Author chosen in this Room (ADR 0002).
+   * an Author chosen in this Room (ADR 0002). `inQueue` has the ids of the
+   * Hands already in this Room's Queue, by key.
    */
   async planImport(
     roomId: string,
@@ -119,15 +132,21 @@ export class QueueService {
     read: Hand[],
     texts: string[],
     db: Database | Transaction = this.db,
-  ): Promise<{ queued: Queued[]; duplicates: Discarded[] }> {
+  ): Promise<{
+    queued: Queued[];
+    duplicates: Discarded[];
+    inQueue: Map<string, string>;
+  }> {
     const stored = await this.storedHands(roomId, read, db);
     const matched = await this.attribute(roomId, importer, read, db);
     const queued: Queued[] = [];
     const duplicates: Discarded[] = [];
+    const inQueue = new Map<string, string>();
     const taken = new Set<string>();
     read.forEach((hand, index) => {
       const key = keyOf(hand);
       const known = stored.get(key);
+      if (known?.inQueue) inQueue.set(key, known.id);
       if (known?.inQueue || taken.has(key)) {
         duplicates.push({ text: texts[index], reason: 'duplicate' });
         return;
@@ -135,7 +154,7 @@ export class QueueService {
       taken.add(key);
       queued.push({ hand, ...matched[index] });
     });
-    return { queued, duplicates };
+    return { queued, duplicates, inQueue };
   }
 
   /**
@@ -246,15 +265,17 @@ export class QueueService {
   }
 
   /**
-   * Stores the Hands that aren't stored yet, and appends a Queue Entry for
-   * each Hand that isn't in the Queue, under the Author chosen for it, inside
-   * the caller's transaction. Returns the new Queue Entries, in Queue order.
+   * Stores the Hands that aren't stored yet, with the Hand History each was
+   * read from, and appends a Queue Entry for each Hand that isn't in the
+   * Queue, under the Author chosen for it, inside the caller's transaction.
+   * A Hand already in the Queue without its text gets it. Returns the new
+   * Queue Entries, in Queue order.
    */
   async append(
     tx: Transaction,
     room: Room,
     importer: Identity,
-    read: Hand[],
+    { hands: read, histories }: HandsRead,
   ): Promise<QueueEntry[]> {
     if (read.length === 0) return [];
     const now = this.clock.now();
@@ -262,13 +283,20 @@ export class QueueService {
     await this.lockRoom(tx, room.id);
     // Read again inside the transaction: Screen Names, and the Queue itself,
     // may have moved on since the import was previewed.
-    const { queued } = await this.planImport(room.id, importer, read, [], tx);
+    const { queued, inQueue } = await this.planImport(
+      room.id,
+      importer,
+      read,
+      [],
+      tx,
+    );
+    await fillHistories(tx, inQueue, histories);
     if (queued.length === 0) return [];
 
     const handIds = await storeHands(
       tx,
       importer.id,
-      queued.map(({ hand }) => hand),
+      { hands: queued.map(({ hand }) => hand), histories },
       now,
     );
     return this.insertEntries(
@@ -685,6 +713,6 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
     siteHandId: row.content.siteHandId,
     playedAt: row.content.playedAt,
     stake: row.content.stake,
-    summary: summarise(row.content),
+    overview: overview(row.content),
   };
 }

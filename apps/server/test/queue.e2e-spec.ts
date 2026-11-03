@@ -18,7 +18,7 @@ interface QueueEntry {
     bigBlind: number;
     currency: string;
   };
-  summary: {
+  overview: {
     positions: string[];
     finalPot: number;
     finalStreet: string;
@@ -68,7 +68,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     return token ? req.set('Authorization', `Bearer ${token}`) : req;
   }
 
-  it('broadcasts a pasted Hand to every Participant, Importer included, with its summary', async () => {
+  it('broadcasts a pasted Hand to every Participant, Importer included, with its overview', async () => {
     const master = await newAccount(running.httpServer);
     const guest = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
@@ -98,7 +98,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
           bigBlind: 10,
           currency: 'EUR',
         },
-        summary: {
+        overview: {
           positions: ['BTN', 'BB'],
           finalPot: 105,
           finalStreet: 'river',

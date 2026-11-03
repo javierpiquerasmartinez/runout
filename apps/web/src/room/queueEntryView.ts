@@ -10,18 +10,18 @@ import type { QueueEntry } from './roomClient'
  */
 
 /** The parts of a Queue Entry these labels read. */
-type Described = Pick<QueueEntry, 'playedAt' | 'stake' | 'summary'>
+type Described = Pick<QueueEntry, 'playedAt' | 'stake' | 'overview'>
 
 /** The Positions involved, against each other: "BTN vs CO". */
 export function positionsLabel(entry: Described, { t }: Translator): string {
-  return entry.summary.positions.join(t('room.versus'))
+  return entry.overview.positions.join(t('room.versus'))
 }
 
 /** The Final Street badge; a Hand that went to Showdown says so instead. */
 export function streetLabel(entry: Described, { t }: Translator): string {
-  return entry.summary.showdown
+  return entry.overview.showdown
     ? t('room.queue.street.showdown')
-    : t(`room.queue.street.${entry.summary.finalStreet}`)
+    : t(`room.queue.street.${entry.overview.finalStreet}`)
 }
 
 const LIMIT_PREFIX = { 'no-limit': 'NL', 'pot-limit': 'PL', 'fixed-limit': 'FL' } as const
@@ -47,7 +47,7 @@ export function potSecondaryLabel(entry: Described, i18n: Translator, unit: Disp
 }
 
 function finalPot(entry: Described, i18n: Translator, unit: DisplayUnit): Quantity {
-  return quantity(entry.summary.finalPot, entry.stake, unit, i18n, { maximumFractionDigits: 2 })
+  return quantity(entry.overview.finalPot, entry.stake, unit, i18n, { maximumFractionDigits: 2 })
 }
 
 /** An instant, date and time in the UI language: "18 sept · 12:34". */

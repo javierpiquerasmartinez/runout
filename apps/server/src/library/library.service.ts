@@ -14,9 +14,14 @@ import {
   tags,
 } from '../database/schema.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
-import { keyOf, storedIds, storeHands } from '../hands/hand-store.js';
+import {
+  keyOf,
+  storedIds,
+  storeHands,
+  type HandsRead,
+} from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
-import { summarise, type HandSummary } from '../hands/replay/summary.js';
+import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { handSelection, requireInLibrary } from './library-hand.js';
@@ -48,7 +53,9 @@ export interface LibraryHand {
   marked: boolean;
   /** This person's Tags on it, sorted by name. Nobody else is ever told. */
   tags: Pick<Tag, 'id' | 'name'>[];
-  summary: HandSummary;
+  overview: HandOverview;
+  /** Whether Runout kept its Hand History, so its "Original" can be copied. */
+  hasHistory: boolean;
 }
 
 /** One page of the Hands a filter keeps, newest first, with how many it keeps. */
@@ -124,18 +131,24 @@ export class LibraryService {
 
   /**
    * Adds the Hands to the Library inside the caller's transaction, storing
-   * those nobody has imported before. Returns the ids of the Hands added:
-   * one added since it was previewed is skipped.
+   * those nobody has imported before with the Hand History each was read
+   * from. Returns the ids of the Hands added: one added since it was
+   * previewed is skipped.
    */
   async add(
     tx: Transaction,
     account: Identity,
-    read: Hand[],
+    { hands: read, histories }: HandsRead,
   ): Promise<string[]> {
     const { kept } = await this.planImport(account, read, [], tx);
     if (kept.length === 0) return [];
     const now = this.clock.now();
-    const handIds = await storeHands(tx, account.id, kept, now);
+    const handIds = await storeHands(
+      tx,
+      account.id,
+      { hands: kept, histories },
+      now,
+    );
     const added = await tx
       .insert(libraryEntries)
       .values(
@@ -178,6 +191,7 @@ export class LibraryService {
           content: hands.content,
           marked: sql<boolean>`${marked}`,
           tags: tagsOn(account.id),
+          hasHistory: sql<boolean>`${hands.handHistory} is not null`,
         })
         .from(libraryEntries)
         .innerJoin(hands, eq(hands.id, libraryEntries.handId))
@@ -193,19 +207,22 @@ export class LibraryService {
       total,
       page: number,
       pageSize: size,
-      hands: rows.map(({ id, result, content, marked, tags: handTags }) => ({
-        id,
-        site: content.site,
-        siteHandId: content.siteHandId,
-        hero: content.hero.screenName,
-        holeCards: content.hero.cards,
-        playedAt: content.playedAt,
-        stake: content.stake,
-        result,
-        marked,
-        tags: handTags,
-        summary: summarise(content),
-      })),
+      hands: rows.map(
+        ({ id, result, content, marked, tags: handTags, hasHistory }) => ({
+          id,
+          site: content.site,
+          siteHandId: content.siteHandId,
+          hero: content.hero.screenName,
+          holeCards: content.hero.cards,
+          playedAt: content.playedAt,
+          stake: content.stake,
+          result,
+          marked,
+          tags: handTags,
+          overview: overview(content),
+          hasHistory,
+        }),
+      ),
       options: { ...options, tags: ownTags },
       counts,
     };
@@ -309,14 +326,14 @@ export class LibraryService {
     return row;
   }
 
-  /** The keys of the Hands among `read` this Library already has. */
+  /** The ids of the Hands among `read` this Library already has, by key. */
   async inLibrary(
     account: Identity,
     read: Hand[],
     db: Database | Transaction = this.db,
-  ): Promise<Set<string>> {
+  ): Promise<Map<string, string>> {
     const stored = await storedIds(db, read);
-    if (stored.size === 0) return new Set();
+    if (stored.size === 0) return new Map();
     const rows = await db
       .select({ handId: libraryEntries.handId })
       .from(libraryEntries)
@@ -327,9 +344,7 @@ export class LibraryService {
         ),
       );
     const held = new Set(rows.map((row) => row.handId));
-    return new Set(
-      [...stored].filter(([, id]) => held.has(id)).map(([key]) => key),
-    );
+    return new Map([...stored].filter(([, id]) => held.has(id)));
   }
 }
 

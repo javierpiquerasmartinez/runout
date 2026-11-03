@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { importHandHistory } from '../import/import.js';
-import { summarise } from './summary.js';
+import { overview } from './overview.js';
 
 function hands(name: string) {
   const text = readFileSync(
@@ -10,12 +10,12 @@ function hands(name: string) {
   return importHandHistory(text).hands;
 }
 
-describe('Replay: a Hand’s summary', () => {
+describe('Replay: a Hand’s overview', () => {
   // Final pots are the "Total pot" each Hand History states in its summary.
-  it('summarises a Hand that went to Showdown on the river', () => {
+  it('gives the overview of a Hand that went to Showdown on the river', () => {
     const [hand] = hands('pokerstars-showdown.txt');
 
-    expect(summarise(hand)).toEqual({
+    expect(overview(hand)).toEqual({
       positions: ['BTN', 'BB'],
       finalPot: 105,
       finalStreet: 'river',
@@ -23,8 +23,8 @@ describe('Replay: a Hand’s summary', () => {
     });
   });
 
-  it('summarises each Hand of an export, net of uncalled bets handed back', () => {
-    expect(hands('pokerstars-session.txt').map(summarise)).toEqual([
+  it('gives the overview of each Hand of an export, net of uncalled bets handed back', () => {
+    expect(hands('pokerstars-session.txt').map(overview)).toEqual([
       // Sitting-out seats aren't dealt in, so this 5-seat table plays 4-handed.
       {
         positions: ['BTN'],

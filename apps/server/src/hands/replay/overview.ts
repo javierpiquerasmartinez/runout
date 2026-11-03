@@ -1,7 +1,7 @@
 import type { Hand, Street } from '../hand.js';
 import { positions, type Position } from './positions.js';
 
-export interface HandSummary {
+export interface HandOverview {
   /** Who took part: the Hero first if they did, then in preflop acting order. */
   positions: Position[];
   /** Everything in the pot, before rake and with any Splash, as an Amount. */
@@ -17,7 +17,7 @@ const STREET_BY_BOARD_SIZE: Record<number, Street> = {
   5: 'river',
 };
 
-export function summarise(hand: Hand): HandSummary {
+export function overview(hand: Hand): HandOverview {
   return {
     positions: positionsInvolved(hand),
     finalPot: finalPot(hand),

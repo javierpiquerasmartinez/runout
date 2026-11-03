@@ -15,6 +15,8 @@ import { Secondary } from '../ui/Secondary'
 import { usePreferences } from '../preferences/context'
 import { followLink, navigate } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
+import { CopyHand } from './CopyHand'
+import { forgetHands } from './hand'
 import { ImportDialog } from './ImportDialog'
 import {
   authoredCount,
@@ -64,10 +66,10 @@ type RoomDecision =
 
 function matchesFilters(entry: QueueEntry, filters: QueueFilters): boolean {
   if (filters.author && entry.author.identityId !== filters.author) return false
-  if (filters.position && !entry.summary.positions.includes(filters.position)) return false
-  if (filters.finalStreet && entry.summary.finalStreet !== filters.finalStreet) return false
-  if (filters.showdown === 'yes' && !entry.summary.showdown) return false
-  if (filters.showdown === 'no' && entry.summary.showdown) return false
+  if (filters.position && !entry.overview.positions.includes(filters.position)) return false
+  if (filters.finalStreet && entry.overview.finalStreet !== filters.finalStreet) return false
+  if (filters.showdown === 'yes' && !entry.overview.showdown) return false
+  if (filters.showdown === 'no' && entry.overview.showdown) return false
   return true
 }
 
@@ -403,7 +405,7 @@ function QueuePanel({
     return [...byId.values()]
   }, [view.queue])
   const positions = useMemo(
-    () => [...new Set(view.queue.flatMap((entry) => entry.summary.positions))].sort(),
+    () => [...new Set(view.queue.flatMap((entry) => entry.overview.positions))].sort(),
     [view.queue],
   )
   const streets = ['preflop', 'flop', 'turn', 'river'] as const
@@ -712,6 +714,8 @@ function LoadedHand({
               {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
             </span>
             <span className="room-stage__spacer" />
+            {/* Any Participant copies the Hand, without asking the Master. */}
+            <CopyHand handId={handId} hasHistory={load.state === 'loaded' ? load.hand.hasHistory : undefined} />
             {/* Both "Sala" boards draw these two at the right of this row. */}
             <Button
               variant="ghost"
@@ -1213,7 +1217,10 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
         method: 'POST',
         body: { text },
       })
-        .then(({ imported, discarded }) => report({ state: 'done', imported, discarded: discarded.length }))
+        .then(({ imported, discarded }) => {
+          forgetHands()
+          report({ state: 'done', imported, discarded: discarded.length })
+        })
         .catch((error: unknown) => report({ state: 'failed', reason: reasonOf(error) }))
     }
     document.addEventListener('paste', onPaste)

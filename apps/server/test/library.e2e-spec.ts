@@ -24,7 +24,7 @@ interface LibraryPage {
     stake: { bigBlind: number; currency: string };
     /** The Hero's Result, as an Amount. */
     result: number;
-    summary: {
+    overview: {
       positions: string[];
       finalPot: number;
       finalStreet: string;
@@ -109,7 +109,8 @@ describe('Importing into the Library and listing it (e2e)', () => {
       result: expect.any(Number),
       marked: false,
       tags: [],
-      summary: expect.objectContaining({ finalStreet: expect.any(String) }),
+      overview: expect.objectContaining({ finalStreet: expect.any(String) }),
+      hasHistory: true,
     });
   });
 

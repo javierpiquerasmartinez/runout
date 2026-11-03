@@ -9,6 +9,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
+import { forgetHands } from './hand'
 import {
   batchHands,
   batchTotals,
@@ -93,7 +94,11 @@ export function ImportDialog({
       if (format) body.append('format', format)
     }
     api<ImportPreview>(`${importsPath(destination)}/previews`, { token, method: 'POST', body })
-      .then((preview) => dispatch({ type: 'read', key, preview }))
+      .then((preview) => {
+        // Into a Library, a duplicate can get its Original back already.
+        forgetHands()
+        dispatch({ type: 'read', key, preview })
+      })
       .catch((error: unknown) => dispatch({ type: 'failed', key, reason: reasonOf(error) }))
   }
 
@@ -150,6 +155,7 @@ export function ImportDialog({
       body: { previews: totals.previewIds },
     })
       .then(({ imported }) => {
+        forgetHands()
         onImported(imported, totals.discarded)
         onClose()
       })

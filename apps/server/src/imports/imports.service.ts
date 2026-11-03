@@ -14,14 +14,19 @@ import {
   type SourceFormat,
   type Stake,
 } from '../hands/hand.js';
-import { keyOf } from '../hands/hand-store.js';
+import {
+  fillHistories,
+  keyOf,
+  withHistories,
+  type HandsRead,
+} from '../hands/hand-store.js';
 import {
   importHandHistory,
   SOURCE_FORMATS,
   type Discarded,
 } from '../hands/import/import.js';
 import { readUpload, UnreadableUpload } from '../hands/import/upload.js';
-import { summarise, type HandSummary } from '../hands/replay/summary.js';
+import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -44,7 +49,7 @@ export interface HandPreview extends Partial<Attribution> {
   playedAt: string;
   stake: Stake;
   board: string[];
-  summary: HandSummary;
+  overview: HandOverview;
   /** Into a Room only: whether the Hand is in the Importer's Library, so confirming queues that Library Hand. */
   inLibrary?: boolean;
 }
@@ -100,15 +105,20 @@ export class ImportsService {
     const roomId = (await this.roomOf(importer, destination))?.id ?? null;
     const picked = pickedFormat(format);
     const result = importHandHistory(textOf(source), { format: picked });
+    const { histories } = withHistories(result.hands, result.texts);
     let kept: Hand[];
     let previews: HandPreview[];
     let duplicates: Discarded[];
+    // A duplicate stored before Runout kept the text gets it back, here:
+    // it never reaches the confirm.
     if (roomId === null) {
       ({ kept, duplicates } = await this.library.planImport(
         importer,
         result.hands,
         result.texts,
       ));
+      const inLibrary = await this.library.inLibrary(importer, result.hands);
+      await fillHistories(this.db, inLibrary, histories);
       previews = kept.map((hand) => handPreview(hand));
     } else {
       const plan = await this.queue.planImport(
@@ -117,6 +127,7 @@ export class ImportsService {
         result.hands,
         result.texts,
       );
+      await fillHistories(this.db, plan.inQueue, histories);
       kept = plan.queued.map(({ hand }) => hand);
       const inLibrary = await this.library.inLibrary(importer, kept);
       previews = plan.queued.map(({ hand, author, heroMatched }) => ({
@@ -136,6 +147,7 @@ export class ImportsService {
         roomId,
         importerId: importer.id,
         hands: kept,
+        handHistories: kept.map((hand) => histories.get(keyOf(hand))!),
         createdAt: this.clock.now(),
       })
       .returning({ id: importPreviews.id });
@@ -188,7 +200,8 @@ export class ImportsService {
   }
 
   /**
-   * Deletes the previews and returns their Hands, in the order of `ids`.
+   * Deletes the previews and returns their Hands, in the order of `ids`,
+   * with the Hand History each was read from.
    * Refuses with `preview-not-found` if any of them is not the Importer's,
    * not for this destination (`null` for their Library), already confirmed
    * or forgotten.
@@ -198,7 +211,7 @@ export class ImportsService {
     importer: Identity,
     room: Room | null,
     ids: string[],
-  ): Promise<Hand[]> {
+  ): Promise<HandsRead> {
     const taken = await tx
       .delete(importPreviews)
       .where(
@@ -214,10 +227,21 @@ export class ImportsService {
           gte(importPreviews.createdAt, this.oldestKept()),
         ),
       )
-      .returning({ id: importPreviews.id, hands: importPreviews.hands });
+      .returning({
+        id: importPreviews.id,
+        hands: importPreviews.hands,
+        handHistories: importPreviews.handHistories,
+      });
     if (taken.length !== ids.length) throw new Rejected('preview-not-found');
-    const handsOf = new Map(taken.map((row) => [row.id, row.hands]));
-    return ids.flatMap((id) => handsOf.get(id)!);
+    const byId = new Map(taken.map((row) => [row.id, row]));
+    const previews = ids.map((id) => byId.get(id)!);
+    // A preview made before Hand Histories were kept has none: its Hands go without.
+    return withHistories(
+      previews.flatMap((preview) => preview.hands),
+      previews.flatMap(
+        (preview) => preview.handHistories ?? preview.hands.map(() => null),
+      ),
+    );
   }
 
   /** The open Room an import goes into, once the Importer is known to be in it; null for the Library. */
@@ -276,6 +300,6 @@ function handPreview(hand: Hand, attribution?: Attribution): HandPreview {
     playedAt: hand.playedAt,
     stake: hand.stake,
     board: hand.board,
-    summary: summarise(hand),
+    overview: overview(hand),
   };
 }

@@ -45,7 +45,7 @@ export interface QueueEntry {
     bigBlind: number
     currency: string
   }
-  summary: {
+  overview: {
     positions: string[]
     finalPot: number
     finalStreet: 'preflop' | 'flop' | 'turn' | 'river'
