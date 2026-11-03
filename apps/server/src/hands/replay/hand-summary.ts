@@ -10,35 +10,32 @@ export const SUMMARY_LANGUAGES: readonly SummaryLanguage[] = ['es', 'en'];
 
 /**
  * The Summary's own few words, and the locale its numbers, money and date
- * are written in. Poker verbs, Positions and "Hero" are never translated.
+ * are written in. Poker verbs, Streets, Positions, "Showdown" and "Hero"
+ * are never translated.
  */
 const WORDS: Record<
   SummaryLanguage,
-  {
-    locale: string;
-    streets: Record<Street, string>;
-    showdown: string;
-    shows: string;
-    wins: string;
-    result: string;
-  }
+  { locale: string; shows: string; wins: string; result: string }
 > = {
   es: {
     locale: 'es-ES',
-    streets: { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' },
-    showdown: 'Showdown',
     shows: 'muestra',
     wins: 'gana',
     result: 'Resultado Hero',
   },
   en: {
     locale: 'en-US',
-    streets: { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' },
-    showdown: 'Showdown',
     shows: 'shows',
     wins: 'wins',
     result: 'Hero result',
   },
+};
+
+const STREET_NAMES: Record<Street, string> = {
+  preflop: 'Preflop',
+  flop: 'Flop',
+  turn: 'Turn',
+  river: 'River',
 };
 
 const SITE_NAMES: Record<PokerSite, string> = {
@@ -79,6 +76,7 @@ export function handSummary(
   const words = WORDS[language];
   const number = new Intl.NumberFormat(words.locale, {
     maximumFractionDigits: 2,
+    useGrouping: false,
   });
   const bb = (amount: number, sign = false) =>
     `${sign && amount > 0 ? '+' : ''}${number.format(amount / hand.stake.bigBlind)}bb`;
@@ -112,7 +110,7 @@ export function handSummary(
     (street) => BOARD_SIZE[street] <= hand.board.length,
   )) {
     const items = streetActions(hand, street, actor, bb);
-    let line = words.streets[street];
+    let line = STREET_NAMES[street];
     if (street !== 'preflop') {
       // The deal of a Street: the pot as it begins, bets gathered.
       const dealt = replay.states.find(
@@ -139,6 +137,7 @@ export function handSummary(
     .join(', ');
   const rake = hand.rake > 0 ? ` (rake ${bb(hand.rake)})` : '';
   const shown = result.revealed
+    // The Hero's own cards are already on the Hero line.
     .filter((revealed) => revealed.screenName !== hero)
     .map(
       (revealed) =>
@@ -146,7 +145,7 @@ export function handSummary(
     );
   lines.push(
     hand.showdown
-      ? `${words.showdown}: ${[...(shown.length > 0 ? [shown.join(', ')] : []), winners + rake].join(' · ')}`
+      ? `Showdown: ${[...(shown.length > 0 ? [shown.join(', ')] : []), winners + rake].join(' · ')}`
       : winners + rake,
   );
   lines.push(`${words.result}: ${bb(heroResult(hand).result, true)}`);
@@ -154,9 +153,9 @@ export function handSummary(
 }
 
 /**
- * Each Action of a Street, in order: who, a verb, and what a bet or raise
- * is to on the Street. Preflop, a straddle comes first, and re-raises count
- * from the big blind as the first bet: raise, 3bet, 4bet…
+ * Each Action of a Street, in order, after a straddle post preflop: who, a
+ * verb, and what a bet or raise is to on the Street. Preflop, re-raises
+ * count from the big blind as the first bet: raise, 3bet, 4bet…
  */
 function streetActions(
   hand: Hand,
@@ -185,28 +184,32 @@ function streetActions(
   }
   for (const action of hand.actions.filter((a) => a.street === street)) {
     const who = actor(action.screenName);
-    const to =
-      action.type === 'raise'
-        ? action.to
-        : action.type === 'call' || action.type === 'bet'
-          ? bet(action.screenName) + action.amount
-          : null;
-    if (to === null) {
-      items.push(`${who} ${action.type}`);
-      continue;
+    let to: number;
+    let said: string;
+    switch (action.type) {
+      case 'fold':
+      case 'check':
+        items.push(`${who} ${action.type}`);
+        continue;
+      case 'call':
+        to = bet(action.screenName) + action.amount;
+        said = 'call';
+        break;
+      case 'bet':
+        to = bet(action.screenName) + action.amount;
+        said = `bet ${bb(to)}`;
+        break;
+      case 'raise': {
+        to = action.to;
+        level += 1;
+        const verb =
+          street === 'preflop' && level > 2 ? `${level}bet` : 'raise';
+        said = `${verb} ${bb(to)}`;
+        break;
+      }
     }
     bets.set(action.screenName, to);
-    if (action.type === 'raise') level += 1;
-    if (action.allIn) {
-      items.push(`${who} all-in ${bb(to)}`);
-    } else if (action.type === 'call') {
-      items.push(`${who} call`);
-    } else if (action.type === 'bet') {
-      items.push(`${who} bet ${bb(to)}`);
-    } else {
-      const verb = street === 'preflop' && level > 2 ? `${level}bet` : 'raise';
-      items.push(`${who} ${verb} ${bb(to)}`);
-    }
+    items.push(`${who} ${action.allIn ? `all-in ${bb(to)}` : said}`);
   }
   return items;
 }

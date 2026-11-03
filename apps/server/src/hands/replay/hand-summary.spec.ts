@@ -307,4 +307,22 @@ describe('Replay: a Hand Summary of an unusual Hand', () => {
       )[0],
     ).toBe('PokerStars · FL50 ($0.25/$0.50) · 6-max · 09/15/2026');
   });
+
+  it('writes big amounts in big blinds without grouping thousands, in both languages', () => {
+    // No fixture has a stack this deep.
+    const [showdown] = hands('pokerstars-showdown.txt');
+    const deep = {
+      ...showdown,
+      seats: showdown.seats.map((seat) => ({
+        ...seat,
+        startingStack: seat.startingStack * 1000,
+      })),
+    };
+
+    for (const language of ['es', 'en'] as const) {
+      expect(
+        handSummary(deep, { language, timeZone: madrid }).split('\n')[1],
+      ).toBe('Hero BTN 100000bb · J♠ 8♠');
+    }
+  });
 });
