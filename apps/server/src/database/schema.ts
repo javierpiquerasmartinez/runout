@@ -272,8 +272,8 @@ export const importPreviews = pgTable(
       .notNull()
       .references(() => identities.id),
     hands: jsonb('hands').$type<Hand[]>().notNull(),
-    /** The text each Hand was read from, in the order of `hands`; null for previews made before it was kept. */
-    texts: jsonb('texts').$type<string[]>(),
+    /** The Hand History each Hand was read from, in the order of `hands`; null for previews made before it was kept. */
+    handHistories: jsonb('hand_histories').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   },
   (table) => [

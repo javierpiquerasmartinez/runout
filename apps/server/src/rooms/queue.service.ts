@@ -23,10 +23,12 @@ import {
   type Stake,
 } from '../hands/hand.js';
 import {
+  fillHistories,
   handKey,
-  historiesOf,
   keyOf,
   storeHands,
+  withHistories,
+  type HandsRead,
 } from '../hands/hand-store.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
@@ -110,8 +112,7 @@ export class QueueService {
         tx,
         room,
         importer,
-        result.hands,
-        historiesOf(result.hands, result.texts),
+        withHistories(result.hands, result.texts),
       ),
     );
     return { room, entries, discarded: [...result.discarded, ...duplicates] };
@@ -122,7 +123,8 @@ export class QueueService {
    * Queue and under which Author, and which are duplicates — already in this
    * Room's Queue, or read twice from the same text. A Hand stored from an
    * earlier Room is not imported again: the Queue Entry references it, with
-   * an Author chosen in this Room (ADR 0002).
+   * an Author chosen in this Room (ADR 0002). `inQueue` has the ids of the
+   * Hands already in this Room's Queue, by key.
    */
   async planImport(
     roomId: string,
@@ -130,15 +132,21 @@ export class QueueService {
     read: Hand[],
     texts: string[],
     db: Database | Transaction = this.db,
-  ): Promise<{ queued: Queued[]; duplicates: Discarded[] }> {
+  ): Promise<{
+    queued: Queued[];
+    duplicates: Discarded[];
+    inQueue: Map<string, string>;
+  }> {
     const stored = await this.storedHands(roomId, read, db);
     const matched = await this.attribute(roomId, importer, read, db);
     const queued: Queued[] = [];
     const duplicates: Discarded[] = [];
+    const inQueue = new Map<string, string>();
     const taken = new Set<string>();
     read.forEach((hand, index) => {
       const key = keyOf(hand);
       const known = stored.get(key);
+      if (known?.inQueue) inQueue.set(key, known.id);
       if (known?.inQueue || taken.has(key)) {
         duplicates.push({ text: texts[index], reason: 'duplicate' });
         return;
@@ -146,7 +154,7 @@ export class QueueService {
       taken.add(key);
       queued.push({ hand, ...matched[index] });
     });
-    return { queued, duplicates };
+    return { queued, duplicates, inQueue };
   }
 
   /**
@@ -257,17 +265,17 @@ export class QueueService {
   }
 
   /**
-   * Stores the Hands that aren't stored yet, with their Hand History from
-   * `histories` (see `historiesOf`), and appends a Queue Entry for each Hand
-   * that isn't in the Queue, under the Author chosen for it, inside the
-   * caller's transaction. Returns the new Queue Entries, in Queue order.
+   * Stores the Hands that aren't stored yet, with the Hand History each was
+   * read from, and appends a Queue Entry for each Hand that isn't in the
+   * Queue, under the Author chosen for it, inside the caller's transaction.
+   * A Hand already in the Queue without its text gets it. Returns the new
+   * Queue Entries, in Queue order.
    */
   async append(
     tx: Transaction,
     room: Room,
     importer: Identity,
-    read: Hand[],
-    histories: ReadonlyMap<string, string> = new Map(),
+    { hands: read, histories }: HandsRead,
   ): Promise<QueueEntry[]> {
     if (read.length === 0) return [];
     const now = this.clock.now();
@@ -275,15 +283,21 @@ export class QueueService {
     await this.lockRoom(tx, room.id);
     // Read again inside the transaction: Screen Names, and the Queue itself,
     // may have moved on since the import was previewed.
-    const { queued } = await this.planImport(room.id, importer, read, [], tx);
+    const { queued, inQueue } = await this.planImport(
+      room.id,
+      importer,
+      read,
+      [],
+      tx,
+    );
+    await fillHistories(tx, inQueue, histories);
     if (queued.length === 0) return [];
 
     const handIds = await storeHands(
       tx,
       importer.id,
-      queued.map(({ hand }) => hand),
+      { hands: queued.map(({ hand }) => hand), histories },
       now,
-      histories,
     );
     return this.insertEntries(
       tx,

@@ -15,10 +15,10 @@ import {
 } from '../database/schema.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
 import {
-  fillHistories,
   keyOf,
   storedIds,
   storeHands,
+  type HandsRead,
 } from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
@@ -131,20 +131,24 @@ export class LibraryService {
 
   /**
    * Adds the Hands to the Library inside the caller's transaction, storing
-   * those nobody has imported before with their Hand History from
-   * `histories` (see `historiesOf`). Returns the ids of the Hands added:
-   * one added since it was previewed is skipped.
+   * those nobody has imported before with the Hand History each was read
+   * from. Returns the ids of the Hands added: one added since it was
+   * previewed is skipped.
    */
   async add(
     tx: Transaction,
     account: Identity,
-    read: Hand[],
-    histories: ReadonlyMap<string, string> = new Map(),
+    { hands: read, histories }: HandsRead,
   ): Promise<string[]> {
     const { kept } = await this.planImport(account, read, [], tx);
     if (kept.length === 0) return [];
     const now = this.clock.now();
-    const handIds = await storeHands(tx, account.id, kept, now, histories);
+    const handIds = await storeHands(
+      tx,
+      account.id,
+      { hands: kept, histories },
+      now,
+    );
     const added = await tx
       .insert(libraryEntries)
       .values(
@@ -320,23 +324,6 @@ export class LibraryService {
       .innerJoin(hands, eq(hands.id, libraryEntries.handId))
       .where(eq(libraryEntries.identityId, account.id));
     return row;
-  }
-
-  /**
-   * Gives the Hands among `read` this Library already has their Hand History
-   * from `histories` (see `historiesOf`), when they have none. Importing
-   * them again adds nothing else: they are duplicates.
-   */
-  async fillHistories(
-    account: Identity,
-    read: Hand[],
-    histories: ReadonlyMap<string, string>,
-  ): Promise<void> {
-    await fillHistories(
-      this.db,
-      await this.inLibrary(account, read),
-      histories,
-    );
   }
 
   /** The ids of the Hands among `read` this Library already has, by key. */

@@ -393,6 +393,67 @@ describe('Copying a Hand (e2e)', () => {
       expect(hand.body.hasHistory).toBe(true);
     });
 
+    it('fills the text of a Hand stored without it when it is pasted again into the Room whose Queue has it, still as a duplicate', async () => {
+      const master = await newAccount(running.httpServer);
+      const { code, socket } = await openRoom(master.token);
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text })
+        .expect(201);
+      const { entries } = await socket.next<{
+        entries: { handId: string }[];
+      }>('queue.entriesAdded');
+      const handId = entries[0].handId;
+      await forgetHistory(handId);
+
+      const again = await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text })
+        .expect(201);
+      const res = await copy(master.token, handId, { as: 'history' }).expect(
+        200,
+      );
+
+      expect(again.body.discarded).toEqual([
+        { text: expect.any(String), reason: 'duplicate' },
+      ]);
+      expect(res.text).toBe(text.trim());
+    });
+
+    it('fills the text of a Hand stored without it when a preview into the Room whose Queue has it finds it a duplicate', async () => {
+      const master = await newAccount(running.httpServer);
+      const { code, socket } = await openRoom(master.token);
+      const text = freshHandHistory('pokerstars-showdown.txt');
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text })
+        .expect(201);
+      const { entries } = await socket.next<{
+        entries: { handId: string }[];
+      }>('queue.entriesAdded');
+      const handId = entries[0].handId;
+      await forgetHistory(handId);
+
+      const preview = await request(running.httpServer)
+        .post(`/api/rooms/${code}/imports/previews`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text })
+        .expect(201);
+      const res = await copy(master.token, handId, { as: 'history' }).expect(
+        200,
+      );
+
+      expect(preview.body.hands).toEqual([]);
+      expect(preview.body.discarded).toEqual([
+        { text: expect.any(String), reason: 'duplicate' },
+      ]);
+      expect(res.text).toBe(text.trim());
+    });
+
     it('keeps the first text of a Hand when it is imported again with a different one', async () => {
       const owner = await newAccount(running.httpServer);
       const other = await newAccount(running.httpServer);

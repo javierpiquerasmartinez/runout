@@ -281,8 +281,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "texts": {
-          "name": "texts",
+        "hand_histories": {
+          "name": "hand_histories",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

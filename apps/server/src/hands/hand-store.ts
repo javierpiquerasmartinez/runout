@@ -50,23 +50,28 @@ function rowKey(row: KeyRow): string {
   return handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat);
 }
 
+/** Hands read from Hand History text, with the Hand History each was read from, by key. */
+export interface HandsRead {
+  hands: Hand[];
+  histories: ReadonlyMap<string, string>;
+}
+
 /**
- * The Hand History each Hand was read from, by key, from texts in step with
- * `read`. A Hand read twice keeps the first text it was read from.
+ * The Hands with the Hand History each was read from, from texts in step
+ * with `hands` (null where it wasn't kept). A Hand read twice keeps the
+ * first text it was read from.
  */
-export function historiesOf(
-  read: Hand[],
-  texts: readonly (string | null | undefined)[],
-): Map<string, string> {
+export function withHistories(
+  hands: Hand[],
+  texts: readonly (string | null)[],
+): HandsRead {
   const histories = new Map<string, string>();
-  read.forEach((hand, index) => {
+  hands.forEach((hand, index) => {
     const text = texts[index];
     const key = keyOf(hand);
-    if (typeof text === 'string' && !histories.has(key)) {
-      histories.set(key, text);
-    }
+    if (text !== null && !histories.has(key)) histories.set(key, text);
   });
-  return histories;
+  return { hands, histories };
 }
 
 /** The ids of the Hands among `read` that are already stored, by key. */
@@ -111,16 +116,15 @@ export async function fillHistories(
 
 /**
  * Stores the Hands that aren't stored yet, with `importerId` as their
- * Importer and the Hand History in `histories` (by key) as their text, and
+ * Importer and the Hand History each was read from as their text, and
  * returns every Hand's id, in order. A Hand already stored without its text
  * gets it (see `fillHistories`).
  */
 export async function storeHands(
   tx: Transaction,
   importerId: string,
-  read: Hand[],
+  { hands: read, histories }: HandsRead,
   now: Date,
-  histories: ReadonlyMap<string, string> = new Map(),
 ): Promise<string[]> {
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
