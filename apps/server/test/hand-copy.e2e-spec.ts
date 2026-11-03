@@ -1,4 +1,6 @@
+import pg from 'pg';
 import request from 'supertest';
+import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
@@ -34,6 +36,40 @@ describe('Copying a Hand (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     return (page.body.hands as { id: string }[])[0].id;
+  }
+
+  /** The ids of every Hand in `token`'s Library. */
+  async function libraryHands(token: string): Promise<{ id: string }[]> {
+    const page = await request(running.httpServer)
+      .get('/api/library/hands')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return page.body.hands as { id: string }[];
+  }
+
+  /** Opens a Room with `token` as its Master, joined, and returns its code. */
+  async function openRoom(token: string): Promise<{
+    code: string;
+    socket: RoomClient;
+  }> {
+    const room = await request(running.httpServer)
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Martes NL10', displayName: 'Javier' });
+    const code = room.body.code as string;
+    const socket = await RoomClient.connect(running.wsUrl, token);
+    clients.push(socket);
+    socket.send('room.join', { code, displayName: 'Javier' });
+    await socket.next('room.snapshot');
+    return { code, socket };
+  }
+
+  /** The Hands of a Hand History text, each as its own block. */
+  function blocksOf(text: string): string[] {
+    return text
+      .split(/\n[ \t\r]*\n/)
+      .map((block) => block.trim())
+      .filter((block) => block.length > 0);
   }
 
   function copy(token: string, handId: string, query: Record<string, string>) {
@@ -180,5 +216,137 @@ describe('Copying a Hand (e2e)', () => {
       const res = await copy(owner.token, handId, query).expect(400);
       expect(res.body).toEqual({ reason: 'invalid-hand-copy' });
     }
+  });
+
+  describe('as its Hand History', () => {
+    it('gives back each Hand of a Library import as exactly its own block of the file', async () => {
+      const owner = await newAccount(running.httpServer);
+      const text = freshHandHistory('pokerstars-session.txt');
+      await importText(owner.token, text);
+
+      const stored = await libraryHands(owner.token);
+      const copied: string[] = [];
+      for (const { id } of stored) {
+        const res = await copy(owner.token, id, { as: 'history' }).expect(200);
+        expect(res.headers['content-type']).toBe('text/plain; charset=utf-8');
+        expect(res.headers['cache-control']).toBe('private, no-cache');
+        copied.push(res.text);
+      }
+
+      expect(stored).toHaveLength(4);
+      expect(copied.sort()).toEqual(blocksOf(text).sort());
+      for (const { id } of stored) {
+        const hand = await request(running.httpServer)
+          .get(`/api/hands/${id}`)
+          .set('Authorization', `Bearer ${owner.token}`)
+          .expect(200);
+        expect(hand.body.hasHistory).toBe(true);
+      }
+    });
+
+    it('gives back each Hand imported into a Room as exactly its own block of the file', async () => {
+      const master = await newAccount(running.httpServer);
+      const { code, socket } = await openRoom(master.token);
+      const text = freshHandHistory('pokerstars-session.txt');
+      const preview = await request(running.httpServer)
+        .post(`/api/rooms/${code}/imports/previews`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .attach('file', Buffer.from(text), 'session.txt')
+        .expect(201);
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/imports`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ previews: [preview.body.id as string] })
+        .expect(201);
+      const { entries } = await socket.next<{
+        entries: { handId: string }[];
+      }>('queue.entriesAdded');
+
+      const copied: string[] = [];
+      for (const { handId } of entries) {
+        const hand = await request(running.httpServer)
+          .get(`/api/hands/${handId}`)
+          .set('Authorization', `Bearer ${master.token}`)
+          .expect(200);
+        expect(hand.body.hasHistory).toBe(true);
+        const res = await copy(master.token, handId, { as: 'history' }).expect(
+          200,
+        );
+        copied.push(res.text);
+      }
+
+      expect(copied.sort()).toEqual(blocksOf(text).sort());
+    });
+
+    it('gives back a Hand pasted from a forum post as it was pasted, without the post around it', async () => {
+      const master = await newAccount(running.httpServer);
+      const { code, socket } = await openRoom(master.token);
+      const hand = freshHandHistory('pokerstars-showdown.txt').trim();
+      const post = [
+        'What do you think of the turn call?',
+        '',
+        hand,
+        '',
+        'Thanks!',
+      ].join('\n');
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text: post })
+        .expect(201);
+      const { entries } = await socket.next<{
+        entries: { handId: string }[];
+      }>('queue.entriesAdded');
+
+      const res = await copy(master.token, entries[0].handId, {
+        as: 'history',
+      }).expect(200);
+
+      expect(res.text).toBe(hand);
+    });
+
+    it('answers no-history for a Hand stored before its text was kept', async () => {
+      const owner = await newAccount(running.httpServer);
+      const handId = await importText(
+        owner.token,
+        freshHandHistory('pokerstars-showdown.txt'),
+      );
+      // As every Hand imported before Runout kept the text.
+      const db = new pg.Client(inject('databaseUrl'));
+      await db.connect();
+      try {
+        await db.query('update hands set hand_history = null where id = $1', [
+          handId,
+        ]);
+      } finally {
+        await db.end();
+      }
+
+      const res = await copy(owner.token, handId, { as: 'history' }).expect(
+        404,
+      );
+      const hand = await request(running.httpServer)
+        .get(`/api/hands/${handId}`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .expect(200);
+
+      expect(res.body).toEqual({ reason: 'no-history' });
+      expect(hand.body.hasHistory).toBe(false);
+    });
+
+    it('refuses someone who cannot see the Hand the same way as the Hand itself', async () => {
+      const owner = await newAccount(running.httpServer);
+      const stranger = await newAccount(running.httpServer);
+      const handId = await importText(
+        owner.token,
+        freshHandHistory('pokerstars-showdown.txt'),
+      );
+
+      const res = await copy(stranger.token, handId, { as: 'history' }).expect(
+        404,
+      );
+
+      expect(res.body).toEqual({ reason: 'hand-not-found' });
+    });
   });
 });

@@ -8,11 +8,12 @@ import {
  * What a copy of a Hand is asked for: which version, and for the Hand
  * Summary the language it is written in and the time zone of its date.
  *
- * Query: `as` (`summary`), `language` (`es` or `en`; `es` if left out) and
+ * Query: `as` (`summary` for the Hand Summary, `history` for the Hand
+ * History as it came in), `language` (`es` or `en`; `es` if left out) and
  * `timeZone` (an IANA name; `UTC` if left out).
  */
 export interface HandCopyRequest {
-  as: 'summary';
+  as: 'summary' | 'history';
   language: SummaryLanguage;
   timeZone: string;
 }
@@ -23,7 +24,7 @@ export function parseHandCopy(query: Record<string, unknown>): HandCopyRequest {
   const language = single(query.language) ?? 'es';
   const timeZone = single(query.timeZone) ?? 'UTC';
   if (
-    as !== 'summary' ||
+    (as !== 'summary' && as !== 'history') ||
     !SUMMARY_LANGUAGES.includes(language as SummaryLanguage) ||
     !isTimeZone(timeZone)
   ) {

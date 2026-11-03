@@ -124,18 +124,20 @@ export class LibraryService {
 
   /**
    * Adds the Hands to the Library inside the caller's transaction, storing
-   * those nobody has imported before. Returns the ids of the Hands added:
+   * those nobody has imported before with their Hand History from
+   * `histories` (see `historiesOf`). Returns the ids of the Hands added:
    * one added since it was previewed is skipped.
    */
   async add(
     tx: Transaction,
     account: Identity,
     read: Hand[],
+    histories: ReadonlyMap<string, string> = new Map(),
   ): Promise<string[]> {
     const { kept } = await this.planImport(account, read, [], tx);
     if (kept.length === 0) return [];
     const now = this.clock.now();
-    const handIds = await storeHands(tx, account.id, kept, now);
+    const handIds = await storeHands(tx, account.id, kept, now, histories);
     const added = await tx
       .insert(libraryEntries)
       .values(

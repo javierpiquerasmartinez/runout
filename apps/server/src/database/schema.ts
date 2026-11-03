@@ -174,6 +174,8 @@ export const hands = pgTable(
     /** The final pot as an Amount, worked out from `content` at import, so the Library sorts on it. */
     finalPot: integer('final_pot').notNull(),
     content: jsonb('content').$type<Hand>().notNull(),
+    /** The Hand History of this one Hand, exactly as it came in; null for Hands stored before it was kept. */
+    handHistory: text('hand_history'),
     importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
   },
   (table) => [
@@ -270,6 +272,8 @@ export const importPreviews = pgTable(
       .notNull()
       .references(() => identities.id),
     hands: jsonb('hands').$type<Hand[]>().notNull(),
+    /** The text each Hand was read from, in the order of `hands`; null for previews made before it was kept. */
+    texts: jsonb('texts').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   },
   (table) => [

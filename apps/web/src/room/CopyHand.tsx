@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
+import { lockedProps } from '../ui/locked'
 import { useHandCopy, VERSION_LABELS, type HandCopyVersion } from './useHandCopy'
 import './CopyHand.css'
 
@@ -9,8 +10,18 @@ import './CopyHand.css'
  * "Copiar mano", by the player: a split button whose main click copies the
  * Hand Summary, and whose arrow opens a menu of the versions to copy. It
  * copies the whole Hand, wherever Playback is, for anyone who can see it.
+ * The Original is locked, saying why, when Runout kept no Hand History of
+ * the Hand (`hasHistory` false); until that is known it is offered.
  */
-export function CopyHand({ handId, className }: { handId: string; className?: string }) {
+export function CopyHand({
+  handId,
+  hasHistory,
+  className,
+}: {
+  handId: string
+  hasHistory?: boolean
+  className?: string
+}) {
   const { t } = useI18n()
   const { copy, message, feedback } = useHandCopy(handId)
   const [open, setOpen] = useState(false)
@@ -19,7 +30,9 @@ export function CopyHand({ handId, className }: { handId: string; className?: st
   const arrow = useRef<HTMLButtonElement>(null)
   const items = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
-  const versions: HandCopyVersion[] = ['summary']
+  const versions: HandCopyVersion[] = ['summary', 'history']
+  const lockedReason = (version: HandCopyVersion) =>
+    version === 'history' && hasHistory === false ? t('hand.copy.history.missing') : undefined
 
   useEffect(() => {
     if (open) items.current[focused]?.focus()
@@ -112,7 +125,8 @@ export function CopyHand({ handId, className }: { handId: string; className?: st
               role="menuitem"
               tabIndex={-1}
               className="copy-hand__item"
-              onClick={() => pick(version)}
+              {...lockedProps(t(VERSION_LABELS[version]), lockedReason(version))}
+              onClick={(event) => (lockedReason(version) ? event.preventDefault() : pick(version))}
             >
               {t(VERSION_LABELS[version])}
             </button>

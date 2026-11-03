@@ -14,7 +14,7 @@ import {
   type SourceFormat,
   type Stake,
 } from '../hands/hand.js';
-import { keyOf } from '../hands/hand-store.js';
+import { historiesOf, keyOf } from '../hands/hand-store.js';
 import {
   importHandHistory,
   SOURCE_FORMATS,
@@ -100,6 +100,7 @@ export class ImportsService {
     const roomId = (await this.roomOf(importer, destination))?.id ?? null;
     const picked = pickedFormat(format);
     const result = importHandHistory(textOf(source), { format: picked });
+    const histories = historiesOf(result.hands, result.texts);
     let kept: Hand[];
     let previews: HandPreview[];
     let duplicates: Discarded[];
@@ -136,6 +137,7 @@ export class ImportsService {
         roomId,
         importerId: importer.id,
         hands: kept,
+        texts: kept.map((hand) => histories.get(keyOf(hand))!),
         createdAt: this.clock.now(),
       })
       .returning({ id: importPreviews.id });
@@ -161,14 +163,10 @@ export class ImportsService {
   ): Promise<{ room: Room; entries: QueueEntry[] }> {
     const room = (await this.roomOf(importer, { kind: 'room', code }))!;
     const ids = validIds(previewIds);
-    const entries = await this.db.transaction(async (tx) =>
-      this.queue.append(
-        tx,
-        room,
-        importer,
-        await this.take(tx, importer, room, ids),
-      ),
-    );
+    const entries = await this.db.transaction(async (tx) => {
+      const { hands, histories } = await this.take(tx, importer, room, ids);
+      return this.queue.append(tx, room, importer, hands, histories);
+    });
     return { room, entries };
   }
 
@@ -182,13 +180,15 @@ export class ImportsService {
     previewIds: unknown,
   ): Promise<string[]> {
     const ids = validIds(previewIds);
-    return this.db.transaction(async (tx) =>
-      this.library.add(tx, importer, await this.take(tx, importer, null, ids)),
-    );
+    return this.db.transaction(async (tx) => {
+      const { hands, histories } = await this.take(tx, importer, null, ids);
+      return this.library.add(tx, importer, hands, histories);
+    });
   }
 
   /**
-   * Deletes the previews and returns their Hands, in the order of `ids`.
+   * Deletes the previews and returns their Hands, in the order of `ids`,
+   * with the Hand History each was read from (see `historiesOf`).
    * Refuses with `preview-not-found` if any of them is not the Importer's,
    * not for this destination (`null` for their Library), already confirmed
    * or forgotten.
@@ -198,7 +198,7 @@ export class ImportsService {
     importer: Identity,
     room: Room | null,
     ids: string[],
-  ): Promise<Hand[]> {
+  ): Promise<{ hands: Hand[]; histories: Map<string, string> }> {
     const taken = await tx
       .delete(importPreviews)
       .where(
@@ -214,10 +214,20 @@ export class ImportsService {
           gte(importPreviews.createdAt, this.oldestKept()),
         ),
       )
-      .returning({ id: importPreviews.id, hands: importPreviews.hands });
+      .returning({
+        id: importPreviews.id,
+        hands: importPreviews.hands,
+        texts: importPreviews.texts,
+      });
     if (taken.length !== ids.length) throw new Rejected('preview-not-found');
-    const handsOf = new Map(taken.map((row) => [row.id, row.hands]));
-    return ids.flatMap((id) => handsOf.get(id)!);
+    const byId = new Map(taken.map((row) => [row.id, row]));
+    const previews = ids.map((id) => byId.get(id)!);
+    const hands = previews.flatMap((preview) => preview.hands);
+    // A preview made before texts were kept has none: its Hands go without.
+    const texts = previews.flatMap(
+      (preview) => preview.texts ?? preview.hands.map(() => null),
+    );
+    return { hands, histories: historiesOf(hands, texts) };
   }
 
   /** The open Room an import goes into, once the Importer is known to be in it; null for the Library. */

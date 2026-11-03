@@ -5,11 +5,14 @@ import type { MessageKey } from '../i18n/catalogue'
 import { useIdentity } from '../identity/context'
 import { copyText } from '../ui/clipboard'
 
-/** A version of a Hand to copy: for now its Hand Summary, the "Resumen". */
-export type HandCopyVersion = 'summary'
+/** A version of a Hand to copy: its Hand Summary, the "Resumen", or its Hand History as it came in, the "Original". */
+export type HandCopyVersion = 'summary' | 'history'
 
 /** What each version is called, in the menu and in "Mano copiada · Resumen". */
-export const VERSION_LABELS: Record<HandCopyVersion, MessageKey> = { summary: 'hand.copy.summary' }
+export const VERSION_LABELS: Record<HandCopyVersion, MessageKey> = {
+  summary: 'hand.copy.summary',
+  history: 'hand.copy.history',
+}
 
 /** How the last copy went, for a moment after it. */
 export type CopyFeedback = { copied: HandCopyVersion } | { failed: true }

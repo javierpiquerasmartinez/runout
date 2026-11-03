@@ -50,6 +50,25 @@ function rowKey(row: KeyRow): string {
   return handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat);
 }
 
+/**
+ * The Hand History each Hand was read from, by key, from texts in step with
+ * `read`. A Hand read twice keeps the first text it was read from.
+ */
+export function historiesOf(
+  read: Hand[],
+  texts: readonly (string | null | undefined)[],
+): Map<string, string> {
+  const histories = new Map<string, string>();
+  read.forEach((hand, index) => {
+    const text = texts[index];
+    const key = keyOf(hand);
+    if (typeof text === 'string' && !histories.has(key)) {
+      histories.set(key, text);
+    }
+  });
+  return histories;
+}
+
 /** The ids of the Hands among `read` that are already stored, by key. */
 export async function storedIds(
   db: Database | Transaction,
@@ -70,13 +89,15 @@ export async function storedIds(
 
 /**
  * Stores the Hands that aren't stored yet, with `importerId` as their
- * Importer, and returns every Hand's id, in order.
+ * Importer and the Hand History in `histories` (by key) as their text, and
+ * returns every Hand's id, in order.
  */
 export async function storeHands(
   tx: Transaction,
   importerId: string,
   read: Hand[],
   now: Date,
+  histories: ReadonlyMap<string, string> = new Map(),
 ): Promise<string[]> {
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
@@ -105,6 +126,7 @@ export async function storeHands(
             heroReachedShowdown: reachedShowdown,
             finalPot: finalPot(hand),
             content: hand,
+            handHistory: histories.get(keyOf(hand)) ?? null,
             importedAt: now,
           };
         }),

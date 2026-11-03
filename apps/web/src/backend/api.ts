@@ -20,6 +20,7 @@ export type RejectionReason =
   | 'identity-of-another-room'
   | 'hand-not-found'
   | 'invalid-hand-copy'
+  | 'no-history'
   | 'hand-not-in-queue'
   | 'no-hand-loaded'
   | 'invalid-action-index'

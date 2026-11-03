@@ -22,7 +22,12 @@ import {
   type PokerSite,
   type Stake,
 } from '../hands/hand.js';
-import { handKey, keyOf, storeHands } from '../hands/hand-store.js';
+import {
+  handKey,
+  historiesOf,
+  keyOf,
+  storeHands,
+} from '../hands/hand-store.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
@@ -101,7 +106,13 @@ export class QueueService {
       result.texts,
     );
     const entries = await this.db.transaction((tx) =>
-      this.append(tx, room, importer, result.hands),
+      this.append(
+        tx,
+        room,
+        importer,
+        result.hands,
+        historiesOf(result.hands, result.texts),
+      ),
     );
     return { room, entries, discarded: [...result.discarded, ...duplicates] };
   }
@@ -246,15 +257,17 @@ export class QueueService {
   }
 
   /**
-   * Stores the Hands that aren't stored yet, and appends a Queue Entry for
-   * each Hand that isn't in the Queue, under the Author chosen for it, inside
-   * the caller's transaction. Returns the new Queue Entries, in Queue order.
+   * Stores the Hands that aren't stored yet, with their Hand History from
+   * `histories` (see `historiesOf`), and appends a Queue Entry for each Hand
+   * that isn't in the Queue, under the Author chosen for it, inside the
+   * caller's transaction. Returns the new Queue Entries, in Queue order.
    */
   async append(
     tx: Transaction,
     room: Room,
     importer: Identity,
     read: Hand[],
+    histories: ReadonlyMap<string, string> = new Map(),
   ): Promise<QueueEntry[]> {
     if (read.length === 0) return [];
     const now = this.clock.now();
@@ -270,6 +283,7 @@ export class QueueService {
       importer.id,
       queued.map(({ hand }) => hand),
       now,
+      histories,
     );
     return this.insertEntries(
       tx,

@@ -714,7 +714,7 @@ function LoadedHand({
             </span>
             <span className="room-stage__spacer" />
             {/* Any Participant copies the Hand, without asking the Master. */}
-            <CopyHand handId={handId} />
+            <CopyHand handId={handId} hasHistory={load.state === 'loaded' ? load.hand.hasHistory : undefined} />
             {/* Both "Sala" boards draw these two at the right of this row. */}
             <Button
               variant="ghost"

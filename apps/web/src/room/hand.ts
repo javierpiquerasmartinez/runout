@@ -83,6 +83,8 @@ export interface HandWithTimeline {
   id: string
   stake: { limit: 'no-limit' | 'pot-limit' | 'fixed-limit'; smallBlind: number; bigBlind: number; currency: string }
   tableSize: number
+  /** Whether Runout kept the Hand History the Hand was read from, to copy as its Original. */
+  hasHistory: boolean
   timeline: {
     seats: { seat: number; screenName: string; position: Position; startingStack: number }[]
     buttonSeat: number

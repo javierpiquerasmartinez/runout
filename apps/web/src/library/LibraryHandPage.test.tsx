@@ -18,14 +18,18 @@ const note = {
 }
 
 const summary = 'PokerStars · NL10 (€0.05/€0.10) · 6-max · 09/18/2026'
+const history = "PokerStars Hand #262120750636: Hold'em No Limit (€0.05/€0.10 EUR) - 2026/09/18 14:34:30 CET"
 
 let notFound: boolean
+/** Whether the server kept the Hand History of the Hand. */
+let hasHistory: boolean
 /** Every call that changed a Note, as method, path and body. */
 let changes: [string, string, unknown][]
 let refusal: string | null
 
 beforeEach(() => {
   notFound = false
+  hasHistory = true
   refusal = null
   changes = []
   vi.stubGlobal(
@@ -44,9 +48,12 @@ beforeEach(() => {
         if (method === 'DELETE') return Response.json({ id: note.id })
         if (path.endsWith('/restore')) return Response.json(note, { status: 201 })
       }
-      if (path.endsWith('/copy')) return new Response(summary, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      if (path.endsWith('/copy')) {
+        const text = url.includes('as=history') ? history : summary
+        return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      }
       if (url.endsWith('/notes')) return Response.json({ notes: [note], marked: false })
-      return Response.json(splitPot)
+      return Response.json({ ...splitPot, hasHistory })
     }),
   )
 })
@@ -183,5 +190,35 @@ describe('LibraryHandPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose what to copy' }))
     await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Summary' }))
     expect(writeText).toHaveBeenCalledWith(summary)
+  })
+
+  it('copies the Original, the Hand History as it came in', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderHand()
+    await screen.findByText('Action 0 of 17')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose what to copy' }))
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Original' }))
+
+    expect(await screen.findByRole('button', { name: 'Hand copied · Original' })).toBeTruthy()
+    expect(writeText).toHaveBeenCalledWith(history)
+  })
+
+  it('locks the Original, saying why, for a Hand Runout kept no text of', async () => {
+    hasHistory = false
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderHand('hand-without-history')
+    await screen.findByText('Action 0 of 17')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose what to copy' }))
+    const original = within(screen.getByRole('menu')).getByRole('menuitem', {
+      name: 'Original. Import the hand again to get the original',
+    })
+    expect(original.getAttribute('aria-disabled')).toBe('true')
+    await userEvent.click(original)
+
+    expect(writeText).not.toHaveBeenCalled()
   })
 })

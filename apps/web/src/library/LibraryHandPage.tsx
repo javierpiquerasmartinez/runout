@@ -61,7 +61,7 @@ export function LibraryHandPage({ handId }: { handId: string }) {
               <Icon name="chevron" size={14} className="library__back-icon" />
               {t('library.back')}
             </a>
-            {table && <CopyHand handId={handId} />}
+            {load.state === 'loaded' && <CopyHand handId={handId} hasHistory={load.hand.hasHistory} />}
           </div>
           {table ? (
             <>
