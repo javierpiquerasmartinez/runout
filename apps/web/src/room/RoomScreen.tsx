@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
-import { forgetHands } from './hand'
 import { useI18n, type MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
@@ -17,6 +16,7 @@ import { usePreferences } from '../preferences/context'
 import { followLink, navigate } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
 import { CopyHand } from './CopyHand'
+import { forgetHands } from './hand'
 import { ImportDialog } from './ImportDialog'
 import {
   authoredCount,

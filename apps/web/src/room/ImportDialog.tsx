@@ -1,6 +1,5 @@
 import { useEffect, useReducer, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 import { api, reasonOf, type FailureReason } from '../backend/api'
-import { forgetHands } from './hand'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
@@ -10,6 +9,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
+import { forgetHands } from './hand'
 import {
   batchHands,
   batchTotals,

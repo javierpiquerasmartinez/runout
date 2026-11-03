@@ -65,10 +65,27 @@ export class ApiError extends Error {
   }
 }
 
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
 export async function api<T>(
   path: string,
-  { token, method = 'GET', body }: { token?: string; method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown } = {},
+  { token, method = 'GET', body }: { token?: string; method?: Method; body?: unknown } = {},
 ): Promise<T> {
+  const res = await request(path, { token, method, body })
+  return (await res.json().catch(() => null)) as T
+}
+
+/** A GET whose answer is plain text; a refusal still comes as `{ reason }`. */
+export async function apiText(path: string, { token }: { token?: string } = {}): Promise<string> {
+  const res = await request(path, { token, method: 'GET' })
+  return res.text()
+}
+
+/** Sends a request to the API; a refusal, or no answer at all, throws its `ApiError`. */
+async function request(
+  path: string,
+  { token, method, body }: { token?: string; method: Method; body?: unknown },
+): Promise<Response> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
   // Form data (file uploads) goes as multipart, with the boundary the browser sets.
@@ -85,26 +102,11 @@ export async function api<T>(
   } catch {
     throw new ApiError(0, 'network')
   }
-  const payload = (await res.json().catch(() => null)) as { reason?: RejectionReason } | null
-  if (!res.ok) throw new ApiError(res.status, payload?.reason ?? 'network')
-  return payload as T
-}
-
-/** A GET whose answer is plain text; a refusal still comes as `{ reason }`. */
-export async function apiText(path: string, { token }: { token?: string } = {}): Promise<string> {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
-  let res: Response
-  try {
-    res = await fetch(`${backendUrl() ?? ''}/api${path}`, { headers })
-  } catch {
-    throw new ApiError(0, 'network')
-  }
   if (!res.ok) {
     const payload = (await res.json().catch(() => null)) as { reason?: RejectionReason } | null
     throw new ApiError(res.status, payload?.reason ?? 'network')
   }
-  return res.text()
+  return res
 }
 
 /** The reason behind any failure of an API call. */

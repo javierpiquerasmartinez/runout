@@ -4,7 +4,7 @@ import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { lockedProps } from '../ui/locked'
-import { useHandCopy, VERSION_LABELS, type HandCopyVersion } from './useHandCopy'
+import { useHandCopy, VERSION_LABELS, type CopyOutcome, type HandCopyVersion } from './useHandCopy'
 import './CopyHand.css'
 
 /** The versions a copy menu offers, in its order. */
@@ -27,24 +27,22 @@ export function CopyHand({
   className?: string
 }) {
   const { t } = useI18n()
-  const { copy, message, feedback } = useHandCopy(handId)
+  const { copy, outcome, message } = useHandCopy(handId)
   const root = useRef<HTMLDivElement>(null)
   const arrow = useRef<HTMLButtonElement>(null)
   const menu = useCopyMenu(root, arrow)
+  const look = outcomeLook(outcome)
 
-  const copied = feedback !== null && 'copied' in feedback
-  const failed = feedback !== null && 'failed' in feedback
   return (
     <div ref={root} className={['copy-hand', className].filter(Boolean).join(' ')}>
       <Button
         variant="secondary"
         size="compact"
         className="copy-hand__main"
-        data-copied={copied || undefined}
-        data-failed={failed || undefined}
+        {...look.marks}
         onClick={() => copy('summary')}
       >
-        <Icon name={copied ? 'success' : failed ? 'error' : 'copy'} size={14} />
+        <Icon name={look.icon} size={14} />
         {message ?? t('hand.copy')}
       </Button>
       <button
@@ -58,9 +56,7 @@ export function CopyHand({
         <Icon name="chevron" size={12} className="copy-hand__chevron" />
       </button>
       {menu.open && <CopyMenu menu={menu} hasHistory={hasHistory} onPick={copy} />}
-      <span className="ro-visually-hidden" role="status">
-        {message}
-      </span>
+      <CopyStatus message={message} />
     </div>
   )
 }
@@ -83,7 +79,7 @@ export function CopyHandMenuButton({
   label: string
   className?: string
 }) {
-  const { copy, message, feedback } = useHandCopy(handId)
+  const { copy, outcome, message } = useHandCopy(handId)
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const menu = useCopyMenu(root, trigger)
@@ -104,25 +100,41 @@ export function CopyHandMenuButton({
     }
   }, [open, setOpen])
 
-  const copied = feedback !== null && 'copied' in feedback
-  const failed = feedback !== null && 'failed' in feedback
+  const look = outcomeLook(outcome)
   return (
     <div ref={root} className={['copy-hand-menu', className].filter(Boolean).join(' ')} data-open={menu.open || undefined}>
       <IconButton
         ref={trigger}
-        icon={copied ? 'success' : failed ? 'error' : 'copy'}
+        icon={look.icon}
         size="compact"
         className="copy-hand-menu__button"
         label={message ?? label}
-        data-copied={copied || undefined}
-        data-failed={failed || undefined}
+        {...look.marks}
         {...menu.triggerProps}
       />
       {menu.open && <CopyMenu menu={menu} hasHistory={hasHistory} onPick={copy} style={place} />}
-      <span className="ro-visually-hidden" role="status">
-        {message}
-      </span>
+      <CopyStatus message={message} />
     </div>
+  )
+}
+
+/** How a copy control shows how the last copy went: its icon, and the marks its styles key on. */
+function outcomeLook(outcome: CopyOutcome) {
+  return {
+    icon: outcome === 'copied' ? 'success' : outcome === 'failed' ? 'error' : 'copy',
+    marks: {
+      'data-copied': outcome === 'copied' || undefined,
+      'data-failed': outcome === 'failed' || undefined,
+    },
+  } as const
+}
+
+/** Tells a screen reader how the copy went. */
+function CopyStatus({ message }: { message: string | null }) {
+  return (
+    <span className="ro-visually-hidden" role="status">
+      {message}
+    </span>
   )
 }
 
@@ -156,7 +168,7 @@ function useCopyMenu(root: RefObject<HTMLElement | null>, trigger: RefObject<HTM
     open,
     setOpen,
     menuId,
-    label: t('hand.copy.choose'),
+    menuLabel: t('hand.copy.choose'),
     /** Closes it, back on the button that opened it. */
     close: () => {
       setOpen(false)
@@ -218,7 +230,7 @@ function CopyMenu({
   }
 
   return (
-    <div id={menu.menuId} role="menu" aria-label={menu.label} className="copy-hand__menu" style={style} onKeyDown={onKeyDown}>
+    <div id={menu.menuId} role="menu" aria-label={menu.menuLabel} className="copy-hand__menu" style={style} onKeyDown={onKeyDown}>
       {VERSIONS.map((version, index) => (
         <button
           key={version}

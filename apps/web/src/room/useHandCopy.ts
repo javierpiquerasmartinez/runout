@@ -15,7 +15,10 @@ export const VERSION_LABELS: Record<HandCopyVersion, MessageKey> = {
 }
 
 /** How the last copy went, for a moment after it. */
-export type CopyFeedback = { copied: HandCopyVersion } | { failed: true }
+type CopyFeedback = { copied: HandCopyVersion } | { failed: true }
+
+/** Whether the last copy went through, for a moment after it; null otherwise. */
+export type CopyOutcome = 'copied' | 'failed' | null
 
 /** How long the control says how the copy went. */
 const FEEDBACK_FOR_MS = 2000
@@ -27,9 +30,9 @@ const FEEDBACK_FOR_MS = 2000
  */
 export function useHandCopy(handId: string): {
   copy: (version: HandCopyVersion) => void
+  outcome: CopyOutcome
   /** "Mano copiada · Resumen", or why not; null when there is nothing to say. */
   message: string | null
-  feedback: CopyFeedback | null
 } {
   const { t, locale } = useI18n()
   const { token } = useIdentity()
@@ -51,11 +54,11 @@ export function useHandCopy(handId: string): {
     })
   }
 
-  const message =
-    feedback === null
-      ? null
-      : 'failed' in feedback
-        ? t('hand.copy.failed')
-        : t('hand.copy.copied', { version: t(VERSION_LABELS[feedback.copied]) })
-  return { copy, message, feedback }
+  if (feedback === null) return { copy, outcome: null, message: null }
+  if ('failed' in feedback) return { copy, outcome: 'failed', message: t('hand.copy.failed') }
+  return {
+    copy,
+    outcome: 'copied',
+    message: t('hand.copy.copied', { version: t(VERSION_LABELS[feedback.copied]) }),
+  }
 }
