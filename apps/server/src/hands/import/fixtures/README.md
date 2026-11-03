@@ -17,7 +17,7 @@ Other files are kept because they must be discarded: PokerTracker 4's forum layo
 
 ## Where the files come from
 
-Screen Names, hand IDs and table names are anonymised. The GGPoker, Winamax, 10-max and 888poker files were written by hand, following each Poker Site's layout as closely as we know it, to cover edge cases: straddles, side pots, uncalled bets, 10-max tables, tournaments and other games. They are not real exports yet. `coinpoker-session.txt` is: seven Hands picked from a session exported by CoinPoker's own client, one per case its layout has (a Splash, a straddle, a run it twice…), left exactly as exported since the site already hashes every opponent and writes the Hero as `Hero`. Add real exports from each Tracker next to them as they turn up: they are what proves the parser right.
+Screen Names, hand IDs and table names are anonymised. The GGPoker, Winamax, 10-max, pot-limit and 888poker files were written by hand, following each Poker Site's layout as closely as we know it, to cover edge cases: straddles, side pots, uncalled bets, 10-max tables, pot-limit Stakes, tournaments and other games. They are not real exports yet. `coinpoker-session.txt` is: seven Hands picked from a session exported by CoinPoker's own client, one per case its layout has (a Splash, a straddle, a run it twice…), left exactly as exported since the site already hashes every opponent and writes the Hero as `Hero`. Add real exports from each Tracker next to them as they turn up: they are what proves the parser right.
 
 ## Adding a file
 

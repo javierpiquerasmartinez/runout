@@ -1,0 +1,33 @@
+PokerStars Hand #262150000101:  Hold'em Pot Limit ($0.25/$0.50 USD) - 2026/09/15 21:00:00 CET [2026/09/15 15:00:00 ET]
+Table 'Maia' 6-max Seat #1 is the button
+Seat 1: HeroPL ($50 in chips)
+Seat 2: Linden2 ($50 in chips)
+Seat 3: Hazel3 ($50 in chips)
+Linden2: posts small blind $0.25
+Hazel3: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to HeroPL [Qs Qh]
+HeroPL: raises $1.25 to $1.75
+Linden2: folds
+Hazel3: calls $1.25
+*** FLOP *** [Qd 7c 2s]
+Hazel3: checks
+HeroPL: bets $2.50
+Hazel3: calls $2.50
+*** TURN *** [Qd 7c 2s] [9h]
+Hazel3: checks
+HeroPL: checks
+*** RIVER *** [Qd 7c 2s 9h] [3d]
+Hazel3: checks
+HeroPL: bets $4
+Hazel3: calls $4
+*** SHOW DOWN ***
+HeroPL: shows [Qs Qh] (three of a kind, Queens)
+Hazel3: mucks hand
+HeroPL collected $16 from pot
+*** SUMMARY ***
+Total pot $16.75 | Rake $0.75
+Board [Qd 7c 2s 9h 3d]
+Seat 1: HeroPL (button) showed [Qs Qh] and won ($16) with three of a kind, Queens
+Seat 2: Linden2 (small blind) folded before Flop
+Seat 3: Hazel3 (big blind) mucked
