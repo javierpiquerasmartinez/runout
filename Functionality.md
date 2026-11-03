@@ -295,6 +295,15 @@ The player is the table and its controls. Its job is not to look like a poker cl
 - Shortcuts do nothing while focus is in a text field.
 - Shortcuts are inactive for Guests.
 
+**H4.8 — Copy a Hand.** As a Participant, I want to copy the Hand to my clipboard, so I can take it to another chat, a forum or my Tracker.
+
+- Every Participant can copy, Master or Guest, from the Room and from a Hand opened from the Library; each row of the Library has a copy button too.
+- **Copiar mano** copies the Hand Summary; its menu offers **Resumen** and **Original**. The row's button opens that menu.
+- The Hand Summary is plain text: the Stake, table size and date, the Hero's Position, Stack and cards, one line per Street with its pot and every Action in big blinds, players other than the Hero by Position, the Showdown and the Hero's Result. Poker verbs stay in English; the rest follows the interface language.
+- **Original** is exactly the Hand History the Hand was read from. Hands imported before Runout kept it have none: **Original** is disabled and says that importing the Hand again brings it back.
+- The whole Hand is copied, wherever the Playback is and whether Hide Opponent Names is on. Notes, Tags and Marks are never copied.
+- The control confirms which version was copied, or that copying failed.
+
 ## E5 · Real-time synchronisation
 
 This epic is the product's promise: what the Master does, everyone sees instantly. It is also what decides trust, because a Guest who doesn't know whether they are up to date stops watching the screen and asks out loud.

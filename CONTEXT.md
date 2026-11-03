@@ -44,6 +44,10 @@ _Avoid_: Poker room, sala, room
 The raw text a Tracker or poker site exports describing one or more hands.
 _Avoid_: Historial (UI only), log, file
 
+**Hand Summary**:
+The readable text Runout writes of one Hand to paste into a chat: the Stake, the Hero's cards, every Action in big blinds with Positions instead of Screen Names, and the Result. Written for people, never read back in. The UI calls it "Resumen"; the exact text a Hand was read from is its Hand History.
+_Avoid_: Export, recap, hand text
+
 **Tracker**:
 Desktop software that records played hands and exports Hand Histories (PokerTracker 4, Hold'em Manager 3, Hand2Note).
 
