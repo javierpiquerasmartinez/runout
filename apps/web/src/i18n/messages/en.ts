@@ -828,6 +828,7 @@ export const en: Messages = {
   'lab.analysis.selection.share': '{combos} combos · {percent} % of the live combos',
   'lab.analysis.selection.clear': 'Clear selection',
   'lab.analysis.selection.sideShare': '{side}: {share}',
+  'lab.analysis.brush.narrowed': 'The range is narrowed on the board: go back to the flop to paint it.',
   'lab.cell.removed': '{title} · {removed} removed by the board or the dead cards',
   'lab.cell.selected': '{title} · {selected} in the selection',
   'lab.nav.ranges': 'Ranges',

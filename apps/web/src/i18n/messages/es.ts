@@ -827,6 +827,7 @@ export const es = {
   'lab.analysis.selection.share': '{combos} combos · {percent} % de los combos vivos',
   'lab.analysis.selection.clear': 'Limpiar selección',
   'lab.analysis.selection.sideShare': '{side}: {share}',
+  'lab.analysis.brush.narrowed': 'El rango está acotado en el board: vuelve al flop para pintarlo.',
   'lab.cell.removed': '{title} · {removed} descartados por el board o las cartas muertas',
   'lab.cell.selected': '{title} · {selected} en la selección',
   'lab.nav.ranges': 'Rangos',

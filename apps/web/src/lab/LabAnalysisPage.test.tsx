@@ -1105,3 +1105,217 @@ describe('LabAnalysisPage · the Equity between two Ranges', () => {
     ])
   })
 })
+
+describe('LabAnalysisPage · narrowing the Range Street by Street', () => {
+  const board = () => screen.getByRole('region', { name: 'Board' })
+  const deck = () => within(board()).getByRole('group', { name: "Pick the board's cards" })
+  const pickCard = (name: string) => userEvent.click(within(deck()).getByRole('button', { name }))
+  const boardField = () => within(board()).getByRole<HTMLInputElement>('textbox', { name: 'Board as text' })
+  const typeBoard = async (text: string) => {
+    await userEvent.clear(boardField())
+    await userEvent.type(boardField(), `${text}{Enter}`)
+  }
+  const row = (category: string) => screen.getByRole('button', { name: category })
+  const selected = () =>
+    screen
+      .getAllByRole('button')
+      .filter((button) => button.closest('table') && button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.textContent)
+  /** A table's rows holding any Combo, as [Category, Combos, %]. */
+  const heldRows = (name: string) =>
+    within(screen.getByRole('table', { name }))
+      .getAllByRole('row')
+      .slice(1)
+      .map((each) => [...each.children].map((cell) => cell.textContent))
+      .filter(([, combos]) => combos !== '0.0')
+  const live = () => screen.getByText(/live combos/).textContent
+  const select = async (...categories: string[]) => {
+    for (const category of categories) await userEvent.click(row(category))
+  }
+  /** On Kd7c4h: AA overpairs, KQs top pair, 77 a set. */
+  const flop = '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h'
+
+  it('turns the Selection into the flop’s Narrowing when the turn is dealt from the grid, analysing the turn with only its Combos', async () => {
+    renderAnalysis('en', flop)
+    await select('Overpair', 'Set')
+
+    await pickCard('2 of spades')
+
+    expect(heldRows('Made hands')).toEqual([
+      ['Set', '3.0', '33.3 %'],
+      ['Overpair', '6.0', '66.7 %'],
+    ])
+    expect(live()).toBe('9.0 live combos')
+    expect(pressed()).toEqual(['AA', '77'])
+    // The turn starts with nothing selected.
+    expect(selected()).toEqual([])
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h2s', narrowing: 'set.overpair' }))
+  })
+
+  it('narrows the same when the turn is typed or dealt at random', async () => {
+    renderAnalysis('en', flop)
+    await select('Top pair')
+    await typeBoard('Kd7c4h2s')
+    expect(heldRows('Made hands')).toEqual([['Top pair', '3.0', '100.0 %']])
+    cleanup()
+
+    // The first card left in the deck: the ace of spades.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    renderAnalysis('en', flop)
+    await select('Overpair')
+    await userEvent.click(within(board()).getByRole('button', { name: 'Random card' }))
+    expect(boardField().value).toBe('Kd7c4hAs')
+    expect(heldRows('Made hands')).toEqual([['Set', '3.0', '100.0 %']])
+  })
+
+  it('narrows again from the turn to the river, keeping each Combo’s Frequency', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%3A0.5%2CKQs%2C77&board=Kd7c4h')
+    await select('Overpair', 'Set')
+    await pickCard('2 of spades')
+    await select('Overpair')
+
+    await pickCard('9 of hearts')
+
+    expect(heldRows('Made hands')).toEqual([['Overpair', '3.0', '100.0 %']])
+    expect(live()).toBe('3.0 live combos')
+    await waitFor(() => expect(address().narrowing).toBe('set.overpair_overpair'))
+  })
+
+  it('carries the whole Range on when the next card is dealt with nothing selected', async () => {
+    renderAnalysis('en', flop)
+
+    await pickCard('2 of spades')
+    await pickCard('9 of hearts')
+
+    expect(live()).toBe('12.0 live combos')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h2s9h' }))
+  })
+
+  it('measures my own Combo against the narrowed Range', async () => {
+    renderAnalysis('en', `${flop}&dead=QhQd`)
+    await select('Overpair')
+
+    await pickCard('2 of spades')
+
+    const own = screen.getByRole('region', { name: 'Your hand' })
+    expect(within(own).getByText(/^Ahead/).textContent).toBe('Ahead of 0.0 combos · 0.0 %')
+    expect(within(own).getByText(/^Behind/).textContent).toBe('Behind 6.0 combos · 100.0 %')
+    expect(within(own).getByText(/^Equity/).textContent).toMatch(/^Equity 4\.5 % · exact/)
+  })
+
+  it('brings a Street’s Narrowing back as the Selection when the last card is taken off', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s9h&narrowing=set.overpair_overpair')
+
+    await pickCard('9 of hearts')
+    expect(selected()).toEqual(['Overpair'])
+    expect(heldRows('Made hands')).toEqual([
+      ['Set', '3.0', '33.3 %'],
+      ['Overpair', '6.0', '66.7 %'],
+    ])
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h2s', narrowing: 'set.overpair' }))
+
+    await pickCard('2 of spades')
+    expect(selected()).toEqual(['Set', 'Overpair'])
+    expect(heldRows('Made hands')).toContainEqual(['Top pair', '3.0', '25.0 %'])
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h' }))
+  })
+
+  it('drops the Narrowings from a Street whose card changes on, keeping the earlier ones', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s9h&narrowing=set.overpair_overpair')
+
+    // The turn taken off: the river's card becomes the turn.
+    await pickCard('2 of spades')
+    expect(selected()).toEqual([])
+    expect(heldRows('Made hands')).toEqual([
+      ['Set', '3.0', '33.3 %'],
+      ['Overpair', '6.0', '66.7 %'],
+    ])
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h9h', narrowing: 'set.overpair' }))
+
+    await pickCard('K of diamonds')
+    expect(live()).toBe('13.0 live combos')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: '7c4h9h' }))
+  })
+
+  it('keeps the flop’s Narrowing when another turn is typed, and drops it when another flop is', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s&narrowing=set.overpair')
+
+    await typeBoard('Kd7c4h3s')
+    await waitFor(() => expect(address().narrowing).toBe('set.overpair'))
+
+    await typeBoard('Kd7c5h3s')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c5h3s' }))
+    expect(live()).toBe('12.0 live combos')
+  })
+
+  it('drops every Narrowing when the Board is cleared', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s9h&narrowing=set.overpair_overpair')
+
+    await userEvent.click(within(board()).getByRole('button', { name: 'Clear board' }))
+
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs' }))
+  })
+
+  it('drops the Narrowings when a Range is loaded or the Range is cleared, and keeps them when the Dead Cards change', async () => {
+    const narrowed = '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s&narrowing=set.overpair'
+    renderAnalysis('en', narrowed)
+
+    const deadField = within(board()).getByRole<HTMLInputElement>('textbox', { name: 'Dead cards as text' })
+    await userEvent.type(deadField, 'QhQd{Enter}')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h2s', dead: 'QhQd', narrowing: 'set.overpair' }))
+
+    await waitFor(() => expect(screen.getByRole('option', { name: 'OR BTN' })).toBeTruthy())
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Load a saved range' }), 'OR BTN')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA', source: 'r1', board: 'Kd7c4h2s', dead: 'QhQd' }))
+    cleanup()
+
+    renderAnalysis('en', narrowed)
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    await waitFor(() => expect(address()).toEqual({ board: 'Kd7c4h2s' }))
+  })
+
+  it('locks the brush while the Range is narrowed, saying why', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s&narrowing=set.overpair')
+    const reason = 'The range is narrowed on the board: go back to the flop to paint it.'
+
+    expect(screen.getByText(reason)).toBeTruthy()
+    expect(screen.getByRole('radio', { name: `50 %. ${reason}` }).getAttribute('aria-disabled')).toBe('true')
+    await userEvent.click(cell('KK'))
+    expect(pressed()).toEqual(['AA', '77'])
+
+    await pickCard('2 of spades')
+    expect(screen.queryByText(reason)).toBeNull()
+    await userEvent.click(cell('KK'))
+    expect(pressed()).toEqual(['AA', 'KK', 'KQs', '77'])
+  })
+
+  it('says why the brush is locked in Spanish too', () => {
+    renderAnalysis('es', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s&narrowing=set.overpair')
+
+    expect(screen.getByText('El rango está acotado en el board: vuelve al flop para pintarlo.')).toBeTruthy()
+  })
+
+  it('reads the Narrowings from the address, leaving out the Category ids it cannot read', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs%2C77&board=Kd7c4h2s&narrowing=nonsense.set..overpair_flush')
+
+    expect(heldRows('Made hands')).toEqual([
+      ['Set', '3.0', '33.3 %'],
+      ['Overpair', '6.0', '66.7 %'],
+    ])
+    // Any change writes the address again, as the screen reads it.
+    await userEvent.type(within(board()).getByRole('textbox', { name: 'Dead cards as text' }), 'Qh{Enter}')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,77,KQs', board: 'Kd7c4h2s', dead: 'Qh', narrowing: 'set.overpair' }))
+  })
+
+  it('narrows nothing with two Ranges: dealing keeps both whole', async () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=77&board=Kd7c4h')
+    await userEvent.click(screen.getByRole('button', { name: /^Overpair · Range 1 · / }))
+
+    await pickCard('2 of spades')
+
+    const liveOf = (name: string) => within(screen.getByRole('region', { name })).getByText(/live combos/).textContent
+    expect(liveOf('Range 1')).toBe('9.0 live combos')
+    expect(liveOf('Range 2')).toBe('3.0 live combos')
+    await waitFor(() => expect(address()).toEqual({ range: 'AA,KQs', range2: '77', board: 'Kd7c4h2s' }))
+  })
+})

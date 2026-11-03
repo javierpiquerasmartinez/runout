@@ -29,6 +29,8 @@ export interface RangeSummary {
  */
 export function AnalysisSideSection({
   side,
+  narrowed,
+  lockedReason,
   label,
   compact,
   saved,
@@ -40,6 +42,10 @@ export function AnalysisSideSection({
   onHover,
 }: {
   side: AnalysisSide
+  /** Its Range on this Street, after its Narrowings: what its matrix and numbers show. */
+  narrowed: Range
+  /** Why it cannot be painted, if it cannot: a Narrowing would hide the cells painted. */
+  lockedReason?: string
   /** What the side is called: the whole Analysis's Range, or "Range 1" or "Range 2" against another. */
   label: string
   /** Whether it shares the screen with another side: no label above its matrix, and only its live Combos under it. */
@@ -104,7 +110,8 @@ export function AnalysisSideSection({
       const range = await api<SavedRange>(`/lab/ranges/${encodeURIComponent(id)}`, { token })
       sourceRef.current = range
       setSource(range)
-      change(() => ({ range: range.combos, sourceId: range.id }))
+      // A Range loaded starts the Street by Street reading over.
+      change(() => ({ range: range.combos, sourceId: range.id, narrowings: [] }))
     } catch (error) {
       setFailure(reasonOf(error))
     }
@@ -132,7 +139,7 @@ export function AnalysisSideSection({
           ))}
         </select>
         <span className="lab__spacer" />
-        <Button variant="secondary" size="compact" onClick={() => setCombos(() => EMPTY_RANGE)}>
+        <Button variant="secondary" size="compact" onClick={() => change((current) => ({ ...current, range: EMPTY_RANGE, narrowings: [] }))}>
           {t('lab.ranges.clear')}
         </Button>
         {onRemove && (
@@ -147,15 +154,15 @@ export function AnalysisSideSection({
         </p>
       )}
       <RangeMatrix
-        range={range}
+        range={narrowed}
         brush={brush}
-        onPaint={paint}
+        onPaint={lockedReason === undefined ? paint : () => undefined}
         removed={(handClass) => removedCombos(handClass, out)}
         highlighted={highlighted}
         onHover={onHover}
       />
-      <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(range, out)) })}</p>
-      {!compact && <Stats stats={rangeStats(range)} />}
+      <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(narrowed, out)) })}</p>
+      {!compact && <Stats stats={rangeStats(narrowed)} />}
     </section>
   )
 }

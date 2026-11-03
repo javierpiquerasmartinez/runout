@@ -15,6 +15,7 @@ import {
   madeHands,
   MAX_DEAD_CARDS,
   ownCombo,
+  rangeOnStreet,
   selectionOf,
   tenAs10,
   type CategoryRow,
@@ -23,7 +24,16 @@ import {
 import { AnalysisSideSection, type RangeSummary } from './AnalysisSideSection'
 import { BoardPicker } from './BoardPicker'
 import { useEquity } from './equity'
-import { analysisStateFromSearch, EMPTY_SIDE, labAnalysisAddress, MAX_ANALYSIS_SIDES, type AnalysisSide, type AnalysisState } from './lab'
+import {
+  analysisStateFromSearch,
+  EMPTY_SIDE,
+  labAnalysisAddress,
+  MAX_ANALYSIS_SIDES,
+  moveAlongBoard,
+  type AnalysisSide,
+  type AnalysisState,
+  type MovedAlongBoard,
+} from './lab'
 import { CategoriesTable } from './CategoriesTable'
 import { LabNav } from './LabNav'
 import type { HandClass, Range } from './range'
@@ -137,14 +147,22 @@ export function LabAnalysisPage() {
   }, [token])
 
   // Every Combo of the deck is classified to tell which Categories can happen: not on every render.
-  // Each side's rows count only its own Range, whatever the other holds.
-  const madeHandRows = useMemo(() => sides.map(({ range }) => madeHands(range, board, dead)), [sides, board, dead])
-  const drawRows = useMemo(
-    () => sides.map(({ range }) => draws(range, board, dead, { oneCardBackdoors })),
+  /** Each side's Range on this Street, after its Narrowings: what the whole Analysis studies. */
+  const narrowedRanges = useMemo(
+    () => sides.map((side) => rangeOnStreet(side.range, board, dead, side.narrowings, { oneCardBackdoors })),
     [sides, board, dead, oneCardBackdoors],
   )
-  const combinationDrawRows = useMemo(() => sides.map(({ range }) => combinationDraws(range, board, dead)), [sides, board, dead])
-  const range = sides[0].range
+  // Each side's rows count only its own Range, whatever the other holds.
+  const madeHandRows = useMemo(() => narrowedRanges.map((range) => madeHands(range, board, dead)), [narrowedRanges, board, dead])
+  const drawRows = useMemo(
+    () => narrowedRanges.map((range) => draws(range, board, dead, { oneCardBackdoors })),
+    [narrowedRanges, board, dead, oneCardBackdoors],
+  )
+  const combinationDrawRows = useMemo(
+    () => narrowedRanges.map((range) => combinationDraws(range, board, dead)),
+    [narrowedRanges, board, dead],
+  )
+  const range = narrowedRanges[0]
   const own = useMemo(() => ownCombo(range, board, dead, { oneCardBackdoors }), [range, board, dead, oneCardBackdoors])
   /** Two Dead Cards are the own Combo, a Range of one, against the Range: preflop or on a flop, turn or river. */
   const ownEquityRequest = useMemo<EquityRequest | null>(
@@ -155,7 +173,7 @@ export function LabAnalysisPage() {
     [range, board, dead],
   )
   const ownEquity = useEquity(ownEquityRequest)
-  const otherRange = sides[1]?.range
+  const otherRange = narrowedRanges[1]
   /** Two sides, each Range against the other: preflop or on a flop, turn or river. */
   const sidesEquityRequest = useMemo<EquityRequest | null>(
     () => (otherRange !== undefined && (board.length === 0 || board.length >= FLOP_CARDS) ? { ranges: [range, otherRange], board } : null),
@@ -174,15 +192,33 @@ export function LabAnalysisPage() {
   const selected = picked !== null && pickedHere(picked) ? picked.categories : sides.map(() => NO_CATEGORIES)
   const hovered = hover !== null && pickedHere(hover) ? hover.category : null
   const rowsOfSide = (index: number) => [...madeHandRows[index], ...drawRows[index], ...combinationDrawRows[index]]
-  const selections = sides.map((side, index) =>
-    selectionOf(side.range, out, rowsOfSide(index).filter((row) => selected[index].has(row.category))),
+  const selections = narrowedRanges.map((each, index) =>
+    selectionOf(each, out, rowsOfSide(index).filter((row) => selected[index].has(row.category))),
   )
   // A hovered row lights up with the selection, as it would once clicked.
-  const highlighted = sides.map(
-    (side, index) =>
-      selectionOf(side.range, out, rowsOfSide(index).filter((row) => selected[index].has(row.category) || row.category === hovered))
-        .range,
+  const highlighted = narrowedRanges.map(
+    (each, index) =>
+      selectionOf(each, out, rowsOfSide(index).filter((row) => selected[index].has(row.category) || row.category === hovered)).range,
   )
+  /** Why a side cannot be painted: its Narrowings would hide the cells it paints. */
+  const lockedReason = (side: AnalysisSide) =>
+    side.narrowings.some((kept) => kept.length > 0) ? t('lab.analysis.brush.narrowed') : undefined
+  /**
+   * The Board changed by the grid, by text or at random. With one side, dealing
+   * on turns its Selection into that Street's Narrowing; with two, nothing
+   * narrows yet. A card taken off brings back the Narrowing it was dealt on as
+   * the Selection.
+   */
+  const changeBoard = (cards: string[]) => {
+    const moved: { to?: MovedAlongBoard } = {}
+    change((state) => {
+      moved.to = moveAlongBoard(state, cards, two ? state.sides.map(() => []) : selected.map((categories) => [...categories]))
+      return moved.to.state
+    })
+    const { state, selections: backTo } = moved.to!
+    if (state.board === board) return
+    setPicked(backTo && { ranges, board: state.board, dead: state.dead, categories: backTo.map((categories) => new Set(categories)) })
+  }
   const anySelected = selected.some((categories) => categories.size > 0)
   const toggle = (category: string, side: number) => {
     const categories = new Set(selected[side])
@@ -208,7 +244,7 @@ export function LabAnalysisPage() {
       <main className="lab__main">
         <h1 className="analysis__title">{t('lab.analysis')}</h1>
         <div className="analysis__toolbar">
-          <Brush brush={brush} onChange={setBrush} />
+          <Brush brush={brush} onChange={setBrush} lockedReason={sides.every(lockedReason) ? lockedReason(sides[0]) : undefined} />
           {sides.length < MAX_ANALYSIS_SIDES && (
             <Button variant="secondary" size="compact" onClick={addSide}>
               {t('lab.analysis.addSide')}
@@ -230,6 +266,8 @@ export function LabAnalysisPage() {
                 // Each side reads its own source: a side that comes back is a new one.
                 key={index}
                 side={side}
+                narrowed={narrowedRanges[index]}
+                lockedReason={lockedReason(side)}
                 label={sideLabel(index)}
                 compact={two}
                 saved={saved}
@@ -250,7 +288,7 @@ export function LabAnalysisPage() {
               board={board}
               dead={dead}
               withDead={!two}
-              onChange={(cards) => change((state) => ({ ...state, board: cards }))}
+              onChange={changeBoard}
               onDeadChange={(cards) => change((state) => ({ ...state, dead: cards }))}
             >
               {(own || ownEquity) && <OwnComboSummary own={own} equity={ownEquity} dead={dead} />}
