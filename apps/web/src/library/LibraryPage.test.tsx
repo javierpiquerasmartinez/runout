@@ -706,6 +706,23 @@ describe('LibraryPage', () => {
       expect(window.location.pathname).toBe('/library')
     })
 
+    it('unlocks the Original once an import closes, even one that only found it again', async () => {
+      pages['1'].hands[0] = { ...pages['1'].hands[0], hasHistory: false }
+      renderLibrary()
+      await firstRow()
+      // Importing it again, as a duplicate, gave the server its text back.
+      pages['1'].hands[0] = { ...pages['1'].hands[0], hasHistory: true }
+
+      await userEvent.click(screen.getAllByRole('button', { name: 'Import hands' })[0])
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      const row = await firstRow()
+      await waitFor(() => expect(requests).toHaveLength(2))
+      await userEvent.click(within(row).getByRole('button', { name: 'Copy BTN vs BB, iMapleAA' }))
+
+      const original = within(within(row).getByRole('menu')).getByRole('menuitem', { name: 'Original' })
+      expect(original.getAttribute('aria-disabled')).toBeNull()
+    })
+
     it('says so when the Hand couldn’t be copied', async () => {
       writeText.mockRejectedValue(new Error('denied'))
       renderLibrary()

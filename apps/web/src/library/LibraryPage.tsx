@@ -386,7 +386,11 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       {importing && (
         <ImportDialog
           destination={{ kind: 'library' }}
-          onClose={() => setImporting(false)}
+          onClose={() => {
+            setImporting(false)
+            // An import that only found duplicates may still have given a Hand its Original back.
+            setRevision((n) => n + 1)
+          }}
           onImported={(imported) => {
             if (imported === 0) return
             // Back to the first page: the list is newest first by when each Hand was played.
