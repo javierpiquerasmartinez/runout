@@ -16,7 +16,7 @@ import {
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
 import { keyOf, storedIds, storeHands } from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
-import { summarise, type HandSummary } from '../hands/replay/summary.js';
+import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { handSelection, requireInLibrary } from './library-hand.js';
@@ -48,7 +48,7 @@ export interface LibraryHand {
   marked: boolean;
   /** This person's Tags on it, sorted by name. Nobody else is ever told. */
   tags: Pick<Tag, 'id' | 'name'>[];
-  summary: HandSummary;
+  overview: HandOverview;
 }
 
 /** One page of the Hands a filter keeps, newest first, with how many it keeps. */
@@ -204,7 +204,7 @@ export class LibraryService {
         result,
         marked,
         tags: handTags,
-        summary: summarise(content),
+        overview: overview(content),
       })),
       options: { ...options, tags: ownTags },
       counts,

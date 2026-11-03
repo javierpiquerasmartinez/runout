@@ -8,7 +8,7 @@ interface LibraryHand {
   playedAt: string;
   stake: { smallBlind: number; bigBlind: number; currency: string };
   result: number;
-  summary: { finalPot: number };
+  overview: { finalPot: number };
 }
 
 interface LibraryPage {
@@ -79,7 +79,7 @@ describe('Sorting the Library (e2e)', () => {
   const resultInBigBlinds = (hand: LibraryHand) =>
     hand.result / hand.stake.bigBlind;
   const potInBigBlinds = (hand: LibraryHand) =>
-    hand.summary.finalPot / hand.stake.bigBlind;
+    hand.overview.finalPot / hand.stake.bigBlind;
 
   it('sorts by Result in big blinds, the biggest first or the smallest', async () => {
     const desc = await list(account.token, 'sort=result&dir=desc');

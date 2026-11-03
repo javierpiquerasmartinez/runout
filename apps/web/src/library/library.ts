@@ -99,7 +99,7 @@ export function roomCodeFromLibraryPath(path: string): string | null {
 }
 
 /** One Library row: what tells the spot apart at a glance. */
-export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 'stake' | 'summary'> & {
+export type LibraryHand = Pick<QueueEntry, 'site' | 'siteHandId' | 'playedAt' | 'stake' | 'overview'> & {
   id: string
   /** The Hero's Screen Name, from the Hand History. */
   hero: string

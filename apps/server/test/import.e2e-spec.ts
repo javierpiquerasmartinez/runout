@@ -18,7 +18,7 @@ interface Preview {
     playedAt: string;
     stake: { bigBlind: number; currency: string };
     board: string[];
-    summary: {
+    overview: {
       positions: string[];
       finalPot: number;
       finalStreet: string;
@@ -149,7 +149,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
           currency: 'EUR',
         },
         board: ['2c', '10h', '4c', 'Qs', '8c'],
-        summary: {
+        overview: {
           positions: ['BTN', 'BB'],
           finalPot: 105,
           finalStreet: 'river',

@@ -24,7 +24,7 @@ import {
 } from '../hands/hand.js';
 import { handKey, keyOf, storeHands } from '../hands/hand-store.js';
 import { importHandHistory, type Discarded } from '../hands/import/import.js';
-import { summarise, type HandSummary } from '../hands/replay/summary.js';
+import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { handSelection } from '../library/library-hand.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -50,7 +50,7 @@ export interface QueueEntry {
   siteHandId: string;
   playedAt: string;
   stake: Stake;
-  summary: HandSummary;
+  overview: HandOverview;
 }
 
 /** Who a Hand's Author would be, and whether its Hero matched their Screen Names. */
@@ -685,6 +685,6 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
     siteHandId: row.content.siteHandId,
     playedAt: row.content.playedAt,
     stake: row.content.stake,
-    summary: summarise(row.content),
+    overview: overview(row.content),
   };
 }

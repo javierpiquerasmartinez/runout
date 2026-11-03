@@ -21,7 +21,7 @@ import {
   type Discarded,
 } from '../hands/import/import.js';
 import { readUpload, UnreadableUpload } from '../hands/import/upload.js';
-import { summarise, type HandSummary } from '../hands/replay/summary.js';
+import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -44,7 +44,7 @@ export interface HandPreview extends Partial<Attribution> {
   playedAt: string;
   stake: Stake;
   board: string[];
-  summary: HandSummary;
+  overview: HandOverview;
   /** Into a Room only: whether the Hand is in the Importer's Library, so confirming queues that Library Hand. */
   inLibrary?: boolean;
 }
@@ -276,6 +276,6 @@ function handPreview(hand: Hand, attribution?: Attribution): HandPreview {
     playedAt: hand.playedAt,
     stake: hand.stake,
     board: hand.board,
-    summary: summarise(hand),
+    overview: overview(hand),
   };
 }

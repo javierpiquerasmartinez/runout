@@ -380,7 +380,7 @@ describe('Routes · from a Library Hand back to the Library', () => {
     result: 49,
     marked: false,
     tags: [],
-    summary: { positions, finalPot: 105, finalStreet: 'river', showdown: true },
+    overview: { positions, finalPot: 105, finalStreet: 'river', showdown: true },
   })
   const listPage = (page: number, hands: unknown[]) => ({
     ...emptyLibrary,

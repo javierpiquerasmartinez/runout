@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { Hand, SourceFormat } from '../hand.js';
-import { summarise } from '../replay/summary.js';
+import { overview } from '../replay/overview.js';
 import { timeline } from '../replay/timeline.js';
 import { importHandHistory, type DiscardReason } from './import.js';
 
@@ -349,7 +349,7 @@ describe('Hand History import: the fixture corpus', () => {
         hand.rake +
         (hand.splash ?? 0);
 
-      expect(paid).toBe(summarise(hand).finalPot);
+      expect(paid).toBe(overview(hand).finalPot);
     },
   );
 

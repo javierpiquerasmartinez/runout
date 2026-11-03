@@ -26,7 +26,7 @@ const firstHand: QueueEntry = {
   siteHandId: '262120750636',
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
-  summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+  overview: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
 }
 
 const secondHand: QueueEntry = { ...firstHand, id: 'entry-2', handId: 'hand-2', position: 2 }

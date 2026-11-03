@@ -21,7 +21,7 @@ const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryH
   result: 49,
   marked: false,
   tags: [],
-  summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+  overview: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
   ...overrides,
 })
 
@@ -84,7 +84,7 @@ beforeEach(() => {
   }
   pages = {
     '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1', { tags: [{ id: 't1', name: 'All-in' }, { id: 't2', name: 'Multiway' }] }), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),
-    '2': libraryPage({ total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { summary: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] }),
+    '2': libraryPage({ total: 3, page: 2, pageSize: 2, hands: [libraryHand('h3', { overview: { positions: ['CO', 'SB'], finalPot: 30, finalStreet: 'flop', showdown: false } })] }),
   }
   vi.stubGlobal(
     'fetch',

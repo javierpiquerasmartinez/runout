@@ -24,14 +24,14 @@ const entry = (overrides: Partial<QueueEntry> = {}): QueueEntry => ({
   siteHandId: '262120750636',
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
-  summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+  overview: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
   ...overrides,
 })
 
 describe('positionsLabel', () => {
   it('joins the Positions involved against each other', () => {
     expect(positionsLabel(entry(), es)).toBe('BTN vs BB')
-    expect(positionsLabel(entry({ summary: { ...entry().summary, positions: ['SB', 'BB', 'CO'] } }), es)).toBe(
+    expect(positionsLabel(entry({ overview: { ...entry().overview, positions: ['SB', 'BB', 'CO'] } }), es)).toBe(
       'SB vs BB vs CO',
     )
   })
@@ -40,9 +40,9 @@ describe('positionsLabel', () => {
 describe('streetLabel', () => {
   it('names the Final Street, or Showdown when the Hand went to one', () => {
     expect(streetLabel(entry(), es)).toBe('SHOWDOWN')
-    expect(streetLabel(entry({ summary: { ...entry().summary, showdown: false } }), es)).toBe('RIVER')
+    expect(streetLabel(entry({ overview: { ...entry().overview, showdown: false } }), es)).toBe('RIVER')
     expect(
-      streetLabel(entry({ summary: { ...entry().summary, finalStreet: 'preflop', showdown: false } }), es),
+      streetLabel(entry({ overview: { ...entry().overview, finalStreet: 'preflop', showdown: false } }), es),
     ).toBe('PREFLOP')
   })
 })
@@ -71,7 +71,7 @@ describe('potLabel', () => {
   it('reads the final pot in big blinds, in the UI language', () => {
     expect(potLabel(entry(), es)).toBe('Bote 10,5 BB')
     expect(potLabel(entry(), createTranslator('en'))).toBe('Pot 10.5 BB')
-    const exact = entry({ summary: { ...entry().summary, finalPot: 100 } })
+    const exact = entry({ overview: { ...entry().overview, finalPot: 100 } })
     expect(potLabel(exact, es)).toBe('Bote 10 BB')
   })
 

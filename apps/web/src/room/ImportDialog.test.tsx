@@ -16,7 +16,7 @@ const hand = (board: string[], hero = 'Marta88', heroMatched = true) => ({
   playedAt: '2026-09-18T12:34:30.000Z',
   stake: { limit: 'no-limit' as const, smallBlind: 5, bigBlind: 10, currency: 'EUR' },
   board,
-  summary: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river' as const, showdown: true },
+  overview: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river' as const, showdown: true },
 })
 
 const previews: Record<string, ImportPreview> = {

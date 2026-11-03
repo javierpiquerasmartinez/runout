@@ -505,7 +505,7 @@ function HandTable({
         <tbody>
           {hands.map((hand) => {
             const positions = positionsLabel(hand, i18n)
-            const pot = quantity(hand.summary.finalPot, hand.stake, displayUnit, i18n, { maximumFractionDigits: 2 })
+            const pot = quantity(hand.overview.finalPot, hand.stake, displayUnit, i18n, { maximumFractionDigits: 2 })
             const result = quantity(hand.result, hand.stake, displayUnit, i18n, {
               maximumFractionDigits: 2,
               signDisplay: 'exceptZero',
@@ -548,7 +548,7 @@ function HandTable({
                   {result.primary}
                 </td>
                 <td>
-                  <span className="library-row__street ro-mono" data-showdown={hand.summary.showdown || undefined}>
+                  <span className="library-row__street ro-mono" data-showdown={hand.overview.showdown || undefined}>
                     {streetLabel(hand, i18n)}
                   </span>
                 </td>
