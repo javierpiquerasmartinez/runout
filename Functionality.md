@@ -652,7 +652,8 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 - With one side, dealing the next card, from the grid, as text or at random, turns my selection (H9.14) into that Street's Narrowing. From then on the Analysis works with only the Combos of those Categories, each at its Frequency: the matrix, the live Combos and width, the Categories and their %, and where my own hand stands, with its Equity (H9.15). Dealing with nothing selected carries the whole Range on. The same happens from the turn to the river.
 - Taking the last card off the Board goes back to the Street before, with its Narrowing shown again as my selection. Changing a card of a Street already narrowed, from the grid or by typing another Board, drops that Street's Narrowing and every later one; clearing the Board drops them all. Changing the Dead Cards keeps them, and loading or clearing the Range drops them.
-- While the Range is narrowed the brush is locked, saying why: painting cells the Narrowing hides would mean nothing. Going back to the flop unlocks it.
+- Above the selection, **Acotado** shows the trail of Narrowings, one step per Street: its Board, the Categories kept (**Todo** for a Street dealt with nothing selected) and the Combos and % kept of the step before. Removing a step makes that Street keep the whole Range, and every later Street is worked out again on what is left, without touching the Board. With no Narrowing there is no trail.
+- While the Range is narrowed the brush is locked, saying why: painting cells the Narrowing hides would mean nothing. Going back to the flop, or removing every step of the trail, unlocks it.
 - The address holds the Narrowings, the Categories kept on each Street, so reloading or going back keeps the hand I am reading.
 - With two sides nothing narrows yet: dealing keeps both whole Ranges.
 

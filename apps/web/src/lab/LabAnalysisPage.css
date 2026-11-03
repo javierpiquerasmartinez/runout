@@ -344,6 +344,51 @@
   outline-offset: var(--focus-offset);
 }
 
+/* ---- The trail of Narrowings: one step per Street, its Board beside what it kept ---- */
+.analysis__trail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.analysis__trail-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.analysis__trail-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.analysis__trail-board {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.analysis__trail-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.analysis__trail-text p {
+  margin: 0;
+}
+.analysis__trail-kept {
+  font-size: 13px;
+}
+.analysis__trail-share {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ---- The selection: its share and what to do with it, above the Categories ---- */
 .analysis__selection {
   display: flex;

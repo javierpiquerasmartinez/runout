@@ -19,6 +19,7 @@ import {
   selectionOf,
   tenAs10,
   type CategoryRow,
+  type Narrowing,
   type OwnCombo,
 } from './board'
 import { AnalysisSideSection, type RangeSummary } from './AnalysisSideSection'
@@ -36,6 +37,7 @@ import {
 } from './lab'
 import { CategoriesTable } from './CategoriesTable'
 import { LabNav } from './LabNav'
+import { NarrowingTrail } from './NarrowingTrail'
 import type { HandClass, Range } from './range'
 import { Brush } from './RangeControls'
 import './LabRangesPage.css'
@@ -124,6 +126,7 @@ export function LabAnalysisPage() {
   const [hover, setHover] = useState<(PickedOn & { category: string }) | null>(null)
   /** Whether the Draws show the one-card backdoor flush draw: off by default, as in Flopzilla. */
   const [oneCardBackdoors, setOneCardBackdoors] = useState(false)
+  const drawOptions = useMemo(() => ({ oneCardBackdoors }), [oneCardBackdoors])
   /** The matrix cell under the pointer or the focus, to show its Hand Class's Equity. */
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null)
 
@@ -292,6 +295,19 @@ export function LabAnalysisPage() {
               onDeadChange={(cards) => change((state) => ({ ...state, dead: cards }))}
             >
               {(own || ownEquity) && <OwnComboSummary own={own} equity={ownEquity} dead={dead} />}
+              {/* Each side's own trail, above the Selection it will add to. */}
+              {sides.map((side, index) => (
+                <NarrowingTrail
+                  key={index}
+                  range={side.range}
+                  narrowings={side.narrowings}
+                  board={board}
+                  dead={dead}
+                  options={drawOptions}
+                  label={two ? t('lab.analysis.trail.side', { side: sideLabel(index) }) : t('lab.analysis.trail')}
+                  onRemove={(street) => changeSide(index)((each) => ({ ...each, narrowings: withoutNarrowing(each.narrowings, street) }))}
+                />
+              ))}
               {anySelected && (
                 <section className="analysis__selection" aria-label={t('lab.analysis.selection')}>
                   <span className="lab__label">{t('lab.analysis.selection')}</span>
@@ -364,6 +380,13 @@ export function LabAnalysisPage() {
   )
 }
 
+/** The Narrowings with this Street's taken away: it keeps the whole Range, and the later Streets narrow what is left. */
+function withoutNarrowing(narrowings: readonly Narrowing[], street: number): Narrowing[] {
+  const left = narrowings.map((kept, index) => (index === street ? [] : kept))
+  // A Street not narrowed at the end is not kept: nothing tells it from one never dealt.
+  while (left.length > 0 && left[left.length - 1].length === 0) left.pop()
+  return left
+}
 
 /** The pieces the Analysis writes an Equity with: `Equity 64.7 %`, `± 0.08 %`, `Win 47.1 % · Tie 35.3 %`. */
 function useEquityText() {
