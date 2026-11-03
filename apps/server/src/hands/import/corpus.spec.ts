@@ -66,6 +66,22 @@ const CORPUS: CorpusEntry[] = [
     discarded: [],
   },
   {
+    file: 'pokerstars-pot-limit.txt',
+    format: 'pokerstars',
+    hands: [
+      {
+        siteHandId: '262150000101',
+        stake: {
+          ...USD_05_10,
+          limit: 'pot-limit',
+          smallBlind: 25,
+          bigBlind: 50,
+        },
+      },
+    ],
+    discarded: [],
+  },
+  {
     file: 'pokerstars-ten-max.txt',
     format: 'pokerstars',
     hands: [],
