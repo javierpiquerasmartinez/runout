@@ -523,3 +523,35 @@ export function ownCombo(
     behind: standing(behind),
   }
 }
+
+/** The ids of the Categories a Street's Narrowing kept; none for a Street not narrowed. */
+export type Narrowing = readonly string[]
+
+/** Every Category a Range has on a Board, as the Analysis's tables show them. */
+function categoryRows(range: Range, board: readonly string[], dead: readonly string[], options: DrawOptions): CategoryRow<string>[] {
+  return [...madeHands(range, board, dead), ...draws(range, board, dead, options), ...combinationDraws(range, board, dead)]
+}
+
+/**
+ * The Range on the Board's Street after its Narrowings, the flop's first: each
+ * keeps, on the Board as it stood on its Street, the Combos in any of its
+ * Categories, at their Frequencies. A Street not narrowed keeps everything; a
+ * Category that is not on its Street, or not on screen, keeps nothing.
+ */
+export function rangeOnStreet(
+  range: Range,
+  board: readonly string[],
+  dead: readonly string[],
+  narrowings: readonly Narrowing[],
+  options: DrawOptions = { oneCardBackdoors: false },
+): Range {
+  let narrowed = range
+  // Only the Streets before the Board's own.
+  narrowings.slice(0, Math.max(0, board.length - FLOP_CARDS)).forEach((kept, index) => {
+    if (kept.length === 0) return
+    const street = board.slice(0, FLOP_CARDS + index)
+    const rows = categoryRows(narrowed, street, dead, options).filter((row) => kept.includes(row.category))
+    narrowed = selectionOf(narrowed, [...street, ...dead], rows).range
+  })
+  return narrowed
+}

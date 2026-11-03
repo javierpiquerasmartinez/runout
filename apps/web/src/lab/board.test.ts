@@ -16,6 +16,7 @@ import {
   selectionOf,
   withRandomCard,
   randomFlop,
+  rangeOnStreet,
   toggleCard,
 } from './board'
 import { HAND_CLASS_BY_NAME, topRange } from './range'
@@ -436,6 +437,35 @@ describe('a selection of Categories', () => {
 
   it('is nothing when no row is selected', () => {
     expect(selectionOf(range, board, [])).toEqual({ combos: 0, share: 0, range: {} })
+  })
+})
+
+describe('the Range on a Street after its Narrowings', () => {
+  const range = { AsAh: 100, AhKd: 50, KsKc: 100, '7s7d': 100, QhJh: 50 }
+  const flop = ['Kh', '7c', '2d']
+
+  it('keeps, Street by Street, the Combos of the Categories each Narrowing kept, at their Frequencies', () => {
+    expect(rangeOnStreet(range, [...flop, '9s'], [], [['set', 'top-pair']])).toEqual({ AhKd: 50, KsKc: 100, '7s7d': 100 })
+    expect(rangeOnStreet(range, [...flop, '9s', '3h'], [], [['set', 'top-pair'], ['top-pair']])).toEqual({ AhKd: 50 })
+  })
+
+  it('is the whole Range with no Narrowing, and through a Street that kept nothing narrowed', () => {
+    expect(rangeOnStreet(range, flop, [], [])).toEqual(range)
+    expect(rangeOnStreet(range, [...flop, '9s'], [], [[]])).toEqual(range)
+    expect(rangeOnStreet(range, [...flop, '9s', '3h'], [], [[], ['overpair']])).toEqual({ AsAh: 100 })
+  })
+
+  it('keeps nothing from a Category that is not on that Street, or not on screen', () => {
+    // No flush on a rainbow flop, and the one-card backdoor is hidden unless asked for.
+    expect(rangeOnStreet(range, [...flop, '9s'], [], [['flush', 'set', 'nonsense']])).toEqual({ KsKc: 100, '7s7d': 100 })
+    expect(rangeOnStreet({ AhKd: 100, QhJh: 100 }, ['Kh', '7h', '2d', '9s'], [], [['backdoor-one-card']])).toEqual({})
+    expect(
+      rangeOnStreet({ AhKd: 100, QhJh: 100 }, ['Kh', '7h', '2d', '9s'], [], [['backdoor-one-card']], { oneCardBackdoors: true }),
+    ).toEqual({ AhKd: 100 })
+  })
+
+  it('leaves out the Combos the Dead Cards remove', () => {
+    expect(rangeOnStreet(range, [...flop, '9s'], ['Ks', 'Qd'], [['set', 'top-pair']])).toEqual({ AhKd: 50, '7s7d': 100 })
   })
 })
 
