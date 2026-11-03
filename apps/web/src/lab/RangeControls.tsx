@@ -3,6 +3,7 @@ import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { copyText } from '../ui/clipboard'
 import { Icon } from '../ui/Icon'
+import { lockedProps } from '../ui/locked'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import {
   formatRange,
@@ -34,7 +35,16 @@ const STROKE_STEP = 6
 const COPIED_FOR_MS = 2000
 
 /** The brush's Frequency: a shortcut, or a whole number from 1 to 100 typed in its field. */
-export function Brush({ brush, onChange }: { brush: number; onChange: (frequency: number) => void }) {
+export function Brush({
+  brush,
+  onChange,
+  lockedReason,
+}: {
+  brush: number
+  onChange: (frequency: number) => void
+  /** Why it cannot paint, if it cannot: said beside it, and on each of its controls. */
+  lockedReason?: string
+}) {
   const { t } = useI18n()
   /** The field while it is being typed in, which may not be a Frequency yet; null shows the brush's. */
   const [typed, setTyped] = useState<string | null>(null)
@@ -50,6 +60,7 @@ export function Brush({ brush, onChange }: { brush: number; onChange: (frequency
           setTyped(null)
           onChange(Number(value))
         }}
+        disabledReason={lockedReason}
       />
       <label className="lab__brush-field" data-active={custom || undefined}>
         <input
@@ -61,6 +72,8 @@ export function Brush({ brush, onChange }: { brush: number; onChange: (frequency
           step={1}
           value={typed ?? String(brush)}
           aria-label={t('lab.brush.frequency')}
+          readOnly={lockedReason !== undefined}
+          {...lockedProps(t('lab.brush.frequency'), lockedReason)}
           onChange={(event) => {
             const value = event.target.value
             setTyped(value)
@@ -70,6 +83,7 @@ export function Brush({ brush, onChange }: { brush: number; onChange: (frequency
         />
         <span aria-hidden="true">%</span>
       </label>
+      {lockedReason !== undefined && <p className="lab__muted lab__locked">{lockedReason}</p>}
     </div>
   )
 }

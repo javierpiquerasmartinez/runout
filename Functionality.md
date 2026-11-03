@@ -621,7 +621,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 
 - Clicking a row toggles it in the selection; hovering a row lights it up without selecting it. With two sides (H9.16) each side has its own selection: clicking a row in a side's column toggles it for that side only, from the keyboard too, and hovering a row lights it up on both. The selected rows' Combos light up in the matrix, each cell in proportion to its Combos in the selection, at their Frequencies.
 - Above the tables, the selection shows its Combos and its % of the live Combos, counting each Combo once however many selected rows hold it.
-- **Limpiar selección** clears it in one click, on both sides; changing the Range, the Board or the Dead Cards (H9.15) clears it too.
+- **Limpiar selección** clears it in one click, on both sides; changing the Range, the Board or the Dead Cards (H9.15) clears it too. Dealing the next card turns it into that Street's Narrowing instead, and taking that card off brings it back (H9.18).
 - Nothing in the selection is saved: it lives in the Analysis only.
 
 **H9.15 — Take my own hand out of the deck.** As a player, I want to set up to two Dead Cards, usually my own hand, so the Range counts only what my opponent can hold and I see where my hand stands.
@@ -647,6 +647,15 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - It appears at once and sharpens while I look, saying **Muestreada** with the margin it reached (it stops under ±0.1 % or after a time cap), or **Exacta** when every deal was counted, as on the river and on smaller turns. The screen keeps responding meanwhile.
 - Changing either Range or the Board starts it over, and a number for what is no longer on screen is never shown. With an empty side, while the flop is half picked, or when no Combo of one side can meet one of the other, there is no bar.
 - Hovering a cell of either matrix shows that Hand Class's Equity against the other side, with its win and tie shares and, while sampled, its own wider margin; a Hand Class that meets no Combo of the other side says so.
+
+**H9.18 — Narrow the Range Street by Street.** As a player, I want the Categories I keep on one Street to be the Range I study on the next, so I can follow a hand as Flopzilla does.
+
+- With one side, dealing the next card, from the grid, as text or at random, turns my selection (H9.14) into that Street's Narrowing. From then on the Analysis works with only the Combos of those Categories, each at its Frequency: the matrix, the live Combos and width, the Categories and their %, and where my own hand stands, with its Equity (H9.15). Dealing with nothing selected carries the whole Range on. The same happens from the turn to the river.
+- Taking the last card off the Board goes back to the Street before, with its Narrowing shown again as my selection. Changing a card of a Street already narrowed, from the grid or by typing another Board, drops that Street's Narrowing and every later one; clearing the Board drops them all. Changing the Dead Cards keeps them, and loading or clearing the Range drops them.
+- Above the selection, **Acotado** shows the trail of Narrowings, one step per Street: its Board, the Categories kept (**Todo** for a Street dealt with nothing selected) and the Combos and % kept of the step before. Removing a step makes that Street keep the whole Range, and every later Street is worked out again on what is left, without touching the Board. With no Narrowing there is no trail.
+- While the Range is narrowed the brush is locked, saying why: painting cells the Narrowing hides would mean nothing. Going back to the flop, or removing every step of the trail, unlocks it.
+- The address holds the Narrowings, the Categories kept on each Street, so reloading or going back keeps the hand I am reading.
+- With two sides (H9.16) each side narrows on its own: dealing the next card turns each side's own selection into its Narrowing, and the Equity between them (H9.17) is worked out between the two narrowed Ranges. Each side has its own trail, **Acotado · Rango 1** and **Acotado · Rango 2**, whose remove buttons name the side, and its own brush lock. Loading or clearing one side drops only its Narrowings; adding or removing the second side keeps the first's. The address holds both.
 
 ## MVP scope and out of scope
 

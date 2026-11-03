@@ -16,6 +16,11 @@ const BOARD_SIZES: readonly number[] = [0, 3, 4, 5]
 /** The cards a flop deals. */
 export const FLOP_CARDS = 3
 
+/** How many Streets come before the own of a Board with this many cards: the ones it can be narrowed on. */
+export function streetsBefore(cards: number): number {
+  return Math.max(0, cards - FLOP_CARDS)
+}
+
 /** The most cards a Board holds. */
 export const MAX_BOARD_CARDS = 5
 
@@ -276,8 +281,8 @@ function rowsOf<Category extends string>(
   })
 }
 
-/** Rows picked from the Categories tables, studied as one part of the Range. */
-export interface Selection {
+/** The Combos rows picked from the Categories tables make, studied as one part of the Range. */
+export interface SelectedCombos {
   /** Its Combos, each counted once by its Frequency, however many of its rows hold it. */
   combos: number
   /** That, as a share of the live Combos, from 0 to 100; 0 when none are live. */
@@ -287,7 +292,7 @@ export interface Selection {
 }
 
 /** The selection these rows of the Range make, with these cards out of the deck: the Board's and the Dead Cards. */
-export function selectionOf(range: Range, out: readonly string[], rows: readonly Pick<CategoryRow<string>, 'members'>[]): Selection {
+export function selectionOf(range: Range, out: readonly string[], rows: readonly Pick<CategoryRow<string>, 'members'>[]): SelectedCombos {
   const selected: Range = {}
   for (const row of rows) for (const combo of row.members) selected[combo] = range[combo]
   const combos = liveCombos(selected, out)
@@ -522,4 +527,98 @@ export function ownCombo(
     tied: standing(tied),
     behind: standing(behind),
   }
+}
+
+/** Any Category of the Analysis's tables. */
+export type Category = MadeHand | Draw | CombinationDraw
+
+/** Every Category, in the tables' order: the Made Hands, the Draws, then the combination Draws. */
+export const CATEGORIES: readonly Category[] = [...MADE_HANDS, ...DRAWS, ...COMBINATION_DRAWS]
+
+/** The key of a Category's name among the Lab's messages. */
+export type CategoryNameKey =
+  | `lab.analysis.madeHand.${MadeHand}`
+  | `lab.analysis.draw.${Draw}`
+  | `lab.analysis.combinationDraw.${CombinationDraw}`
+
+const MADE_HAND_IDS: readonly string[] = MADE_HANDS
+const DRAW_IDS: readonly string[] = DRAWS
+
+/** The key of this Category's name, by the table it is in. */
+export function categoryNameKey(category: Category): CategoryNameKey {
+  if (MADE_HAND_IDS.includes(category)) return `lab.analysis.madeHand.${category as MadeHand}`
+  if (DRAW_IDS.includes(category)) return `lab.analysis.draw.${category as Draw}`
+  return `lab.analysis.combinationDraw.${category as CombinationDraw}`
+}
+
+/** The ids of some Categories, as a side marks or keeps them. */
+export type CategoryIds = readonly string[]
+
+/** The Categories marked on a side on the current Street. */
+export type Selection = CategoryIds
+
+/** The Categories a Street's Narrowing kept, the Selection it was dealt on with; none for a Street not narrowed. */
+export type Narrowing = CategoryIds
+
+/** A side's rows, one table per kind of Category. */
+export interface CategoryTables {
+  madeHands: readonly CategoryRow<MadeHand>[]
+  draws: readonly CategoryRow<Draw>[]
+  combinationDraws: readonly CategoryRow<CombinationDraw>[]
+}
+
+/** Every row of the tables in their order, as CATEGORIES lists them. */
+export function rowsInOrder({ madeHands, draws, combinationDraws }: CategoryTables): CategoryRow<Category>[] {
+  return [...madeHands, ...draws, ...combinationDraws]
+}
+
+/** Every Category a Range has on a Board, as the Analysis's tables show them. */
+function categoryRows(range: Range, board: readonly string[], dead: readonly string[], options: DrawOptions): CategoryRow<Category>[] {
+  return rowsInOrder({
+    madeHands: madeHands(range, board, dead),
+    draws: draws(range, board, dead, options),
+    combinationDraws: combinationDraws(range, board, dead),
+  })
+}
+
+/**
+ * The Range on each Street of the Board up to its own, the flop's first: the
+ * whole Range on the flop, then on each next Street what the Narrowing of the
+ * one before kept. Each Narrowing keeps, on the Board as it stood on its
+ * Street, the Combos in any of its Categories, at their Frequencies. A Street
+ * not narrowed keeps everything, the same Range; a Category that is not on its
+ * Street, or not on screen, keeps nothing. Narrowings past the Board are left
+ * out. Before a flop, only the whole Range.
+ */
+export function rangesOnStreets(
+  range: Range,
+  board: readonly string[],
+  dead: readonly string[],
+  narrowings: readonly Narrowing[],
+  options: DrawOptions = { oneCardBackdoors: false },
+): Range[] {
+  const ranges = [range]
+  for (let index = 0; index < streetsBefore(board.length); index++) {
+    const before = ranges[index]
+    const kept = narrowings[index] ?? []
+    if (kept.length === 0) {
+      ranges.push(before)
+      continue
+    }
+    const street = board.slice(0, FLOP_CARDS + index)
+    const rows = categoryRows(before, street, dead, options).filter((row) => kept.includes(row.category))
+    ranges.push(selectionOf(before, [...street, ...dead], rows).range)
+  }
+  return ranges
+}
+
+/** The Range on the Board's own Street after its Narrowings: the last of rangesOnStreets. */
+export function rangeOnStreet(
+  range: Range,
+  board: readonly string[],
+  dead: readonly string[],
+  narrowings: readonly Narrowing[],
+  options: DrawOptions = { oneCardBackdoors: false },
+): Range {
+  return rangesOnStreets(range, board, dead, narrowings, options).at(-1)!
 }

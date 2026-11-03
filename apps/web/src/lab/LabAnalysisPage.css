@@ -240,6 +240,9 @@
 
 /* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
 /* Made Hands in one column; the Draws with the combination Draws in another. */
+.analysis__categories-columns {
+  display: contents;
+}
 .analysis__categories-column {
   /* What it hides for screen readers stays inside it, and inside its scrolling. */
   position: relative;
@@ -342,6 +345,53 @@
 .analysis__category:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
+}
+
+/* ---- The trail of Narrowings: one step per Street, its Board above what it kept ---- */
+.analysis__trail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.analysis__trail-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The Board column is narrow: the Board and its remove button share a line, the text gets the full width under them */
+.analysis__trail-step {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 10px;
+}
+.analysis__trail-board {
+  display: flex;
+  gap: 2px;
+}
+.analysis__trail-text {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.analysis__trail-text p {
+  margin: 0;
+}
+.analysis__trail-kept {
+  font-size: 13px;
+}
+.analysis__trail-share {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* ---- The selection: its share and what to do with it, above the Categories ---- */
@@ -571,8 +621,25 @@
   .analysis__body[data-sides='2'] .analysis__board {
     grid-row: 1 / span 2;
   }
-  .analysis__body[data-sides='2'] .analysis__categories-column {
+  /* One column for both, scrolling as one: on a wet Board the Made Hands would otherwise leave the Draws a sliver. */
+  .analysis__body[data-sides='2'] .analysis__categories-columns {
     grid-column: 4;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    /* Room for the focus rings the scrolling would clip. */
+    margin: -4px;
+    padding: 4px 8px 4px 4px;
+  }
+  .analysis__body[data-sides='2'] .analysis__categories-column {
+    flex-shrink: 0;
+    overflow-y: visible;
+    margin: 0;
+    padding: 0;
   }
   .analysis__body[data-sides='2'] .analysis__side .lab__cell {
     font-size: clamp(7px, 0.6vw, 9px);

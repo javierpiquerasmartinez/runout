@@ -415,6 +415,11 @@
 .lab__muted {
   color: var(--text-muted);
 }
+/* Why the brush, or one side's matrix, cannot paint: a muted line, as small as the numbers beside it. */
+.lab__locked {
+  margin: 0;
+  font-size: 12px;
+}
 .lab__breakdown {
   margin: 0;
   display: flex;
