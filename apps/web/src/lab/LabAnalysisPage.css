@@ -240,6 +240,9 @@
 
 /* ---- The Categories: how the Range hits the Board, as wide as the Board's deck ---- */
 /* Made Hands in one column; the Draws with the combination Draws in another. */
+.analysis__categories-columns {
+  display: contents;
+}
 .analysis__categories-column {
   /* What it hides for screen readers stays inside it, and inside its scrolling. */
   position: relative;
@@ -618,8 +621,25 @@
   .analysis__body[data-sides='2'] .analysis__board {
     grid-row: 1 / span 2;
   }
-  .analysis__body[data-sides='2'] .analysis__categories-column {
+  /* One column for both, scrolling as one: on a wet Board the Made Hands would otherwise leave the Draws a sliver. */
+  .analysis__body[data-sides='2'] .analysis__categories-columns {
     grid-column: 4;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    /* Room for the focus rings the scrolling would clip. */
+    margin: -4px;
+    padding: 4px 8px 4px 4px;
+  }
+  .analysis__body[data-sides='2'] .analysis__categories-column {
+    flex-shrink: 0;
+    overflow-y: visible;
+    margin: 0;
+    padding: 0;
   }
   .analysis__body[data-sides='2'] .analysis__side .lab__cell {
     font-size: clamp(7px, 0.6vw, 9px);

@@ -332,51 +332,54 @@ export function LabAnalysisPage() {
                 </section>
               )}
             </BoardPicker>
-            {/* Each kind of Category in a column of its own, scrolling on its own when it is taller than the screen. */}
-            {madeHandRows[0].length > 0 && (
-              <div className="analysis__categories-column">
-                <CategoriesTable
-                  title={t('lab.analysis.madeHands')}
-                  heading={t('lab.analysis.madeHands.category')}
-                  sides={sidesOf(madeHandRows)}
-                  nameOf={(madeHand) => t(categoryNameKey(madeHand))}
-                  {...categoriesTable}
-                />
-              </div>
-            )}
-            {anyDraws && (
-              <div className="analysis__categories-column">
-                {drawRows[0].length > 0 && (
-                  <div className="analysis__draws">
-                    <CategoriesTable
-                      title={t('lab.analysis.draws')}
-                      heading={t('lab.analysis.draws.category')}
-                      sides={sidesOf(drawRows)}
-                      nameOf={(draw) => t(categoryNameKey(draw))}
-                      {...categoriesTable}
-                    />
-                    {/* Backdoors are only drawn on the flop. */}
-                    {board.length === FLOP_CARDS && (
-                      <Toggle
-                        label={t('lab.analysis.draws.oneCardBackdoors')}
-                        checked={oneCardBackdoors}
-                        onChange={setOneCardBackdoors}
-                        showLabel
-                      />
-                    )}
-                  </div>
-                )}
-                {combinationDrawRows[0].length > 0 && (
+            {/* Each kind of Category in a column of its own, scrolling on its own when it is taller than the screen.
+                With two Ranges they stack in one column and scroll together. */}
+            <div className="analysis__categories-columns">
+              {madeHandRows[0].length > 0 && (
+                <div className="analysis__categories-column">
                   <CategoriesTable
-                    title={t('lab.analysis.combinationDraws')}
-                    heading={t('lab.analysis.combinationDraws.category')}
-                    sides={sidesOf(combinationDrawRows)}
-                    nameOf={(combinationDraw) => t(categoryNameKey(combinationDraw))}
+                    title={t('lab.analysis.madeHands')}
+                    heading={t('lab.analysis.madeHands.category')}
+                    sides={sidesOf(madeHandRows)}
+                    nameOf={(madeHand) => t(categoryNameKey(madeHand))}
                     {...categoriesTable}
                   />
-                )}
-              </div>
-            )}
+                </div>
+              )}
+              {anyDraws && (
+                <div className="analysis__categories-column">
+                  {drawRows[0].length > 0 && (
+                    <div className="analysis__draws">
+                      <CategoriesTable
+                        title={t('lab.analysis.draws')}
+                        heading={t('lab.analysis.draws.category')}
+                        sides={sidesOf(drawRows)}
+                        nameOf={(draw) => t(categoryNameKey(draw))}
+                        {...categoriesTable}
+                      />
+                      {/* Backdoors are only drawn on the flop. */}
+                      {board.length === FLOP_CARDS && (
+                        <Toggle
+                          label={t('lab.analysis.draws.oneCardBackdoors')}
+                          checked={oneCardBackdoors}
+                          onChange={setOneCardBackdoors}
+                          showLabel
+                        />
+                      )}
+                    </div>
+                  )}
+                  {combinationDrawRows[0].length > 0 && (
+                    <CategoriesTable
+                      title={t('lab.analysis.combinationDraws')}
+                      heading={t('lab.analysis.combinationDraws.category')}
+                      sides={sidesOf(combinationDrawRows)}
+                      nameOf={(combinationDraw) => t(categoryNameKey(combinationDraw))}
+                      {...categoriesTable}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
