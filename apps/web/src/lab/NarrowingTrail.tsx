@@ -1,31 +1,9 @@
 import { useMemo } from 'react'
-import { useI18n, type MessageKey } from '../i18n'
+import { useI18n } from '../i18n'
 import { Card } from '../ui/Card'
 import { IconButton } from '../ui/IconButton'
-import {
-  COMBINATION_DRAWS,
-  DRAWS,
-  FLOP_CARDS,
-  formatBoard,
-  liveCombos,
-  MADE_HANDS,
-  rangeOnStreet,
-  tenAs10,
-  type CombinationDraw,
-  type Draw,
-  type DrawOptions,
-  type MadeHand,
-  type Narrowing,
-} from './board'
+import { CATEGORIES, categoryNameKey, FLOP_CARDS, formatBoard, liveCombos, streetsBefore, tenAs10, type Category, type Narrowing } from './board'
 import type { Range } from './range'
-
-/** Every Category id in the tables' order, each with the key of its name. */
-const CATEGORY_NAMES = new Map<string, MessageKey>([
-  ...MADE_HANDS.map((id: MadeHand) => [id, `lab.analysis.madeHand.${id}`] as const),
-  ...DRAWS.map((id: Draw) => [id, `lab.analysis.draw.${id}`] as const),
-  ...COMBINATION_DRAWS.map((id: CombinationDraw) => [id, `lab.analysis.combinationDraw.${id}`] as const),
-])
-const CATEGORY_ORDER = [...CATEGORY_NAMES.keys()]
 
 /** The Streets a Narrowing can be made on: every one but the river, the last. */
 const STREETS = ['flop', 'turn'] as const
@@ -33,7 +11,7 @@ const STREETS = ['flop', 'turn'] as const
 interface Step {
   street: (typeof STREETS)[number]
   cards: readonly string[]
-  kept: Narrowing
+  kept: readonly Category[]
   combos: number
   share: number
 }
@@ -46,21 +24,19 @@ interface Step {
  * whole Range. Nothing is shown while the side has no Narrowing.
  */
 export function NarrowingTrail({
-  range,
+  ranges,
   narrowings,
   board,
   dead,
-  options,
   label,
   side,
   onRemove,
 }: {
-  /** The side's Range, before any Narrowing. */
-  range: Range
+  /** The side's Range on each Street up to the Board's own, the flop's first: its rangesOnStreets. */
+  ranges: readonly Range[]
   narrowings: readonly Narrowing[]
   board: readonly string[]
   dead: readonly string[]
-  options: DrawOptions
   label: string
   /** The side's name, with two: it tells the two trails' remove buttons apart. */
   side?: string
@@ -68,21 +44,20 @@ export function NarrowingTrail({
   onRemove: (street: number) => void
 }) {
   const { t, formatNumber } = useI18n()
-  const streets = Math.max(0, Math.min(board.length - FLOP_CARDS, STREETS.length))
+  const streets = Math.min(streetsBefore(board.length), STREETS.length)
   const narrowed = narrowings.slice(0, streets).some((kept) => kept.length > 0)
   const steps = useMemo<Step[]>(() => {
     if (!narrowed) return []
     return STREETS.slice(0, streets).map((street, index) => {
       const cards = board.slice(0, FLOP_CARDS + index)
-      // Measured on the next Street's Board, which applies every Narrowing given; counted with this Street's cards out.
-      const next = board.slice(0, FLOP_CARDS + index + 1)
+      // The Range on this Street, and on the next, which this Street's Narrowing made; counted with this Street's cards out.
       const out = [...cards, ...dead]
-      const before = liveCombos(rangeOnStreet(range, next, dead, narrowings.slice(0, index), options), out)
-      const after = liveCombos(rangeOnStreet(range, next, dead, narrowings.slice(0, index + 1), options), out)
-      const kept = [...(narrowings[index] ?? [])].sort((a, b) => CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b))
+      const before = liveCombos(ranges[index], out)
+      const after = liveCombos(ranges[index + 1], out)
+      const kept = CATEGORIES.filter((category) => (narrowings[index] ?? []).includes(category))
       return { street, cards, kept, combos: after, share: before > 0 ? (after / before) * 100 : 0 }
     })
-  }, [narrowed, streets, range, board, dead, narrowings, options])
+  }, [narrowed, streets, ranges, board, dead, narrowings])
 
   if (steps.length === 0) return null
   const oneDecimal = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -100,12 +75,7 @@ export function NarrowingTrail({
             <div className="analysis__trail-text">
               <p className="lab__label">{t(`lab.analysis.trail.street.${street}`)}</p>
               <p className="analysis__trail-kept">
-                {kept.length > 0
-                  ? kept.flatMap((category) => {
-                      const name = CATEGORY_NAMES.get(category)
-                      return name ? [t(name)] : []
-                    }).join(', ')
-                  : t('lab.analysis.trail.everything')}
+                {kept.length > 0 ? kept.map((category) => t(categoryNameKey(category))).join(', ') : t('lab.analysis.trail.everything')}
               </p>
               <p className="analysis__trail-share ro-mono">
                 {t('lab.analysis.trail.share', { combos: oneDecimal(combos), percent: oneDecimal(share) })}

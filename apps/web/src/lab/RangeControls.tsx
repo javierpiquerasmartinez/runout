@@ -83,7 +83,7 @@ export function Brush({
         />
         <span aria-hidden="true">%</span>
       </label>
-      {lockedReason !== undefined && <p className="lab__muted lab__brush-locked">{lockedReason}</p>}
+      {lockedReason !== undefined && <p className="lab__muted lab__locked">{lockedReason}</p>}
     </div>
   )
 }

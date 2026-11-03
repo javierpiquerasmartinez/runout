@@ -31,6 +31,7 @@ export function AnalysisSideSection({
   side,
   narrowed,
   lockedReason,
+  showLockedReason = false,
   label,
   compact,
   saved,
@@ -46,6 +47,8 @@ export function AnalysisSideSection({
   narrowed: Range
   /** Why it cannot be painted, if it cannot: a Narrowing would hide the cells painted. */
   lockedReason?: string
+  /** Whether it says why under its matrix: when the brush, shared with the other side, does not. */
+  showLockedReason?: boolean
   /** What the side is called: the whole Analysis's Range, or "Range 1" or "Range 2" against another. */
   label: string
   /** Whether it shares the screen with another side: no label above its matrix, and only its live Combos under it. */
@@ -161,6 +164,7 @@ export function AnalysisSideSection({
         highlighted={highlighted}
         onHover={onHover}
       />
+      {showLockedReason && lockedReason !== undefined && <p className="lab__muted lab__locked">{lockedReason}</p>}
       <p className="analysis__live ro-mono">{t('lab.analysis.live', { combos: oneDecimal(liveCombos(narrowed, out)) })}</p>
       {!compact && <Stats stats={rangeStats(narrowed)} />}
     </section>

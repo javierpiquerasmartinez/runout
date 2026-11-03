@@ -1499,6 +1499,23 @@ describe('LabAnalysisPage · narrowing two Ranges', () => {
     expect(pressedIn('Range 2')).toEqual(['KK', 'KQs', '77'])
   })
 
+  it('says why under the narrowed side only', () => {
+    renderAnalysis('en', '/lab/analysis?range=AA%2CKQs&range2=KQs%2C77&board=Kd7c4h2s&narrowing=overpair')
+    const reason = 'The range is narrowed on the board: go back to the flop or clear the trail to paint it.'
+
+    expect(within(side('Range 1')).getByText(reason)).toBeTruthy()
+    expect(within(side('Range 2')).queryByText(reason)).toBeNull()
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+  })
+
+  it('says why once, in the brush, when both sides are narrowed', () => {
+    renderAnalysis('en', turn)
+    const reason = 'The range is narrowed on the board: go back to the flop or clear the trail to paint it.'
+
+    expect(within(screen.getByRole('group', { name: 'Brush' })).getByText(reason)).toBeTruthy()
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+  })
+
   it("drops only that side's Narrowings when one side is loaded or cleared", async () => {
     renderAnalysis('en', turn)
 

@@ -1,6 +1,6 @@
 import type { FailureReason } from '../backend/api'
 import type { I18n } from '../i18n/context'
-import { COMBINATION_DRAWS, DRAWS, FLOP_CARDS, formatBoard, MADE_HANDS, readBoardCards, readDeadCards, type Narrowing } from './board'
+import { CATEGORIES, FLOP_CARDS, formatBoard, readBoardCards, readDeadCards, streetsBefore, type Narrowing, type Selection } from './board'
 import { EMPTY_RANGE, formatRange, parseRange, type Range } from './range'
 
 /** The Lab ("Laboratorio"): an Account's study tools. It opens on the Analysis. */
@@ -72,16 +72,13 @@ const sideKeys = (index: number) => {
   return { range: `range${suffix}`, source: `source${suffix}`, narrowing: `narrowing${suffix}` }
 }
 
-/** Every Category id, in the tables' order, which is the order the address writes a Narrowing's in. */
-const CATEGORY_IDS: readonly string[] = [...MADE_HANDS, ...DRAWS, ...COMBINATION_DRAWS]
-
 /** What separates Streets in the address's Narrowings, and Categories within a Street, as `set.overpair_top-pair`. */
 const STREET_MARK = '_'
 const CATEGORY_MARK = '.'
 
-/** A side's Narrowings as the address writes them; empty when no Street is narrowed. */
+/** A side's Narrowings as the address writes them, each Street's Categories in the tables' order; empty when no Street is narrowed. */
 function formatNarrowings(narrowings: readonly Narrowing[]): string {
-  const streets = narrowings.map((kept) => CATEGORY_IDS.filter((id) => kept.includes(id)).join(CATEGORY_MARK))
+  const streets = narrowings.map((kept) => CATEGORIES.filter((id) => kept.includes(id)).join(CATEGORY_MARK))
   while (streets.length > 0 && streets[streets.length - 1] === '') streets.pop()
   return streets.join(STREET_MARK)
 }
@@ -91,8 +88,8 @@ function readNarrowings(text: string, board: readonly string[]): Narrowing[] {
   if (text === '') return []
   return text
     .split(STREET_MARK)
-    .slice(0, Math.max(0, board.length - FLOP_CARDS))
-    .map((street) => CATEGORY_IDS.filter((id) => street.split(CATEGORY_MARK).includes(id)))
+    .slice(0, streetsBefore(board.length))
+    .map((street) => CATEGORIES.filter((id) => street.split(CATEGORY_MARK).includes(id)))
 }
 
 /**
@@ -140,7 +137,7 @@ export function analysisStateFromSearch(search: string): AnalysisState {
 export interface MovedAlongBoard {
   state: AnalysisState
   /** Each side's Categories selected on the new Street: the Narrowing a card taken off brings back. Null drops the Selection. */
-  selections: Narrowing[] | null
+  selections: Selection[] | null
 }
 
 /**
@@ -150,24 +147,23 @@ export interface MovedAlongBoard {
  * Street gone back to as its Selection. Any other change keeps only the
  * Narrowings made on cards still on the Board, in the same place.
  */
-export function moveAlongBoard(state: AnalysisState, board: readonly string[], selections: readonly Narrowing[]): MovedAlongBoard {
+export function moveAlongBoard(state: AnalysisState, board: readonly string[], selections: readonly Selection[]): MovedAlongBoard {
   const before = state.board
   let same = 0
   while (same < before.length && same < board.length && before[same] === board[same]) same++
   if (same === before.length && same === board.length) return { state, selections: [...selections] }
 
-  const streetsOn = (cards: number) => Math.max(0, cards - FLOP_CARDS)
   const dealt = same === before.length && before.length >= FLOP_CARDS
   const takenOff = same === board.length && board.length >= FLOP_CARDS
   const sides = state.sides.map((side, index) => {
     if (dealt) {
-      const kept = Array.from({ length: streetsOn(before.length) }, (_, street) => side.narrowings[street] ?? [])
+      const kept = Array.from({ length: streetsBefore(before.length) }, (_, street) => side.narrowings[street] ?? [])
       return { ...side, narrowings: [...kept, selections[index] ?? []] }
     }
-    return { ...side, narrowings: side.narrowings.slice(0, Math.min(streetsOn(same + 1), streetsOn(board.length))) }
+    return { ...side, narrowings: side.narrowings.slice(0, Math.min(streetsBefore(same + 1), streetsBefore(board.length))) }
   })
   return {
     state: { ...state, sides, board },
-    selections: takenOff ? state.sides.map((side) => [...(side.narrowings[streetsOn(board.length)] ?? [])]) : null,
+    selections: takenOff ? state.sides.map((side) => [...(side.narrowings[streetsBefore(board.length)] ?? [])]) : null,
   }
 }

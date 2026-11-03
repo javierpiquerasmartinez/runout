@@ -9,13 +9,15 @@ import { Card } from '../ui/Card'
 import { Toggle } from '../ui/Toggle'
 import type { EquityRequest, EquityResult, SideEquity } from '@runout/poker'
 import {
+  categoryNameKey,
   combinationDraws,
   draws,
   FLOP_CARDS,
   madeHands,
   MAX_DEAD_CARDS,
   ownCombo,
-  rangeOnStreet,
+  rangesOnStreets,
+  rowsInOrder,
   selectionOf,
   tenAs10,
   type CategoryRow,
@@ -33,7 +35,6 @@ import {
   moveAlongBoard,
   type AnalysisSide,
   type AnalysisState,
-  type MovedAlongBoard,
 } from './lab'
 import { CategoriesTable } from './CategoriesTable'
 import { LabNav } from './LabNav'
@@ -114,7 +115,8 @@ function useAnalysisState(): [AnalysisState, (next: (state: AnalysisState) => An
 export function LabAnalysisPage() {
   const { t, formatNumber } = useI18n()
   const { token } = useIdentity()
-  const [{ sides, board, dead }, change] = useAnalysisState()
+  const [state, change] = useAnalysisState()
+  const { sides, board, dead } = state
   const [brush, setBrush] = useState<number>(100)
   /** The Account's saved Ranges, to load one; empty until they are read. */
   const [saved, setSaved] = useState<RangeSummary[]>([])
@@ -149,12 +151,14 @@ export function LabAnalysisPage() {
     }
   }, [token])
 
-  // Every Combo of the deck is classified to tell which Categories can happen: not on every render.
-  /** Each side's Range on this Street, after its Narrowings: what the whole Analysis studies. */
-  const narrowedRanges = useMemo(
-    () => sides.map((side) => rangeOnStreet(side.range, board, dead, side.narrowings, { oneCardBackdoors })),
-    [sides, board, dead, oneCardBackdoors],
+  /** Each side's Range on each Street up to the Board's own, after the Narrowings before it: its trail's steps. */
+  const streetRanges = useMemo(
+    () => sides.map((side) => rangesOnStreets(side.range, board, dead, side.narrowings, drawOptions)),
+    [sides, board, dead, drawOptions],
   )
+  /** Each side's Range on this Street, after its Narrowings: what the whole Analysis studies. */
+  const narrowedRanges = useMemo(() => streetRanges.map((ranges) => ranges[ranges.length - 1]), [streetRanges])
+  // Every Combo of the deck is classified to tell which Categories can happen: not on every render.
   // Each side's rows count only its own Range, whatever the other holds.
   const madeHandRows = useMemo(() => narrowedRanges.map((range) => madeHands(range, board, dead)), [narrowedRanges, board, dead])
   const drawRows = useMemo(
@@ -194,7 +198,8 @@ export function LabAnalysisPage() {
     on.ranges.every((each, index) => each === ranges[index])
   const selected = picked !== null && pickedHere(picked) ? picked.categories : sides.map(() => NO_CATEGORIES)
   const hovered = hover !== null && pickedHere(hover) ? hover.category : null
-  const rowsOfSide = (index: number) => [...madeHandRows[index], ...drawRows[index], ...combinationDrawRows[index]]
+  const rowsOfSide = (index: number) =>
+    rowsInOrder({ madeHands: madeHandRows[index], draws: drawRows[index], combinationDraws: combinationDrawRows[index] })
   const selections = narrowedRanges.map((each, index) =>
     selectionOf(each, out, rowsOfSide(index).filter((row) => selected[index].has(row.category))),
   )
@@ -206,20 +211,18 @@ export function LabAnalysisPage() {
   /** Why a side cannot be painted: its Narrowings would hide the cells it paints. */
   const lockedReason = (side: AnalysisSide) =>
     side.narrowings.some((kept) => kept.length > 0) ? t('lab.analysis.brush.narrowed') : undefined
+  /** The one brush is locked when every side is: it says why itself. */
+  const brushLocked = sides.every((side) => lockedReason(side) !== undefined)
   /**
    * The Board changed by the grid, by text or at random. Dealing on turns each
    * side's own Selection into its Narrowing of that Street. A card taken off
    * brings back each side's Narrowing it was dealt on as its Selection.
    */
   const changeBoard = (cards: string[]) => {
-    const moved: { to?: MovedAlongBoard } = {}
-    change((state) => {
-      moved.to = moveAlongBoard(state, cards, selected.map((categories) => [...categories]))
-      return moved.to.state
-    })
-    const { state, selections: backTo } = moved.to!
-    if (state.board === board) return
-    setPicked(backTo && { ranges, board: state.board, dead: state.dead, categories: backTo.map((categories) => new Set(categories)) })
+    const { state: moved, selections: backTo } = moveAlongBoard(state, cards, selected.map((categories) => [...categories]))
+    if (moved === state) return
+    change(() => moved)
+    setPicked(backTo && { ranges, board: moved.board, dead: moved.dead, categories: backTo.map((categories) => new Set(categories)) })
   }
   const anySelected = selected.some((categories) => categories.size > 0)
   const toggle = (category: string, side: number) => {
@@ -246,7 +249,7 @@ export function LabAnalysisPage() {
       <main className="lab__main">
         <h1 className="analysis__title">{t('lab.analysis')}</h1>
         <div className="analysis__toolbar">
-          <Brush brush={brush} onChange={setBrush} lockedReason={sides.every(lockedReason) ? lockedReason(sides[0]) : undefined} />
+          <Brush brush={brush} onChange={setBrush} lockedReason={brushLocked ? lockedReason(sides[0]) : undefined} />
           {sides.length < MAX_ANALYSIS_SIDES && (
             <Button variant="secondary" size="compact" onClick={addSide}>
               {t('lab.analysis.addSide')}
@@ -270,6 +273,8 @@ export function LabAnalysisPage() {
                 side={side}
                 narrowed={narrowedRanges[index]}
                 lockedReason={lockedReason(side)}
+                // The brush says why when it is locked for every side; otherwise only this side's matrix is.
+                showLockedReason={!brushLocked}
                 label={sideLabel(index)}
                 compact={two}
                 saved={saved}
@@ -298,11 +303,10 @@ export function LabAnalysisPage() {
               {sides.map((side, index) => (
                 <NarrowingTrail
                   key={index}
-                  range={side.range}
+                  ranges={streetRanges[index]}
                   narrowings={side.narrowings}
                   board={board}
                   dead={dead}
-                  options={drawOptions}
                   label={two ? t('lab.analysis.trail.side', { side: sideLabel(index) }) : t('lab.analysis.trail')}
                   side={two ? sideLabel(index) : undefined}
                   onRemove={(street) => changeSide(index)((each) => ({ ...each, narrowings: withoutNarrowing(each.narrowings, street) }))}
@@ -335,7 +339,7 @@ export function LabAnalysisPage() {
                   title={t('lab.analysis.madeHands')}
                   heading={t('lab.analysis.madeHands.category')}
                   sides={sidesOf(madeHandRows)}
-                  nameOf={(madeHand) => t(`lab.analysis.madeHand.${madeHand}`)}
+                  nameOf={(madeHand) => t(categoryNameKey(madeHand))}
                   {...categoriesTable}
                 />
               </div>
@@ -348,7 +352,7 @@ export function LabAnalysisPage() {
                       title={t('lab.analysis.draws')}
                       heading={t('lab.analysis.draws.category')}
                       sides={sidesOf(drawRows)}
-                      nameOf={(draw) => t(`lab.analysis.draw.${draw}`)}
+                      nameOf={(draw) => t(categoryNameKey(draw))}
                       {...categoriesTable}
                     />
                     {/* Backdoors are only drawn on the flop. */}
@@ -367,7 +371,7 @@ export function LabAnalysisPage() {
                     title={t('lab.analysis.combinationDraws')}
                     heading={t('lab.analysis.combinationDraws.category')}
                     sides={sidesOf(combinationDrawRows)}
-                    nameOf={(combinationDraw) => t(`lab.analysis.combinationDraw.${combinationDraw}`)}
+                    nameOf={(combinationDraw) => t(categoryNameKey(combinationDraw))}
                     {...categoriesTable}
                   />
                 )}
@@ -462,7 +466,7 @@ function OwnComboSummary({ own, equity, dead }: { own: OwnCombo | null; equity: 
   const text = useEquityText()
   const { oneDecimal } = text
   const description = own
-    ? [t(`lab.analysis.madeHand.${own.madeHand}`), own.draws.map((draw) => t(`lab.analysis.draw.${draw}`)).join(', ')].filter(
+    ? [t(categoryNameKey(own.madeHand)), own.draws.map((draw) => t(categoryNameKey(draw))).join(', ')].filter(
         (part) => part !== '',
       )
     : []
