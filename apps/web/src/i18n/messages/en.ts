@@ -836,6 +836,7 @@ export const en: Messages = {
   'lab.analysis.trail.share': 'Kept {combos} combos · {percent} %',
   'lab.analysis.trail.remove.flop': 'Remove the flop’s narrowing',
   'lab.analysis.trail.remove.turn': 'Remove the turn’s narrowing',
+  'lab.analysis.trail.remove.side': '{remove} · {side}',
   'lab.analysis.brush.narrowed': 'The range is narrowed on the board: go back to the flop or clear the trail to paint it.',
   'lab.cell.removed': '{title} · {removed} removed by the board or the dead cards',
   'lab.cell.selected': '{title} · {selected} in the selection',

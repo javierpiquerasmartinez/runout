@@ -655,7 +655,7 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - Above the selection, **Acotado** shows the trail of Narrowings, one step per Street: its Board, the Categories kept (**Todo** for a Street dealt with nothing selected) and the Combos and % kept of the step before. Removing a step makes that Street keep the whole Range, and every later Street is worked out again on what is left, without touching the Board. With no Narrowing there is no trail.
 - While the Range is narrowed the brush is locked, saying why: painting cells the Narrowing hides would mean nothing. Going back to the flop, or removing every step of the trail, unlocks it.
 - The address holds the Narrowings, the Categories kept on each Street, so reloading or going back keeps the hand I am reading.
-- With two sides nothing narrows yet: dealing keeps both whole Ranges.
+- With two sides (H9.16) each side narrows on its own: dealing the next card turns each side's own selection into its Narrowing, and the Equity between them (H9.17) is worked out between the two narrowed Ranges. Each side has its own trail, **Acotado · Rango 1** and **Acotado · Rango 2**, whose remove buttons name the side, and its own brush lock. Loading or clearing one side drops only its Narrowings; adding or removing the second side keeps the first's. The address holds both.
 
 ## MVP scope and out of scope
 

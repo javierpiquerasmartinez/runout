@@ -207,15 +207,14 @@ export function LabAnalysisPage() {
   const lockedReason = (side: AnalysisSide) =>
     side.narrowings.some((kept) => kept.length > 0) ? t('lab.analysis.brush.narrowed') : undefined
   /**
-   * The Board changed by the grid, by text or at random. With one side, dealing
-   * on turns its Selection into that Street's Narrowing; with two, nothing
-   * narrows yet. A card taken off brings back the Narrowing it was dealt on as
-   * the Selection.
+   * The Board changed by the grid, by text or at random. Dealing on turns each
+   * side's own Selection into its Narrowing of that Street. A card taken off
+   * brings back each side's Narrowing it was dealt on as its Selection.
    */
   const changeBoard = (cards: string[]) => {
     const moved: { to?: MovedAlongBoard } = {}
     change((state) => {
-      moved.to = moveAlongBoard(state, cards, two ? state.sides.map(() => []) : selected.map((categories) => [...categories]))
+      moved.to = moveAlongBoard(state, cards, selected.map((categories) => [...categories]))
       return moved.to.state
     })
     const { state, selections: backTo } = moved.to!
@@ -305,6 +304,7 @@ export function LabAnalysisPage() {
                   dead={dead}
                   options={drawOptions}
                   label={two ? t('lab.analysis.trail.side', { side: sideLabel(index) }) : t('lab.analysis.trail')}
+                  side={two ? sideLabel(index) : undefined}
                   onRemove={(street) => changeSide(index)((each) => ({ ...each, narrowings: withoutNarrowing(each.narrowings, street) }))}
                 />
               ))}

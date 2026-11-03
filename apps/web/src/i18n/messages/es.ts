@@ -835,6 +835,7 @@ export const es = {
   'lab.analysis.trail.share': 'Quedan {combos} combos · {percent} %',
   'lab.analysis.trail.remove.flop': 'Quitar el acotado del flop',
   'lab.analysis.trail.remove.turn': 'Quitar el acotado del turn',
+  'lab.analysis.trail.remove.side': '{remove} · {side}',
   'lab.analysis.brush.narrowed': 'El rango está acotado en el board: vuelve al flop o quita el acotado para pintarlo.',
   'lab.cell.removed': '{title} · {removed} descartados por el board o las cartas muertas',
   'lab.cell.selected': '{title} · {selected} en la selección',

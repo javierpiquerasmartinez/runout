@@ -52,6 +52,7 @@ export function NarrowingTrail({
   dead,
   options,
   label,
+  side,
   onRemove,
 }: {
   /** The side's Range, before any Narrowing. */
@@ -61,6 +62,8 @@ export function NarrowingTrail({
   dead: readonly string[]
   options: DrawOptions
   label: string
+  /** The side's name, with two: it tells the two trails' remove buttons apart. */
+  side?: string
   /** Removes the Narrowing of the Street at this index, the flop's first. */
   onRemove: (street: number) => void
 }) {
@@ -110,7 +113,16 @@ export function NarrowingTrail({
             </div>
             {/* A Street that kept everything has nothing to remove. */}
             {kept.length > 0 && (
-              <IconButton icon="close" size="compact" label={t(`lab.analysis.trail.remove.${street}`)} onClick={() => onRemove(index)} />
+              <IconButton
+                icon="close"
+                size="compact"
+                label={
+                  side === undefined
+                    ? t(`lab.analysis.trail.remove.${street}`)
+                    : t('lab.analysis.trail.remove.side', { remove: t(`lab.analysis.trail.remove.${street}`), side })
+                }
+                onClick={() => onRemove(index)}
+              />
             )}
           </li>
         ))}
