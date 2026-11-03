@@ -1,8 +1,18 @@
-import { Controller, Get, Header, Headers, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  Headers,
+  Param,
+  Query,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { MarksService } from '../rooms/marks.service.js';
 import { NotesService, type Note } from '../rooms/notes.service.js';
+import { parseHandCopy } from './hand-copy.js';
 import { HandsService, type HandWithTimeline } from './hands.service.js';
 
 /** A Hand's Notes as they are read outside a Room, with this viewer's own Mark. */
@@ -37,6 +47,28 @@ export class HandsController {
       bearerToken(authorization),
     );
     return this.hands.withTimeline(viewer, id);
+  }
+
+  /**
+   * The whole Hand as plain text to paste elsewhere (see `parseHandCopy`),
+   * for whoever can see the Hand. Notes, Tags and Marks are never part of it.
+   */
+  @Get(':id/copy')
+  @Header('Cache-Control', 'private, no-cache')
+  async copy(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+    @Query() query: Record<string, unknown>,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<string> {
+    const request = parseHandCopy(query);
+    const viewer = await this.identities.authenticate(
+      bearerToken(authorization),
+    );
+    const text = await this.hands.copy(viewer, id, request);
+    // Only the text is plain: a refusal is JSON like any other.
+    res.type('text/plain; charset=utf-8');
+    return text;
   }
 
   /**

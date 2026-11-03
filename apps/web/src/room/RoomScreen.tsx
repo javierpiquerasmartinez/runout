@@ -15,6 +15,7 @@ import { Secondary } from '../ui/Secondary'
 import { usePreferences } from '../preferences/context'
 import { followLink, navigate } from '../routing'
 import { settingsPath } from '../settings/SettingsPage'
+import { CopyHand } from './CopyHand'
 import { ImportDialog } from './ImportDialog'
 import {
   authoredCount,
@@ -712,6 +713,8 @@ function LoadedHand({
               {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
             </span>
             <span className="room-stage__spacer" />
+            {/* Any Participant copies the Hand, without asking the Master. */}
+            <CopyHand handId={handId} />
             {/* Both "Sala" boards draw these two at the right of this row. */}
             <Button
               variant="ghost"

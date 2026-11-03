@@ -12,6 +12,8 @@ import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import type { Hand, Stake } from './hand.js';
+import type { HandCopyRequest } from './hand-copy.js';
+import { handSummary } from './replay/hand-summary.js';
 import { timeline, type Timeline } from './replay/timeline.js';
 
 /** What the web needs to draw a Hand at any Action. It never changes. */
@@ -40,6 +42,20 @@ export class HandsService {
       tableSize: content.tableSize,
       timeline: timeline(content),
     };
+  }
+
+  /**
+   * The whole Hand as text to paste elsewhere, for someone who can see it:
+   * its Hand Summary. Whatever Playback shows, and Hide Opponent Names, it
+   * is the same.
+   */
+  async copy(
+    viewer: Identity,
+    id: string,
+    { language, timeZone }: HandCopyRequest,
+  ): Promise<string> {
+    const content = await this.visibleTo(viewer, id);
+    return handSummary(content, { language, timeZone });
   }
 
   /**

@@ -19,6 +19,7 @@ export type RejectionReason =
   | 'kicked-from-room'
   | 'identity-of-another-room'
   | 'hand-not-found'
+  | 'invalid-hand-copy'
   | 'hand-not-in-queue'
   | 'no-hand-loaded'
   | 'invalid-action-index'
@@ -86,6 +87,23 @@ export async function api<T>(
   const payload = (await res.json().catch(() => null)) as { reason?: RejectionReason } | null
   if (!res.ok) throw new ApiError(res.status, payload?.reason ?? 'network')
   return payload as T
+}
+
+/** A GET whose answer is plain text; a refusal still comes as `{ reason }`. */
+export async function apiText(path: string, { token }: { token?: string } = {}): Promise<string> {
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  let res: Response
+  try {
+    res = await fetch(`${backendUrl() ?? ''}/api${path}`, { headers })
+  } catch {
+    throw new ApiError(0, 'network')
+  }
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as { reason?: RejectionReason } | null
+    throw new ApiError(res.status, payload?.reason ?? 'network')
+  }
+  return res.text()
 }
 
 /** The reason behind any failure of an API call. */

@@ -17,6 +17,8 @@ const note = {
   editedAt: null,
 }
 
+const summary = 'PokerStars · NL10 (€0.05/€0.10) · 6-max · 09/18/2026'
+
 let notFound: boolean
 /** Every call that changed a Note, as method, path and body. */
 let changes: [string, string, unknown][]
@@ -42,6 +44,7 @@ beforeEach(() => {
         if (method === 'DELETE') return Response.json({ id: note.id })
         if (path.endsWith('/restore')) return Response.json(note, { status: 201 })
       }
+      if (path.endsWith('/copy')) return new Response(summary, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
       if (url.endsWith('/notes')) return Response.json({ notes: [note], marked: false })
       return Response.json(splitPot)
     }),
@@ -162,5 +165,23 @@ describe('LibraryHandPage', () => {
     renderHand('gone')
 
     expect(await screen.findByText("That hand doesn't exist or you can't see it.")).toBeTruthy()
+  })
+
+  it('copies the whole Hand as its Summary, from the button or its menu', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderHand()
+    await screen.findByText('Action 0 of 17')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy hand' }))
+
+    expect(await screen.findByRole('button', { name: 'Hand copied · Summary' })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('Hand copied · Summary')
+    expect(writeText).toHaveBeenCalledWith(summary)
+
+    writeText.mockClear()
+    await userEvent.click(screen.getByRole('button', { name: 'Choose what to copy' }))
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Summary' }))
+    expect(writeText).toHaveBeenCalledWith(summary)
   })
 })

@@ -423,6 +423,109 @@ describe('RoomScreen \u00b7 Marks', () => {
   })
 })
 
+describe('RoomScreen · copying the Hand', () => {
+  const summary = 'PokerStars · NL10 (€0.05/€0.10) · 6-max · 09/18/2026'
+  let writeText: ReturnType<typeof vi.fn>
+  let asked: { url: string; authorization: string | undefined }[]
+  let refused: boolean
+
+  beforeEach(() => {
+    asked = []
+    refused = false
+    writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit = {}) => {
+        asked.push({ url, authorization: new Headers(init.headers).get('Authorization') ?? undefined })
+        if (!url.includes('/copy')) return Response.json({ reason: 'hand-not-found' }, { status: 404 })
+        if (refused) return Response.json({ reason: 'hand-not-found' }, { status: 404 })
+        return new Response(summary, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      }),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const copyRequests = () => asked.filter(({ url }) => url.includes('/copy'))
+
+  it.each([
+    ['the Master', 'id-javier'],
+    ['a Guest', 'id-marta'],
+  ])('lets %s copy the whole Hand as its Summary in one click, and says so', async (_, you) => {
+    renderRoom(roomWithLoadedHand({ you }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy hand' }))
+
+    expect(await screen.findByRole('button', { name: 'Hand copied · Summary' })).toBeTruthy()
+    expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('Hand copied · Summary')
+    expect(writeText).toHaveBeenCalledWith(summary)
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    expect(copyRequests()).toEqual([
+      {
+        url: `/api/hands/hand-1/copy?as=summary&language=en&timeZone=${encodeURIComponent(timeZone)}`,
+        authorization: 'Bearer token',
+      },
+    ])
+  })
+
+  it('offers the Summary in the menu beside it', async () => {
+    renderRoom(roomWithLoadedHand({ you: 'id-marta' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose what to copy' }))
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Summary'])
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Summary' }))
+
+    expect(await screen.findByRole('button', { name: 'Hand copied · Summary' })).toBeTruthy()
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(writeText).toHaveBeenCalledWith(summary)
+  })
+
+  it('opens the menu from the keyboard, and closes it back onto its arrow', async () => {
+    renderRoom(roomWithLoadedHand({ you: 'id-marta' }))
+    const arrow = screen.getByRole('button', { name: 'Choose what to copy' })
+
+    arrow.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Summary' }))
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(arrow)
+    await userEvent.keyboard('{ArrowDown}')
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByRole('button', { name: 'Hand copied · Summary' })).toBeTruthy()
+  })
+
+  it('copies the same whatever the Playback shows and whether names are hidden', async () => {
+    renderRoom(
+      roomWithLoadedHand({ you: 'id-marta', playback: { handId: 'hand-1', actionIndex: 7, hideOpponentNames: true } }),
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy hand' }))
+
+    expect(await screen.findByRole('button', { name: 'Hand copied · Summary' })).toBeTruthy()
+    expect(copyRequests().map(({ url }) => new URL(url, 'http://localhost').pathname)).toEqual([
+      '/api/hands/hand-1/copy',
+    ])
+    expect(writeText).toHaveBeenCalledWith(summary)
+  })
+
+  it('says so when the Hand could not be copied', async () => {
+    refused = true
+    renderRoom(roomWithLoadedHand({ you: 'id-marta' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy hand' }))
+
+    expect(await screen.findByRole('button', { name: 'Couldn’t copy the hand' })).toBeTruthy()
+    expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('Couldn’t copy the hand')
+    expect(writeText).not.toHaveBeenCalled()
+  })
+})
+
 describe('RoomScreen \u00b7 Hands in your Library', () => {
   it('says on each Queue Entry whether its Hand is in the viewer\u2019s Library', () => {
     renderRoom(roomView({ queue: [firstHand, secondHand], inLibrary: ['hand-2'] }))

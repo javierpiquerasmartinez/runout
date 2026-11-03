@@ -11,8 +11,12 @@
 .library-hand__stage {
   gap: 0;
 }
-.library-hand__stage > .library__back {
-  align-self: flex-start;
+/* Back to the Library on the left, "Copiar mano" on the right. */
+.library-hand__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 14px 18px 0;
 }
 .library-hand__side {
