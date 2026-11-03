@@ -344,7 +344,7 @@
   outline-offset: var(--focus-offset);
 }
 
-/* ---- The trail of Narrowings: one step per Street, its Board beside what it kept ---- */
+/* ---- The trail of Narrowings: one step per Street, its Board above what it kept ---- */
 .analysis__trail {
   display: flex;
   flex-direction: column;
@@ -361,19 +361,21 @@
   padding: 0;
   list-style: none;
 }
+/* The Board column is narrow: the Board and its remove button share a line, the text gets the full width under them */
 .analysis__trail-step {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
 }
 .analysis__trail-board {
   display: flex;
-  flex-shrink: 0;
   gap: 2px;
 }
 .analysis__trail-text {
   display: flex;
-  flex: 1;
+  grid-column: 1 / -1;
+  grid-row: 2;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
