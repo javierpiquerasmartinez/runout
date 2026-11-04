@@ -7,7 +7,7 @@
     "assets": [
       {
         "include": "identity/common-passwords.txt",
-        "outDir": "dist/src"
+        "outDir": "dist"
       }
     ]
   }

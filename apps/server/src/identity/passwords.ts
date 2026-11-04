@@ -70,7 +70,9 @@ export const NO_PASSWORD_HASH = await hashPassword(
 
 /**
  * The bundled list of common and leaked passwords, read once at start-up,
- * lower-cased so they are matched ignoring case.
+ * lower-cased so they are matched ignoring case: the UK NCSC's 100,000 most
+ * used passwords from breach data, as SecLists publishes it
+ * (Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt).
  */
 export const COMMON_PASSWORDS: ReadonlySet<string> = new Set(
   readFileSync(new URL('./common-passwords.txt', import.meta.url), 'utf8')
