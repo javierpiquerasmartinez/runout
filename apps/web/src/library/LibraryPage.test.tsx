@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { PreferencesContext } from '../preferences/context'
@@ -662,6 +662,31 @@ describe('LibraryPage', () => {
 
         expect(await screen.findByText(zoomedIn)).toBeTruthy()
         expect(resultsRequests.at(-1)).toBe('/api/library/results?zoomFrom=1200&zoomTo=1850')
+      })
+
+      it('is there again on coming back from a Hand opened from the graph', async () => {
+        results = { ...results, points: [{ ...results.points[0], hand: 1850, handId: 'h1' }] }
+        // jsdom lays nothing out, so the chart is 600 by 220 pixels: Hand 1,850, the last, is drawn at x = 580.
+        vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+        const layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ width: 600, height: 220 }))
+        onTestFinished(() => layout.mockRestore())
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph?period=all&zoomFrom=1200&zoomTo=1850')
+        await screen.findByText(zoomedIn)
+
+        const chart = document.querySelector('.recharts-wrapper')!
+        const mouse = { pointerType: 'mouse', button: 0, clientX: 580, clientY: 100 }
+        fireEvent.pointerDown(chart, mouse)
+        fireEvent.pointerUp(chart, mouse)
+
+        await waitFor(() => expect(window.location.pathname).toBe('/library/hands/h1'))
+        const openedFrom = libraryOpenedFrom(window.history.state)
+        expect(openedFrom).toBe('/library/graph?period=all&zoomFrom=1200&zoomTo=1850')
+        await act(async () => {
+          window.history.back()
+          await new Promise((popped) => window.addEventListener('popstate', popped, { once: true }))
+        })
+        expect(`${window.location.pathname}${window.location.search}`).toBe(openedFrom)
+        expect(await screen.findByText(zoomedIn)).toBeTruthy()
       })
     })
 
