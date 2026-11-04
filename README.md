@@ -42,6 +42,10 @@ A connection check lives at `/status`: it calls `GET /api/health` and pings the 
 
 Both apps need the same OAuth client ID: `GOOGLE_CLIENT_ID` for the server, which refuses to start without it, and `VITE_GOOGLE_CLIENT_ID` for the web. Create a "Web application" OAuth client in the Google Cloud console (APIs & Services → Credentials) and add `http://localhost:5173` and the production frontend's origin to its authorised JavaScript origins. The e2e tests never call Google: `startApp()` injects a fake verifier (`test/support/google.ts`) that accepts made-up ID tokens.
 
+### Test mode (local only)
+
+To try pages behind an Account without signing in to Google, set `DEV_SIGN_IN=true` in `apps/server/.env` and `VITE_DEV_SIGN_IN=true` in `apps/web/.env.local`, then restart `pnpm dev`. A "Test mode" box shows under Google's button, with one button per test persona (Tester A and Tester B, two so a Room can have two people from two tabs). Each is a fixed Account (`dev-tester-a`, `dev-tester-b`) whose Library, Ranges and Preferences stay between visits. It goes through `POST /api/sessions/google` like Google does, with `dev-sign-in|<persona>` in place of the ID token; any other token still goes to Google, and with `DEV_SIGN_IN` on the server no longer needs `GOOGLE_CLIENT_ID`. Both flags are off unless set. The web draws the box only in the Vite dev server (`import.meta.env.DEV`), so a build never has it, and the server refuses to start with `DEV_SIGN_IN` set alongside `FRONTEND_URL`, which only production sets.
+
 ## Database
 
 The server persists to Postgres through [Drizzle](https://orm.drizzle.team): Neon in production, any local Postgres in development. It connects to `DATABASE_URL`, read from the environment or from `apps/server/.env` (see `.env.example`).

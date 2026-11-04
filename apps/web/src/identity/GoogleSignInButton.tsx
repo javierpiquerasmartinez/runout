@@ -4,6 +4,8 @@ import { useI18n } from '../i18n'
 import { usePreferences } from '../preferences/context'
 import { useHeldRoom } from '../room/heldRoomContext'
 import { useSession } from './context'
+import { DevSignIn } from './DevSignIn'
+import { DEV_SIGN_IN, devSignInToken } from './devPersonas'
 import { googleClientId, loadGoogleIdentity } from './google'
 import './GoogleSignInButton.css'
 
@@ -62,6 +64,14 @@ export function GoogleSignInButton({ label = 'sign-in' }: { label?: 'sign-in' | 
   return (
     <div className="google-sign-in">
       <div ref={slot} className="google-sign-in__button" />
+      {DEV_SIGN_IN && (
+        <DevSignIn
+          onSignIn={(persona) => {
+            setFailure(null)
+            signIn(devSignInToken(persona), fromRoom).catch((error: unknown) => setFailure(reasonOf(error)))
+          }}
+        />
+      )}
       {failure && (
         <p className="google-sign-in__error" role="alert">
           {failure === 'google-unavailable' || failure === 'google-not-configured'
