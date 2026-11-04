@@ -618,16 +618,26 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 35.3%;
+  top: 36.3%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
+/* Smaller than the board's 54 × 76 cards, so a 9-max table's bets fit beside it (tableLayout.ts). */
 .poker-table__board {
   display: flex;
-  gap: 7px;
+  gap: 5px;
+}
+.poker-table__board .ro-card {
+  --card-w: 44px;
+  --card-h: 60px;
+  --card-radius: 5px;
+  --card-pad: 4px;
+  --card-rank: 22px;
+  --card-ten: 17px;
+  --card-suit: 17px;
 }
 
 .poker-table__pot {
@@ -660,7 +670,8 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: stretch;
-  gap: 8px;
+  gap: 4px 5px;
+  max-width: 280px;
 }
 .poker-table__pots .poker-table__pot-detail {
   flex-basis: 100%;
@@ -671,7 +682,9 @@
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 7px 14px;
+  max-width: 90px;
+  box-sizing: border-box;
+  padding: 3px 8px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-chip);
@@ -689,7 +702,7 @@
   color: var(--text-secondary);
 }
 .poker-table__side-pot-value {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.1;
   color: var(--text-secondary);
@@ -698,20 +711,25 @@
   color: var(--brass-ink);
 }
 .poker-table__side-pot-who {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 10px;
   color: var(--text-muted);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .poker-table__bet {
   position: absolute;
   transform: translate(-50%, -50%);
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 5px;
+  gap: 5px;
+  max-width: 96px;
+  padding: 3px 8px 3px 4px;
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: 12px;
   background: var(--color-chip);
   font-size: 12px;
   font-weight: 600;
@@ -720,25 +738,29 @@
 }
 .poker-table__bet-chip {
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--color-border-hover);
 }
-.poker-table__bet-share {
+.poker-table__bet-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.poker-table__bet-amount {
+  line-height: 16px;
+}
+/* Below the amount: the pot share, "all-in", or the Amount in the other unit. */
+.poker-table__bet-below {
+  overflow: hidden;
   font-size: 10px;
   font-weight: 400;
-  color: var(--text-secondary);
+  line-height: 12px;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
 }
-/* Board "Cartas": the Hero's bet in brass, an all-in in red, always with its amount. */
-.poker-table__bet[data-hero] {
-  border-color: var(--brass-soft-border);
-  background: var(--brass-soft-bg);
-  color: var(--brass-ink);
-}
-.poker-table__bet[data-hero] .poker-table__bet-chip {
-  background: var(--brass);
-}
+/* The same chip for the Hero and everyone else; an all-in in red. */
 .poker-table__bet[data-kind='all-in'] {
   border-color: var(--alert-border);
   background: var(--alert-hover-bg);
@@ -746,6 +768,26 @@
 }
 .poker-table__bet[data-kind='all-in'] .poker-table__bet-chip {
   background: var(--alert);
+}
+.poker-table__bet[data-kind='all-in'] .poker-table__bet-below {
+  color: var(--alert-ink);
+}
+
+/* On the felt beside its seat, placed by tableLayout.ts. */
+.poker-table__dealer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--dealer-button);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--card-ink-black);
 }
 
 /* A seat is anchored by its plate; cards and status hang above or below it. */
@@ -899,8 +941,12 @@
 }
 
 .seat__stack {
+  min-width: 0;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-primary);
 }
 .seat[data-folded] .seat__stack {
@@ -909,10 +955,16 @@
 .seat[data-all-in] .seat__stack {
   color: var(--alert-ink);
 }
+/*
+ * One line, always, so the plate keeps the 57 px tableLayout.ts places bets
+ * around: when the stack in both units and a note don't fit, the stack's
+ * Amount (`.seat__stack`, ellipsed) gives way first.
+ */
 .seat__line--stack {
   align-items: baseline;
 }
 .seat__note {
+  flex-shrink: 0;
   font-size: 10px;
   white-space: nowrap;
 }
@@ -921,23 +973,6 @@
 }
 .seat__note--all-in {
   color: var(--alert-ink);
-}
-
-.seat__dealer {
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 10px;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--dealer-button);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 50%);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--card-ink-black);
 }
 
 /*

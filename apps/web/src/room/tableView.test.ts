@@ -261,13 +261,20 @@ describe('tableView: pots and bets', () => {
     ])
   })
 
-  it('draws an all-in bet in red, always with its amount, and says the player is all in', () => {
+  it('draws an all-in bet in red with just its amount, and says the player is all in', () => {
     // Turn: Olive6 bets her last $31.
     const olive = tableView(straddled, 14, es).seats.find((seat) => seat.screenName === 'Olive6')!
 
-    expect(olive.chip).toEqual({ kind: 'all-in', label: 'all-in 62 BB', secondary: null, potShare: null })
+    // The pill says "all-in" on its own line, below the amount.
+    expect(olive.chip).toEqual({ kind: 'all-in', label: '62 BB', secondary: null, potShare: null })
     expect(olive.stack).toBe('0 BB')
     expect(olive.allInLabel).toBe('all-in 100 BB')
+  })
+
+  it('gives bets a second line for the whole Hand when one can carry the pot share, the other unit or all-in', () => {
+    const plain = { displayUnit: 'big-blinds', potPercentage: false } as const
+    expect(tableView(straddled, 0, es, undefined, plain).betLines).toBe(2) // Olive6 goes all-in later on
+    expect(tableView(straddled, 0, es, undefined, { ...plain, potPercentage: true }).betLines).toBe(2)
   })
 
   it('shows side pots apart, each with who contests it', () => {
