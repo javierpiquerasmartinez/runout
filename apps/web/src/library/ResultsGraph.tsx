@@ -4,6 +4,7 @@ import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
 import { graphColour, type DisplayUnit, type Preferences } from '../preferences/preferences'
+import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results } from './results'
 import './ResultsGraph.css'
@@ -33,9 +34,10 @@ const WIN_RATE_LINES = ['result', 'allInEv'] as const satisfies readonly ResultL
 /**
  * The Results Graph: the running Result, All-in EV, Showdown and Non-showdown Results
  * over the filtered Hands, with a legend that shows each line's total and
- * hides or shows it. Draws only Results that hold Hands.
+ * hides or shows it. Draws only Results that hold Hands. With a Zoom, it
+ * draws only that stretch, says so, and leaves it with `onLeaveZoom`.
  */
-export function ResultsGraph({ results }: { results: Results }) {
+export function ResultsGraph({ results, onLeaveZoom }: { results: Results; onLeaveZoom: () => void }) {
   const i18n = useI18n()
   const { t } = i18n
   const preferences = usePreferences()
@@ -49,9 +51,9 @@ export function ResultsGraph({ results }: { results: Results }) {
   const linesOf = (point: Omit<Results['points'][number], 'hand'>): ResultLines =>
     unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
 
-  // Every line starts from nothing before the first Hand.
+  // Every line starts where it stood before the first Hand drawn: nothing, unless zoomed.
   const data: Point[] = [
-    { hand: 0, result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
+    { hand: results.zoom ? results.zoom.from - 1 : 0, ...linesOf(results.start) },
     ...results.points.map((point) => ({ hand: point.hand, ...linesOf(point) })),
   ]
   const totals = linesOf(results.totals)
@@ -83,49 +85,62 @@ export function ResultsGraph({ results }: { results: Results }) {
       </div>
       <div className="results__body">
         <div className="results__plot">
-          <LineChart data={data} responsive style={{ width: '100%', height: '100%' }} margin={{ top: 8, right: 20, bottom: 0, left: 0 }}>
-            <CartesianGrid vertical={false} stroke="var(--color-divider)" />
-            <XAxis
-              dataKey="hand"
-              type="number"
-              domain={[0, 'dataMax']}
-              allowDecimals={false}
-              tick={AXIS_TICK}
-              tickLine={false}
-              axisLine={{ stroke: 'var(--color-border)' }}
-              tickFormatter={(hand: number) => i18n.formatNumber(hand)}
-            />
-            <YAxis
-              width={56}
-              tick={AXIS_TICK}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value: number) => formatTick(value, unit, results.currency, i18n)}
-            />
-            <ReferenceLine y={0} stroke="var(--color-border-strong)" />
-            <Tooltip
-              cursor={{ stroke: 'var(--color-border-hover)', strokeDasharray: '3 3' }}
-              isAnimationActive={false}
-              content={({ active, payload }) =>
-                active && payload?.[0] ? (
-                  <Readout point={payload[0].payload as Point} format={format} hidden={hidden} stroke={stroke} />
-                ) : null
-              }
-            />
-            {RESULT_LINES.map((line) => (
-              <Line
-                key={line}
-                dataKey={line}
-                className={`results__line results__line--${line}`}
-                stroke={stroke[line]}
-                strokeWidth={line === 'result' ? 2 : 1.5}
-                dot={false}
-                activeDot={{ r: 3, stroke: 'var(--color-panel)', strokeWidth: 1.5, fill: stroke[line] }}
-                hide={hidden.has(line)}
-                isAnimationActive={false}
+          <div className="results__chart">
+            <LineChart data={data} responsive style={{ width: '100%', height: '100%' }} margin={{ top: 8, right: 20, bottom: 0, left: 0 }}>
+              <CartesianGrid vertical={false} stroke="var(--color-divider)" />
+              <XAxis
+                dataKey="hand"
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                allowDecimals={false}
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tickFormatter={(hand: number) => i18n.formatNumber(hand)}
               />
-            ))}
-          </LineChart>
+              <YAxis
+                width={56}
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value: number) => formatTick(value, unit, results.currency, i18n)}
+              />
+              <ReferenceLine y={0} stroke="var(--color-border-strong)" />
+              <Tooltip
+                cursor={{ stroke: 'var(--color-border-hover)', strokeDasharray: '3 3' }}
+                isAnimationActive={false}
+                content={({ active, payload }) =>
+                  active && payload?.[0] ? (
+                    <Readout point={payload[0].payload as Point} format={format} hidden={hidden} stroke={stroke} />
+                  ) : null
+                }
+              />
+              {RESULT_LINES.map((line) => (
+                <Line
+                  key={line}
+                  dataKey={line}
+                  className={`results__line results__line--${line}`}
+                  stroke={stroke[line]}
+                  strokeWidth={line === 'result' ? 2 : 1.5}
+                  dot={false}
+                  activeDot={{ r: 3, stroke: 'var(--color-panel)', strokeWidth: 1.5, fill: stroke[line] }}
+                  hide={hidden.has(line)}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </div>
+          {results.zoom && (
+            <p className="results__zoom">
+              {t('library.results.zoom', {
+                from: i18n.formatNumber(results.zoom.from),
+                to: i18n.formatNumber(results.zoom.to),
+              })}
+              <Button variant="ghost" size="compact" onClick={onLeaveZoom}>
+                {t('library.results.zoom.leave')}
+              </Button>
+            </p>
+          )}
         </div>
         <div className="results__side">
           <ul className="results__legend" aria-label={t('library.results.lines')}>

@@ -18,6 +18,11 @@ const euros: Results = {
     bigBlinds: { result: 4, allInEv: 1, showdown: 4.9, nonShowdown: -0.9 },
     amounts: { result: 40, allInEv: 10, showdown: 49, nonShowdown: -9 },
   },
+  start: {
+    bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
+    amounts: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
+  },
+  zoom: null,
   points: [
     {
       hand: 3,
@@ -32,11 +37,36 @@ const euros: Results = {
   ],
 }
 
-function renderGraph(results: Results, preferences: Preferences = DEFAULT_PREFERENCES) {
+/**
+ * The same Hands zoomed into Hands 2 to 4 of 1.500: -€0.30, €0 and -€0.10,
+ * after +€0.31 before the stretch.
+ */
+const zoomed: Results = {
+  hands: 3,
+  currency: 'EUR',
+  totals: {
+    bigBlinds: { result: -4, allInEv: -2, showdown: 0, nonShowdown: -4 },
+    amounts: { result: -40, allInEv: -20, showdown: 0, nonShowdown: -40 },
+  },
+  start: {
+    bigBlinds: { result: 3.1, allInEv: 3.1, showdown: 0, nonShowdown: 3.1 },
+    amounts: { result: 31, allInEv: 31, showdown: 0, nonShowdown: 31 },
+  },
+  zoom: { from: 1200, to: 1202 },
+  points: [
+    {
+      hand: 1202,
+      bigBlinds: { result: -0.9, allInEv: 1.1, showdown: 0, nonShowdown: -0.9 },
+      amounts: { result: -9, allInEv: 11, showdown: 0, nonShowdown: -9 },
+    },
+  ],
+}
+
+function renderGraph(results: Results, preferences: Preferences = DEFAULT_PREFERENCES, onLeaveZoom = () => {}) {
   return render(
     <I18nProvider initialLocale="en">
       <PreferencesContext.Provider value={preferences}>
-        <ResultsGraph results={results} />
+        <ResultsGraph results={results} onLeaveZoom={onLeaveZoom} />
       </PreferencesContext.Provider>
     </I18nProvider>,
   )
@@ -82,6 +112,37 @@ describe('ResultsGraph', () => {
     expect(within(legendEntry('All-in EV')).getByText('+1 BB')).toBeTruthy()
     expect(within(legendEntry('Showdown')).getByText('+4.9 BB')).toBeTruthy()
     expect(within(legendEntry('Non-showdown')).getByText('-0.9 BB')).toBeTruthy()
+  })
+
+  describe('Zoom', () => {
+    it('counts, totals and rates the stretch alone', () => {
+      renderGraph(zoomed)
+
+      expect(screen.getByText('3 hands')).toBeTruthy()
+      expect(within(legendEntry('Result')).getByText('-4 BB')).toBeTruthy()
+      expect(within(legendEntry('All-in EV')).getByText('-2 BB')).toBeTruthy()
+      expect(within(legendEntry('Non-showdown')).getByText('-4 BB')).toBeTruthy()
+      // -4 BB and -2 BB over 3 Hands.
+      expect(winRate('Result')).toBe('-133.3')
+      expect(winRate('All-in EV')).toBe('-66.7')
+    })
+
+    it('says which Hands it shows, and leaves them from a button', async () => {
+      let left = 0
+      renderGraph(zoomed, DEFAULT_PREFERENCES, () => left++)
+
+      expect(screen.getByText('Graph zoomed in between hands 1,200 and 1,202')).toBeTruthy()
+      await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+      expect(left).toBe(1)
+    })
+
+    it('says nothing of a Zoom without one', () => {
+      renderGraph(euros)
+
+      expect(screen.queryByText(/zoomed in/)).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    })
   })
 
   it('hides and shows each line from the legend', async () => {

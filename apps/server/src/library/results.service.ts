@@ -31,15 +31,28 @@ export interface ResultsPoint {
   amounts: ResultLines | null;
 }
 
-/** The running Results over the Hands a Library filter keeps. */
+/** A stretch of Hands, both ends counted from 1 in played order and included. */
+export interface Zoom {
+  from: number;
+  to: number;
+}
+
+/** The running Results over the Hands a Library filter keeps, or over a Zoom of them. */
 export interface Results {
+  /** How many Hands the series covers: all the filter keeps, or the Zoom's. */
   hands: number;
-  /** The currency every Hand shares, or null when they mix (or there are none). */
+  /** The currency every Hand the filter keeps shares, or null when they mix (or there are none). */
   currency: string | null;
+  /** What each line won or lost over the Hands the series covers. */
   totals: Omit<ResultsPoint, 'hand'>;
+  /** Where the lines stood just before the first Hand the series covers: nothing without a Zoom. */
+  start: Omit<ResultsPoint, 'hand'>;
+  /** The stretch the series covers, clamped to the Hands there are, or null for all of them. */
+  zoom: Zoom | null;
   /**
-   * At most the points asked for, evenly spread over the Hands in played
-   * order; the last one is always the last Hand, so it equals the totals.
+   * At most the points asked for, evenly spread over the Hands the series
+   * covers in played order; the last one is always its last Hand. Each keeps
+   * the running totals from the first Hand the filter keeps.
    */
   points: ResultsPoint[];
 }
@@ -61,70 +74,135 @@ export class ResultsService {
 
   /**
    * The running Results over the Hands the filter keeps, at most `points`
-   * of them (a number from the query; 500 unless asked otherwise).
+   * of them (a number from the query; 500 unless asked otherwise). With
+   * `zoomFrom` and `zoomTo` (Hand numbers from the query), only that stretch
+   * of them: see `zoomOf`.
    */
   async results(
     account: Identity,
     filter: LibraryFilter,
     points: unknown,
+    zoomFrom?: unknown,
+    zoomTo?: unknown,
   ): Promise<Results> {
     const maxPoints = boundedInt(points, DEFAULT_POINTS, 2, MAX_POINTS);
     const kept = libraryFilterWhere(account.id, filter);
-    // One snapshot, so an import landing in between can't set the totals
-    // apart from the series' last point.
-    const [totals, running] = await this.db.transaction(
-      (tx) =>
-        Promise.all([
-          tx.execute<
-            Sums & {
-              hands: number;
-              currencies: number;
-              currency: string | null;
-            }
-          >(sql`
+    // One snapshot, so an import landing in between can't set the count
+    // apart from the series.
+    return this.db.transaction(
+      async (tx) => {
+        const counted = await tx.execute<{
+          hands: number;
+          currencies: number;
+          currency: string | null;
+        }>(sql`
+          select
+            count(*)::int as hands,
+            count(distinct ${hands.currency})::int as currencies,
+            min(${hands.currency}) as currency
+          from ${libraryEntries}
+          inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
+          where ${kept}
+        `);
+        const [{ hands: count, currencies, currency }] = counted.rows;
+        const oneCurrency = currencies === 1;
+        const zoom = zoomOf(zoomFrom, zoomTo, count);
+        const { from, to } = zoom ?? { from: 1, to: count };
+        const span = to - from + 1;
+        // The running sums of every Hand, of which only the last of each of
+        // `maxPoints` even stretches of the series is kept (with fewer Hands,
+        // every Hand), and the one just before the series, where it starts.
+        const running = await tx.execute<Sums & { hand: number }>(sql`
+          select * from (
             select
-              count(*)::int as hands,
-              count(distinct ${hands.currency})::int as currencies,
-              min(${hands.currency}) as currency,
-              ${sums(sql``)}
+              row_number() over played::int as hand,
+              ${sums(sql`over played`)}
             from ${libraryEntries}
             inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
             where ${kept}
-          `),
-          // The running sums of every Hand, of which only the last of each of
-          // `maxPoints` even stretches is kept: with fewer Hands, every Hand.
-          tx.execute<Sums & { hand: number }>(sql`
-            select * from (
-              select
-                row_number() over played::int as hand,
-                count(*) over () as hands,
-                ${sums(sql`over played`)}
-              from ${libraryEntries}
-              inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
-              where ${kept}
-              window played as (
-                order by ${hands.playedAt}, ${hands.id}
-                rows between unbounded preceding and current row
-              )
-            ) running
-            where hand * ${maxPoints}::bigint / hands > (hand - 1) * ${maxPoints}::bigint / hands
-            order by hand
-          `),
-        ]),
+            window played as (
+              order by ${hands.playedAt}, ${hands.id}
+              rows between unbounded preceding and current row
+            )
+          ) running
+          where hand = ${from - 1}::int
+            or (
+              hand between ${from}::int and ${to}::int
+              and (hand - ${from - 1}::int)::bigint * ${maxPoints}::bigint / ${span}::bigint
+                > (hand - ${from}::int)::bigint * ${maxPoints}::bigint / ${span}::bigint
+            )
+          order by hand
+        `);
+        const series = running.rows.map(({ hand, ...sums }) => ({
+          hand,
+          ...linesOf(sums, oneCurrency),
+        }));
+        const before =
+          series[0]?.hand === from - 1 ? series.shift() : undefined;
+        const start = before
+          ? { bigBlinds: before.bigBlinds, amounts: before.amounts }
+          : nothing(oneCurrency);
+        const end = series.at(-1) ?? nothing(oneCurrency);
+        return {
+          hands: span,
+          currency: oneCurrency ? currency : null,
+          totals: between(start, end),
+          start,
+          zoom,
+          points: series,
+        };
+      },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
     );
-    const [{ hands: count, currencies, currency, ...total }] = totals.rows;
-    const oneCurrency = currencies === 1;
-    return {
-      hands: count,
-      currency: oneCurrency ? currency : null,
-      totals: linesOf(total, oneCurrency),
-      points: running.rows.map(({ hand, ...sums }) => ({
-        hand,
-        ...linesOf(sums, oneCurrency),
-      })),
-    };
   }
+}
+
+/**
+ * The Zoom a query asks for, clamped to the `count` Hands there are; none
+ * when either end is missing or not a whole number, or when the stretch
+ * holds fewer than two Hands.
+ */
+function zoomOf(rawFrom: unknown, rawTo: unknown, count: number): Zoom | null {
+  const from = wholeNumber(rawFrom);
+  const to = wholeNumber(rawTo);
+  if (from === null || to === null) return null;
+  const zoom = { from: Math.max(1, from), to: Math.min(count, to) };
+  return zoom.to - zoom.from + 1 >= 2 ? zoom : null;
+}
+
+/** A whole number from a query string, or null. */
+function wholeNumber(raw: unknown): number | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+/** Every line at nothing, as before the first Hand. */
+function nothing(oneCurrency: boolean): Omit<ResultsPoint, 'hand'> {
+  const zero = { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 };
+  return { bigBlinds: zero, amounts: oneCurrency ? { ...zero } : null };
+}
+
+/** What each line won or lost from one point to a later one, to the hundredth. */
+function between(
+  start: Omit<ResultsPoint, 'hand'>,
+  end: Omit<ResultsPoint, 'hand'>,
+): Omit<ResultsPoint, 'hand'> {
+  const minus = (later: ResultLines, earlier: ResultLines): ResultLines => {
+    const line = (key: keyof ResultLines) =>
+      Math.round((later[key] - earlier[key]) * 100) / 100;
+    return {
+      result: line('result'),
+      allInEv: line('allInEv'),
+      showdown: line('showdown'),
+      nonShowdown: line('nonShowdown'),
+    };
+  };
+  return {
+    bigBlinds: minus(end.bigBlinds, start.bigBlinds),
+    amounts:
+      end.amounts && start.amounts ? minus(end.amounts, start.amounts) : null,
+  };
 }
 
 /**

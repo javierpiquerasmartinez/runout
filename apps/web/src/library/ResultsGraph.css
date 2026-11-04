@@ -44,6 +44,22 @@
   flex-grow: 1;
   min-width: 0;
   height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+.results__chart {
+  flex-grow: 1;
+  min-height: 0;
+}
+/* Under the chart, only with a Zoom: which Hands it shows, and the way back to all of them. */
+.results__zoom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 6px 0 0 56px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 /* Recharts' own text and focus outline give way to the app's. */
 .results__plot .recharts-surface {

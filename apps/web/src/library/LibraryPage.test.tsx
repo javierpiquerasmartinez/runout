@@ -6,7 +6,7 @@ import { SessionContext } from '../identity/context'
 import { PreferencesContext } from '../preferences/context'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 import { fakeSession } from '../test/fakeSession'
-import type { LibraryHand, LibraryPage as Page } from './library'
+import { libraryOpenedFrom, type LibraryHand, type LibraryPage as Page } from './library'
 import { LibraryPage } from './LibraryPage'
 import type { Results } from './results'
 
@@ -84,6 +84,8 @@ beforeEach(() => {
     hands: 3,
     currency: 'EUR',
     totals: { bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } },
+    start: { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 } },
+    zoom: null,
     points: [{ hand: 3, bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } }],
   }
   pages = {
@@ -122,7 +124,10 @@ beforeEach(() => {
       }
       if (url.startsWith('/api/library/results')) {
         resultsRequests.push(url)
-        return Response.json(results)
+        // A Zoom asked for is the one answered, unclamped.
+        const query = new URL(url, 'http://localhost').searchParams
+        const zoom = query.has('zoomFrom') ? { from: Number(query.get('zoomFrom')), to: Number(query.get('zoomTo')) } : null
+        return Response.json({ ...results, zoom })
       }
       requests.push(url)
       const page = new URL(url, 'http://localhost').searchParams.get('page') ?? '1'
@@ -601,9 +606,69 @@ describe('LibraryPage', () => {
       expect(window.location.pathname).toBe('/library/graph')
     })
 
+    describe('Zoom', () => {
+      const zoomedIn = 'Graph zoomed in between hands 1,200 and 1,850'
+
+      it('shows the Zoom the address keeps', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph?period=all&site=pokerstars&zoomFrom=1200&zoomTo=1850')
+
+        expect(await screen.findByText(zoomedIn)).toBeTruthy()
+        expect(resultsRequests).toEqual(['/api/library/results?site=pokerstars&zoomFrom=1200&zoomTo=1850'])
+      })
+
+      it('leaves the Zoom for the whole graph, in place of the address', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph?period=all&zoomFrom=1200&zoomTo=1850')
+        await screen.findByText(zoomedIn)
+        const entries = window.history.length
+
+        await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+        expect(window.location.pathname).toBe('/library/graph')
+        expect(window.location.search).toBe('?period=all')
+        expect(window.history.length).toBe(entries)
+        await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?'))
+        await waitFor(() => expect(screen.queryByText(zoomedIn)).toBeNull())
+      })
+
+      it('goes when the filter changes', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph?period=all&zoomFrom=1200&zoomTo=1850')
+        await screen.findByText(zoomedIn)
+
+        await choose(screen.getByRole('group', { name: 'Filters' }), 'Poker site', 'PokerStars')
+
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+        await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?site=pokerstars'))
+        expect(screen.queryByText(zoomedIn)).toBeNull()
+      })
+
+      it('stays through the list, and is there again on coming back from a Hand', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/graph?period=all&zoomFrom=1200&zoomTo=1850')
+        await screen.findByText(zoomedIn)
+
+        await userEvent.click(screen.getByRole('radio', { name: 'Hands' }))
+        await userEvent.click(await screen.findByRole('link', { name: 'Open BTN vs BB, iMapleAA' }))
+
+        expect(window.location.pathname).toBe('/library/hands/h1')
+        const openedFrom = libraryOpenedFrom(window.history.state)
+        expect(openedFrom).toBe('/library?period=all&zoomFrom=1200&zoomTo=1850')
+
+        // "Volver" in the replayer steps back to the entry the Hand was opened from.
+        await act(async () => {
+          window.history.back()
+          await new Promise((popped) => window.addEventListener('popstate', popped, { once: true }))
+        })
+        expect(`${window.location.pathname}${window.location.search}`).toBe(openedFrom)
+        await userEvent.click(await screen.findByRole('radio', { name: 'Graph' }))
+
+        expect(await screen.findByText(zoomedIn)).toBeTruthy()
+        expect(resultsRequests.at(-1)).toBe('/api/library/results?zoomFrom=1200&zoomTo=1850')
+      })
+    })
+
     it('draws nothing when no Hand matches, inviting to import instead', async () => {
       pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
-      results = { hands: 0, currency: null, totals: { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: null }, points: [] }
+      const nothing = { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: null }
+      results = { hands: 0, currency: null, totals: nothing, start: nothing, zoom: null, points: [] }
       renderGraph()
 
       expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()
