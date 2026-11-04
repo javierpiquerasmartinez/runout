@@ -7,8 +7,24 @@ A web room where a small study group replays the same poker hand together, in re
 ### People and roles
 
 **Account**:
-A person's lasting identity in Runout, signed in with Google. Everything that outlives a Room belongs to one: their Library, Screen Names, Display Name, Preferences, Marks and Tags.
+A person's lasting identity in Runout, signed in with Google or with their email and a password. Everything that outlives a Room belongs to one: their Library, Screen Names, Display Name, Preferences, Marks and Tags. A new one is only created from an Invitation.
 _Avoid_: User, profile, login
+
+**Invitation**:
+An Administrator's offer to one email address to create an Account, sent to it as a single-use link. Pending until it is accepted, expires or is cancelled; resending it replaces the link. Only that email address can accept it. Unrelated to a Room Code, which lets people into a Room, not into Runout.
+_Avoid_: Invite code, registration code, invitación (UI only)
+
+**Administrator**:
+An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms and Impersonates people. A role of the Account, not of any Room; it has nothing to do with being Master.
+_Avoid_: Admin, superuser, owner, Master
+
+**Suspension**:
+An Administrator's withdrawal of an Account's access: it can no longer sign in, every Sign-in it held ends, and it leaves any Room it is in as if Kicked. Nothing it owns is touched, and lifting the Suspension gives it all back.
+_Avoid_: Revoke, ban, delete, block
+
+**Impersonation**:
+An Administrator using Runout as another Account, seeing and changing what they would, with Runout showing throughout that it is not them. Never in a Room, and never over how that Account signs in. Every Impersonation is recorded.
+_Avoid_: Log in as, sudo, view as
 
 **Sign-in**:
 One browser holding a bearer token for an identity. An Account has one per browser it signed in with; signing out ends that one only. The code calls it a session (the `sessions` table, `/api/sessions`), and the UI says "iniciar/cerrar sesión"; anywhere else, "session" on its own means neither this nor a Room.
