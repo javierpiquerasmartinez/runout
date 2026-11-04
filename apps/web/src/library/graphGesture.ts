@@ -16,10 +16,19 @@ export interface GraphPress {
 }
 
 /** What the gesture asks the graph to do. */
-export type GraphGesture = { kind: 'open'; hand: number } | { kind: 'nothing' }
+export type GraphGesture =
+  | { kind: 'open'; hand: number }
+  | { kind: 'zoom'; from: number; to: number }
+  | { kind: 'nothing' }
 
-/** A press and release that barely moved open the Hand under the press; anything else, nothing yet. */
-export function graphGesture({ press, moved }: GraphPress): GraphGesture {
+/**
+ * A press and release that barely moved open the Hand under the press. A drag
+ * Zooms into the Hands between them, whichever way it went, as long as it
+ * covers at least two Hands; one that starts or ends where no Hand stands
+ * does nothing.
+ */
+export function graphGesture({ press, release, moved }: GraphPress): GraphGesture {
   if (moved < CLICK_THRESHOLD) return press === null ? { kind: 'nothing' } : { kind: 'open', hand: press }
-  return { kind: 'nothing' }
+  if (press === null || release === null || press === release) return { kind: 'nothing' }
+  return { kind: 'zoom', from: Math.min(press, release), to: Math.max(press, release) }
 }

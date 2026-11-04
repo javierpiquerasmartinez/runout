@@ -354,6 +354,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             <ResultsGraph
               results={results}
               onOpenHand={(handId) => openHandAt(libraryHandPath(handId))}
+              onZoom={(zoom) => redirect(`${path}${withLibraryZoom(search, zoom)}`)}
               onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)}
             />
           )}

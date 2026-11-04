@@ -50,6 +50,8 @@
 .results__chart {
   flex-grow: 1;
   min-height: 0;
+  /* A drag across the chart Zooms; it never selects the page's text. */
+  user-select: none;
 }
 /* Under the chart, only with a Zoom: which Hands it shows, and the way back to all of them. */
 .results__zoom {
@@ -61,10 +63,10 @@
   font-size: 12px;
   color: var(--text-secondary);
 }
-/* A point opens its Hand with the mouse. */
+/* With the mouse, a point opens its Hand and a drag Zooms into a stretch. */
 @media (pointer: fine) {
   .results__plot .recharts-surface {
-    cursor: pointer;
+    cursor: crosshair;
   }
 }
 /* Recharts' own text and focus outline give way to the app's. */

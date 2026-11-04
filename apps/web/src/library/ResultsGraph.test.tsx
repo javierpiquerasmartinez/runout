@@ -72,7 +72,7 @@ function renderGraph(results: Results, preferences: Preferences = DEFAULT_PREFER
   return render(
     <I18nProvider initialLocale="en">
       <PreferencesContext.Provider value={preferences}>
-        <ResultsGraph results={results} onOpenHand={() => {}} onLeaveZoom={onLeaveZoom} />
+        <ResultsGraph results={results} onOpenHand={() => {}} onZoom={() => {}} onLeaveZoom={onLeaveZoom} />
       </PreferencesContext.Provider>
     </I18nProvider>,
   )

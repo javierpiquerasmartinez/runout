@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
@@ -7,9 +7,9 @@ import { graphColour, type DisplayUnit, type Preferences } from '../preferences/
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
-import { graphGesture } from './graphGesture'
+import { CLICK_THRESHOLD, graphGesture } from './graphGesture'
 import { libraryHandPath } from './library'
-import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type ResultsLines } from './results'
+import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type ResultsLines, type Zoom } from './results'
 import './ResultsGraph.css'
 
 /** What the graph adds up in: big blinds always, Amounts only in one currency. */
@@ -40,16 +40,19 @@ const WIN_RATE_LINES = ['result', 'allInEv'] as const satisfies readonly ResultL
  * over the filtered Hands, with a legend that shows each line's total and
  * hides or shows it. Draws only Results that hold Hands. Clicking a point
  * with the mouse opens its Hand through `onOpenHand`, or in a new tab with
- * Cmd/Ctrl. With a Zoom, it draws only that stretch, says so, and leaves it
- * with `onLeaveZoom`.
+ * Cmd/Ctrl. Dragging across it with the mouse asks for a Zoom into that
+ * stretch through `onZoom`. With a Zoom, it draws only that stretch, says so,
+ * and leaves it with `onLeaveZoom`.
  */
 export function ResultsGraph({
   results,
   onOpenHand,
+  onZoom,
   onLeaveZoom,
 }: {
   results: Results
   onOpenHand: (handId: string) => void
+  onZoom: (zoom: Zoom) => void
   onLeaveZoom: () => void
 }) {
   const i18n = useI18n()
@@ -74,21 +77,40 @@ export function ResultsGraph({
   // The point the hover box shows is the one a press or release lands on.
   const hovered = useRef<Point | null>(null)
   const pressed = useRef<{ hand: number | null; x: number; y: number } | null>(null)
+  // The stretch a drag spans so far, shaded while the mouse is down.
+  const [band, setBand] = useState<{ from: number; to: number } | null>(null)
   const handOf = (point: Point | null) => (point?.handId ? point.hand : null)
+  const movedSince = (start: { x: number; y: number }, event: PointerEvent<HTMLDivElement>) =>
+    Math.hypot(event.clientX - start.x, event.clientY - start.y)
   const press = (event: PointerEvent<HTMLDivElement>) => {
     // Mouse only: touch and pen keep the graph as it was (a tap shows the hover box).
     if (event.pointerType !== 'mouse' || event.button !== 0) return
     pressed.current = { hand: handOf(hovered.current), x: event.clientX, y: event.clientY }
   }
+  const drag = (event: PointerEvent<HTMLDivElement>) => {
+    const start = pressed.current
+    if (!start || event.pointerType !== 'mouse') return
+    const under = handOf(hovered.current)
+    if (start.hand === null || under === null || movedSince(start, event) < CLICK_THRESHOLD) return
+    setBand({ from: start.hand, to: under })
+  }
+  const cancel = () => {
+    pressed.current = null
+    setBand(null)
+  }
   const release = (event: PointerEvent<HTMLDivElement>) => {
     const start = pressed.current
-    pressed.current = null
+    cancel()
     if (!start || event.pointerType !== 'mouse') return
     const gesture = graphGesture({
       press: start.hand,
       release: handOf(hovered.current),
-      moved: Math.hypot(event.clientX - start.x, event.clientY - start.y),
+      moved: movedSince(start, event),
     })
+    if (gesture.kind === 'zoom') {
+      onZoom({ from: gesture.from, to: gesture.to })
+      return
+    }
     if (gesture.kind !== 'open') return
     const handId = data.find((point) => point.hand === gesture.hand)?.handId
     if (!handId) return
@@ -123,7 +145,14 @@ export function ResultsGraph({
       </div>
       <div className="results__body">
         <div className="results__plot">
-          <div className="results__chart" onPointerDown={press} onPointerUp={release}>
+          <div
+            className="results__chart"
+            onPointerDown={press}
+            onPointerMove={drag}
+            onPointerUp={release}
+            onPointerLeave={cancel}
+            onPointerCancel={cancel}
+          >
             <LineChart
               data={data}
               onMouseMove={(state) => {
@@ -156,6 +185,17 @@ export function ResultsGraph({
                 tickFormatter={(value: number) => formatTick(value, unit, results.currency, i18n)}
               />
               <ReferenceLine y={0} stroke="var(--color-border-strong)" />
+              {band && band.from !== band.to && (
+                <ReferenceArea
+                  x1={Math.min(band.from, band.to)}
+                  x2={Math.max(band.from, band.to)}
+                  fill="var(--color-selected)"
+                  fillOpacity={0.7}
+                  stroke="var(--color-border-hover)"
+                  strokeOpacity={1}
+                  ifOverflow="hidden"
+                />
+              )}
               <Tooltip
                 cursor={{ stroke: 'var(--color-border-hover)', strokeDasharray: '3 3' }}
                 isAnimationActive={false}
