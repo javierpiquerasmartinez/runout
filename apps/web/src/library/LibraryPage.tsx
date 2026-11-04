@@ -488,20 +488,24 @@ function HandTable({
               {t('library.column.hand')}
             </th>
             <th scope="col">{t('library.column.hero')}</th>
-            <SortableHeader by="stake" sort={sort} onSort={onSort}>
+            <SortableHeader by="stake" sort={sort} onSort={onSort} className="library-table__stake">
               {t('library.column.stake')}
             </SortableHeader>
-            <SortableHeader by="pot" sort={sort} onSort={onSort}>
+            <SortableHeader by="pot" sort={sort} onSort={onSort} className="library-table__pot">
               {t('library.column.pot')}
             </SortableHeader>
             <SortableHeader by="result" sort={sort} onSort={onSort}>
               {t('library.column.result')}
             </SortableHeader>
-            <th scope="col">{t('library.column.street')}</th>
+            <th scope="col" className="library-table__street">
+              {t('library.column.street')}
+            </th>
             <SortableHeader by="date" sort={sort} onSort={onSort}>
               {t('library.column.date')}
             </SortableHeader>
-            <th scope="col">{t('library.column.tags')}</th>
+            <th scope="col" className="library-table__tags">
+              {t('library.column.tags')}
+            </th>
             <th scope="col" className="library-table__mark">
               <span className="library-table__hidden">{t('library.marked')}</span>
             </th>
@@ -540,25 +544,24 @@ function HandTable({
                         <Card key={card} card={card} size="list" />
                       ))}
                     </span>
-                    <span className="library-row__positions">{positions}</span>
                   </a>
                 </td>
                 <td>
                   <span className="library-row__hero ro-mono">{hand.hero}</span>
                   <span className="library-row__site">{siteLabel(hand, i18n)}</span>
                 </td>
-                <td className="library-row__stake ro-mono">{stakeLabel(hand)}</td>
-                <td className="library-row__pot ro-mono">{pot.primary}</td>
+                <td className="library-table__stake library-row__stake ro-mono">{stakeLabel(hand)}</td>
+                <td className="library-table__pot library-row__pot ro-mono">{pot.primary}</td>
                 <td className="library-row__result ro-mono" data-sign={Math.sign(hand.result)}>
                   {result.primary}
                 </td>
-                <td>
+                <td className="library-table__street">
                   <span className="library-row__street ro-mono" data-showdown={hand.overview.showdown || undefined}>
                     {streetLabel(hand, i18n)}
                   </span>
                 </td>
                 <td className="library-row__date ro-mono">{playedAtLabel(hand, i18n)}</td>
-                <td>
+                <td className="library-table__tags">
                   <span className="library-row__tags">
                     {hand.tags.map((tag) => (
                       <Chip key={tag.id} variant="tag">
@@ -602,16 +605,18 @@ function SortableHeader({
   by,
   sort,
   onSort,
+  className,
   children,
 }: {
   by: LibrarySortColumn
   sort: LibrarySort
   onSort: (by: LibrarySortColumn) => void
+  className?: string
   children: ReactNode
 }) {
   const current = sort.by === by
   return (
-    <th scope="col" aria-sort={current ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}>
+    <th scope="col" className={className} aria-sort={current ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}>
       <button
         type="button"
         className="library-table__sort"

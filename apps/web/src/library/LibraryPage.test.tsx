@@ -197,7 +197,9 @@ describe('LibraryPage', () => {
     const table = await screen.findByRole('table', { name: 'All hands' })
     const rows = within(table).getAllByRole('row').slice(1)
     expect(rows).toHaveLength(2)
-    expect(within(rows[0]).getByText('BTN vs BB')).toBeTruthy()
+    // The positions name the row's controls, but are not shown: the cards say which Hand it is.
+    expect(within(rows[0]).queryByText('BTN vs BB')).toBeNull()
+    expect(within(rows[0]).getByRole('link', { name: 'Open BTN vs BB, iMapleAA' })).toBeTruthy()
     expect(within(rows[0]).getByText('iMapleAA')).toBeTruthy()
     expect(within(rows[0]).getByText('NL10')).toBeTruthy()
     expect(within(rows[0]).getByText('SHOWDOWN')).toBeTruthy()
@@ -236,7 +238,7 @@ describe('LibraryPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
 
     expect(await screen.findByText('Showing 3–3 of 3')).toBeTruthy()
-    expect(screen.getByText('CO vs SB')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Open CO vs SB, iMapleAA' })).toBeTruthy()
     expect(requests.at(-1)).toBe('/api/library/hands?page=2&pageSize=50')
     expect(screen.getByRole('button', { name: /^Next page/ }).getAttribute('aria-disabled')).toBe('true')
   })

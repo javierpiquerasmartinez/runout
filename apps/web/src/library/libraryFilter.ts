@@ -37,7 +37,7 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   tags: [],
 }
 
-export type QuickRange = 'today' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
+export type QuickRange = 'today' | 'yesterday' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
 
 /** The period the Library starts on, and the one a bare address means. */
 export const DEFAULT_PERIOD: QuickRange = 'today'
@@ -51,14 +51,18 @@ export function defaultLibraryFilter(now: Date = new Date()): LibraryFilter {
 }
 
 /** Shortest first, so days two of them share are named by the shorter. */
-export const QUICK_RANGES: QuickRange[] = ['today', 'this-week', 'this-month', 'this-year', 'all-time']
+export const QUICK_RANGES: QuickRange[] = ['today', 'yesterday', 'this-week', 'this-month', 'this-year', 'all-time']
 
-/** The quick range's days, up to today in the viewer's time zone. Weeks start on Monday. */
+/** The quick range's days, up to today (yesterday's ends the day before) in the viewer's time zone. Weeks start on Monday. */
 export function quickRange(range: QuickRange, now: Date = new Date()): Pick<LibraryFilter, 'from' | 'to'> {
   const today = localDay(now)
   switch (range) {
     case 'today':
       return { from: today, to: today }
+    case 'yesterday': {
+      const yesterday = localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
+      return { from: yesterday, to: yesterday }
+    }
     case 'this-week': {
       const sinceMonday = (now.getDay() + 6) % 7
       return { from: localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - sinceMonday)), to: today }
