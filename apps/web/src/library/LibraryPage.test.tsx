@@ -86,7 +86,7 @@ beforeEach(() => {
     totals: { bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } },
     start: { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 } },
     zoom: null,
-    points: [{ hand: 3, bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } }],
+    points: [{ hand: 3, handId: 'hand-3', holeCards: ['4s', '10c'], bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } }],
   }
   pages = {
     '1': libraryPage({ total: 3, page: 1, pageSize: 2, hands: [libraryHand('h1', { tags: [{ id: 't1', name: 'All-in' }, { id: 't2', name: 'Multiway' }] }), libraryHand('h2', { hero: 'Hero', site: 'coinpoker', result: -10 })] }),

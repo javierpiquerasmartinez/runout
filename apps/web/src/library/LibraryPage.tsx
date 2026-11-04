@@ -146,11 +146,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     window.history.replaceState(withLibraryScroll(window.history.state, null), '')
   }, [page])
   // Opening a Hand keeps where the Library was, so "Volver" leads back to it.
+  const openHandAt = (handPath: string) => {
+    window.history.replaceState(withLibraryScroll(window.history.state, window.scrollY), '')
+    navigate(handPath, openedFromLibrary(`${path}${search}`))
+  }
   const openHand = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!isPlainClick(event)) return
     event.preventDefault()
-    window.history.replaceState(withLibraryScroll(window.history.state, window.scrollY), '')
-    navigate(event.currentTarget.pathname, openedFromLibrary(`${path}${search}`))
+    openHandAt(event.currentTarget.pathname)
   }
   // When only a quick period leaves nothing, the way out is all the Library, not clearing filters.
   const period = periodOf(filter)
@@ -348,7 +351,11 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             />
           )}
           {view === 'graph' && page && page.total > 0 && results && results.hands > 0 && (
-            <ResultsGraph results={results} onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)} />
+            <ResultsGraph
+              results={results}
+              onOpenHand={(handId) => openHandAt(libraryHandPath(handId))}
+              onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)}
+            />
           )}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">

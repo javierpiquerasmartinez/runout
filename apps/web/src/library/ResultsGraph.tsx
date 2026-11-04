@@ -1,18 +1,22 @@
-import { useState } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
 import { graphColour, type DisplayUnit, type Preferences } from '../preferences/preferences'
 import { Button } from '../ui/Button'
+import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
-import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results } from './results'
+import { graphGesture } from './graphGesture'
+import { libraryHandPath } from './library'
+import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type ResultsLines } from './results'
 import './ResultsGraph.css'
 
 /** What the graph adds up in: big blinds always, Amounts only in one currency. */
 type GraphUnit = Exclude<DisplayUnit, 'both'>
 
-type Point = { hand: number } & ResultLines
+/** A point as drawn; the start point stands for no Hand, so it has no cards. */
+type Point = { hand: number; handId?: string; holeCards?: string[] } & ResultLines
 
 /*
  * Recharts draws the shapes; everything it would style on its own (colours,
@@ -34,10 +38,20 @@ const WIN_RATE_LINES = ['result', 'allInEv'] as const satisfies readonly ResultL
 /**
  * The Results Graph: the running Result, All-in EV, Showdown and Non-showdown Results
  * over the filtered Hands, with a legend that shows each line's total and
- * hides or shows it. Draws only Results that hold Hands. With a Zoom, it
- * draws only that stretch, says so, and leaves it with `onLeaveZoom`.
+ * hides or shows it. Draws only Results that hold Hands. Clicking a point
+ * with the mouse opens its Hand through `onOpenHand`, or in a new tab with
+ * Cmd/Ctrl. With a Zoom, it draws only that stretch, says so, and leaves it
+ * with `onLeaveZoom`.
  */
-export function ResultsGraph({ results, onLeaveZoom }: { results: Results; onLeaveZoom: () => void }) {
+export function ResultsGraph({
+  results,
+  onOpenHand,
+  onLeaveZoom,
+}: {
+  results: Results
+  onOpenHand: (handId: string) => void
+  onLeaveZoom: () => void
+}) {
   const i18n = useI18n()
   const { t } = i18n
   const preferences = usePreferences()
@@ -48,15 +62,39 @@ export function ResultsGraph({ results, onLeaveZoom }: { results: Results; onLea
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
   const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
-  const linesOf = (point: Omit<Results['points'][number], 'hand'>): ResultLines =>
+  const linesOf = (point: ResultsLines): ResultLines =>
     unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
 
   // Every line starts where it stood before the first Hand drawn: nothing, unless zoomed.
   const data: Point[] = [
     { hand: results.zoom ? results.zoom.from - 1 : 0, ...linesOf(results.start) },
-    ...results.points.map((point) => ({ hand: point.hand, ...linesOf(point) })),
+    ...results.points.map((point) => ({ hand: point.hand, handId: point.handId, holeCards: point.holeCards, ...linesOf(point) })),
   ]
   const totals = linesOf(results.totals)
+  // The point the hover box shows is the one a press or release lands on.
+  const hovered = useRef<Point | null>(null)
+  const pressed = useRef<{ hand: number | null; x: number; y: number } | null>(null)
+  const handOf = (point: Point | null) => (point?.handId ? point.hand : null)
+  const press = (event: PointerEvent<HTMLDivElement>) => {
+    // Mouse only: touch and pen keep the graph as it was (a tap shows the hover box).
+    if (event.pointerType !== 'mouse' || event.button !== 0) return
+    pressed.current = { hand: handOf(hovered.current), x: event.clientX, y: event.clientY }
+  }
+  const release = (event: PointerEvent<HTMLDivElement>) => {
+    const start = pressed.current
+    pressed.current = null
+    if (!start || event.pointerType !== 'mouse') return
+    const gesture = graphGesture({
+      press: start.hand,
+      release: handOf(hovered.current),
+      moved: Math.hypot(event.clientX - start.x, event.clientY - start.y),
+    })
+    if (gesture.kind !== 'open') return
+    const handId = data.find((point) => point.hand === gesture.hand)?.handId
+    if (!handId) return
+    if (event.metaKey || event.ctrlKey) window.open(libraryHandPath(handId), '_blank', 'noopener')
+    else onOpenHand(handId)
+  }
   const toggle = (line: ResultLine) =>
     setHidden((current) => {
       const next = new Set(current)
@@ -85,8 +123,20 @@ export function ResultsGraph({ results, onLeaveZoom }: { results: Results; onLea
       </div>
       <div className="results__body">
         <div className="results__plot">
-          <div className="results__chart">
-            <LineChart data={data} responsive style={{ width: '100%', height: '100%' }} margin={{ top: 8, right: 20, bottom: 0, left: 0 }}>
+          <div className="results__chart" onPointerDown={press} onPointerUp={release}>
+            <LineChart
+              data={data}
+              onMouseMove={(state) => {
+                const index = state.activeTooltipIndex
+                hovered.current = index === undefined || index === null ? null : (data[Number(index)] ?? null)
+              }}
+              onMouseLeave={() => {
+                hovered.current = null
+              }}
+              responsive
+              style={{ width: '100%', height: '100%' }}
+              margin={{ top: 8, right: 20, bottom: 0, left: 0 }}
+            >
               <CartesianGrid vertical={false} stroke="var(--color-divider)" />
               <XAxis
                 dataKey="hand"
@@ -197,6 +247,13 @@ function Readout({
   return (
     <div className="results__readout">
       <span className="results__readout-hand ro-mono">{t('library.results.hand', { hand: formatNumber(point.hand) })}</span>
+      {point.holeCards && (
+        <span className="results__readout-cards">
+          {point.holeCards.map((card) => (
+            <Card key={card} card={card} size="list" />
+          ))}
+        </span>
+      )}
       {RESULT_LINES.filter((line) => !hidden.has(line)).map((line) => (
         <span key={line} className="results__readout-line">
           <span className="results__swatch" style={{ background: stroke[line] }} aria-hidden="true" />

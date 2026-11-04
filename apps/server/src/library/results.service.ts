@@ -25,6 +25,10 @@ export interface ResultLines {
 /** Where the lines stand after one Hand, counted from 1 in played order. */
 export interface ResultsPoint {
   hand: number;
+  /** The Hand itself, so it can be opened from the graph. */
+  handId: string;
+  /** The Hero's cards in that Hand, as the Library list shows them. */
+  holeCards: string[];
   /** In big blinds of each Hand's own Stake, to the hundredth. */
   bigBlinds: ResultLines;
   /** As Amounts, only when every Hand shares one currency. */
@@ -44,9 +48,9 @@ export interface Results {
   /** The currency every Hand the filter keeps shares, or null when they mix (or there are none). */
   currency: string | null;
   /** What each line won or lost over the Hands the series covers. */
-  totals: Omit<ResultsPoint, 'hand'>;
+  totals: Lines;
   /** Where the lines stood just before the first Hand the series covers: nothing without a Zoom. */
-  start: Omit<ResultsPoint, 'hand'>;
+  start: Lines;
   /** The stretch the series covers, clamped to the Hands there are, or null for all of them. */
   zoom: Zoom | null;
   /**
@@ -56,6 +60,9 @@ export interface Results {
    */
   points: ResultsPoint[];
 }
+
+/** Where the lines stand, in both units. */
+type Lines = Pick<ResultsPoint, 'bigBlinds' | 'amounts'>;
 
 /** Running sums as the database reads them, as text: Amounts, then big blinds. */
 type Sums = {
@@ -112,10 +119,16 @@ export class ResultsService {
         // The running sums of every Hand, of which only the last of each of
         // `maxPoints` even stretches of the series is kept (with fewer Hands,
         // every Hand), and the one just before the series, where it starts.
-        const running = await tx.execute<Sums & { hand: number }>(sql`
-          select * from (
+        // The Hero's cards are read only for the kept points, joining back
+        // on their Hands, so the window never reads a whole stored Hand.
+        const running = await tx.execute<
+          Sums & { hand: number; hand_id: string; hole_cards: string[] }
+        >(sql`
+          select running.*, point_hand.content->'hero'->'cards' as hole_cards
+          from (
             select
               row_number() over played::int as hand,
+              ${hands.id} as hand_id,
               ${sums(sql`over played`)}
             from ${libraryEntries}
             inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
@@ -125,6 +138,7 @@ export class ResultsService {
               rows between unbounded preceding and current row
             )
           ) running
+          inner join ${hands} as point_hand on point_hand.id = running.hand_id
           where hand = ${from - 1}::int
             or (
               hand between ${from}::int and ${to}::int
@@ -133,10 +147,14 @@ export class ResultsService {
             )
           order by hand
         `);
-        const series = running.rows.map(({ hand, ...sums }) => ({
-          hand,
-          ...linesOf(sums, oneCurrency),
-        }));
+        const series: ResultsPoint[] = running.rows.map(
+          ({ hand, hand_id, hole_cards, ...sums }) => ({
+            hand,
+            handId: hand_id,
+            holeCards: hole_cards,
+            ...linesOf(sums, oneCurrency),
+          }),
+        );
         const before =
           series[0]?.hand === from - 1 ? series.shift() : undefined;
         const start = before
@@ -178,16 +196,13 @@ function wholeNumber(raw: unknown): number | null {
 }
 
 /** Every line at nothing, as before the first Hand. */
-function nothing(oneCurrency: boolean): Omit<ResultsPoint, 'hand'> {
+function nothing(oneCurrency: boolean): Lines {
   const zero = { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 };
   return { bigBlinds: zero, amounts: oneCurrency ? { ...zero } : null };
 }
 
 /** What each line won or lost from one point to a later one, to the hundredth. */
-function between(
-  start: Omit<ResultsPoint, 'hand'>,
-  end: Omit<ResultsPoint, 'hand'>,
-): Omit<ResultsPoint, 'hand'> {
+function between(start: Lines, end: Lines): Lines {
   const minus = (later: ResultLines, earlier: ResultLines): ResultLines => {
     const line = (key: keyof ResultLines) =>
       Math.round((later[key] - earlier[key]) * 100) / 100;
@@ -225,7 +240,7 @@ function sums(over: SQL) {
 }
 
 /** The lines from their sums: the Non-showdown Result is whatever the Showdown Result leaves of the Result. */
-function linesOf(sums: Sums, oneCurrency: boolean): Omit<ResultsPoint, 'hand'> {
+function linesOf(sums: Sums, oneCurrency: boolean): Lines {
   const lines = (
     result: number,
     allInEv: number,
