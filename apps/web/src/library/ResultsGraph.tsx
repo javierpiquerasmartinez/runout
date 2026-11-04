@@ -286,7 +286,7 @@ export function ResultsGraph({
                 from: i18n.formatNumber(results.zoom.from),
                 to: i18n.formatNumber(results.zoom.to),
               })}
-              <Button variant="ghost" size="compact" onClick={onLeaveZoom}>
+              <Button variant="ghost" size="compact" className="results__zoom-leave" onClick={onLeaveZoom}>
                 {t('library.results.zoom.leave')}
               </Button>
             </p>
