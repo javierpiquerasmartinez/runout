@@ -2,19 +2,20 @@ import type { CSSProperties } from 'react'
 import { useI18n } from '../i18n'
 import { Card, CardBack, CardSlot } from '../ui/Card'
 import { Icon } from '../ui/Icon'
-import { asPercent, cachedBetCentres, seatCentre } from './tableLayout'
+import { asPercent, betHeight, cachedPlaces, seatCentre } from './tableLayout'
 import { Secondary } from '../ui/Secondary'
 import type { SeatView, TableView } from './tableView'
 
 /*
  * The top-down table of the "Sala" boards, laid out at 820 × 606: the felt,
- * the board and pot in the middle, and the seats around it, each bet placed
- * clear of everything else. It doesn't scale as one drawing yet (issue 19).
+ * the board and pot in the middle, and the seats around it, with the dealer
+ * button and each bet on the felt beside their seat, clear of everything
+ * else. It doesn't scale as one drawing yet (issue 19).
  */
 
 export function PokerTable({ view }: { view: TableView }) {
   const { t } = useI18n()
-  const bets = cachedBetCentres(view.slots, view.seats)
+  const places = cachedPlaces(view.slots, view.seats, betHeight(view.betLines))
   const winning = new Set(view.winningCards)
   return (
     <div className="poker-table">
@@ -59,25 +60,30 @@ export function PokerTable({ view }: { view: TableView }) {
       {view.seats.map((seat) => (
         <Seat key={seat.screenName} seat={seat} winning={winning} style={asPercent(seatCentre(seat.slot, view.slots))} />
       ))}
-      {view.seats.map(
-        (seat) =>
-          seat.chip && (
-            <span
-              key={seat.screenName}
-              className="poker-table__bet ro-mono"
-              data-kind={seat.chip.kind}
-              data-hero={seat.hero || undefined}
-              style={asPercent(bets.get(seat.slot)!)}
-            >
-              <span className="poker-table__bet-chip" />
-              <span className="poker-table__bet-amount">
-                {seat.chip.label}
-                <Secondary value={seat.chip.secondary} />
-              </span>
-              {seat.chip.potShare && <span className="poker-table__bet-share">{seat.chip.potShare}</span>}
-            </span>
-          ),
+      {places.dealer && (
+        <span className="poker-table__dealer ro-mono" role="img" aria-label={t('room.table.dealer')} style={asPercent(places.dealer)}>
+          D
+        </span>
       )}
+      {view.seats.map((seat) => {
+        if (!seat.chip) return null
+        // Below the amount, smaller: that it is all-in, the pot share, or else the Amount in the other unit.
+        const below = (seat.chip.kind === 'all-in' ? t('room.table.allInBet') : seat.chip.potShare) ?? seat.chip.secondary
+        return (
+          <span
+            key={seat.screenName}
+            className="poker-table__bet ro-mono"
+            data-kind={seat.chip.kind}
+            style={asPercent(places.bets.get(seat.slot)!)}
+          >
+            <span className="poker-table__bet-chip" />
+            <span className="poker-table__bet-text">
+              <span className="poker-table__bet-amount">{seat.chip.label}</span>
+              {below && <span className="poker-table__bet-below">{below}</span>}
+            </span>
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -143,11 +149,6 @@ function Seat({ seat, winning, style }: { seat: SeatView; winning: Set<string>; 
           {seat.netResult && <span className="seat__note seat__note--won ro-mono">{seat.netResult}</span>}
           {seat.allInLabel && <span className="seat__note seat__note--all-in ro-mono">{seat.allInLabel}</span>}
         </div>
-        {seat.dealer && (
-          <span className="seat__dealer ro-mono" role="img" aria-label={t('room.table.dealer')}>
-            D
-          </span>
-        )}
       </div>
       {seat.hero ? (
         <span className="seat__below">

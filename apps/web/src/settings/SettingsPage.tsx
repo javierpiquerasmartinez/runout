@@ -24,7 +24,6 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Card, type Deck } from '../ui/Card'
 import { Icon } from '../ui/Icon'
-import { Secondary } from '../ui/Secondary'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toggle } from '../ui/Toggle'
@@ -434,14 +433,14 @@ function SettingRow({
 function BetPreview({ unit, potPercentage }: { unit: DisplayUnit; potPercentage: boolean }) {
   const i18n = useI18n()
   const bet = quantity(65, { bigBlind: 10, currency: 'EUR' }, unit, i18n)
+  const below = potPercentage ? i18n.t('room.table.potShare', { percent: 33 }) : bet.secondary
   return (
     <span className="settings-row__bet ro-mono" role="img" aria-label={i18n.t('settings.potPercentage.preview')}>
       <span className="settings-row__bet-chip" />
-      <span>
+      <span className="settings-row__bet-text">
         {bet.primary}
-        <Secondary value={bet.secondary} />
+        {below && <span className="settings-row__bet-share">{below}</span>}
       </span>
-      {potPercentage && <span className="settings-row__bet-share">{i18n.t('room.table.potShare', { percent: 33 })}</span>}
     </span>
   )
 }

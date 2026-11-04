@@ -332,6 +332,7 @@ export const es = {
   'room.playback.dealt': 'se reparte',
   'room.playback.handOver': 'fin de la mano',
   'room.table.allIn': 'all-in {amount}',
+  'room.table.allInBet': 'all-in',
   'room.table.wins': 'gana {amount}',
   'room.log.label': 'Acciones de la calle',
   'room.log.pending': '{name} · pendiente',

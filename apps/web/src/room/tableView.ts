@@ -46,12 +46,15 @@ export interface SeatView {
 }
 
 export interface ChipView {
+  /** An all-in says so on a second line, below the amount. */
   kind: 'bet' | 'all-in'
+  /** The amount alone: "3 BB". */
   label: string
   /** The Amount beside `label`, when both units are shown. */
   secondary: string | null
   /**
-   * A bet or raise as a share of the pot it went into: "33% bote". Not for
+   * A bet or raise as a share of the pot it went into: "33% bote", on a
+   * second line below the amount. Not for
    * calls, blinds or all-ins, nor for a reader who turned it off.
    */
   potShare: string | null
@@ -100,6 +103,12 @@ export interface TableView {
   potDetail: string | null
   /** The main pot and each side pot, once there are side pots. */
   sidePots: PotView[] | null
+  /**
+   * How many lines a bet on this Hand's table can take: 2 when one can carry
+   * the pot share, "all-in" or the Amount in the other unit below its amount.
+   * Worked out for the whole Hand, so bets never shift mid-Hand.
+   */
+  betLines: 1 | 2
   street: Street
   /** The step of the Timeline Playback is on, 0 at the Initial State: what to step from. */
   actionIndex: number
@@ -220,6 +229,12 @@ export function tableView(
       gathered > 0 && inPlay > 0
         ? t('room.table.potInPlay', { gathered: inUnit(gathered), inPlay: inUnit(inPlay) })
         : null,
+    betLines:
+      preferences.displayUnit === 'both' ||
+      preferences.potPercentage ||
+      states.some((s) => s.players.some((p) => p.allIn && p.bet > 0))
+        ? 2
+        : 1,
     sidePots:
       state.pots.length > 1
         ? state.pots.map((side, i) => {
@@ -369,7 +384,7 @@ function chipOf(
   if (player.bet === 0) return null
   const { primary, secondary } = measure(player.bet)
   if (player.allIn) {
-    return { kind: 'all-in', label: t('room.table.allIn', { amount: primary }), secondary, potShare: null }
+    return { kind: 'all-in', label: primary, secondary, potShare: null }
   }
   if (!potPercentage || latest === undefined || (move?.type !== 'bet' && move?.type !== 'raise')) {
     // Calls follow someone else's sizing; blinds and straddles are posted.

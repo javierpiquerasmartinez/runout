@@ -333,6 +333,7 @@ export const en: Messages = {
   'room.playback.dealt': 'dealt',
   'room.playback.handOver': 'end of the hand',
   'room.table.allIn': 'all-in {amount}',
+  'room.table.allInBet': 'all-in',
   'room.table.wins': 'wins {amount}',
   'room.log.label': 'Actions on this street',
   'room.log.pending': '{name} · to act',
