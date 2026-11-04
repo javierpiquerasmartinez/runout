@@ -4,14 +4,16 @@ import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
 import { graphColour, type DisplayUnit, type Preferences } from '../preferences/preferences'
+import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
-import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results } from './results'
+import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type ResultsLines } from './results'
 import './ResultsGraph.css'
 
 /** What the graph adds up in: big blinds always, Amounts only in one currency. */
 type GraphUnit = Exclude<DisplayUnit, 'both'>
 
-type Point = { hand: number } & ResultLines
+/** A point as drawn; the start point stands for no Hand, so it has no cards. */
+type Point = { hand: number; holeCards?: string[] } & ResultLines
 
 /*
  * Recharts draws the shapes; everything it would style on its own (colours,
@@ -46,13 +48,13 @@ export function ResultsGraph({ results }: { results: Results }) {
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
   const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
-  const linesOf = (point: Omit<Results['points'][number], 'hand'>): ResultLines =>
+  const linesOf = (point: ResultsLines): ResultLines =>
     unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
 
   // Every line starts from nothing before the first Hand.
   const data: Point[] = [
     { hand: 0, result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
-    ...results.points.map((point) => ({ hand: point.hand, ...linesOf(point) })),
+    ...results.points.map((point) => ({ hand: point.hand, holeCards: point.holeCards, ...linesOf(point) })),
   ]
   const totals = linesOf(results.totals)
   const toggle = (line: ResultLine) =>
@@ -182,6 +184,13 @@ function Readout({
   return (
     <div className="results__readout">
       <span className="results__readout-hand ro-mono">{t('library.results.hand', { hand: formatNumber(point.hand) })}</span>
+      {point.holeCards && (
+        <span className="results__readout-cards">
+          {point.holeCards.map((card) => (
+            <Card key={card} card={card} size="list" />
+          ))}
+        </span>
+      )}
       {RESULT_LINES.filter((line) => !hidden.has(line)).map((line) => (
         <span key={line} className="results__readout-line">
           <span className="results__swatch" style={{ background: stroke[line] }} aria-hidden="true" />

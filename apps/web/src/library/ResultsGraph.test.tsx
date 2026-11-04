@@ -21,11 +21,15 @@ const euros: Results = {
   points: [
     {
       hand: 3,
+      handId: 'hand-3',
+      holeCards: ['4s', '10c'],
       bigBlinds: { result: 0.1, allInEv: 0.1, showdown: 0, nonShowdown: 0.1 },
       amounts: { result: 1, allInEv: 1, showdown: 0, nonShowdown: 1 },
     },
     {
       hand: 5,
+      handId: 'hand-5',
+      holeCards: ['Js', '8s'],
       bigBlinds: { result: 4, allInEv: 1, showdown: 4.9, nonShowdown: -0.9 },
       amounts: { result: 40, allInEv: 10, showdown: 49, nonShowdown: -9 },
     },

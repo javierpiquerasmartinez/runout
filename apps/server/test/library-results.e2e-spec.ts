@@ -14,7 +14,13 @@ interface Results {
   hands: number;
   currency: string | null;
   totals: { bigBlinds: Lines; amounts: Lines | null };
-  points: { hand: number; bigBlinds: Lines; amounts: Lines | null }[];
+  points: {
+    hand: number;
+    handId: string;
+    holeCards: string[];
+    bigBlinds: Lines;
+    amounts: Lines | null;
+  }[];
 }
 
 /*
@@ -87,7 +93,7 @@ describe('The Library’s Results (e2e)', () => {
     expect(stars.points.map((point) => point.bigBlinds.showdown)).toEqual([
       0, 0, 0, 0, 4.9,
     ]);
-    expect(stars.points.at(-1)).toEqual({ hand: 5, ...stars.totals });
+    expect(stars.points.at(-1)).toMatchObject({ hand: 5, ...stars.totals });
   });
 
   it('runs the All-in EV beside the Result', async () => {
@@ -124,7 +130,7 @@ describe('The Library’s Results (e2e)', () => {
       4 + coin.totals.bigBlinds.result,
       2,
     );
-    expect(all.points.at(-1)).toEqual({ hand: all.hands, ...all.totals });
+    expect(all.points.at(-1)).toMatchObject({ hand: all.hands, ...all.totals });
   });
 
   it('describes the same Hands as the list under the same filter', async () => {
@@ -165,7 +171,49 @@ describe('The Library’s Results (e2e)', () => {
     expect(sampled.points.map((point) => point.amounts?.result)).toEqual([
       1, 40,
     ]);
-    expect(sampled.points.at(-1)).toEqual({ hand: 5, ...sampled.totals });
+    expect(sampled.points.at(-1)).toMatchObject({ hand: 5, ...sampled.totals });
+  });
+
+  /** The ids of the Hands the filter keeps, in played order, as the list sorts them. */
+  async function playedOrder(token: string, query: string): Promise<string[]> {
+    const list = await request(running.httpServer)
+      .get(`/api/library/hands?${query}&sort=date&dir=asc`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return (list.body.hands as { id: string }[]).map((hand) => hand.id);
+  }
+
+  it('names each point’s Hand and the Hero’s cards in it', async () => {
+    const account = await stockedAccount();
+
+    const stars = await results(account.token, 'site=pokerstars');
+
+    expect(stars.points.map((point) => point.handId)).toEqual(
+      await playedOrder(account.token, 'site=pokerstars'),
+    );
+    expect(stars.points.map((point) => point.holeCards)).toEqual([
+      ['Ac', 'Kh'],
+      ['Qc', '10c'],
+      ['4s', '10c'],
+      ['4c', 'Jc'],
+      ['Js', '8s'],
+    ]);
+  });
+
+  it('names the last Hand of each stretch on a downsampled series', async () => {
+    const account = await stockedAccount();
+    const ids = await playedOrder(account.token, 'site=pokerstars');
+
+    const sampled = await results(account.token, 'site=pokerstars&points=2');
+
+    expect(sampled.points.map((point) => point.handId)).toEqual([
+      ids[2],
+      ids[4],
+    ]);
+    expect(sampled.points.map((point) => point.holeCards)).toEqual([
+      ['4s', '10c'],
+      ['Js', '8s'],
+    ]);
   });
 
   it('has nothing to draw for an empty Library, and none for an anonymous identity', async () => {

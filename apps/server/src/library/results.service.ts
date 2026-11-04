@@ -25,6 +25,10 @@ export interface ResultLines {
 /** Where the lines stand after one Hand, counted from 1 in played order. */
 export interface ResultsPoint {
   hand: number;
+  /** The Hand itself, so it can be opened from the graph. */
+  handId: string;
+  /** The Hero's cards in that Hand, as the Library list shows them. */
+  holeCards: string[];
   /** In big blinds of each Hand's own Stake, to the hundredth. */
   bigBlinds: ResultLines;
   /** As Amounts, only when every Hand shares one currency. */
@@ -36,13 +40,16 @@ export interface Results {
   hands: number;
   /** The currency every Hand shares, or null when they mix (or there are none). */
   currency: string | null;
-  totals: Omit<ResultsPoint, 'hand'>;
+  totals: Lines;
   /**
    * At most the points asked for, evenly spread over the Hands in played
    * order; the last one is always the last Hand, so it equals the totals.
    */
   points: ResultsPoint[];
 }
+
+/** Where the lines stand, in both units. */
+type Lines = Pick<ResultsPoint, 'bigBlinds' | 'amounts'>;
 
 /** Running sums as the database reads them, as text: Amounts, then big blinds. */
 type Sums = {
@@ -93,10 +100,16 @@ export class ResultsService {
           `),
           // The running sums of every Hand, of which only the last of each of
           // `maxPoints` even stretches is kept: with fewer Hands, every Hand.
-          tx.execute<Sums & { hand: number }>(sql`
-            select * from (
+          // The Hero's cards are read only for the kept points, joining back
+          // on their Hands, so the window never reads a whole stored Hand.
+          tx.execute<
+            Sums & { hand: number; hand_id: string; hole_cards: string[] }
+          >(sql`
+            select running.*, point_hand.content->'hero'->'cards' as hole_cards
+            from (
               select
                 row_number() over played::int as hand,
+                ${hands.id} as hand_id,
                 count(*) over () as hands,
                 ${sums(sql`over played`)}
               from ${libraryEntries}
@@ -107,6 +120,7 @@ export class ResultsService {
                 rows between unbounded preceding and current row
               )
             ) running
+            inner join ${hands} as point_hand on point_hand.id = running.hand_id
             where hand * ${maxPoints}::bigint / hands > (hand - 1) * ${maxPoints}::bigint / hands
             order by hand
           `),
@@ -119,8 +133,10 @@ export class ResultsService {
       hands: count,
       currency: oneCurrency ? currency : null,
       totals: linesOf(total, oneCurrency),
-      points: running.rows.map(({ hand, ...sums }) => ({
+      points: running.rows.map(({ hand, hand_id, hole_cards, ...sums }) => ({
         hand,
+        handId: hand_id,
+        holeCards: hole_cards,
         ...linesOf(sums, oneCurrency),
       })),
     };
@@ -147,7 +163,7 @@ function sums(over: SQL) {
 }
 
 /** The lines from their sums: the Non-showdown Result is whatever the Showdown Result leaves of the Result. */
-function linesOf(sums: Sums, oneCurrency: boolean): Omit<ResultsPoint, 'hand'> {
+function linesOf(sums: Sums, oneCurrency: boolean): Lines {
   const lines = (
     result: number,
     allInEv: number,
