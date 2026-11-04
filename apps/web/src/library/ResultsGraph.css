@@ -45,6 +45,12 @@
   min-width: 0;
   height: 220px;
 }
+/* A point opens its Hand with the mouse. */
+@media (pointer: fine) {
+  .results__plot .recharts-surface {
+    cursor: pointer;
+  }
+}
 /* Recharts' own text and focus outline give way to the app's. */
 .results__plot .recharts-surface {
   font-family: var(--font-mono);

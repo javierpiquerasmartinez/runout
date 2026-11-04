@@ -40,7 +40,7 @@ function renderGraph(results: Results, preferences: Preferences = DEFAULT_PREFER
   return render(
     <I18nProvider initialLocale="en">
       <PreferencesContext.Provider value={preferences}>
-        <ResultsGraph results={results} />
+        <ResultsGraph results={results} onOpenHand={() => {}} />
       </PreferencesContext.Provider>
     </I18nProvider>,
   )
