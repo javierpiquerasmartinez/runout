@@ -612,6 +612,8 @@
   .analysis__body[data-sides='1'] .analysis__board {
     display: grid;
     grid-template-columns: max-content var(--board-controls);
+    /* When the cards on top are wider, the room left goes between the deck and the fields. */
+    justify-content: space-between;
     align-content: start;
     gap: 10px 14px;
   }
@@ -632,10 +634,9 @@
     grid-template-columns: none;
     grid-template-rows: repeat(13, max-content);
     grid-auto-flow: column;
-    /* Each column as wide as its cards, so a picked card's outline hugs it; the room left goes between them. */
+    /* Each column as wide as its cards, so a picked card's outline hugs it, and as far apart as the rows. */
     grid-auto-columns: max-content;
-    justify-content: space-between;
-    gap: 2px 3px;
+    gap: 3px;
     zoom: 1.15;
   }
   .analysis__body[data-sides='1'] .analysis__board-field {
@@ -716,6 +717,8 @@
     padding: 4px 8px 4px 4px;
     display: grid;
     grid-template-columns: max-content var(--board-controls);
+    /* When the cards on top are wider, the room left goes between the deck and the fields. */
+    justify-content: space-between;
     align-content: start;
     gap: 10px 14px;
   }
@@ -735,10 +738,9 @@
     grid-template-columns: none;
     grid-template-rows: repeat(13, max-content);
     grid-auto-flow: column;
-    /* Each column as wide as its cards, so a picked card's outline hugs it; the room left goes between them. */
+    /* Each column as wide as its cards, so a picked card's outline hugs it, and as far apart as the rows. */
     grid-auto-columns: max-content;
-    justify-content: space-between;
-    gap: 2px 3px;
+    gap: 3px;
     /* Smaller than with one Range: two matrices leave the Board no wider than it was. */
     zoom: 1;
   }
