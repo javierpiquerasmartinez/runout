@@ -27,6 +27,7 @@ export class DevSignInVerifier implements GoogleVerifier {
     return Promise.resolve({
       subject: `dev-${persona}`,
       email: `${persona}@dev.runout.test`,
+      persona: true,
     });
   }
 }

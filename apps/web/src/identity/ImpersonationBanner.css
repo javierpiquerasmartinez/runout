@@ -1,0 +1,17 @@
+/* "Viendo como X": on top of everything, in the brass that says someone else drives. */
+
+.impersonation-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--brass-soft-bg);
+  border-bottom: 1px solid var(--brass-soft-border);
+  color: var(--brass-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}

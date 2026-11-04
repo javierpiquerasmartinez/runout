@@ -9,10 +9,22 @@ export interface Identity {
   screenNames: string[]
   /** How this person reads the table; kept by the server, restored on every visit. */
   preferences: Preferences
-  /** The Google account signed in (ADR 0005); null for an anonymous identity. */
-  account: { email: string | null } | null
+  /** How the Account signs in (ADR 0008); null for an anonymous identity. */
+  account: { email: string | null; signInMethods?: SignInMethod[] } | null
   /** The one Room an anonymous identity exists for, and ends with; null for an Account. */
   room: { code: string } | null
+  /** Whether the Account runs Runout itself; only the server's configuration makes one. */
+  administrator?: boolean
+  /** Who is using this Account through an Impersonation, and until when; null for its owner. */
+  impersonation?: Impersonation | null
+}
+
+export type SignInMethod = 'google' | 'password'
+
+export interface Impersonation {
+  administrator: { displayName: string | null; email: string | null }
+  /** An ISO instant: the Impersonation ends on its own then. */
+  endsAt: string
 }
 
 export interface Session {
@@ -37,6 +49,8 @@ function withDefaults(session: Session): Session {
 export const DISPLAY_NAME_MAX_LENGTH = 40
 
 const TOKEN_KEY = 'runout.identityToken'
+/** The Administrator's own token, kept aside while they impersonate someone. */
+const ADMINISTRATOR_TOKEN_KEY = 'runout.administratorToken'
 
 let loading: Promise<Session | null> | null = null
 
@@ -65,7 +79,63 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
     if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error
   }
   removeToken(storage)
+  // An Impersonation that ran out: back to the Administrator's own Sign-in.
+  const administrator = readKey(storage, ADMINISTRATOR_TOKEN_KEY)
+  if (administrator) {
+    removeKey(storage, ADMINISTRATOR_TOKEN_KEY)
+    writeToken(storage, administrator)
+    return fetchSession(storage)
+  }
   return null
+}
+
+/** Keeps a session the server has just handed this browser, as its own from now on. */
+export function keepSession(signedIn: Session, storage: Storage = window.localStorage): Session {
+  const session = withDefaults(signedIn)
+  writeToken(storage, session.token)
+  loading = Promise.resolve(session)
+  return session
+}
+
+/** Signs in with an email and its password. */
+export async function signInWithPassword(email: string, password: string): Promise<Session> {
+  return keepSession(await api<Session>('/sessions/password', { method: 'POST', body: { email, password } }))
+}
+
+/**
+ * Starts an Impersonation of an Account: the Administrator's own token is
+ * kept aside, and this browser becomes that Account until it ends.
+ */
+export async function startImpersonation(
+  administratorToken: string,
+  accountId: string,
+  storage: Storage = window.localStorage,
+): Promise<Session> {
+  const signedIn = await api<Session>(`/admin/accounts/${encodeURIComponent(accountId)}/impersonations`, {
+    token: administratorToken,
+    method: 'POST',
+  })
+  writeKey(storage, ADMINISTRATOR_TOKEN_KEY, administratorToken)
+  return keepSession(signedIn, storage)
+}
+
+/**
+ * Ends the Impersonation ("Salir", or it ran out) and brings the
+ * Administrator back as themselves. Null when their own Sign-in is gone too.
+ */
+export async function endImpersonation(token: string, storage: Storage = window.localStorage): Promise<Session | null> {
+  try {
+    await api<void>('/sessions/current', { token, method: 'DELETE' })
+  } catch (error) {
+    // Already over on the server.
+    if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error
+  }
+  const administrator = readKey(storage, ADMINISTRATOR_TOKEN_KEY)
+  removeKey(storage, ADMINISTRATOR_TOKEN_KEY)
+  if (administrator) writeToken(storage, administrator)
+  else removeToken(storage)
+  loading = null
+  return loadSession(storage)
 }
 
 /**
@@ -145,24 +215,36 @@ export async function endSession(token: string, storage: Storage = window.localS
 }
 
 function readToken(storage: Storage): string | null {
+  return readKey(storage, TOKEN_KEY)
+}
+
+function removeToken(storage: Storage) {
+  removeKey(storage, TOKEN_KEY)
+}
+
+function writeToken(storage: Storage, token: string) {
+  writeKey(storage, TOKEN_KEY, token)
+}
+
+function readKey(storage: Storage, key: string): string | null {
   try {
-    return storage.getItem(TOKEN_KEY)
+    return storage.getItem(key)
   } catch {
     return null
   }
 }
 
-function removeToken(storage: Storage) {
+function removeKey(storage: Storage, key: string) {
   try {
-    storage.removeItem(TOKEN_KEY)
+    storage.removeItem(key)
   } catch {
     // Storage blocked: nothing was kept.
   }
 }
 
-function writeToken(storage: Storage, token: string) {
+function writeKey(storage: Storage, key: string, value: string) {
   try {
-    storage.setItem(TOKEN_KEY, token)
+    storage.setItem(key, value)
   } catch {
     // Storage blocked: the identity lasts for this page only.
   }

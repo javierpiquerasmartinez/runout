@@ -5,6 +5,11 @@ export interface GoogleAccount {
   /** Google's stable id for the person; never reused, never changes. */
   subject: string;
   email: string | null;
+  /**
+   * A Test mode persona (local development only): created without an
+   * Invitation, as Test mode always has.
+   */
+  persona?: true;
 }
 
 /**

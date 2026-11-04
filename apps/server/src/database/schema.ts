@@ -21,20 +21,117 @@ import type { Hand } from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
 
 /**
- * A person as Runout knows them: an Account, signed in with Google and lasting
- * (ADR 0005), or an anonymous identity, bound to one Room and ended with it.
- * An ended one stays, without sessions, so Notes keep their writer's name.
+ * A person as Runout knows them: an Account, signed in with Google or a
+ * password and lasting (ADR 0005, ADR 0008), or an anonymous identity, bound
+ * to one Room and ended with it. An ended one stays, without sessions, so
+ * Notes keep their writer's name.
  */
-export const identities = pgTable('identities', {
+export const identities = pgTable(
+  'identities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Google's id for the person; null for an anonymous identity or an Account without Google. */
+    googleSubject: text('google_subject').unique(),
+    /** The Account's email, lower-case: how it is found, one Account per email. */
+    email: text('email'),
+    /** scrypt hash of the Account's password; null when it signs in with Google only. */
+    passwordHash: text('password_hash'),
+    /** The Invitation the Account was created from; null for Accounts from before them. */
+    invitationId: uuid('invitation_id').references(
+      (): AnyPgColumn => invitations.id,
+    ),
+    displayName: text('display_name'),
+    /** The one Room an anonymous identity exists for; null for an Account. */
+    roomId: uuid('room_id').references((): AnyPgColumn => rooms.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    /** When an Administrator Suspended the Account; null while it has access. */
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    suspendedBy: uuid('suspended_by').references(
+      (): AnyPgColumn => identities.id,
+    ),
+    /** Its last authenticated request, kept to within a few minutes; null until the first one. */
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
+    /** When it last signed in, by any method; null until it does. */
+    lastSignedInAt: timestamp('last_signed_in_at', { withTimezone: true }),
+  },
+  (table) => [uniqueIndex('identities_email_idx').on(table.email)],
+);
+
+/**
+ * An Administrator's offer to one email address to create an Account
+ * (ADR 0008). Its status is derived, never stored: accepted, cancelled,
+ * expired once past `expiresAt`, pending otherwise.
+ */
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Lower-case. */
+    email: text('email').notNull(),
+    /** The language of its email, and of the Account's first Preferences. */
+    language: text('language', { enum: ['es', 'en'] }).notNull(),
+    /** SHA-256 of the link's token; the token itself is never stored. */
+    tokenHash: text('token_hash').notNull().unique(),
+    sentBy: uuid('sent_by')
+      .notNull()
+      .references((): AnyPgColumn => identities.id),
+    /** When it was last sent; resending moves it. */
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    /** The Account it became. */
+    accountId: uuid('account_id').references((): AnyPgColumn => identities.id),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  },
+  (table) => [
+    // One live link per person: an unaccepted, uncancelled one is resent, never doubled.
+    uniqueIndex('invitations_open_email_idx')
+      .on(table.email)
+      .where(sql`${table.acceptedAt} is null and ${table.cancelledAt} is null`),
+  ],
+);
+
+/** A link to choose a new password, valid once and for one hour. */
+export const passwordResets = pgTable(
+  'password_resets',
+  {
+    /** SHA-256 of the link's token. */
+    tokenHash: text('token_hash').primaryKey(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (table) => [index('password_resets_identity_id_idx').on(table.identityId)],
+);
+
+/**
+ * Consecutive failed password sign-ins at one email, whether it has an
+ * Account or not, and until when the next attempt is refused.
+ */
+export const passwordAttempts = pgTable('password_attempts', {
+  /** Lower-case. */
+  email: text('email').primaryKey(),
+  failures: integer('failures').notNull(),
+  blockedUntil: timestamp('blocked_until', { withTimezone: true }),
+});
+
+/** An Administrator using Runout as another Account, from start to end. */
+export const impersonations = pgTable('impersonations', {
   id: uuid('id').primaryKey().defaultRandom(),
-  /** Google's id for the person; null for an anonymous identity. */
-  googleSubject: text('google_subject').unique(),
-  /** The Account's Google email, for display only. */
-  email: text('email'),
-  displayName: text('display_name'),
-  /** The one Room an anonymous identity exists for; null for an Account. */
-  roomId: uuid('room_id').references((): AnyPgColumn => rooms.id),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  administratorId: uuid('administrator_id')
+    .notNull()
+    .references((): AnyPgColumn => identities.id),
+  accountId: uuid('account_id')
+    .notNull()
+    .references((): AnyPgColumn => identities.id),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  /** One hour after it started: its Sign-in stops authenticating then. */
+  endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  /** When the Administrator left it, or it ran out; null while it goes on. */
+  endedAt: timestamp('ended_at', { withTimezone: true }),
 });
 
 /**
@@ -50,6 +147,10 @@ export const sessions = pgTable(
       .notNull()
       .references(() => identities.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    /** The Impersonation this Sign-in is for; it stops authenticating once that ends. */
+    impersonationId: uuid('impersonation_id').references(
+      () => impersonations.id,
+    ),
   },
   (table) => [index('sessions_identity_id_idx').on(table.identityId)],
 );
@@ -126,8 +227,16 @@ export const rooms = pgTable('rooms', {
   masterId: uuid('master_id')
     .notNull()
     .references(() => identities.id),
+  /** The Account that created it, whoever is Master now. */
+  creatorId: uuid('creator_id')
+    .notNull()
+    .references(() => identities.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
+  /** Its last Revision or join, so stale Rooms can be found. */
+  lastActivityAt: timestamp('last_activity_at', {
+    withTimezone: true,
+  }).notNull(),
 });
 
 export const roomMemberships = pgTable(

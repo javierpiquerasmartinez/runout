@@ -169,6 +169,13 @@
       "when": 1793719141893,
       "tag": "0023_hand_history",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793812482953,
+      "tag": "0024_invitations_and_administrators",
+      "breakpoints": true
     }
   ]
 }

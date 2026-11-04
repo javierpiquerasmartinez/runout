@@ -55,9 +55,33 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'invalid-range-tags': HttpStatus.BAD_REQUEST,
   'invalid-range-filter': HttpStatus.BAD_REQUEST,
   'range-not-found': HttpStatus.NOT_FOUND,
+  'not-found': HttpStatus.NOT_FOUND,
+  'invalid-email': HttpStatus.BAD_REQUEST,
+  'invalid-language': HttpStatus.BAD_REQUEST,
+  'account-exists': HttpStatus.CONFLICT,
+  'invitation-pending': HttpStatus.CONFLICT,
+  'invitation-not-found': HttpStatus.NOT_FOUND,
+  'invitation-expired': HttpStatus.GONE,
+  'invitation-cancelled': HttpStatus.GONE,
+  'invitation-used': HttpStatus.GONE,
+  'invitation-email-mismatch': HttpStatus.FORBIDDEN,
+  'invitation-required': HttpStatus.FORBIDDEN,
+  'email-taken': HttpStatus.CONFLICT,
+  'password-too-weak': HttpStatus.BAD_REQUEST,
+  'invalid-credentials': HttpStatus.UNAUTHORIZED,
+  'too-many-attempts': HttpStatus.TOO_MANY_REQUESTS,
+  'account-suspended': HttpStatus.FORBIDDEN,
+  'reset-not-found': HttpStatus.NOT_FOUND,
+  'reset-expired': HttpStatus.GONE,
+  'reset-used': HttpStatus.GONE,
+  'password-exists': HttpStatus.CONFLICT,
+  'cannot-suspend-administrator': HttpStatus.FORBIDDEN,
+  'cannot-impersonate-administrator': HttpStatus.FORBIDDEN,
+  'impersonation-not-allowed': HttpStatus.FORBIDDEN,
+  'invalid-admin-query': HttpStatus.BAD_REQUEST,
 };
 
-/** Replies to an HTTP request the domain rejected with `{ reason }`. */
+/** Replies to an HTTP request the domain rejected with `{ reason }` and its details. */
 @Catch(Rejected)
 export class RejectionFilter implements ExceptionFilter {
   catch(rejection: Rejected, host: ArgumentsHost): void {
@@ -65,6 +89,6 @@ export class RejectionFilter implements ExceptionFilter {
       .switchToHttp()
       .getResponse<Response>()
       .status(statusFor[rejection.reason])
-      .json({ reason: rejection.reason });
+      .json({ ...rejection.details, reason: rejection.reason });
   }
 }

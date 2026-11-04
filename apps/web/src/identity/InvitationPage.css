@@ -1,0 +1,74 @@
+/* `/invitation/<token>` and the reset pages: one card, centred, like `/login`. */
+
+.invitation {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.invitation__card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.invitation__card > .ro-brand {
+  align-self: center;
+}
+
+.invitation__card p {
+  margin: 0;
+}
+
+.invitation__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.invitation__title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 400;
+}
+
+.invitation__email {
+  color: var(--brass-ink);
+}
+
+.invitation__hint {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.invitation__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.invitation__or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.invitation__or::before,
+.invitation__or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-divider);
+}
+
+.invitation__error {
+  color: var(--alert-ink);
+  font-size: 13px;
+}

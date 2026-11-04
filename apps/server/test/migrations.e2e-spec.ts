@@ -295,4 +295,54 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       await client.end();
     }
   });
+
+  it('backfills what Invitations need: lower-case emails, and each Room’s creator and last activity', async () => {
+    await migrateUpTo('0023_hand_history');
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    try {
+      const {
+        rows: [account],
+      } = await client.query<{ id: string }>(
+        `insert into identities (google_subject, email, created_at)
+         values ('ana-subject', 'Ana@Example.com', now()) returning id`,
+      );
+      await client.query(
+        `insert into rooms (code, name, master_id, created_at)
+         values ('OPEN2345', 'Open', $1, '2026-10-01T10:00:00Z')`,
+        [account.id],
+      );
+      await client.query(
+        `insert into rooms (code, name, status, master_id, created_at, closed_at)
+         values ('SHUT2345', 'Shut', 'closed', $1, '2026-10-01T10:00:00Z', '2026-10-02T12:00:00Z')`,
+        [account.id],
+      );
+
+      await migrateWith(MIGRATIONS_FOLDER);
+
+      const { rows: emails } = await client.query<{ email: string }>(
+        'select email from identities',
+      );
+      expect(emails).toEqual([{ email: 'ana@example.com' }]);
+      const { rows: rooms } = await client.query<{
+        code: string;
+        creator_id: string;
+        last_activity_at: Date;
+      }>('select code, creator_id, last_activity_at from rooms order by code');
+      expect(rooms).toEqual([
+        {
+          code: 'OPEN2345',
+          creator_id: account.id,
+          last_activity_at: new Date('2026-10-01T10:00:00Z'),
+        },
+        {
+          code: 'SHUT2345',
+          creator_id: account.id,
+          last_activity_at: new Date('2026-10-02T12:00:00Z'),
+        },
+      ]);
+    } finally {
+      await client.end();
+    }
+  });
 });

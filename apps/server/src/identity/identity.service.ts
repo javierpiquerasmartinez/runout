@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
-import { createHash, randomBytes } from 'node:crypto';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { and, asc, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
@@ -10,18 +10,54 @@ import {
 import {
   GRAPH_COLOURS,
   identities,
+  impersonations,
+  invitations,
   marks,
+  passwordAttempts,
+  passwordResets,
   preferences,
   rooms,
   screenNames,
   sessions,
 } from '../database/schema.js';
+import { isUniqueViolation } from '../database/unique-violation.js';
+import { EmailWriter } from '../mail/emails.js';
+import { MAILER, type Mailer } from '../mail/mailer.js';
 import { Rejected } from '../rejection/rejection.js';
-import { GOOGLE_VERIFIER, type GoogleVerifier } from './google-verifier.js';
+import {
+  ADMINISTRATOR_EMAILS,
+  type AdministratorEmails,
+} from './administrators.js';
+import {
+  GOOGLE_VERIFIER,
+  type GoogleAccount,
+  type GoogleVerifier,
+} from './google-verifier.js';
+import { requirePending } from './invitations.js';
+import { waitAfterFailures } from './password-rules.js';
+import {
+  NO_PASSWORD_HASH,
+  hashPassword,
+  validPassword,
+  verifyPassword,
+} from './passwords.js';
+import { hashToken, newToken, normalEmail } from './tokens.js';
 
 export interface Identity {
   id: string;
   displayName: string | null;
+  /**
+   * Set when this identity is being used by an Administrator through an
+   * Impersonation, not by its owner: some things are then refused.
+   */
+  impersonation?: Impersonating;
+}
+
+/** The Impersonation a Sign-in is for. */
+export interface Impersonating {
+  id: string;
+  administratorId: string;
+  endsAt: Date;
 }
 
 /** How one person reads the table. Personal: the Room never sees it. */
@@ -56,17 +92,26 @@ export const DEFAULT_PREFERENCES: Preferences = {
   nonShowdownColour: 'red',
 };
 
+export type SignInMethod = 'google' | 'password';
+
 /**
  * An identity as its owner sees it: with the Screen Names they declared and
  * how they read the table.
  */
-export interface Profile extends Identity {
+export interface Profile extends Omit<Identity, 'impersonation'> {
   screenNames: string[];
   preferences: Preferences;
-  /** The Google account behind it; null for an anonymous identity. */
-  account: { email: string | null } | null;
+  /** How the Account signs in; null for an anonymous identity. */
+  account: { email: string | null; signInMethods: SignInMethod[] } | null;
   /** The one Room an anonymous identity exists for; null for an Account. */
   room: { code: string } | null;
+  /** Whether the Account runs Runout itself (ADR 0008); from the server's configuration. */
+  administrator: boolean;
+  /** Who is using this Account through an Impersonation, and until when; null for its owner. */
+  impersonation: {
+    administrator: { displayName: string | null; email: string | null };
+    endsAt: string;
+  } | null;
 }
 
 /** A browser just given a token for an identity. */
@@ -93,9 +138,26 @@ export const DISPLAY_NAME_MAX_LENGTH = 40;
 export const SCREEN_NAME_MAX_LENGTH = 50;
 export const SCREEN_NAMES_MAX_COUNT = 20;
 
+/** How far apart an Account's last activity is written: close enough, nearly free. */
+export const ACTIVITY_PRECISION_MS = 5 * 60_000;
+/** How long a password reset link works. */
+export const RESET_LIFETIME_MS = 3_600_000;
+/** How long an Impersonation lasts before it ends on its own. */
+export const IMPERSONATION_LIFETIME_MS = 3_600_000;
+
+type IdentityRow = typeof identities.$inferSelect;
+
+/** Whether a stored identity is an Account, rather than an anonymous one. */
+function isAccount(
+  row: Pick<IdentityRow, 'googleSubject' | 'passwordHash'>,
+): boolean {
+  return row.googleSubject !== null || row.passwordHash !== null;
+}
+
 /**
- * Issues identities, Accounts through Google and anonymous ones, and
- * recognises them by their bearer token (ADR 0005).
+ * Issues identities, Accounts (from an Invitation, through Google or a
+ * password) and anonymous ones, and recognises them by their bearer token
+ * (ADR 0005, ADR 0008).
  */
 @Injectable()
 export class IdentityService {
@@ -105,11 +167,18 @@ export class IdentityService {
     identityId: string,
     screenNames: string[],
   ) => void)[] = [];
+  private readonly logger = new Logger(IdentityService.name);
+  /** When each Account's last activity was last written, so it is written seldom. */
+  private readonly activityWritten = new Map<string, number>();
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(GOOGLE_VERIFIER) private readonly google: GoogleVerifier,
+    @Inject(ADMINISTRATOR_EMAILS)
+    private readonly administrators: AdministratorEmails,
+    @Inject(MAILER) private readonly mailer: Mailer,
+    private readonly emails: EmailWriter,
   ) {}
 
   /**
@@ -134,10 +203,22 @@ export class IdentityService {
     };
   }
 
+  /** The Google account behind an ID token, or `invalid-google-token`. */
+  private async verifyGoogle(idToken: unknown): Promise<GoogleAccount> {
+    const google =
+      typeof idToken === 'string' && idToken.length > 0
+        ? await this.google.verify(idToken)
+        : null;
+    if (!google) throw new Rejected('invalid-google-token');
+    return { ...google, email: google.email?.toLowerCase() ?? null };
+  }
+
   /**
-   * Signs in with a Google ID token: the Account of that Google account,
-   * created the first time, and a new token for this browser. A token Google
-   * didn't issue for this app is refused with `invalid-google-token`.
+   * Signs in with a Google ID token: the Account with that Google account, or
+   * else the one with its email, which gets Google linked to it. With neither,
+   * `invitation-required`, and nothing is created: a new Account only comes
+   * from an Invitation (ADR 0008). Test mode's personas are the exception.
+   * A token Google didn't issue for this app is `invalid-google-token`.
    *
    * Signed in from inside a Room as anonymous (`fromToken` is that identity's),
    * the Account takes its place in the Room, keeps its Display Name if it has
@@ -147,29 +228,370 @@ export class IdentityService {
     idToken: unknown,
     fromToken?: string,
   ): Promise<SignedIn> {
-    const google =
-      typeof idToken === 'string' && idToken.length > 0
-        ? await this.google.verify(idToken)
-        : null;
-    if (!google) throw new Rejected('invalid-google-token');
-    const [row] = await this.db
+    const google = await this.verifyGoogle(idToken);
+    const found = await this.accountForGoogle(google);
+    requireNotSuspended(found);
+    const account = await this.takeOver(fromToken, toIdentity(found));
+    return this.signedIn(account);
+  }
+
+  /** The Account a Google account signs in to, linked or created as needed. */
+  private async accountForGoogle(google: GoogleAccount): Promise<IdentityRow> {
+    const [bySubject] = await this.db
+      .select()
+      .from(identities)
+      .where(eq(identities.googleSubject, google.subject));
+    if (bySubject) {
+      // The email may have changed on Google's side since last time.
+      if (google.email === null || google.email === bySubject.email) {
+        return bySubject;
+      }
+      return this.updateOrRefuse(bySubject.id, { email: google.email });
+    }
+    const [byEmail] =
+      google.email === null
+        ? []
+        : await this.db
+            .select()
+            .from(identities)
+            .where(eq(identities.email, google.email));
+    if (byEmail) {
+      // Another Google account already signs in to it: never two on one.
+      if (byEmail.googleSubject !== null) throw new Rejected('email-taken');
+      return this.updateOrRefuse(byEmail.id, { googleSubject: google.subject });
+    }
+    if (!google.persona) throw new Rejected('invitation-required');
+    const [created] = await this.db
       .insert(identities)
       .values({
         googleSubject: google.subject,
         email: google.email,
         createdAt: this.clock.now(),
       })
-      .onConflictDoUpdate({
-        target: identities.googleSubject,
-        // The email may have changed on Google's side since last time.
-        set: { email: google.email },
-      })
+      // The same persona signing in twice at once: one creates it, the
+      // other finds it.
+      .onConflictDoNothing()
       .returning();
-    const account = await this.takeOver(fromToken, toIdentity(row));
-    return {
-      token: await this.startSession(account.id),
-      identity: await this.profile(account),
-    };
+    return created ?? this.accountForGoogle(google);
+  }
+
+  /** Writes to an Account, refusing with `email-taken` rather than merge two. */
+  private async updateOrRefuse(
+    id: string,
+    changes: Partial<IdentityRow>,
+  ): Promise<IdentityRow> {
+    try {
+      const [row] = await this.db
+        .update(identities)
+        .set(changes)
+        .where(eq(identities.id, id))
+        .returning();
+      return row;
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new Rejected('email-taken');
+      throw error;
+    }
+  }
+
+  /**
+   * Accepts an Invitation by choosing a password: a new Account with the
+   * invited email, its Preferences in the Invitation's language, signed in.
+   */
+  async acceptWithPassword(
+    token: unknown,
+    password: unknown,
+  ): Promise<SignedIn> {
+    const chosen = validPassword(password);
+    // A made-up link is refused before any hashing is paid for.
+    requirePending(
+      await this.invitationByToken(this.db, token),
+      this.clock.now(),
+    );
+    const passwordHash = await hashPassword(chosen);
+    return this.accept(token, () => ({ passwordHash }));
+  }
+
+  /**
+   * Accepts an Invitation with Google, which must say the invited email:
+   * `invitation-email-mismatch` otherwise, carrying the one invited.
+   */
+  async acceptWithGoogle(token: unknown, idToken: unknown): Promise<SignedIn> {
+    const google = await this.verifyGoogle(idToken);
+    return this.accept(token, (invited) => {
+      if (google.email !== invited) {
+        throw new Rejected('invitation-email-mismatch', { email: invited });
+      }
+      return { googleSubject: google.subject };
+    });
+  }
+
+  private async accept(
+    token: unknown,
+    signInWith: (invitedEmail: string) => Partial<IdentityRow>,
+  ): Promise<SignedIn> {
+    const now = this.clock.now();
+    const account = await this.db
+      .transaction(async (tx) => {
+        const invitation = requirePending(
+          await this.invitationByToken(tx, token, true),
+          now,
+        );
+        const method = signInWith(invitation.email);
+        const [taken] = await tx
+          .select({ id: identities.id })
+          .from(identities)
+          .where(eq(identities.email, invitation.email));
+        if (taken) throw new Rejected('account-exists');
+        const [row] = await tx
+          .insert(identities)
+          .values({
+            ...method,
+            email: invitation.email,
+            invitationId: invitation.id,
+            createdAt: now,
+          })
+          .returning();
+        await tx.insert(preferences).values({
+          ...DEFAULT_PREFERENCES,
+          identityId: row.id,
+          language: invitation.language,
+        });
+        await tx
+          .update(invitations)
+          .set({ acceptedAt: now, accountId: row.id })
+          .where(eq(invitations.id, invitation.id));
+        return row;
+      })
+      .catch((error: unknown) => {
+        // The same Google account or email got there first.
+        if (isUniqueViolation(error)) throw new Rejected('account-exists');
+        throw error;
+      });
+    return this.signedIn(toIdentity(account));
+  }
+
+  private async invitationByToken(
+    db: Database | Transaction,
+    token: unknown,
+    lock = false,
+  ): Promise<typeof invitations.$inferSelect | undefined> {
+    if (typeof token !== 'string' || token.length === 0) return undefined;
+    const query = db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.tokenHash, hashToken(token)));
+    const [found] = lock ? await query.for('update') : await query;
+    return found;
+  }
+
+  /**
+   * Signs in with an email and its password. A wrong password and an email
+   * with no Account get the same `invalid-credentials`; past five failures in
+   * a row each one makes the next attempt wait, `too-many-attempts` carrying
+   * until when. Emails without an Account are slowed the same way, so neither
+   * the answer nor its timing tells which emails have one.
+   */
+  async signInWithPassword(
+    email: unknown,
+    password: unknown,
+  ): Promise<SignedIn> {
+    const address = normalEmail(email) ?? '';
+    const typed = typeof password === 'string' ? password : '';
+    // One attempt per email at a time: attempts made side by side can't all
+    // slip past the wait before any of them has counted.
+    const outcome = await this.db.transaction(async (tx) => {
+      const now = this.clock.now();
+      await tx
+        .insert(passwordAttempts)
+        .values({ email: address, failures: 0 })
+        .onConflictDoNothing();
+      const [attempts] = await tx
+        .select()
+        .from(passwordAttempts)
+        .where(eq(passwordAttempts.email, address))
+        .for('update');
+      if (attempts.blockedUntil && attempts.blockedUntil > now) {
+        return { refused: tooManyAttempts(attempts.blockedUntil) };
+      }
+      const [account] = address
+        ? await tx
+            .select()
+            .from(identities)
+            .where(eq(identities.email, address))
+        : [];
+      const matches = await verifyPassword(
+        typed,
+        account?.passwordHash ?? NO_PASSWORD_HASH,
+      );
+      if (account?.passwordHash && matches) {
+        await tx
+          .delete(passwordAttempts)
+          .where(eq(passwordAttempts.email, address));
+        return { account };
+      }
+      const failures = attempts.failures + 1;
+      const wait = waitAfterFailures(failures);
+      const blockedUntil = wait === 0 ? null : new Date(now.getTime() + wait);
+      await tx
+        .update(passwordAttempts)
+        .set({ failures, blockedUntil })
+        .where(eq(passwordAttempts.email, address));
+      return {
+        refused: blockedUntil
+          ? tooManyAttempts(blockedUntil)
+          : new Rejected('invalid-credentials'),
+      };
+    });
+    if ('refused' in outcome) throw outcome.refused;
+    requireNotSuspended(outcome.account);
+    return this.signedIn(toIdentity(outcome.account));
+  }
+
+  /**
+   * Sends a link to choose a new password to the Account with this email, if
+   * there is one: the answer is the same whatever the email. Earlier links
+   * stop working. A suspended Account is told so instead.
+   */
+  async requestPasswordReset(email: unknown): Promise<void> {
+    const address = normalEmail(email);
+    if (!address) return;
+    const [account] = await this.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, address));
+    if (!account || !isAccount(account)) return;
+    requireNotSuspended(account);
+    const token = newToken();
+    const now = this.clock.now();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(passwordResets)
+        .where(
+          and(
+            eq(passwordResets.identityId, account.id),
+            isNull(passwordResets.usedAt),
+          ),
+        );
+      await tx.insert(passwordResets).values({
+        tokenHash: hashToken(token),
+        identityId: account.id,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + RESET_LIFETIME_MS),
+      });
+    });
+    const { language } = await this.preferences(account.id);
+    // Not waited for: neither how long it takes nor whether it fails may tell
+    // this email from one without an Account.
+    void this.mailer
+      .send(this.emails.passwordReset({ to: address, language, token }))
+      .catch((error: unknown) => this.logger.error(error));
+  }
+
+  /**
+   * Chooses a new password from a reset link: every Sign-in of the Account
+   * ends, its failed attempts are forgotten, and this browser is signed in.
+   */
+  async completePasswordReset(
+    token: unknown,
+    password: unknown,
+  ): Promise<SignedIn> {
+    const chosen = validPassword(password);
+    const [known] =
+      typeof token === 'string' && token.length > 0
+        ? await this.db
+            .select({ tokenHash: passwordResets.tokenHash })
+            .from(passwordResets)
+            .where(eq(passwordResets.tokenHash, hashToken(token)))
+        : [];
+    // A made-up link is refused before any hashing is paid for.
+    if (!known) throw new Rejected('reset-not-found');
+    const passwordHash = await hashPassword(chosen);
+    const now = this.clock.now();
+    const account = await this.db.transaction(async (tx) => {
+      const [reset] =
+        typeof token === 'string' && token.length > 0
+          ? await tx
+              .select()
+              .from(passwordResets)
+              .where(eq(passwordResets.tokenHash, hashToken(token)))
+              .for('update')
+          : [];
+      if (!reset) throw new Rejected('reset-not-found');
+      if (reset.usedAt) throw new Rejected('reset-used');
+      if (reset.expiresAt <= now) throw new Rejected('reset-expired');
+      const [row] = await tx
+        .update(identities)
+        .set({ passwordHash })
+        .where(eq(identities.id, reset.identityId))
+        .returning();
+      requireNotSuspended(row);
+      await tx
+        .update(passwordResets)
+        .set({ usedAt: now })
+        .where(eq(passwordResets.tokenHash, reset.tokenHash));
+      await this.endSignInsOf(tx, row.id);
+      if (row.email) {
+        await tx
+          .delete(passwordAttempts)
+          .where(eq(passwordAttempts.email, row.email));
+      }
+      return row;
+    });
+    return this.signedIn(toIdentity(account));
+  }
+
+  /** Gives an Account that signs in with Google only a password too. */
+  async addPassword(identity: Identity, password: unknown): Promise<Profile> {
+    refuseImpersonation(identity);
+    const passwordHash = await hashPassword(validPassword(password));
+    const added = await this.db
+      .update(identities)
+      .set({ passwordHash })
+      .where(
+        and(eq(identities.id, identity.id), isNull(identities.passwordHash)),
+      )
+      .returning({ id: identities.id });
+    if (added.length === 0) throw new Rejected('password-exists');
+    return this.profile(identity);
+  }
+
+  /**
+   * Changes the Account's password, given the current one
+   * (`invalid-credentials` otherwise). Every other browser it was signed in
+   * on is signed out; this one stays.
+   */
+  async changePassword(
+    identity: Identity,
+    token: string | undefined,
+    currentPassword: unknown,
+    password: unknown,
+  ): Promise<Profile> {
+    refuseImpersonation(identity);
+    const [row] = await this.db
+      .select()
+      .from(identities)
+      .where(eq(identities.id, identity.id));
+    const matches =
+      row?.passwordHash != null &&
+      typeof currentPassword === 'string' &&
+      (await verifyPassword(currentPassword, row.passwordHash));
+    if (!matches) throw new Rejected('invalid-credentials');
+    const passwordHash = await hashPassword(validPassword(password));
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(identities)
+        .set({ passwordHash })
+        .where(eq(identities.id, identity.id));
+      await tx
+        .delete(sessions)
+        .where(
+          and(
+            eq(sessions.identityId, identity.id),
+            ne(sessions.tokenHash, hashToken(token ?? '')),
+          ),
+        );
+    });
+    return this.profile(identity);
   }
 
   /** The Account in the place of the anonymous identity holding `token`, if one does. */
@@ -195,6 +617,18 @@ export class IdentityService {
       return account;
     }
     return this.setDisplayName(account.id, anonymous.displayName);
+  }
+
+  /** A new Sign-in for an Account that has just signed in, by whichever way. */
+  private async signedIn(account: Identity): Promise<SignedIn> {
+    await this.db
+      .update(identities)
+      .set({ lastSignedInAt: this.clock.now() })
+      .where(eq(identities.id, account.id));
+    return {
+      token: await this.startSession(account.id),
+      identity: await this.profile(account),
+    };
   }
 
   /**
@@ -228,7 +662,10 @@ export class IdentityService {
     await tx.delete(marks).where(inArray(marks.identityId, identityIds));
   }
 
-  /** Ends the session holding `token`; the token stops authenticating at once. */
+  /**
+   * Ends the session holding `token`; the token stops authenticating at once.
+   * For an Impersonation's Sign-in, that ends the Impersonation.
+   */
   async signOut(token: string | undefined): Promise<void> {
     if (!token) throw new Rejected('unauthenticated');
     const ended = await this.db
@@ -236,11 +673,62 @@ export class IdentityService {
       .where(eq(sessions.tokenHash, hashToken(token)))
       .returning();
     if (ended.length === 0) throw new Rejected('unauthenticated');
+    const impersonationId = ended[0].impersonationId;
+    if (impersonationId) {
+      await this.db
+        .update(impersonations)
+        .set({ endedAt: this.clock.now() })
+        .where(
+          and(
+            eq(impersonations.id, impersonationId),
+            isNull(impersonations.endedAt),
+          ),
+        );
+    }
+  }
+
+  /**
+   * Ends every Sign-in an Account holds, at once: on every browser it is out.
+   * An Impersonation of it going on ends with them, and is recorded so.
+   */
+  async endSignInsOf(tx: Transaction, identityId: string): Promise<void> {
+    await tx.delete(sessions).where(eq(sessions.identityId, identityId));
+    const now = this.clock.now();
+    await tx
+      .update(impersonations)
+      .set({ endedAt: now })
+      .where(
+        and(
+          eq(impersonations.accountId, identityId),
+          isNull(impersonations.endedAt),
+          gt(impersonations.endsAt, now),
+        ),
+      );
+  }
+
+  /**
+   * A Sign-in for `accountId` that an Administrator uses through the
+   * Impersonation `impersonationId`. The Account's own Sign-ins are untouched.
+   */
+  async startImpersonationSession(
+    tx: Transaction,
+    accountId: string,
+    impersonationId: string,
+  ): Promise<string> {
+    const token = newToken();
+    await tx.insert(sessions).values({
+      tokenHash: hashToken(token),
+      identityId: accountId,
+      impersonationId,
+      createdAt: this.clock.now(),
+    });
+    return token;
   }
 
   /** The identity holding `token`, or `unauthenticated`. */
   async authenticate(token: string | undefined): Promise<Identity> {
-    return toIdentity(await this.holder(token));
+    const { identity } = await this.holder(token);
+    return identity;
   }
 
   /**
@@ -248,20 +736,47 @@ export class IdentityService {
    * `account-required` when it belongs to an anonymous identity.
    */
   async authenticateAccount(token: string | undefined): Promise<Identity> {
-    const row = await this.holder(token);
-    if (row.googleSubject === null) throw new Rejected('account-required');
-    return toIdentity(row);
+    const { row, identity } = await this.holder(token);
+    if (!isAccount(row)) throw new Rejected('account-required');
+    return identity;
+  }
+
+  /**
+   * The Administrator holding `token`. To anyone else, signed in or not, the
+   * answer is `not-found`: the Administrator panel isn't there for them. While
+   * impersonating, `impersonation-not-allowed`.
+   */
+  async authenticateAdministrator(
+    token: string | undefined,
+  ): Promise<Identity> {
+    let held: { row: IdentityRow; identity: Identity };
+    try {
+      held = await this.holder(token);
+    } catch (error) {
+      if (error instanceof Rejected) throw new Rejected('not-found');
+      throw error;
+    }
+    if (held.identity.impersonation) {
+      throw new Rejected('impersonation-not-allowed');
+    }
+    if (!isAccount(held.row) || !this.administrators.includes(held.row.email)) {
+      throw new Rejected('not-found');
+    }
+    return held.identity;
+  }
+
+  /** Whether the Account with this email is an Administrator. */
+  isAdministrator(email: string | null): boolean {
+    return this.administrators.includes(email);
   }
 
   /**
    * The stored identity holding `token`, when there is one: a token that no
    * longer works just means there is nothing to take over.
    */
-  private async anonymousHolder(
-    token: string,
-  ): Promise<typeof identities.$inferSelect | null> {
+  private async anonymousHolder(token: string): Promise<IdentityRow | null> {
     try {
-      return await this.holder(token);
+      return (await this.holder(token)).row;
     } catch (error) {
       if (error instanceof Rejected && error.reason === 'unauthenticated') {
         return null;
@@ -283,22 +798,62 @@ export class IdentityService {
     return row.roomId;
   }
 
-  /** The stored identity holding `token`, or `unauthenticated`. */
+  /**
+   * The stored identity holding `token`, or `unauthenticated`: also for a
+   * suspended Account, and for an Impersonation that has ended. The owner's
+   * own requests keep their last activity up to date.
+   */
   private async holder(
     token: string | undefined,
-  ): Promise<typeof identities.$inferSelect> {
+  ): Promise<{ row: IdentityRow; identity: Identity }> {
     if (!token) throw new Rejected('unauthenticated');
-    const [row] = await this.db
-      .select({ identity: identities })
+    const now = this.clock.now();
+    const [held] = await this.db
+      .select({ identity: identities, impersonation: impersonations })
       .from(sessions)
       .innerJoin(identities, eq(identities.id, sessions.identityId))
+      .leftJoin(impersonations, eq(impersonations.id, sessions.impersonationId))
       .where(eq(sessions.tokenHash, hashToken(token)));
-    if (!row) throw new Rejected('unauthenticated');
-    return row.identity;
+    if (!held || held.identity.suspendedAt !== null) {
+      throw new Rejected('unauthenticated');
+    }
+    const impersonation = held.impersonation;
+    if (impersonation) {
+      if (impersonation.endedAt !== null || impersonation.endsAt <= now) {
+        throw new Rejected('unauthenticated');
+      }
+      return {
+        row: held.identity,
+        identity: {
+          ...toIdentity(held.identity),
+          impersonation: {
+            id: impersonation.id,
+            administratorId: impersonation.administratorId,
+            endsAt: impersonation.endsAt,
+          },
+        },
+      };
+    }
+    if (isAccount(held.identity)) await this.active(held.identity.id, now);
+    return { row: held.identity, identity: toIdentity(held.identity) };
+  }
+
+  /** Records an Account's activity, at most once every few minutes. */
+  private async active(identityId: string, now: Date): Promise<void> {
+    const last = this.activityWritten.get(identityId);
+    if (last !== undefined && now.getTime() - last < ACTIVITY_PRECISION_MS) {
+      return;
+    }
+    this.activityWritten.set(identityId, now.getTime());
+    await this.db
+      .update(identities)
+      .set({ lastActiveAt: now })
+      .where(eq(identities.id, identityId));
   }
 
   async profile(identity: Identity): Promise<Profile> {
-    const [rows, preferences, [stored]] = await Promise.all([
+    const administrator = alias(identities, 'administrator');
+    const [rows, preferences, [stored], [impersonating]] = await Promise.all([
       this.db
         .select({ screenName: screenNames.screenName })
         .from(screenNames)
@@ -308,25 +863,52 @@ export class IdentityService {
       this.db
         .select({
           googleSubject: identities.googleSubject,
+          passwordHash: identities.passwordHash,
           email: identities.email,
           roomCode: rooms.code,
         })
         .from(identities)
         .leftJoin(rooms, eq(rooms.id, identities.roomId))
         .where(eq(identities.id, identity.id)),
+      identity.impersonation
+        ? this.db
+            .select({
+              displayName: administrator.displayName,
+              email: administrator.email,
+            })
+            .from(administrator)
+            .where(eq(administrator.id, identity.impersonation.administratorId))
+        : Promise.resolve([]),
     ]);
+    const account = stored !== undefined && isAccount(stored);
+    const methods: SignInMethod[] = [];
+    if (stored?.googleSubject != null) methods.push('google');
+    if (stored?.passwordHash != null) methods.push('password');
     return {
-      ...identity,
+      id: identity.id,
+      displayName: identity.displayName,
       screenNames: rows.map((row) => row.screenName),
       preferences,
-      account:
-        stored?.googleSubject == null ? null : { email: stored.email ?? null },
+      account: account
+        ? { email: stored.email ?? null, signInMethods: methods }
+        : null,
       room: stored?.roomCode == null ? null : { code: stored.roomCode },
+      administrator:
+        account &&
+        !identity.impersonation &&
+        this.administrators.includes(stored.email),
+      impersonation:
+        identity.impersonation && impersonating
+          ? {
+              administrator: impersonating,
+              endsAt: identity.impersonation.endsAt.toISOString(),
+            }
+          : null,
     };
   }
 
   private async startSession(identityId: string): Promise<string> {
-    const token = randomBytes(32).toString('base64url');
+    const token = newToken();
     await this.db.insert(sessions).values({
       tokenHash: hashToken(token),
       identityId,
@@ -491,10 +1073,20 @@ function validPreferenceChanges(raw: unknown): Partial<Preferences> {
   return raw as Partial<Preferences>;
 }
 
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+function toIdentity(row: IdentityRow): Identity {
+  return { id: row.id, displayName: row.displayName };
 }
 
-function toIdentity(row: typeof identities.$inferSelect): Identity {
-  return { id: row.id, displayName: row.displayName };
+/** `account-suspended` for an Account an Administrator Suspended. */
+function requireNotSuspended(row: IdentityRow): void {
+  if (row.suspendedAt !== null) throw new Rejected('account-suspended');
+}
+
+/** What an Administrator using someone's Account through an Impersonation may not do. */
+export function refuseImpersonation(identity: Identity): void {
+  if (identity.impersonation) throw new Rejected('impersonation-not-allowed');
+}
+
+function tooManyAttempts(retryAt: Date): Rejected {
+  return new Rejected('too-many-attempts', { retryAt: retryAt.toISOString() });
 }

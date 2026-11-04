@@ -1,5 +1,9 @@
-import { useEffect } from 'react'
+import { adminTabFromPath } from '../admin/admin'
+import { AdminPage } from '../admin/AdminPage'
+import { invitationTokenFromPath, resetPasswordPath, resetTokenFromPath } from '../identity/accessPaths'
 import { useSession } from '../identity/context'
+import { InvitationPage } from '../identity/InvitationPage'
+import { CompleteResetPage, RequestResetPage } from '../identity/ResetPasswordPages'
 import { LandingPage } from '../landing/LandingPage'
 import { isLabPath, labAnalysisPath, labPath, labRangeIdFromPath, labRangesPath } from '../lab/lab'
 import { LabAnalysisPage } from '../lab/LabAnalysisPage'
@@ -14,7 +18,8 @@ import { enterRoomPath, formatRoomCode, roomCodeFromPath } from '../room/roomCod
 import { RoomPage } from '../room/RoomPage'
 import { roomsPath } from '../rooms/rooms'
 import { RoomsPage } from '../rooms/RoomsPage'
-import { redirect, usePath } from '../routing'
+import { usePath } from '../routing'
+import { Redirect } from './Redirect'
 import { SettingsPage, settingsPath } from '../settings/SettingsPage'
 
 /**
@@ -29,6 +34,12 @@ export function Routes() {
 
   const code = roomCodeFromPath(path)
   if (code) return <RoomPage code={code} />
+  // Getting in: an Invitation's link, and choosing a new password, for whoever opens them.
+  const invitation = invitationTokenFromPath(path)
+  if (invitation) return <InvitationPage key={invitation} token={invitation} />
+  if (path === resetPasswordPath) return <RequestResetPage />
+  const reset = resetTokenFromPath(path)
+  if (reset) return <CompleteResetPage token={reset} />
   // An Account's Rooms screen already has a field for the code.
   if (path === enterRoomPath) return identity?.account ? <Redirect to={roomsPath} /> : <EnterRoomPage />
   // Settings are an identity's: without one there is nothing to set yet.
@@ -43,6 +54,9 @@ export function Routes() {
     return <LandingPage />
   }
   if (path === roomsPath) return <RoomsPage />
+  // The panel exists only for Administrators; anyone else finds a path that leads nowhere.
+  const adminTab = identity.administrator ? adminTabFromPath(path) : null
+  if (adminTab) return <AdminPage tab={adminTab} />
   // The Lab opens on its study tool.
   if (path === labPath) return <Redirect to={labAnalysisPath} />
   if (path === labAnalysisPath) return <LabAnalysisPage />
@@ -58,11 +72,7 @@ export function Routes() {
   return <Redirect to={libraryPath} />
 }
 
-/** Sends this person to `to` in place of the path they opened, so going back skips it. */
-export function Redirect({ to }: { to: string }) {
-  useEffect(() => redirect(to), [to])
-  return null
-}
+export { Redirect }
 
 /** The Library, opened from the Room this person is still in, to add Hands to its Queue. */
 function RoomLibrary({ code }: { code: string }) {

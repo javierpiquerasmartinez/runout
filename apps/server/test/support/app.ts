@@ -8,7 +8,13 @@ import { configureApp } from '../../src/app.setup.js';
 import { CLOCK } from '../../src/clock/clock.js';
 import { DATABASE_URL } from '../../src/database/database.js';
 import { GOOGLE_VERIFIER } from '../../src/identity/google-verifier.js';
+import {
+  ADMINISTRATOR_EMAILS,
+  AdministratorEmails,
+} from '../../src/identity/administrators.js';
+import { MAILER } from '../../src/mail/mailer.js';
 import { FakeGoogleVerifier } from './google.js';
+import { FakeInbox } from './inbox.js';
 import { TestClock } from './test-clock.js';
 
 export interface RunningApp {
@@ -18,6 +24,8 @@ export interface RunningApp {
   wsUrl: string;
   /** The app's clock; advance it to trigger time-based rules. */
   clock: TestClock;
+  /** Every email the app has sent. */
+  inbox: FakeInbox;
   close(): Promise<void>;
 }
 
@@ -25,6 +33,8 @@ export interface StartAppOptions {
   clock?: TestClock;
   /** Defaults to the Postgres started for this e2e run. */
   databaseUrl?: string;
+  /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
+  administratorEmails?: string[];
 }
 
 /** Boots the real app on a random port, wired exactly like production. */
@@ -32,6 +42,7 @@ export async function startApp(
   options: StartAppOptions = {},
 ): Promise<RunningApp> {
   const clock = options.clock ?? new TestClock();
+  const inbox = new FakeInbox();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DATABASE_URL)
     .useValue(options.databaseUrl ?? inject('databaseUrl'))
@@ -39,6 +50,10 @@ export async function startApp(
     .useValue(clock)
     .overrideProvider(GOOGLE_VERIFIER)
     .useValue(new FakeGoogleVerifier())
+    .overrideProvider(MAILER)
+    .useValue(inbox)
+    .overrideProvider(ADMINISTRATOR_EMAILS)
+    .useValue(new AdministratorEmails(options.administratorEmails ?? []))
     .compile();
 
   const app = moduleRef.createNestApplication();
@@ -52,6 +67,7 @@ export async function startApp(
     httpServer,
     wsUrl: `ws://127.0.0.1:${port}/ws`,
     clock,
+    inbox,
     close: () => app.close(),
   };
 }

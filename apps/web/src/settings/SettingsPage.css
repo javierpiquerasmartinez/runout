@@ -492,3 +492,21 @@
     width: 100%;
   }
 }
+
+/* "Acceso": how the Account signs in, and its password. */
+.settings-access__form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
+.settings-access__form > .ro-btn {
+  align-self: flex-start;
+}
+
+.settings-access__heading {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}

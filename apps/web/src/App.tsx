@@ -3,6 +3,7 @@ import { useHealth, usePing } from './backend/useBackendStatus'
 import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
 import { FirstDisplayName } from './identity/ChooseDisplayName'
+import { ImpersonationBanner } from './identity/ImpersonationBanner'
 import { SessionProvider } from './identity/SessionProvider'
 import { roomCodeFromLibraryPath } from './library/library'
 import { RoomHolder } from './room/RoomHolder'
@@ -20,6 +21,7 @@ function App() {
   if (path === statusPath) return <ConnectionStatus />
   return (
     <SessionProvider>
+      <ImpersonationBanner />
       <FirstDisplayName>
         <KeepRoom path={path}>
           <Routes />
