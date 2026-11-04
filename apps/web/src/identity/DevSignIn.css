@@ -1,0 +1,26 @@
+/* A dashed box, so it never passes for part of the product. */
+.dev-sign-in {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.dev-sign-in__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dev-sign-in__personas {
+  display: flex;
+  gap: 8px;
+}
+
+.dev-sign-in__personas > .ro-btn {
+  flex: 1;
+}
