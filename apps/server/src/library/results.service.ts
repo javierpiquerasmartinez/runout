@@ -4,7 +4,7 @@ import { DATABASE, type Database } from '../database/database.js';
 import { hands, libraryEntries } from '../database/schema.js';
 import type { Identity } from '../identity/identity.service.js';
 import { libraryFilterWhere, type LibraryFilter } from './library-filter.js';
-import { boundedInt } from './query.js';
+import { boundedInt, wholeNumber } from './query.js';
 
 /** How many points of the series to send, unless asked for fewer or more. */
 const DEFAULT_POINTS = 500;
@@ -48,9 +48,9 @@ export interface Results {
   /** The currency every Hand the filter keeps shares, or null when they mix (or there are none). */
   currency: string | null;
   /** What each line won or lost over the Hands the series covers. */
-  totals: Lines;
+  totals: LinesInBothUnits;
   /** Where the lines stood just before the first Hand the series covers: nothing without a Zoom. */
-  start: Lines;
+  start: LinesInBothUnits;
   /** The stretch the series covers, clamped to the Hands there are, or null for all of them. */
   zoom: Zoom | null;
   /**
@@ -62,7 +62,7 @@ export interface Results {
 }
 
 /** Where the lines stand, in both units. */
-type Lines = Pick<ResultsPoint, 'bigBlinds' | 'amounts'>;
+type LinesInBothUnits = Pick<ResultsPoint, 'bigBlinds' | 'amounts'>;
 
 /** Running sums as the database reads them, as text: Amounts, then big blinds. */
 type Sums = {
@@ -159,12 +159,12 @@ export class ResultsService {
           series[0]?.hand === from - 1 ? series.shift() : undefined;
         const start = before
           ? { bigBlinds: before.bigBlinds, amounts: before.amounts }
-          : nothing(oneCurrency);
-        const end = series.at(-1) ?? nothing(oneCurrency);
+          : zeroLines(oneCurrency);
+        const end = series.at(-1) ?? zeroLines(oneCurrency);
         return {
           hands: span,
           currency: oneCurrency ? currency : null,
-          totals: between(start, end),
+          totals: linesBetween(start, end),
           start,
           zoom,
           points: series,
@@ -188,21 +188,17 @@ function zoomOf(rawFrom: unknown, rawTo: unknown, count: number): Zoom | null {
   return zoom.to - zoom.from + 1 >= 2 ? zoom : null;
 }
 
-/** A whole number from a query string, or null. */
-function wholeNumber(raw: unknown): number | null {
-  if (typeof raw !== 'string' || raw.trim() === '') return null;
-  const value = Number(raw);
-  return Number.isSafeInteger(value) ? value : null;
-}
-
 /** Every line at nothing, as before the first Hand. */
-function nothing(oneCurrency: boolean): Lines {
+function zeroLines(oneCurrency: boolean): LinesInBothUnits {
   const zero = { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 };
   return { bigBlinds: zero, amounts: oneCurrency ? { ...zero } : null };
 }
 
 /** What each line won or lost from one point to a later one, to the hundredth. */
-function between(start: Lines, end: Lines): Lines {
+function linesBetween(
+  start: LinesInBothUnits,
+  end: LinesInBothUnits,
+): LinesInBothUnits {
   const minus = (later: ResultLines, earlier: ResultLines): ResultLines => {
     const line = (key: keyof ResultLines) =>
       Math.round((later[key] - earlier[key]) * 100) / 100;
@@ -240,7 +236,7 @@ function sums(over: SQL) {
 }
 
 /** The lines from their sums: the Non-showdown Result is whatever the Showdown Result leaves of the Result. */
-function linesOf(sums: Sums, oneCurrency: boolean): Lines {
+function linesOf(sums: Sums, oneCurrency: boolean): LinesInBothUnits {
   const lines = (
     result: number,
     allInEv: number,

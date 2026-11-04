@@ -82,6 +82,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const pageNumber = libraryPageFromSearch(search)
   // The Results Graph's Zoom too, so the list and back, or a Hand and back, keep it.
   const zoom = libraryZoomFromSearch(search)
+  // As numbers, so the graph's effect below depends on them: the Zoom is a new object on every render.
   const zoomFrom = zoom?.from
   const zoomTo = zoom?.to
   // Bumped after an import, so the list is read again.

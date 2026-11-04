@@ -33,13 +33,18 @@ export function libraryPageFromSearch(search: string): number {
   return Number.isInteger(page) && page > 1 ? page : 1
 }
 
+/** A query as an address's search: "?" and the query, or nothing when it is empty. */
+function asSearch(query: URLSearchParams): string {
+  const written = query.toString()
+  return written && `?${written}`
+}
+
 /** The address's search with the page written in place of whichever it had; the first page is left out. */
 export function withLibraryPage(search: string, page: number): string {
   const query = new URLSearchParams(search)
   query.delete('page')
   if (page > 1) query.set('page', String(page))
-  const written = query.toString()
-  return written && `?${written}`
+  return asSearch(query)
 }
 
 /*
@@ -67,8 +72,7 @@ export function withLibraryZoom(search: string, zoom: Zoom | null): string {
     query.set(ZOOM_FROM, String(zoom.from))
     query.set(ZOOM_TO, String(zoom.to))
   }
-  const written = query.toString()
-  return written && `?${written}`
+  return asSearch(query)
 }
 
 /*
