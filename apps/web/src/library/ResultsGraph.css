@@ -64,6 +64,16 @@
   font-size: 12px;
   color: var(--text-secondary);
 }
+/* "Volver" reads as a link in the sentence: brass ink, underlined. */
+.results__zoom .results__zoom-leave {
+  color: var(--brass-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.results__zoom .results__zoom-leave:hover {
+  color: var(--brass-ink);
+  text-decoration-thickness: 2px;
+}
 /* With the mouse, a point opens its Hand and a drag Zooms into a stretch. */
 @media (pointer: fine) {
   .results__plot .recharts-surface {
