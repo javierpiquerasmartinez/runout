@@ -103,6 +103,10 @@ _Avoid_: Red line, blue line
 The running total over a person's Library, Hand by Hand: Result, All-in EV, Showdown Result and Non-showdown Result. Filtered the same way as the Library's list of Hands (period, Poker Site, Hero, Stake, Marks, Tags), and shown in big blinds unless every Hand in the period shares one currency.
 _Avoid_: Chart, winrate graph
 
+**Zoom**:
+A stretch of the Results Graph's Hands, from one to another in played order, that the graph shows on its own: each line keeps its running total from the first Hand, while the totals and the Win Rate are only the stretch's. It narrows nothing the filter keeps, and goes whenever the filter changes.
+_Avoid_: Range (that is the Lab's), selection, window
+
 **Win Rate**:
 A Result line per 100 Hands, in big blinds whatever the currency, over the Hands the Results Graph shows: the Result's, and the All-in EV's. Written as BB/100.
 _Avoid_: bb/100 (as a name), winnings rate
