@@ -352,6 +352,8 @@
 .library-table__frame {
   /* Holds the table's hidden labels too, which would otherwise widen the page on a phone. */
   position: relative;
+  /* The columns give way to the room the table has, not the window's: the sidebar takes some of it. */
+  container: library-table / inline-size;
   overflow-x: auto;
   border: 1px solid var(--color-panel-border);
   border-radius: 10px;
@@ -508,10 +510,6 @@
   display: flex;
   gap: 3px;
 }
-.library-row__positions {
-  font-size: 13.5px;
-  font-weight: 600;
-}
 .library-row__hero {
   display: block;
   font-size: 12.5px;
@@ -579,6 +577,39 @@
 .library__page {
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+
+/* As the table narrows, the columns least needed to pick a Hand give way, least needed first. */
+@container library-table (max-width: 920px) {
+  .library-table .library-table__tags,
+  .library-table .library-table__street {
+    display: none;
+  }
+}
+@container library-table (max-width: 720px) {
+  .library-table .library-table__pot,
+  .library-row__site {
+    display: none;
+  }
+}
+@container library-table (max-width: 600px) {
+  .library-table .library-table__stake {
+    display: none;
+  }
+}
+/* Then the cells close up; past that, the frame scrolls sideways. */
+@container library-table (max-width: 520px) {
+  .library-table th,
+  .library-table td {
+    padding: 0 6px;
+  }
+  .library-table .library-table__select {
+    padding: 0 0 0 10px;
+  }
+  .library-table .library-table__mark {
+    width: auto;
+    padding: 0 4px 0 0;
+  }
 }
 
 @media (max-width: 760px) {
