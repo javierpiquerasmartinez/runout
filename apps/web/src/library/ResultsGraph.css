@@ -59,7 +59,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  margin: 6px 0 0 56px;
+  /* Past the y-axis' labels (their width is set beside the chart's), under the plot. */
+  margin: 6px 0 0 var(--results-y-axis-width);
   font-size: 12px;
   color: var(--text-secondary);
 }

@@ -1,5 +1,16 @@
-import { useRef, useState, type PointerEvent } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type RefObject } from 'react'
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceArea,
+  ReferenceLine,
+  Tooltip,
+  usePlotArea,
+  useXAxisInverseDataSnapScale,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
@@ -9,7 +20,7 @@ import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { CLICK_THRESHOLD, graphGesture } from './graphGesture'
 import { libraryHandPath } from './library'
-import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type ResultsLines, type Zoom } from './results'
+import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type LinesInBothUnits, type Zoom } from './results'
 import './ResultsGraph.css'
 
 /** What the graph adds up in: big blinds always, Amounts only in one currency. */
@@ -17,6 +28,19 @@ type GraphUnit = Exclude<DisplayUnit, 'both'>
 
 /** A point as drawn; the start point stands for no Hand, so it has no cards. */
 type Point = { hand: number; handId?: string; holeCards?: string[] } & ResultLines
+
+/** The stretch a drag spans so far: from the Hand it was pressed on to the one it is over, either way round. */
+type DragBand = { pressed: number; over: number }
+
+/** Where the pointer is, as a press, move or release gives it. */
+type PointerAt = Pick<MouseEvent, 'clientX' | 'clientY'>
+
+/**
+ * The x-axis value of the point nearest the pointer, or undefined. Only
+ * inside the plot unless `anywhere`, when the pointer counts as at the
+ * plot's nearest edge.
+ */
+type PointUnder = (pointer: PointerAt, anywhere: boolean) => unknown
 
 /*
  * Recharts draws the shapes; everything it would style on its own (colours,
@@ -31,6 +55,9 @@ function strokes(preferences: Preferences): Record<ResultLine, string> {
   ) as Record<ResultLine, string>
 }
 const AXIS_TICK = { fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }
+
+/** How wide the y-axis' labels are; the line under the chart starts past them. */
+const Y_AXIS_WIDTH = 56
 
 /** The lines whose Win Rate the graph shows. */
 const WIN_RATE_LINES = ['result', 'allInEv'] as const satisfies readonly ResultLine[]
@@ -65,7 +92,7 @@ export function ResultsGraph({
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
   const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
-  const linesOf = (point: ResultsLines): ResultLines =>
+  const linesOf = (point: LinesInBothUnits): ResultLines =>
     unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
 
   // Every line starts where it stood before the first Hand drawn: nothing, unless zoomed.
@@ -74,37 +101,39 @@ export function ResultsGraph({
     ...results.points.map((point) => ({ hand: point.hand, handId: point.handId, holeCards: point.holeCards, ...linesOf(point) })),
   ]
   const totals = linesOf(results.totals)
-  // The point the hover box shows is the one a press or release lands on.
-  const hovered = useRef<Point | null>(null)
-  const pressed = useRef<{ hand: number | null; x: number; y: number } | null>(null)
-  // The stretch a drag spans so far, shaded while the mouse is down.
-  const [band, setBand] = useState<{ from: number; to: number } | null>(null)
-  const handOf = (point: Point | null) => (point?.handId ? point.hand : null)
-  const movedSince = (start: { x: number; y: number }, event: PointerEvent<HTMLDivElement>) =>
-    Math.hypot(event.clientX - start.x, event.clientY - start.y)
-  const press = (event: PointerEvent<HTMLDivElement>) => {
-    // Mouse only: touch and pen keep the graph as it was (a tap shows the hover box).
-    if (event.pointerType !== 'mouse' || event.button !== 0) return
-    pressed.current = { hand: handOf(hovered.current), x: event.clientX, y: event.clientY }
+  // Reads the Hand under the pointer the moment it is asked, the way the hover box picks it. Recharts moves
+  // the hover box a frame after the mouse, so a press right after a move would otherwise read the Hand before.
+  const chart = useRef<HTMLDivElement>(null)
+  const pointUnder = useRef<PointUnder | null>(null)
+  const handUnder = (pointer: PointerAt, anywhere = false): number | null => {
+    const value = pointUnder.current?.(pointer, anywhere)
+    const point = data.find((candidate) => candidate.hand === value)
+    return point?.handId ? point.hand : null
   }
-  const drag = (event: PointerEvent<HTMLDivElement>) => {
+  // From the press until the release, wherever the mouse goes: `over` is the last Hand it was over.
+  const pressed = useRef<{ hand: number | null; over: number | null; x: number; y: number } | null>(null)
+  // The stretch a drag spans so far, shaded while the mouse is down.
+  const [band, setBand] = useState<DragBand | null>(null)
+  const movedSince = (start: { x: number; y: number }, pointer: PointerAt) =>
+    Math.hypot(pointer.clientX - start.x, pointer.clientY - start.y)
+  const drag = (event: globalThis.PointerEvent) => {
     const start = pressed.current
     if (!start || event.pointerType !== 'mouse') return
-    const under = handOf(hovered.current)
-    if (start.hand === null || under === null || movedSince(start, event) < CLICK_THRESHOLD) return
-    setBand({ from: start.hand, to: under })
+    start.over = handUnder(event, true) ?? start.over
+    if (start.hand === null || start.over === null || movedSince(start, event) < CLICK_THRESHOLD) return
+    setBand({ pressed: start.hand, over: start.over })
   }
   const cancel = () => {
     pressed.current = null
     setBand(null)
   }
-  const release = (event: PointerEvent<HTMLDivElement>) => {
+  const release = (event: globalThis.PointerEvent) => {
     const start = pressed.current
     cancel()
     if (!start || event.pointerType !== 'mouse') return
     const gesture = graphGesture({
       press: start.hand,
-      release: handOf(hovered.current),
+      release: handUnder(event, true) ?? start.over,
       moved: movedSince(start, event),
     })
     if (gesture.kind === 'zoom') {
@@ -116,6 +145,45 @@ export function ResultsGraph({
     if (!handId) return
     if (event.metaKey || event.ctrlKey) window.open(libraryHandPath(handId), '_blank', 'noopener')
     else onOpenHand(handId)
+  }
+  // A drag goes on past the chart's edges until the button comes up, so the window follows it; Escape drops it.
+  // The listeners call the latest render's handlers, which know the latest points.
+  const gesture = useRef({ drag, release, cancel })
+  useLayoutEffect(() => {
+    gesture.current = { drag, release, cancel }
+  })
+  const [following, setFollowing] = useState(false)
+  useEffect(() => {
+    if (!following) return
+    const onMove = (event: globalThis.PointerEvent) => gesture.current.drag(event)
+    const onUp = (event: globalThis.PointerEvent) => {
+      gesture.current.release(event)
+      setFollowing(false)
+    }
+    const onCancel = () => {
+      gesture.current.cancel()
+      setFollowing(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [following])
+  const press = (event: PointerEvent<HTMLDivElement>) => {
+    // Mouse only: touch and pen keep the graph as it was (a tap shows the hover box).
+    if (event.pointerType !== 'mouse' || event.button !== 0) return
+    const hand = handUnder(event)
+    pressed.current = { hand, over: hand, x: event.clientX, y: event.clientY }
+    setFollowing(true)
   }
   const toggle = (line: ResultLine) =>
     setHidden((current) => {
@@ -144,24 +212,10 @@ export function ResultsGraph({
         />
       </div>
       <div className="results__body">
-        <div className="results__plot">
-          <div
-            className="results__chart"
-            onPointerDown={press}
-            onPointerMove={drag}
-            onPointerUp={release}
-            onPointerLeave={cancel}
-            onPointerCancel={cancel}
-          >
+        <div className="results__plot" style={{ '--results-y-axis-width': `${Y_AXIS_WIDTH}px` } as CSSProperties}>
+          <div ref={chart} className="results__chart" onPointerDown={press}>
             <LineChart
               data={data}
-              onMouseMove={(state) => {
-                const index = state.activeTooltipIndex
-                hovered.current = index === undefined || index === null ? null : (data[Number(index)] ?? null)
-              }}
-              onMouseLeave={() => {
-                hovered.current = null
-              }}
               responsive
               style={{ width: '100%', height: '100%' }}
               margin={{ top: 8, right: 20, bottom: 0, left: 0 }}
@@ -178,17 +232,23 @@ export function ResultsGraph({
                 tickFormatter={(hand: number) => i18n.formatNumber(hand)}
               />
               <YAxis
-                width={56}
+                width={Y_AXIS_WIDTH}
                 tick={AXIS_TICK}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value: number) => formatTick(value, unit, results.currency, i18n)}
               />
+              <PointReader
+                chart={chart}
+                onReader={(read) => {
+                  pointUnder.current = read
+                }}
+              />
               <ReferenceLine y={0} stroke="var(--color-border-strong)" />
-              {band && band.from !== band.to && (
+              {band && band.pressed !== band.over && (
                 <ReferenceArea
-                  x1={Math.min(band.from, band.to)}
-                  x2={Math.max(band.from, band.to)}
+                  x1={Math.min(band.pressed, band.over)}
+                  x2={Math.max(band.pressed, band.over)}
                   fill="var(--color-selected)"
                   fillOpacity={0.7}
                   stroke="var(--color-border-hover)"
@@ -269,6 +329,27 @@ export function ResultsGraph({
       </div>
     </section>
   )
+}
+
+/**
+ * Inside the chart, hands the graph a way to read which point is nearest the
+ * pointer from the chart's own axis, as the hover box picks it, at once.
+ */
+function PointReader({ chart, onReader }: { chart: RefObject<HTMLDivElement | null>; onReader: (read: PointUnder) => void }) {
+  const snap = useXAxisInverseDataSnapScale()
+  const plot = usePlotArea()
+  useLayoutEffect(() => {
+    onReader((pointer, anywhere) => {
+      const box = chart.current?.getBoundingClientRect()
+      if (!snap || !plot || !box) return undefined
+      const x = pointer.clientX - box.left
+      const y = pointer.clientY - box.top
+      const inside = x >= plot.x && x <= plot.x + plot.width && y >= plot.y && y <= plot.y + plot.height
+      if (!inside && !anywhere) return undefined
+      return snap(Math.min(Math.max(x, plot.x), plot.x + plot.width))
+    })
+  })
+  return null
 }
 
 /** What hovering the graph reads: the Hand and each shown line's value there. */

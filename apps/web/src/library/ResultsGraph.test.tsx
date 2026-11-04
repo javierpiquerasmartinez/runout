@@ -1,10 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { PreferencesContext } from '../preferences/context'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
-import type { Results } from './results'
+import type { Results, Zoom } from './results'
 import { ResultsGraph } from './ResultsGraph'
 
 /**
@@ -68,11 +68,16 @@ const zoomed: Results = {
   ],
 }
 
-function renderGraph(results: Results, preferences: Preferences = DEFAULT_PREFERENCES, onLeaveZoom = () => {}) {
+function renderGraph(
+  results: Results,
+  preferences: Preferences = DEFAULT_PREFERENCES,
+  onLeaveZoom = () => {},
+  { onOpenHand = () => {}, onZoom = () => {} }: { onOpenHand?: (handId: string) => void; onZoom?: (zoom: Zoom) => void } = {},
+) {
   return render(
     <I18nProvider initialLocale="en">
       <PreferencesContext.Provider value={preferences}>
-        <ResultsGraph results={results} onOpenHand={() => {}} onZoom={() => {}} onLeaveZoom={onLeaveZoom} />
+        <ResultsGraph results={results} onOpenHand={onOpenHand} onZoom={onZoom} onLeaveZoom={onLeaveZoom} />
       </PreferencesContext.Provider>
     </I18nProvider>,
   )
@@ -118,6 +123,78 @@ describe('ResultsGraph', () => {
     expect(within(legendEntry('All-in EV')).getByText('+1 BB')).toBeTruthy()
     expect(within(legendEntry('Showdown')).getByText('+4.9 BB')).toBeTruthy()
     expect(within(legendEntry('Non-showdown')).getByText('-0.9 BB')).toBeTruthy()
+  })
+
+  describe('with the mouse', () => {
+    /*
+     * jsdom lays nothing out, so the chart is given a size: 600 by 220 pixels
+     * at the viewport's corner. The plot then runs from x = 56 (past the
+     * y-axis) to x = 580, and `euros` draws Hands 0 (the start), 3 and 5.
+     */
+    const xOf = (hand: number) => 56 + (hand / 5) * 524
+    const y = 100
+    beforeEach(() => {
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      )
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ width: 600, height: 220 }))
+    })
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
+    const nextFrame = () => new Promise((frame) => requestAnimationFrame(frame))
+    const mouse = { pointerType: 'mouse', button: 0, clientY: y }
+
+    it('opens the Hand under a click, even one that follows the mouse moving onto it', async () => {
+      const opened: string[] = []
+      const { container } = renderGraph(euros, DEFAULT_PREFERENCES, undefined, { onOpenHand: (handId) => opened.push(handId) })
+      const chart = container.querySelector('.recharts-wrapper')!
+      fireEvent.mouseMove(chart, { clientX: xOf(3), clientY: y })
+      await nextFrame()
+
+      // Onto Hand 5 and pressed at once, before the graph draws another frame.
+      fireEvent.mouseMove(chart, { clientX: xOf(5), clientY: y })
+      fireEvent.pointerDown(chart, { ...mouse, clientX: xOf(5) })
+      fireEvent.pointerUp(chart, { ...mouse, clientX: xOf(5) })
+      await nextFrame()
+
+      expect(opened).toEqual(['hand-5'])
+    })
+
+    it('zooms into a drag that ends past the chart’s edge, up to the last Hand it crossed', async () => {
+      const zooms: Zoom[] = []
+      const { container } = renderGraph(euros, DEFAULT_PREFERENCES, undefined, { onZoom: (zoom) => zooms.push(zoom) })
+      const chart = container.querySelector('.recharts-wrapper')!
+
+      fireEvent.pointerDown(chart, { ...mouse, clientX: xOf(3) })
+      fireEvent.pointerMove(chart, { ...mouse, clientX: xOf(5) })
+      fireEvent.pointerLeave(chart, { ...mouse, clientX: 640 })
+      fireEvent.pointerMove(document.body, { ...mouse, clientX: 640 })
+      fireEvent.pointerUp(document.body, { ...mouse, clientX: 640 })
+      await nextFrame()
+
+      expect(zooms).toEqual([{ from: 3, to: 5 }])
+    })
+
+    it('drops a drag on Escape', async () => {
+      const zooms: Zoom[] = []
+      const { container } = renderGraph(euros, DEFAULT_PREFERENCES, undefined, { onZoom: (zoom) => zooms.push(zoom) })
+      const chart = container.querySelector('.recharts-wrapper')!
+
+      fireEvent.pointerDown(chart, { ...mouse, clientX: xOf(3) })
+      fireEvent.pointerMove(chart, { ...mouse, clientX: xOf(5) })
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      fireEvent.pointerUp(chart, { ...mouse, clientX: xOf(5) })
+      await nextFrame()
+
+      expect(zooms).toEqual([])
+    })
   })
 
   describe('Zoom', () => {
