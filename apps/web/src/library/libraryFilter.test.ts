@@ -29,6 +29,11 @@ describe('quickRange', () => {
     expect(quickRange('today', now)).toEqual({ from: '2026-10-21', to: '2026-10-21' })
   })
 
+  it('is just the day before for yesterday, across a month', () => {
+    expect(quickRange('yesterday', now)).toEqual({ from: '2026-10-20', to: '2026-10-20' })
+    expect(quickRange('yesterday', new Date('2026-11-01T12:00:00+01:00'))).toEqual({ from: '2026-10-31', to: '2026-10-31' })
+  })
+
   it('starts this week on Monday, whatever the language', () => {
     expect(quickRange('this-week', now)).toEqual({ from: '2026-10-19', to: '2026-10-21' })
     // A Sunday: the week began in the month before.
@@ -49,6 +54,7 @@ describe('periodOf', () => {
   it('names the quick range the dates match, or calls them custom', () => {
     expect(periodOf({ from: null, to: null }, now)).toBe('all-time')
     expect(periodOf({ from: '2026-10-19', to: '2026-10-21' }, now)).toBe('this-week')
+    expect(periodOf({ from: '2026-10-20', to: '2026-10-20' }, now)).toBe('yesterday')
     expect(periodOf({ from: '2026-10-14', to: '2026-10-21' }, now)).toBe('custom')
     expect(periodOf({ from: null, to: '2026-10-21' }, now)).toBe('custom')
   })
