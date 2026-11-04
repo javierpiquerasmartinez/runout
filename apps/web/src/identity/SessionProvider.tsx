@@ -8,11 +8,15 @@ import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { SessionContext } from './context'
 import {
+  endImpersonation,
   endSession,
   forgetSession,
   joinAnonymously,
+  keepSession,
   loadSession,
   signInWithGoogle,
+  signInWithPassword,
+  startImpersonation,
   type Identity,
   type Session,
 } from './identity'
@@ -48,6 +52,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [])
   const rememberDisplayName = useCallback((displayName: string) => remember({ displayName }), [remember])
   const rememberScreenNames = useCallback((screenNames: string[]) => remember({ screenNames }), [remember])
+  const rememberAccount = useCallback((account: Identity['account']) => remember({ account }), [remember])
 
   const session = loading.state === 'ready' ? loading.session : null
   const token = session?.token ?? null
@@ -111,6 +116,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await endSession(token)
     setLoading({ state: 'ready', session: null })
   }, [token])
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      const session = await signInWithPassword(email, password)
+      if (token !== null) void endSession(token).catch(() => undefined)
+      setLoading({ state: 'ready', session })
+    },
+    [token],
+  )
+  const adopt = useCallback((session: Session) => {
+    setLoading({ state: 'ready', session: keepSession(session) })
+  }, [])
+  const impersonate = useCallback(
+    async (accountId: string) => {
+      if (token === null) return
+      setLoading({ state: 'ready', session: await startImpersonation(token, accountId) })
+    },
+    [token],
+  )
+  const stopImpersonating = useCallback(async () => {
+    if (token === null) return
+    setLoading({ state: 'ready', session: await endImpersonation(token) })
+  }, [token])
+  // An Impersonation ends on its own after an hour: back to the Administrator then.
+  const endsAt = session?.identity.impersonation?.endsAt
+  useEffect(() => {
+    if (!endsAt) return
+    const timer = setTimeout(() => void stopImpersonating().catch(() => undefined), Math.max(0, Date.parse(endsAt) - Date.now()))
+    return () => clearTimeout(timer)
+  }, [endsAt, stopImpersonating])
   const joinRoom = useCallback(async (code: string, displayName: string) => {
     const session = await joinAnonymously(code, displayName)
     setLoading({ state: 'ready', session })
@@ -126,14 +160,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             ...(loading.session ?? { token: null, identity: null }),
             rememberDisplayName,
             rememberScreenNames,
+            rememberAccount,
             changePreferences,
             signIn,
+            signInWithPassword: signInWithEmail,
+            adopt,
+            impersonate,
+            stopImpersonating,
             signOut,
             joinAnonymously: joinRoom,
             forgetEnded,
           }
         : null,
-    [loading, rememberDisplayName, rememberScreenNames, changePreferences, signIn, signOut, joinRoom, forgetEnded],
+    [
+      loading,
+      rememberDisplayName,
+      rememberScreenNames,
+      rememberAccount,
+      changePreferences,
+      signIn,
+      signInWithEmail,
+      adopt,
+      impersonate,
+      stopImpersonating,
+      signOut,
+      joinRoom,
+      forgetEnded,
+    ],
   )
 
   if (loading.state === 'loading') return <SessionLoading />

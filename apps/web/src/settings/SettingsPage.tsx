@@ -4,6 +4,8 @@ import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { locales, useI18n, type MessageKey } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { GoogleSignInButton } from '../identity/GoogleSignInButton'
+import { useImpersonationLock } from '../identity/impersonationLock'
+import { NewPasswordField } from '../identity/PasswordField'
 import { DISPLAY_NAME_MAX_LENGTH, saveDisplayName, type Identity } from '../identity/identity'
 import { formatScreenNames, parseScreenNames } from '../identity/screenNames'
 import { useSignOut } from '../identity/useSignOut'
@@ -39,6 +41,7 @@ export const settingsPath = '/settings'
  */
 export function SettingsPage() {
   const { t } = useI18n()
+  const { identity } = useIdentity()
   return (
     <div className="settings">
       <AppHeader where={t('room.settings')} back={<BackLink />} />
@@ -61,6 +64,7 @@ export function SettingsPage() {
           </div>
           <div className="settings__column settings__column--side">
             <AccountCard />
+            {identity.account && <AccessCard />}
             <DeckCard />
             <ThemeCard />
             <LanguageCard />
@@ -233,6 +237,88 @@ function AccountCard() {
           <GoogleSignInButton />
         </>
       )}
+    </section>
+  )
+}
+
+/**
+ * "Acceso": how the Account signs in, Google, a password or both. One without
+ * a password can add one; one with a password changes it by giving the
+ * current one, which signs out every other browser. Not while impersonating:
+ * how an Account gets in is never the Administrator's to change.
+ */
+function AccessCard() {
+  const { t } = useI18n()
+  const { token, identity, rememberAccount } = useIdentity()
+  const methods = identity.account?.signInMethods ?? ['google']
+  const hasPassword = methods.includes('password')
+  const [current, setCurrent] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{ ok: true } | { ok: false; reason: FailureReason } | null>(null)
+  const locked = useImpersonationLock('access')
+
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    if (busy || locked) return
+    setBusy(true)
+    setResult(null)
+    try {
+      const saved = await api<Identity>('/identities/me/password', {
+        token,
+        method: hasPassword ? 'PUT' : 'POST',
+        body: hasPassword ? { currentPassword: current, password } : { password },
+      })
+      rememberAccount(saved.account)
+      setCurrent('')
+      setPassword('')
+      setResult({ ok: true })
+    } catch (error) {
+      setResult({ ok: false, reason: reasonOf(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="settings-card settings-card--side" aria-labelledby="settings-access-title">
+      <h2 id="settings-access-title" className="settings-card__eyebrow">
+        {t('settings.access.title')}
+      </h2>
+      <p className="settings-card__hint settings-card__hint--flat">
+        {t('settings.access.methods', {
+          methods: methods.map((method) => t(`settings.access.method.${method}`)).join(' · '),
+        })}
+      </p>
+      <form className="settings-access__form" onSubmit={save} noValidate>
+        <h3 className="settings-access__heading">
+          {hasPassword ? t('settings.access.change') : t('settings.access.add')}
+        </h3>
+        {hasPassword && (
+          <TextField
+            label={t('settings.access.current')}
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            disabledReason={locked}
+            onChange={(event) => setCurrent(event.target.value)}
+          />
+        )}
+        <NewPasswordField
+          label={hasPassword ? t('settings.access.new') : t('settings.access.password')}
+          value={password}
+          onChange={setPassword}
+        />
+        <Button type="submit" variant="secondary" size="compact" disabledReason={locked} aria-busy={busy}>
+          {hasPassword ? t('settings.access.saveChange') : t('settings.access.saveAdd')}
+        </Button>
+        {result?.ok && (
+          <p className="settings-card__hint settings-card__hint--flat" role="status">
+            {hasPassword ? t('settings.access.changed') : t('settings.access.added')}
+          </p>
+        )}
+        <Failure message={result && !result.ok ? t(`reason.${result.reason}`) : null} />
+      </form>
     </section>
   )
 }

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { startApp, type RunningApp } from './support/app.js';
-import { googleIdToken } from './support/google.js';
+import { personaIdToken } from './support/google.js';
 
 describe('Accounts with Google (e2e)', () => {
   let running: RunningApp;
@@ -19,9 +19,11 @@ describe('Accounts with Google (e2e)', () => {
       .send({ idToken });
   }
 
-  it('creates an Account on the first sign-in, still without a Display Name', async () => {
+  // Accounts come from Invitations (invitations.e2e-spec); Test mode's
+  // personas are the one way in without one, and are used here.
+  it('creates a Test mode persona’s Account on its first sign-in, still without a Display Name', async () => {
     const res = await signInWith(
-      googleIdToken('ana-subject', 'ana@example.com'),
+      personaIdToken('ana-subject', 'ana@example.com'),
     ).expect(201);
 
     expect(res.body.token).toEqual(expect.any(String));
@@ -31,8 +33,10 @@ describe('Accounts with Google (e2e)', () => {
       displayName: null,
       screenNames: [],
       preferences: expect.any(Object),
-      account: { email: 'ana@example.com' },
+      account: { email: 'ana@example.com', signInMethods: ['google'] },
       room: null,
+      administrator: false,
+      impersonation: null,
     });
   });
 
@@ -43,14 +47,14 @@ describe('Accounts with Google (e2e)', () => {
   }
 
   it('finds the same Account on every later sign-in, from any browser', async () => {
-    const laptop = await signInWith(googleIdToken('ana-subject')).expect(201);
+    const laptop = await signInWith(personaIdToken('ana-subject')).expect(201);
     await request(running.httpServer)
       .put('/api/identities/me/display-name')
       .set('Authorization', `Bearer ${laptop.body.token}`)
       .send({ displayName: 'Ana' })
       .expect(200);
 
-    const phone = await signInWith(googleIdToken('ana-subject')).expect(201);
+    const phone = await signInWith(personaIdToken('ana-subject')).expect(201);
 
     expect(phone.body.token).not.toBe(laptop.body.token);
     expect(phone.body.identity).toMatchObject({
@@ -63,8 +67,8 @@ describe('Accounts with Google (e2e)', () => {
   });
 
   it('gives different Google accounts different Accounts', async () => {
-    const ana = await signInWith(googleIdToken('ana-subject')).expect(201);
-    const bea = await signInWith(googleIdToken('bea-subject')).expect(201);
+    const ana = await signInWith(personaIdToken('ana-subject')).expect(201);
+    const bea = await signInWith(personaIdToken('bea-subject')).expect(201);
 
     expect(bea.body.identity.id).not.toBe(ana.body.identity.id);
   });
@@ -81,8 +85,8 @@ describe('Accounts with Google (e2e)', () => {
   });
 
   it("signing out ends that browser's session only", async () => {
-    const laptop = await signInWith(googleIdToken('ana-subject')).expect(201);
-    const phone = await signInWith(googleIdToken('ana-subject')).expect(201);
+    const laptop = await signInWith(personaIdToken('ana-subject')).expect(201);
+    const phone = await signInWith(personaIdToken('ana-subject')).expect(201);
 
     await request(running.httpServer)
       .delete('/api/sessions/current')

@@ -49,6 +49,30 @@ export type RejectionReason =
   | 'invalid-range-tags'
   | 'invalid-range-filter'
   | 'range-not-found'
+  | 'not-found'
+  | 'invalid-email'
+  | 'invalid-language'
+  | 'account-exists'
+  | 'invitation-pending'
+  | 'invitation-not-found'
+  | 'invitation-expired'
+  | 'invitation-cancelled'
+  | 'invitation-used'
+  | 'invitation-email-mismatch'
+  | 'invitation-required'
+  | 'email-taken'
+  | 'password-too-weak'
+  | 'invalid-credentials'
+  | 'too-many-attempts'
+  | 'account-suspended'
+  | 'reset-not-found'
+  | 'reset-expired'
+  | 'reset-used'
+  | 'password-exists'
+  | 'cannot-suspend-administrator'
+  | 'cannot-impersonate-administrator'
+  | 'impersonation-not-allowed'
+  | 'invalid-admin-query'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'
@@ -57,11 +81,14 @@ export type FailureReason = RejectionReason | 'network'
 export class ApiError extends Error {
   readonly reason: FailureReason
   readonly status: number
+  /** What the server said beside the reason: when to try again, which email was invited. */
+  readonly details: Record<string, unknown>
 
-  constructor(status: number, reason: FailureReason) {
+  constructor(status: number, reason: FailureReason, details: Record<string, unknown> = {}) {
     super(reason)
     this.status = status
     this.reason = reason
+    this.details = details
   }
 }
 
@@ -103,8 +130,9 @@ async function request(
     throw new ApiError(0, 'network')
   }
   if (!res.ok) {
-    const payload = (await res.json().catch(() => null)) as { reason?: RejectionReason } | null
-    throw new ApiError(res.status, payload?.reason ?? 'network')
+    const payload = (await res.json().catch(() => null)) as ({ reason?: RejectionReason } & Record<string, unknown>) | null
+    const { reason, ...details } = payload ?? {}
+    throw new ApiError(res.status, reason ?? 'network', details)
   }
   return res
 }
@@ -112,4 +140,10 @@ async function request(
 /** The reason behind any failure of an API call. */
 export function reasonOf(error: unknown): FailureReason {
   return error instanceof ApiError ? error.reason : 'network'
+}
+
+/** A detail of a refusal, when it is a string: `detailOf(error, 'email')`. */
+export function detailOf(error: unknown, key: string): string | null {
+  const value = error instanceof ApiError ? error.details[key] : undefined
+  return typeof value === 'string' ? value : null
 }

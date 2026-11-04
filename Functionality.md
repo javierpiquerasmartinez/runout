@@ -44,7 +44,7 @@ The Master role is born with the Room: whoever creates it holds it. It is never 
 
 If the Master loses connection for more than two minutes, the role passes automatically to the Participant who has been present the longest, so the session never gets stuck. When the former Master comes back they join as a Guest; if they want the role back they ask for it out loud.
 
-What lasts belongs to an Account, signed in with Google: the Library, Screen Names, Display Name, Preferences, Marks and Tags. The Account is recognised on any device where that person signs in (ADR 0005). Creating a Room needs an Account, so every Room starts with a lasting Master.
+What lasts belongs to an Account, signed in with Google or with an email and a password: the Library, Screen Names, Display Name, Preferences, Marks and Tags. The Account is recognised on any device where that person signs in (ADR 0005). Accounts are by Invitation only: a new one is only created from an Invitation an Administrator sent (ADR 0008). Creating a Room needs an Account, so every Room starts with a lasting Master.
 
 Joining a Room needs none. A person who doesn't sign in gets an anonymous identity that exists for that one Room. They can import Hands, write Notes and even become Master, but their identity, Screen Names, Preferences and Marks are lost when the Room closes. Notes they wrote keep their Display Name. If they sign in while inside the Room, their Account takes the anonymous identity's place, keeping the Master role if they held it.
 
@@ -90,6 +90,7 @@ Nine epics cover the product. Five are essential for a session to work end to en
 | E7 · Library and Results | Keep, find, classify and measure your own Hands, and bring them to a Room | Second release |
 | E8 · Accounts and preferences | Sign in, read the table your own way, and be recognised in Hand Histories | Partial in MVP |
 | E9 · Lab | Build, measure, name and find your own preflop Ranges | After the second release |
+| E10 · Administration | Decide who gets an Account, see how Runout is used, and help someone from inside their Account | Trial |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
 
@@ -499,12 +500,14 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 **H8.7 — Sign in with Google.** As a player, I want to sign in with my Google account, so my Hands and results are not tied to one browser.
 
 - Without an Account, `/` shows a short landing: the brand, what Runout is, a **Iniciar sesión** button and a "¿Tienes un código de sala?" link to `/room`.
-- **Iniciar sesión** takes me to `/login`, which offers only Google and a way back. I can also sign in from a Room's link (H1.4).
+- **Iniciar sesión** takes me to `/login`, which says Runout is invitation-only and offers Google, the email and password form (H8.11) and a way back. I can also sign in from a Room's link (H1.4).
 - Signing in on `/login` takes me to my Library, wherever I was sent there from. Signed in, `/` and `/login` take me to my Library too.
-- Signing in for the first time creates my Account on the spot and asks for my Display Name, with no separate sign-up form.
+- Google finds my Account by my Google account, or else by its email: an Account created with a password gets Google linked the first time, so both reach the same Account. A Google account whose email another Account already has is refused, never merged.
+- Without an Account or an Invitation, Google sign-in is refused with "Runout funciona solo por invitación" and creates nothing. Accounts are only created from an Invitation (H8.15).
 - I am recognised on any device where I sign in, with everything my Account holds: Library, Screen Names, Display Name, Preferences, Marks and Tags.
 - My sign-in survives closing the tab or the browser.
 - An Account is needed to create a Room or reach a Library, never to join a Room.
+- A suspended Account is refused, with "tu acceso está suspendido", whichever way it signs in.
 
 **H8.8 — Sign out.** As a signed-in player, I want to sign out, so I can leave a shared computer safely.
 
@@ -525,6 +528,33 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 - Every colour of the palette has a light and a dark version, so it reads in either Theme. Two lines may share a colour.
 - The colours the lines have always had are the defaults; **Restaurar colores** puts every line back on its own.
 - Like the other Preferences, the choice is personal, applies at once and is kept with my identity.
+
+**H8.11 — Sign in with email and password.** As a player who would rather not use Google, I want to sign in with my email and a password.
+
+- `/login` has an email and password form under Google's button. A wrong password and an email with no Account get the same "email o contraseña incorrectos", so nobody learns which emails have an Account.
+- After five failed attempts in a row at an email, each further one makes me wait 1, 5, 15 and then 60 minutes (staying at 60), and the page says how long. A correct password clears it. Emails without an Account are slowed the same way, Google sign-in never is, and nothing locks an Account out for good.
+
+**H8.12 — Reset a forgotten password.** As a player who forgot my password, I want a link by email to choose a new one.
+
+- "¿Olvidaste tu contraseña?" on `/login` leads to `/reset-password`, which asks for an email and always answers "si ese email tiene cuenta, te hemos enviado un enlace".
+- The email, in my language, has a link that works once and for one hour; asking again invalidates earlier links. An Account that signs in with Google only gets one too, and it gives it its first password.
+- Choosing the new password (same rules as H8.13) signs out every other browser, clears the failed-attempt slowdown on my email and signs this browser in.
+
+**H8.13 — The password rules.** As a player choosing a password, I want to know the rules while I type.
+
+- At least 12 characters and at most 256, any characters including spaces, no mix of upper case, digits or symbols asked for, and not one of a bundled list of common and leaked passwords (matched ignoring case). The rules show, ticked off, while I type; the server decides on submit.
+
+**H8.14 — Access in Settings.** As a player, I want to see how I sign in and manage my password.
+
+- Settings has an **Acceso** section saying how my Account signs in: Google, password, or both.
+- Without a password I can add one; with one I can change it by giving the current one, which signs out every other browser and keeps this one.
+
+**H8.15 — Accept an Invitation.** As someone invited to Runout, I want to create my Account from the link I was sent.
+
+- The Invitation email says who invited me, has a single-use link and says when it expires (7 days).
+- The link opens `/invitation/<token>`, showing the email I was invited with, **Continuar con Google** and a password form. Google must say the invited email; otherwise I'm told which email was invited.
+- Accepting creates my Account with that email, its Preferences in the Invitation's language, asks for my Display Name and lands me in my Library.
+- An expired, cancelled, already used or unknown link says which it is, and to ask for a new one. Signed in as another Account, I'm told "Esta invitación es para ana@x.com" and offered to sign out to continue.
 
 ## E9 · Lab
 
@@ -661,6 +691,42 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - The address holds the Narrowings, the Categories kept on each Street, so reloading or going back keeps the hand I am reading.
 - With two sides (H9.16) each side narrows on its own: dealing the next card turns each side's own selection into its Narrowing, and the Equity between them (H9.17) is worked out between the two narrowed Ranges. Each side has its own trail, **Acotado · Rango 1** and **Acotado · Rango 2**, whose remove buttons name the side, and its own brush lock. Loading or clearing one side drops only its Narrowings; adding or removing the second side keeps the first's. The address holds both.
 
+## E10 · Administration
+
+Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administrator is an Account named as one in the server's configuration (`ADMINISTRATOR_EMAILS`), never from Runout itself. They have **Administración** in the header's menu, leading to `/admin` with three tabs, each its own route. For anyone else neither the entry nor `/admin` exists: the path leads nowhere, as any unknown path does.
+
+**H10.1 — Invitations.** As an Administrator, I want to choose who can create an Account.
+
+- I type an email and pick the language of its email (Spanish by default, or English), and the Invitation is sent.
+- The tab lists every Invitation with its email, who sent it, when, when it expires and its status: pending, accepted (with the Account it became and when), expired or cancelled.
+- A pending or expired one can be resent: a new link with a fresh 7 days, and the old link stops working. A pending one can be cancelled. Both ask for confirmation.
+- Inviting an email with a pending Invitation is refused, pointing to resend. Inviting one that already has an Account is refused; if that Account is suspended, the tab offers lifting the Suspension instead.
+- If the email fails to go out, I'm told and the Invitation stays pending to be resent.
+
+**H10.2 — Accounts and their statistics.** As an Administrator, I want to see who uses Runout and how.
+
+- Above the list, totals: Accounts, active in the last 7 and 30 days, suspended, pending Invitations, Hands, Ranges, and open and closed Rooms.
+- Each Account with its email, Display Name, sign-up date, the Invitation it came from, sign-in methods, last sign-in, last activity, and counts: Hands in its Library, imports, Ranges, Library Tags, Lab Tags, Notes written, Rooms created and Rooms taken part in. Last activity is recorded from now on, to within a few minutes.
+- The list sorts by email, Display Name, last activity and the counts, searches by email and Display Name, and pages like the Library.
+
+**H10.3 — Suspension.** As an Administrator, I want to withdraw someone's access when their trial ends, and give it back.
+
+- Suspending (with confirmation) ends every Sign-in of the Account at once and takes it out of every open Room it is in as if Kicked; if it was Master, the role passes on by the usual failover.
+- Its Library, Ranges, Notes, Tags, Marks and Preferences are untouched; lifting the Suspension gives it everything back. The row shows when it was suspended and by whom.
+- Nobody can suspend themselves or another Administrator.
+
+**H10.4 — Rooms.** As an Administrator, I want to find Rooms left behind and clean them up.
+
+- Every Room, open or closed, with its name, Room Code, Master, status, Participants, Queue length, creation date and last activity (its last Revision or join). It shows the open ones by default, the stalest first.
+- An open Room can be closed (with confirmation), exactly as its Master would close it: its Participants see it close, its Room Hands and anonymous identities go with it.
+
+**H10.5 — Impersonation.** As an Administrator, I want to see Runout as someone sees it when they report a problem.
+
+- From an Account's row, after a confirmation, I use Runout as that Account: its Library, Lab and Settings, and can change things there.
+- A banner on every screen reads "Viendo como X" with **Salir**, which ends it and brings me back to the panel as myself. It ends on its own after one hour.
+- Rooms are refused while impersonating, and their entry points are locked with the reason; so are passwords and sign-in methods, and the panel itself.
+- Nobody can impersonate an Administrator or a suspended Account. Every Impersonation is recorded with who, whom, start and end, and shown on the Account's row. The Account's own Sign-ins and last activity are untouched.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.
@@ -670,6 +736,8 @@ In the first version: create a Room and join by code or link, the Room lifecycle
 The second release adds what lets Runout replace the Tracker as the place each person keeps their Hands: Accounts with Google and anonymous identities that last one Room (H8.7, H8.8), the Library with its import, filters, Tags, Notes and removal, the Results Graph, and Library Hands in Rooms (E7). Room Hands are discarded when their Room closes. All data from the MVP is wiped rather than migrated.
 
 After it, the Lab (E9) gives each Account somewhere to build, measure, Tag and keep their preflop Ranges, with the text notation other tools use. It stays apart from Rooms and the Library for now.
+
+For the trial, Accounts become invitation-only (ADR 0008): signing in with an email and a password beside Google, password resets, Settings' **Acceso** section (H8.11–H8.15), and the Administrator panel with Invitations, Accounts with their statistics and Suspension, Rooms, and Impersonation (E10). Joining a Room still needs no Account.
 
 Deliberately out, with the reason:
 
@@ -689,7 +757,11 @@ Deliberately out, with the reason:
 | Statistics such as VPIP, PFR or winrate by Position, and currency conversion | The Results Graph answers the first question, whether you are winning; the rest can follow |
 | Keeping Room Hands after their Room closes | A Hand that should last is imported into a Library before the Room closes |
 | Sharing a Library or Tags with other people | A Library is one person's repository; the group shares Hands through Rooms |
-| Sign-in methods other than Google, Account deletion and data export | Every member of a small group already has a Google account |
+| Sign-in methods other than Google and a password, two-factor authentication, changing an Account's email | Google and a password cover a small invited group |
+| Account deletion and data export, purging closed Rooms | A trial that ends is Suspended, so it can resume; nothing is deleted |
+| Self-service sign-up, waiting lists, Invitations from anyone but an Administrator | The trial is hand-picked (ADR 0008) |
+| Granting the Administrator role from the panel | Only the server's configuration makes one, so a compromised Administrator can't make more |
+| Recording what changed during an Impersonation, statistics over time | Start and end are recorded; a small group trusts its Administrator, and current counts are enough for now |
 | Study groups or teams inside the app, and billing | The group lives outside Runout, and there is no business model to validate yet |
 
 Two assumptions carry all of this and should be tested early: that Hand Histories from the three Trackers parse reliably enough, and that sync latency stays below what the eye notices while someone is talking.

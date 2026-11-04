@@ -49,11 +49,42 @@ export type RejectionReason =
   | 'invalid-range-combos'
   | 'invalid-range-tags'
   | 'invalid-range-filter'
-  | 'range-not-found';
+  | 'range-not-found'
+  | 'not-found'
+  | 'invalid-email'
+  | 'invalid-language'
+  | 'account-exists'
+  | 'invitation-pending'
+  | 'invitation-not-found'
+  | 'invitation-expired'
+  | 'invitation-cancelled'
+  | 'invitation-used'
+  | 'invitation-email-mismatch'
+  | 'invitation-required'
+  | 'email-taken'
+  | 'password-too-weak'
+  | 'invalid-credentials'
+  | 'too-many-attempts'
+  | 'account-suspended'
+  | 'reset-not-found'
+  | 'reset-expired'
+  | 'reset-used'
+  | 'password-exists'
+  | 'cannot-suspend-administrator'
+  | 'cannot-impersonate-administrator'
+  | 'impersonation-not-allowed'
+  | 'invalid-admin-query';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {
-  constructor(readonly reason: RejectionReason) {
+  /**
+   * `details` travel beside the reason, for a refusal the person can act on:
+   * when to try again, which email was invited.
+   */
+  constructor(
+    readonly reason: RejectionReason,
+    readonly details: Record<string, unknown> = {},
+  ) {
     super(reason);
     this.name = 'Rejected';
   }

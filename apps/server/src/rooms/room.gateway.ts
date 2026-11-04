@@ -1,4 +1,4 @@
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Logger, type BeforeApplicationShutdown } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -14,6 +14,7 @@ import { CLOCK, type Clock } from '../clock/clock.js';
 import type { Transaction } from '../database/database.js';
 import {
   IdentityService,
+  refuseImpersonation,
   type Identity,
 } from '../identity/identity.service.js';
 import { Rejected, type RejectionReason } from '../rejection/rejection.js';
@@ -153,7 +154,9 @@ export interface RejectedEvent {
  * in the URL (`/ws?token=…`), since browsers can't set headers on a WebSocket.
  */
 @WebSocketGateway({ path: '/ws' })
-export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RoomGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, BeforeApplicationShutdown
+{
   private readonly logger = new Logger(RoomGateway.name);
   private readonly identityOf = new WeakMap<WebSocket, Promise<Identity>>();
   private readonly presence = new RoomPresence<WebSocket>();
@@ -167,6 +170,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly revisions = new RoomRevisions();
   /** The last presence each Room was told about, so only real changes travel. */
   private readonly presenceTold = new Map<string, ParticipantPresence[]>();
+  /** Each Room's last activity being written, one after another. */
+  private readonly activity = new Map<string, Promise<void>>();
+  private shuttingDown = false;
 
   constructor(
     private readonly identities: IdentityService,
@@ -224,6 +230,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): Promise<WsResponse<RoomSnapshot | RejectedEvent> | undefined> {
     return this.rejecting('room.join', async () => {
       const identity = await this.authenticated(socket);
+      refuseImpersonation(identity);
       const { room, participant } = await this.rooms.join(
         identity,
         String(command?.code ?? ''),
@@ -722,6 +729,56 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
   }
 
+  /**
+   * An Administrator closes the Room: everyone in it sees it close exactly as
+   * when its Master closes it.
+   */
+  async closeAsAdministrator(roomId: string): Promise<void> {
+    if (await this.rooms.closeAsAdministrator(roomId)) this.roomClosed(roomId);
+  }
+
+  /**
+   * A suspended Account has left these open Rooms for good, as if Kicked:
+   * each Room hears it, and one it was the Master of passes the role on by
+   * the usual failover.
+   */
+  expelled(
+    identityId: string,
+    rooms: { roomId: string; wasMaster: boolean }[],
+  ): void {
+    for (const { roomId, wasMaster } of rooms) {
+      this.publish(roomId, 'room.participantKicked', { identityId });
+      this.presence.evict(roomId, identityId);
+      if (wasMaster) this.failover.watch(roomId);
+      this.reportPresence(roomId);
+      this.watchIfEmpty(roomId);
+    }
+  }
+
+  /** The last activities still being written land before the database goes. */
+  async beforeApplicationShutdown(): Promise<void> {
+    // Connections closing on the way out are no activity of anyone's.
+    this.shuttingDown = true;
+    await this.activitySettled();
+  }
+
+  /** Waits for every last activity being written, so a reader sees them. */
+  async activitySettled(): Promise<void> {
+    await Promise.all(this.activity.values());
+  }
+
+  /** Writes the Room's last activity, after any write still on its way. */
+  private touch(roomId: string): void {
+    if (this.shuttingDown) return;
+    const next = (this.activity.get(roomId) ?? Promise.resolve())
+      .then(() => this.rooms.touch(roomId))
+      .catch((error: unknown) => this.logger.error(error));
+    this.activity.set(roomId, next);
+    void next.then(() => {
+      if (this.activity.get(roomId) === next) this.activity.delete(roomId);
+    });
+  }
+
   /** Tells the Room it has closed and empties it; it never reopens. */
   private roomClosed(roomId: string): void {
     this.publish(roomId, 'room.closed', {});
@@ -896,6 +953,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     data: unknown,
   ): void {
     const revision = this.revisions.next(roomId);
+    this.touch(roomId);
     this.send(roomId, exceptIdentityId, { event, data, revision });
     this.reportPresence(roomId);
   }

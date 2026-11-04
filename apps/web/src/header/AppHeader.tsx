@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { adminPath } from '../admin/admin'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
+import { useImpersonationLock } from '../identity/impersonationLock'
 import { useSignOut } from '../identity/useSignOut'
 import { labAnalysisPath } from '../lab/lab'
 import { libraryPath } from '../library/library'
@@ -29,6 +31,7 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
   const { t } = useI18n()
   const { identity } = useIdentity()
   const account = Boolean(identity.account)
+  const noRooms = useImpersonationLock('rooms')
   return (
     <header className="app-header">
       {account ? <Brand href={libraryPath} label={t('header.brandToLibrary')} /> : <Brand />}
@@ -39,7 +42,14 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
       <span className="app-header__spacer" />
       {back}
       {account && (
-        <Button variant="primary" size="compact" className="app-header__new-room" onClick={requestNewRoom}>
+        <Button
+          variant="primary"
+          size="compact"
+          className="app-header__new-room"
+          aria-label={noRooms ? t('header.newRoom') : undefined}
+          disabledReason={noRooms}
+          onClick={requestNewRoom}
+        >
           <Icon name="add" size={14} />
           <span className="app-header__new-room-label">{t('header.newRoom')}</span>
         </Button>
@@ -127,6 +137,19 @@ function AccountMenu() {
         <div id={menuId} className="app-header__menu" role="group" aria-label={t('header.accountMenu')}>
           <span className="app-header__menu-name">{name}</span>
           <hr className="app-header__menu-rule" />
+          {identity.administrator && (
+            <a
+              href={adminPath}
+              className="app-header__menu-item"
+              onClick={(event) => {
+                setOpen(false)
+                followLink(event)
+              }}
+            >
+              <Icon name="settings" size={16} />
+              {t('header.administration')}
+            </a>
+          )}
           <a
             href={settingsPath}
             className="app-header__menu-item"

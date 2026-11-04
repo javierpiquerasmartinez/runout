@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, reasonOf } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useSession } from '../identity/context'
+import { useImpersonationLock } from '../identity/impersonationLock'
 import { DISPLAY_NAME_MAX_LENGTH } from '../identity/identity'
 import { followLink, navigate } from '../routing'
 import type { RoomSummary } from '../room/roomClient'
@@ -113,6 +114,7 @@ export function RecentRooms({ token }: { token: string }) {
 function CreateRoomCard({ focus }: { focus: number | null }) {
   const { t } = useI18n()
   const { token, identity, rememberDisplayName } = useSession()
+  const noRooms = useImpersonationLock('rooms')
   const [name, setName] = useState('')
   const [displayName, setDisplayName] = useState(identity?.displayName ?? '')
   const [error, setError] = useState<{ field: 'name' | 'displayName' | 'form'; message: MessageKey } | null>(null)
@@ -174,6 +176,7 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
         size="prominent"
         aria-busy={busy}
         aria-label={t('rooms.create.submit')}
+        disabledReason={noRooms}
       >
         <Icon name="add" size={16} />
         {t('rooms.create.submit')}
@@ -191,6 +194,8 @@ function CreateRoomCard({ focus }: { focus: number | null }) {
 export function JoinRoomForm({ heading: Heading = 'h2' }: { heading?: 'h1' | 'h2' }) {
   const { t } = useI18n()
   const { token } = useSession()
+  // Nobody in a live session may see someone who isn't there (ADR 0008).
+  const noRooms = useImpersonationLock('rooms')
   const [code, setCode] = useState('')
   const [error, setError] = useState<MessageKey | null>(null)
   const [busy, setBusy] = useState(false)
@@ -237,7 +242,14 @@ export function JoinRoomForm({ heading: Heading = 'h2' }: { heading?: 'h1' | 'h2
           }}
           error={error ? t(error) : undefined}
         />
-        <Button type="submit" variant="sync" size="prominent" className="room-code__submit" aria-busy={busy}>
+        <Button
+          type="submit"
+          variant="sync"
+          size="prominent"
+          className="room-code__submit"
+          aria-busy={busy}
+          disabledReason={noRooms}
+        >
           {t('rooms.join.submit')}
         </Button>
       </div>

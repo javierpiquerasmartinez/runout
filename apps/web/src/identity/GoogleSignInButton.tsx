@@ -19,7 +19,14 @@ const MAX_WIDTH = 400
  * signing in carries on into something, such as a Room. The ID token it hands
  * back is traded for an Account's session, and this browser becomes that Account.
  */
-export function GoogleSignInButton({ label = 'sign-in' }: { label?: 'sign-in' | 'continue' }) {
+export function GoogleSignInButton({
+  label = 'sign-in',
+  onCredential,
+}: {
+  label?: 'sign-in' | 'continue'
+  /** Takes Google's ID token instead of signing in with it, as accepting an Invitation does; it reports its own failures. */
+  onCredential?: (credential: string) => void
+}) {
   const { t, locale } = useI18n()
   const { signIn } = useSession()
   // Inside a Room (or in Settings with one behind), the Account takes this browser's place in it.
@@ -39,7 +46,8 @@ export function GoogleSignInButton({ label = 'sign-in' }: { label?: 'sign-in' | 
           client_id: clientId,
           callback: ({ credential }) => {
             setFailure(null)
-            signIn(credential, fromRoom).catch((error: unknown) => setFailure(reasonOf(error)))
+            if (onCredential) onCredential(credential)
+            else signIn(credential, fromRoom).catch((error: unknown) => setFailure(reasonOf(error)))
           },
         })
         // As wide as the place it is given, as far as Google allows.
@@ -59,12 +67,12 @@ export function GoogleSignInButton({ label = 'sign-in' }: { label?: 'sign-in' | 
     return () => {
       cancelled = true
     }
-  }, [clientId, signIn, fromRoom, theme, locale, label])
+  }, [clientId, signIn, onCredential, fromRoom, theme, locale, label])
 
   return (
     <div className="google-sign-in">
       <div ref={slot} className="google-sign-in__button" />
-      {DEV_SIGN_IN && (
+      {DEV_SIGN_IN && !onCredential && (
         <DevSignIn
           onSignIn={(persona) => {
             setFailure(null)

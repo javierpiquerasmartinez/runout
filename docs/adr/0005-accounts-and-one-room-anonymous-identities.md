@@ -1,6 +1,6 @@
 # 0005 · Accounts with Google; anonymous identities last one Room
 
-Date: 2026-10-21 · Status: accepted · Supersedes ADR 0003
+Date: 2026-10-21 · Status: accepted (amended by ADR 0008: Accounts by Invitation, passwords too) · Supersedes ADR 0003
 
 Once Runout is where people keep their Hands (ADR 0004), what lasts has to be tied to something that survives a browser: an Account, signed in with Google. The Library, Screen Names, Display Name, Preferences, Marks and Tags all belong to an Account. Joining a Room still takes no registration: a person who doesn't sign in gets an anonymous identity that exists for that one Room, and it is lost when the Room closes. Creating a Room needs an Account.
 

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import {
   IdentityService,
+  refuseImpersonation,
   type SignedIn,
 } from '../identity/identity.service.js';
 import type { Discarded } from '../hands/import/import.js';
@@ -35,6 +36,8 @@ export class RoomsController {
     const creator = await this.identities.authenticateAccount(
       bearerToken(authorization),
     );
+    // Nobody in a live session may see someone who isn't there (ADR 0008).
+    refuseImpersonation(creator);
     const room = await this.rooms.create(creator, {
       name: body.name,
       displayName: body.displayName,
@@ -75,11 +78,10 @@ export class RoomsController {
     @Param('code') code: string,
   ): Promise<RoomSummary> {
     const token = bearerToken(authorization);
-    const room = token
-      ? await this.rooms.findOpenFor(
-          await this.identities.authenticate(token),
-          code,
-        )
+    const identity = token ? await this.identities.authenticate(token) : null;
+    if (identity) refuseImpersonation(identity);
+    const room = identity
+      ? await this.rooms.findOpenFor(identity, code)
       : await this.rooms.findOpen(code);
     return { code: room.code, name: room.name };
   }

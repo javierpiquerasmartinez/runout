@@ -4,7 +4,7 @@ import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
-import { googleIdToken, newAccount } from './support/google.js';
+import { newAccount, personaIdToken } from './support/google.js';
 
 interface Participant {
   identityId: string;
@@ -168,6 +168,8 @@ describe('Anonymous identities last one Room (e2e)', () => {
         preferences: expect.any(Object),
         account: null,
         room: { code },
+        administrator: false,
+        impersonation: null,
       });
       const { snapshot } = await enter(res.body.token, code, 'Marta');
       expect(snapshot.participants).toContainEqual(
@@ -369,7 +371,7 @@ describe('Anonymous identities last one Room (e2e)', () => {
       return request(running.httpServer)
         .post('/api/sessions/google')
         .set('Authorization', `Bearer ${anonymousToken}`)
-        .send({ idToken: googleIdToken(subject) });
+        .send({ idToken: personaIdToken(subject) });
     }
 
     it('puts the Account in the anonymous identity’s place, which ends there', async () => {

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Headers, Patch, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { bearerToken } from './bearer-token.js';
 import {
   IdentityService,
@@ -55,6 +63,33 @@ export class IdentityController {
     return this.identities.changePreferences(
       await this.identities.authenticate(bearerToken(authorization)),
       body,
+    );
+  }
+
+  /** Gives an Account that signs in with Google only a password too. */
+  @Post('me/password')
+  async addPassword(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: { password?: unknown } = {},
+  ): Promise<Profile> {
+    return this.identities.addPassword(
+      await this.identities.authenticateAccount(bearerToken(authorization)),
+      body.password,
+    );
+  }
+
+  /** Changes the password, given the current one; every other browser is signed out. */
+  @Put('me/password')
+  async changePassword(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: { currentPassword?: unknown; password?: unknown } = {},
+  ): Promise<Profile> {
+    const token = bearerToken(authorization);
+    return this.identities.changePassword(
+      await this.identities.authenticateAccount(token),
+      token,
+      body.currentPassword,
+      body.password,
     );
   }
 }

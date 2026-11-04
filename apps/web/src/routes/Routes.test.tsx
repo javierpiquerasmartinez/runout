@@ -449,3 +449,44 @@ describe('Routes · from a Library Hand back to the Library', () => {
     expect(window.location.search).toBe('')
   })
 })
+
+describe('Routes · the Administrator panel, only for an Administrator', () => {
+  it('opens on Invitations, with each tab a route of its own', async () => {
+    renderAt('/admin', fakeSession({ administrator: true }))
+
+    expect(screen.getByRole('heading', { name: 'Administration' })).toBeTruthy()
+    const tabs = screen.getByRole('navigation', { name: 'Administration sections' })
+    expect(within(tabs).getByRole('link', { name: 'Invitations' }).getAttribute('aria-current')).toBe('page')
+
+    await userEvent.click(within(tabs).getByRole('link', { name: 'Rooms' }))
+
+    expect(window.location.pathname).toBe('/admin/rooms')
+    expect(within(tabs).getByRole('link', { name: 'Rooms' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it.each(['/admin', '/admin/accounts'])('is a path that leads nowhere for another Account: %s goes to its Library', async (path) => {
+    renderAt(path, account())
+
+    await waitFor(() => expect(window.location.pathname).toBe('/library'))
+    expect(screen.queryByRole('heading', { name: 'Administration' })).toBeNull()
+  })
+
+  it('is the landing for a visitor, like any path that leads nowhere', () => {
+    renderAt('/admin', visitor())
+
+    expect(window.location.pathname).toBe('/admin')
+    expect(screen.queryByRole('heading', { name: 'Administration' })).toBeNull()
+  })
+})
+
+describe('Routes · getting in, for anyone', () => {
+  it('opens the page to ask for a reset link without an identity', async () => {
+    renderAt('/reset-password', visitor())
+    expect(screen.getByRole('heading', { name: 'Change your password' })).toBeTruthy()
+  })
+
+  it('lets an Account signed in on this browser finish a reset link too', () => {
+    renderAt('/reset-password/some-token', account())
+    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeTruthy()
+  })
+})

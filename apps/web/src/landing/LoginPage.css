@@ -33,3 +33,26 @@
   font-weight: 600;
   text-decoration: none;
 }
+
+.login__invitation-only {
+  margin: 0;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.login__or {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.login__or::before,
+.login__or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-divider);
+}

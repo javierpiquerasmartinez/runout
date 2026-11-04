@@ -78,7 +78,9 @@ export class RoomsService {
           code: await this.unusedCode(),
           name,
           masterId: creator.id,
+          creatorId: creator.id,
           createdAt: now,
+          lastActivityAt: now,
         })
         .returning();
       await tx
@@ -190,6 +192,7 @@ export class RoomsService {
       })
       .returning();
     if (!membership) throw new Rejected('kicked-from-room');
+    await this.touch(room.id);
     const { screenNames } = await this.identities.profile(named);
     return {
       room,
@@ -352,6 +355,68 @@ export class RoomsService {
     await this.requireMaster(roomId, master.id);
     // The Room closed between the check and the write; it is closed either way.
     await this.markClosed(roomId);
+  }
+
+  /**
+   * An Administrator closes the Room, exactly as its Master would: its Room
+   * Hands and anonymous identities go with it. False when it was closed already.
+   */
+  async closeAsAdministrator(roomId: string): Promise<boolean> {
+    return this.markClosed(roomId);
+  }
+
+  /** Records that something happened in the Room just now. */
+  async touch(roomId: string): Promise<void> {
+    await this.db
+      .update(rooms)
+      .set({ lastActivityAt: this.clock.now() })
+      .where(eq(rooms.id, roomId));
+  }
+
+  /**
+   * Takes a suspended Account out of every open Room it is in, as a Kick does,
+   * in the Suspension's own transaction: it can never come back to them. The Rooms it left, and whether it was the
+   * Master of each.
+   */
+  async expel(
+    tx: Transaction,
+    identityId: string,
+  ): Promise<{ roomId: string; wasMaster: boolean }[]> {
+    const expelled = await tx
+      .update(roomMemberships)
+      .set({ kicked: true })
+      .where(
+        and(
+          eq(roomMemberships.identityId, identityId),
+          eq(roomMemberships.kicked, false),
+          inArray(
+            roomMemberships.roomId,
+            tx
+              .select({ id: rooms.id })
+              .from(rooms)
+              .where(eq(rooms.status, 'open')),
+          ),
+        ),
+      )
+      .returning({ roomId: roomMemberships.roomId });
+    if (expelled.length === 0) return [];
+    const mastered = await tx
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(
+        and(
+          eq(rooms.masterId, identityId),
+          inArray(
+            rooms.id,
+            expelled.map((row) => row.roomId),
+          ),
+        ),
+      );
+    const masterOf = new Set(mastered.map((row) => row.id));
+    return expelled.map(({ roomId }) => ({
+      roomId,
+      wasMaster: masterOf.has(roomId),
+    }));
   }
 
   /** Closes a Room nobody has been connected to for long enough. */

@@ -133,3 +133,38 @@ describe('AppHeader · getting around', () => {
     expect(screen.getByRole('link', { name: 'Runout, go to the start' }).getAttribute('href')).toBe('/')
   })
 })
+
+describe('AppHeader · the Administrator panel', () => {
+  it('offers "Administration" in the menu to an Administrator, leading to the panel', async () => {
+    renderHeader(fakeSession({ administrator: true }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Administration' }))
+
+    expect(window.location.pathname).toBe('/admin')
+  })
+
+  it('offers it to nobody else', async () => {
+    renderHeader(fakeSession({ administrator: false }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+
+    expect(screen.queryByRole('link', { name: 'Administration' })).toBeNull()
+  })
+})
+
+describe('AppHeader · while impersonating', () => {
+  it('locks "New room", saying why', async () => {
+    renderHeader(
+      fakeSession({
+        impersonation: { administrator: { displayName: 'Admin', email: 'admin@x.com' }, endsAt: '2099-01-01T00:00:00Z' },
+      }),
+    )
+
+    const newRoom = screen.getByRole('button', { name: /New room/ })
+    expect(newRoom.getAttribute('aria-disabled')).toBe('true')
+    expect(newRoom.getAttribute('title')).toBe("Rooms aren't available while impersonating someone")
+    await userEvent.click(newRoom)
+    expect(window.location.pathname).toBe('/')
+  })
+})

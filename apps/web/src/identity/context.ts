@@ -1,10 +1,12 @@
 import { createContext, useContext } from 'react'
 import type { Preferences } from '../preferences/preferences'
-import type { Session } from './identity'
+import type { Identity, Session } from './identity'
 
 interface SessionActions {
   /** Keeps the Display Name just used, so later forms are prefilled with it. */
   rememberDisplayName: (displayName: string) => void
+  /** Keeps how the Account signs in, as the server just answered it. */
+  rememberAccount: (account: Identity['account']) => void
   /** Keeps the Screen Names just saved on the server. */
   rememberScreenNames: (screenNames: string[]) => void
   /**
@@ -18,6 +20,14 @@ interface SessionActions {
    * holds (`fromRoom`), the Account takes that identity's place there.
    */
   signIn: (idToken: string, fromRoom: boolean) => Promise<void>
+  /** Signs in with an email and its password; this browser becomes that Account. */
+  signInWithPassword: (email: string, password: string) => Promise<void>
+  /** Keeps a session the server has just handed this browser: an accepted Invitation, a reset password. */
+  adopt: (session: Session) => void
+  /** An Administrator starts using Runout as another Account (ADR 0008). */
+  impersonate: (accountId: string) => Promise<void>
+  /** Ends the Impersonation, back to the Administrator's own Sign-in ("Salir"). */
+  stopImpersonating: () => Promise<void>
   /** Signs this browser out, on the server too; it goes on without an identity. */
   signOut: () => Promise<void>
   /** Forgets an anonymous identity whose Room has closed: it no longer works. */

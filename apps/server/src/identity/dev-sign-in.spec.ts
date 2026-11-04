@@ -18,6 +18,7 @@ describe('dev sign-in', () => {
     const account = {
       subject: 'dev-tester-a',
       email: 'tester-a@dev.runout.test',
+      persona: true,
     };
     expect(await verifier.verify('dev-sign-in|tester-a')).toEqual(account);
     expect(await verifier.verify('dev-sign-in|tester-a')).toEqual(account);
