@@ -124,11 +124,18 @@
 
 /* ---- The Board: its cards, the 52 to pick from, its text and the random deals ---- */
 .analysis__board {
+  /* Beside the upright deck on a wide screen: the fields and the deals, the smaller part of the Board. */
+  --board-controls: 110px;
   flex: 0 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+/* Board | Dead Cards: as wide as its two options, not the Board's whole width. */
+.analysis__board > .ro-segmented {
+  align-self: flex-start;
+  justify-self: start;
 }
 .analysis__board-cards {
   display: flex;
@@ -521,94 +528,236 @@
 }
 
 /*
- * ---- One Range on one screen: matrix | Board | Made Hands | Draws ----
- * On a wide screen the page is as tall as the window: the Categories columns,
- * and the Board when it is taller, scroll on their own instead. Only a window
- * shorter than the matrix scrolls the page. Narrower, the layout above wraps.
+ * ---- One screen: matrix | Board | Categories ----
+ * The page is as tall as the window: the Categories, and the Board when it is
+ * taller, scroll on their own instead. Only a window shorter than the matrix
+ * scrolls the page. One Range takes this layout from 1100px, its Made Hands
+ * over its Draws, and from 1280px each in a column of their own. Two Ranges
+ * need two matrices beside each other, so they wait until 1280px. Narrower,
+ * the layout above wraps.
+ *
+ * Plain CSS cannot join "one Range from 1100px" and "two from 1280px" in one
+ * selector, so the rules both share are written twice: here for one Range,
+ * in the 1280px block for two. A change to one copy goes in the other too.
  */
-@media (min-width: 1280px) {
-  .lab:has(.analysis__body[data-sides]) {
+@media (min-width: 1100px) {
+  .lab:has(.analysis__body[data-sides='1']) {
     height: 100vh;
   }
-  .lab__main:has(> .analysis__body[data-sides]) {
+  .lab__main:has(> .analysis__body[data-sides='1']) {
     min-height: 0;
     gap: 12px;
     padding-top: 16px;
     padding-bottom: 16px;
   }
-  .analysis__body[data-sides] {
+  .analysis__body[data-sides='1'] {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(280px, 330px) max-content minmax(220px, 1fr) minmax(220px, 1fr);
+    grid-template-columns: 330px max-content minmax(220px, 1fr);
     /* What is left of the window, or the matrix's height if it needs more. */
     grid-template-rows: 1fr;
     align-items: start;
     gap: 28px;
   }
-  .analysis__body[data-sides] .analysis__sides,
-  .analysis__body[data-sides] .analysis__panel {
+  .analysis__body[data-sides='1'] .analysis__sides,
+  .analysis__body[data-sides='1'] .analysis__panel {
     display: contents;
   }
-  .analysis__body[data-sides] .analysis__side {
+  .analysis__body[data-sides='1'] .analysis__side {
     max-width: none;
     gap: 10px;
   }
-  .analysis__body[data-sides] .lab__stats {
+  /* The matrix's labels grow with it, from where they are readable at its smallest. */
+  .analysis__body[data-sides='1'] .analysis__side .lab__cell {
+    font-size: clamp(10px, 0.8vw, 13.5px);
+  }
+  .analysis__body[data-sides='1'] .lab__stats {
     gap: 12px;
   }
-  .analysis__body[data-sides] .lab__breakdown {
+  .analysis__body[data-sides='1'] .lab__breakdown {
     gap: 4px;
   }
-  .analysis__body[data-sides] .analysis__categories-column {
+  .analysis__body[data-sides='1'] .analysis__categories-column {
     gap: 20px;
   }
   /* The Board too, when the own Combo and the Selection make it taller than the window. */
-  .analysis__body[data-sides] .analysis__categories-column,
-  .analysis__body[data-sides] .analysis__board {
+  .analysis__body[data-sides='1'] .analysis__board {
     align-self: stretch;
     min-height: 0;
     overflow-y: auto;
+    /* A scrollbar takes its room beside the Board instead of clipping it. */
+    scrollbar-gutter: stable;
     /* Room for the focus rings the scrolling would clip. */
     margin: -4px;
     padding: 4px 8px 4px 4px;
   }
+  /* The Made Hands over the Draws, scrolling as one. */
+  .analysis__body[data-sides='1'] .analysis__categories-columns {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin: -4px;
+    padding: 4px 8px 4px 4px;
+  }
+  /* Each keeps its height: the column they share scrolls, not them. */
+  .analysis__body[data-sides='1'] .analysis__categories-column {
+    flex-shrink: 0;
+  }
 
-  /* The Board: its cards on top, then the deck upright with the fields, the deals and the Selection beside it. */
-  .analysis__body[data-sides] .analysis__board {
+  /* The Board: its cards on top, then the deck upright, the larger part, with the fields and the deals beside it. */
+  .analysis__body[data-sides='1'] .analysis__board {
     display: grid;
-    grid-template-columns: max-content 220px;
+    grid-template-columns: max-content var(--board-controls);
     align-content: start;
     gap: 10px 14px;
   }
-  .analysis__body[data-sides] .analysis__board > * {
+  .analysis__body[data-sides='1'] .analysis__board > * {
     grid-column: 1 / -1;
   }
-  .analysis__body[data-sides] .analysis__board > .analysis__deck {
+  .analysis__body[data-sides='1'] .analysis__board > .analysis__deck {
     grid-column: 1;
   }
-  .analysis__body[data-sides] .analysis__board > .analysis__board-controls {
+  .analysis__body[data-sides='1'] .analysis__board > .analysis__board-controls {
     grid-column: 2;
   }
-  .analysis__body[data-sides] .analysis__board-cards {
+  .analysis__body[data-sides='1'] .analysis__board-cards {
     zoom: 0.8;
   }
-  /* One column per suit, aces on top, smaller than on a narrow screen. */
-  .analysis__body[data-sides] .analysis__deck {
+  /* One column per suit, aces on top, a little larger than on a narrow screen: about two thirds of the Board's width. */
+  .analysis__body[data-sides='1'] .analysis__deck {
     grid-template-columns: none;
     grid-template-rows: repeat(13, max-content);
     grid-auto-flow: column;
+    /* Each column as wide as its cards, so a picked card's outline hugs it; the room left goes between them. */
+    grid-auto-columns: max-content;
+    justify-content: space-between;
     gap: 2px 3px;
-    zoom: 0.8;
+    zoom: 1.15;
   }
-  .analysis__body[data-sides] .analysis__board-field {
+  .analysis__body[data-sides='1'] .analysis__board-field {
     max-width: none;
   }
-  .analysis__body[data-sides] .analysis__board-actions {
+  .analysis__body[data-sides='1'] .analysis__board-actions {
     flex-direction: column;
     align-items: stretch;
   }
-  .analysis__body[data-sides] .analysis__board-actions .lab__spacer {
+  /* A deal's name may take two lines in the narrow column. */
+  .analysis__body[data-sides='1'] .analysis__board-actions .ro-btn {
+    height: auto;
+    min-height: var(--control-compact);
+    padding-top: 4px;
+    padding-bottom: 4px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .analysis__body[data-sides='1'] .analysis__board-actions .lab__spacer {
+    display: none;
+  }
+}
+
+@media (min-width: 1280px) {
+  /* One Range: the matrix grows with the window, up to where it stops gaining, and the Draws get a column of their own. */
+  .analysis__body[data-sides='1'] {
+    grid-template-columns: clamp(330px, 26vw, 440px) max-content minmax(220px, 1fr) minmax(220px, 1fr);
+  }
+  /* The Made Hands and the Draws each a grid column, each scrolling on its own. */
+  .analysis__body[data-sides='1'] .analysis__categories-columns {
+    display: contents;
+  }
+  .analysis__body[data-sides='1'] .analysis__categories-column {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+    margin: -4px;
+    padding: 4px 8px 4px 4px;
+  }
+
+  /* Two Ranges: what they share with one Range's layout above, written again. */
+  .lab:has(.analysis__body[data-sides='2']) {
+    height: 100vh;
+  }
+  .lab__main:has(> .analysis__body[data-sides='2']) {
+    min-height: 0;
+    gap: 12px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .analysis__body[data-sides='2'] {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    align-items: start;
+    gap: 28px;
+  }
+  .analysis__body[data-sides='2'] .analysis__sides,
+  .analysis__body[data-sides='2'] .analysis__panel {
+    display: contents;
+  }
+  .analysis__body[data-sides='2'] .analysis__side {
+    max-width: none;
+    gap: 10px;
+  }
+  .analysis__body[data-sides='2'] .lab__stats {
+    gap: 12px;
+  }
+  .analysis__body[data-sides='2'] .lab__breakdown {
+    gap: 4px;
+  }
+  .analysis__body[data-sides='2'] .analysis__board {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    margin: -4px;
+    padding: 4px 8px 4px 4px;
+    display: grid;
+    grid-template-columns: max-content var(--board-controls);
+    align-content: start;
+    gap: 10px 14px;
+  }
+  .analysis__body[data-sides='2'] .analysis__board > * {
+    grid-column: 1 / -1;
+  }
+  .analysis__body[data-sides='2'] .analysis__board > .analysis__deck {
+    grid-column: 1;
+  }
+  .analysis__body[data-sides='2'] .analysis__board > .analysis__board-controls {
+    grid-column: 2;
+  }
+  .analysis__body[data-sides='2'] .analysis__board-cards {
+    zoom: 0.8;
+  }
+  .analysis__body[data-sides='2'] .analysis__deck {
+    grid-template-columns: none;
+    grid-template-rows: repeat(13, max-content);
+    grid-auto-flow: column;
+    /* Each column as wide as its cards, so a picked card's outline hugs it; the room left goes between them. */
+    grid-auto-columns: max-content;
+    justify-content: space-between;
+    gap: 2px 3px;
+    /* Smaller than with one Range: two matrices leave the Board no wider than it was. */
+    zoom: 1;
+  }
+  .analysis__body[data-sides='2'] .analysis__board-field {
+    max-width: none;
+  }
+  .analysis__body[data-sides='2'] .analysis__board-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .analysis__body[data-sides='2'] .analysis__board-actions .ro-btn {
+    height: auto;
+    min-height: var(--control-compact);
+    padding-top: 4px;
+    padding-bottom: 4px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .analysis__body[data-sides='2'] .analysis__board-actions .lab__spacer {
     display: none;
   }
 
@@ -637,15 +786,10 @@
   }
   .analysis__body[data-sides='2'] .analysis__categories-column {
     flex-shrink: 0;
-    overflow-y: visible;
-    margin: 0;
-    padding: 0;
+    gap: 20px;
   }
   .analysis__body[data-sides='2'] .analysis__side .lab__cell {
     font-size: clamp(7px, 0.6vw, 9px);
-  }
-  .analysis__body[data-sides='2'] .analysis__board {
-    grid-template-columns: max-content 150px;
   }
   /* Both matrices start at the same height: the load, Clear and Remove share one line. */
   .analysis__body[data-sides='2'] .analysis__side-actions {
