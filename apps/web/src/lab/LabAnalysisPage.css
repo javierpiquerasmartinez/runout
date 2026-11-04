@@ -611,9 +611,8 @@
   /* The Board: its cards on top, then the deck upright, the larger part, with the fields and the deals beside it. */
   .analysis__body[data-sides='1'] .analysis__board {
     display: grid;
-    grid-template-columns: max-content var(--board-controls);
-    /* When the cards on top are wider, the room left goes between the deck and the fields. */
-    justify-content: space-between;
+    /* The cards on top set the Board's width; the deck takes what the fields leave of it. */
+    grid-template-columns: minmax(0, 1fr) var(--board-controls);
     align-content: start;
     gap: 10px 14px;
   }
@@ -629,15 +628,29 @@
   .analysis__body[data-sides='1'] .analysis__board-cards {
     zoom: 0.8;
   }
-  /* One column per suit, aces on top, a little larger than on a narrow screen: about two thirds of the Board's width. */
+  /* One column per suit, aces on top, as far apart as the rows. */
   .analysis__body[data-sides='1'] .analysis__deck {
+    container-type: inline-size;
     grid-template-columns: none;
     grid-template-rows: repeat(13, max-content);
     grid-auto-flow: column;
-    /* Each column as wide as its cards, so a picked card's outline hugs it, and as far apart as the rows. */
+    /* Each column as wide as its cards, so a picked card's outline hugs it. */
     grid-auto-columns: max-content;
     gap: 3px;
-    zoom: 1.15;
+  }
+  /*
+   * Its cards fill the deck's width, unless the window is too short for
+   * thirteen of them that tall: then they fit the height instead, so the deck
+   * never makes the Board scroll. Never so small its rank is hard to read.
+   * --deck-above is what stands above the deck's top and below its bottom.
+   */
+  .analysis__body[data-sides='1'] .analysis__deck .ro-card {
+    --deck-above: 330px;
+    --card-h: max(28px, min(calc((100cqi - 9px) / 4 * 34 / 24), calc((100vh - var(--deck-above)) / 13 - 3px)));
+    --card-w: calc(var(--card-h) * 24 / 34);
+    --card-rank: calc(var(--card-h) * 13 / 34);
+    --card-ten: calc(var(--card-h) * 10 / 34);
+    --card-suit: calc(var(--card-h) * 10 / 34);
   }
   .analysis__body[data-sides='1'] .analysis__board-field {
     max-width: none;
