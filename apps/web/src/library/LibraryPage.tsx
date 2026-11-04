@@ -25,9 +25,11 @@ import {
   libraryScroll,
   libraryViewFromPath,
   libraryViewPath,
+  libraryZoomFromSearch,
   openedFromLibrary,
   withLibraryPage,
   withLibraryScroll,
+  withLibraryZoom,
   type LibraryHand,
   type LibraryPage as Page,
   type LibraryView,
@@ -78,6 +80,11 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const sort = useMemo(() => librarySortFromSearch(search), [search])
   // The page is in the address too, so coming back from a Hand, or a reload, opens the same one.
   const pageNumber = libraryPageFromSearch(search)
+  // The Results Graph's Zoom too, so the list and back, or a Hand and back, keep it.
+  const zoom = libraryZoomFromSearch(search)
+  // As numbers, so the graph's effect below depends on them: the Zoom is a new object on every render.
+  const zoomFrom = zoom?.from
+  const zoomTo = zoom?.to
   // Bumped after an import, so the list is read again.
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
@@ -89,8 +96,8 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [adding, setAdding] = useState(false)
   const [addFailure, setAddFailure] = useState<FailureReason | null>(null)
   // Any change of filter or sort, from a control or from the history, starts with nothing selected; the address it
-  // comes in has no page, so it is the first.
-  const filteredBy = withLibraryPage(search, 1)
+  // comes in has no page, so it is the first. A Zoom is no change of filter.
+  const filteredBy = withLibraryZoom(withLibraryPage(search, 1), null)
   const [lastFilteredBy, setLastFilteredBy] = useState(filteredBy)
   if (lastFilteredBy !== filteredBy) {
     setLastFilteredBy(filteredBy)
@@ -112,18 +119,20 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     }
   }, [token, pageNumber, filter, sort, revision])
 
-  // The Results Graph reads the same filter, so it describes the same Hands; paging leaves it be.
+  // The Results Graph reads the same filter, so it describes the same Hands, and its Zoom; paging leaves it be.
   useEffect(() => {
     if (view !== 'graph') return
     let cancelled = false
-    api<Results>(`/library/results?${libraryFilterQuery(filter)}`, { token })
+    const zoomed = zoomFrom !== undefined && zoomTo !== undefined ? { from: zoomFrom, to: zoomTo } : null
+    const query = new URLSearchParams(withLibraryZoom(libraryFilterQuery(filter).toString(), zoomed))
+    api<Results>(`/library/results?${query}`, { token })
       .then((read) => !cancelled && setResults(read))
       // A graph that can't be read is left out; the list says what went wrong.
       .catch(() => !cancelled && setResults(null))
     return () => {
       cancelled = true
     }
-  }, [token, filter, revision, view])
+  }, [token, filter, zoomFrom, zoomTo, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
   // Back from a Hand, the list lands as far down as it was left, once its Hands are there again.
@@ -138,11 +147,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     window.history.replaceState(withLibraryScroll(window.history.state, null), '')
   }, [page])
   // Opening a Hand keeps where the Library was, so "Volver" leads back to it.
+  const openHandAt = (handPath: string) => {
+    window.history.replaceState(withLibraryScroll(window.history.state, window.scrollY), '')
+    navigate(handPath, openedFromLibrary(`${path}${search}`))
+  }
   const openHand = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!isPlainClick(event)) return
     event.preventDefault()
-    window.history.replaceState(withLibraryScroll(window.history.state, window.scrollY), '')
-    navigate(event.currentTarget.pathname, openedFromLibrary(`${path}${search}`))
+    openHandAt(event.currentTarget.pathname)
   }
   // When only a quick period leaves nothing, the way out is all the Library, not clearing filters.
   const period = periodOf(filter)
@@ -339,7 +351,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               onChange={showView}
             />
           )}
-          {view === 'graph' && page && page.total > 0 && results && results.hands > 0 && <ResultsGraph results={results} />}
+          {view === 'graph' && page && page.total > 0 && results && results.hands > 0 && (
+            <ResultsGraph
+              results={results}
+              onOpenHand={(handId) => openHandAt(libraryHandPath(handId))}
+              onZoom={(zoom) => redirect(`${path}${withLibraryZoom(search, zoom)}`)}
+              onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)}
+            />
+          )}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{noMatches.message}</p>

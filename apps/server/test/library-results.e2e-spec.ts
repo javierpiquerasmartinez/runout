@@ -14,7 +14,15 @@ interface Results {
   hands: number;
   currency: string | null;
   totals: { bigBlinds: Lines; amounts: Lines | null };
-  points: { hand: number; bigBlinds: Lines; amounts: Lines | null }[];
+  start: { bigBlinds: Lines; amounts: Lines | null };
+  zoom: { from: number; to: number } | null;
+  points: {
+    hand: number;
+    handId: string;
+    holeCards: string[];
+    bigBlinds: Lines;
+    amounts: Lines | null;
+  }[];
 }
 
 /*
@@ -87,7 +95,7 @@ describe('The Library’s Results (e2e)', () => {
     expect(stars.points.map((point) => point.bigBlinds.showdown)).toEqual([
       0, 0, 0, 0, 4.9,
     ]);
-    expect(stars.points.at(-1)).toEqual({ hand: 5, ...stars.totals });
+    expect(stars.points.at(-1)).toMatchObject({ hand: 5, ...stars.totals });
   });
 
   it('runs the All-in EV beside the Result', async () => {
@@ -124,7 +132,7 @@ describe('The Library’s Results (e2e)', () => {
       4 + coin.totals.bigBlinds.result,
       2,
     );
-    expect(all.points.at(-1)).toEqual({ hand: all.hands, ...all.totals });
+    expect(all.points.at(-1)).toMatchObject({ hand: all.hands, ...all.totals });
   });
 
   it('describes the same Hands as the list under the same filter', async () => {
@@ -165,7 +173,162 @@ describe('The Library’s Results (e2e)', () => {
     expect(sampled.points.map((point) => point.amounts?.result)).toEqual([
       1, 40,
     ]);
-    expect(sampled.points.at(-1)).toEqual({ hand: 5, ...sampled.totals });
+    expect(sampled.points.at(-1)).toMatchObject({ hand: 5, ...sampled.totals });
+  });
+
+  /** The ids of the Hands the filter keeps, in played order, as the list sorts them. */
+  async function playedOrder(token: string, query: string): Promise<string[]> {
+    const list = await request(running.httpServer)
+      .get(`/api/library/hands?${query}&sort=date&dir=asc`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return (list.body.hands as { id: string }[]).map((hand) => hand.id);
+  }
+
+  it('names each point’s Hand and the Hero’s cards in it', async () => {
+    const account = await stockedAccount();
+
+    const stars = await results(account.token, 'site=pokerstars');
+
+    expect(stars.points.map((point) => point.handId)).toEqual(
+      await playedOrder(account.token, 'site=pokerstars'),
+    );
+    expect(stars.points.map((point) => point.holeCards)).toEqual([
+      ['Ac', 'Kh'],
+      ['Qc', '10c'],
+      ['4s', '10c'],
+      ['4c', 'Jc'],
+      ['Js', '8s'],
+    ]);
+  });
+
+  it('names the last Hand of each stretch on a downsampled series', async () => {
+    const account = await stockedAccount();
+    const ids = await playedOrder(account.token, 'site=pokerstars');
+
+    const sampled = await results(account.token, 'site=pokerstars&points=2');
+
+    expect(sampled.points.map((point) => point.handId)).toEqual([
+      ids[2],
+      ids[4],
+    ]);
+    expect(sampled.points.map((point) => point.holeCards)).toEqual([
+      ['4s', '10c'],
+      ['Js', '8s'],
+    ]);
+  });
+
+  it('zooms into a stretch, keeping the running totals from the first Hand', async () => {
+    const account = await stockedAccount();
+
+    const zoomed = await results(
+      account.token,
+      'site=pokerstars&zoomFrom=2&zoomTo=4',
+    );
+
+    // Hands 2 to 4: -€0.30, €0 and -€0.10, after Hand 1's +€0.31.
+    expect(zoomed.zoom).toEqual({ from: 2, to: 4 });
+    expect(zoomed.hands).toBe(3);
+    expect(zoomed.currency).toBe('EUR');
+    expect(zoomed.points.map((point) => point.hand)).toEqual([2, 3, 4]);
+    expect(zoomed.points.map((point) => point.amounts?.result)).toEqual([
+      1, 1, -9,
+    ]);
+    expect(zoomed.start).toEqual({
+      bigBlinds: { result: 3.1, allInEv: 3.1, showdown: 0, nonShowdown: 3.1 },
+      amounts: { result: 31, allInEv: 31, showdown: 0, nonShowdown: 31 },
+    });
+    expect(zoomed.totals).toEqual({
+      bigBlinds: { result: -4, allInEv: -4, showdown: 0, nonShowdown: -4 },
+      amounts: { result: -40, allInEv: -40, showdown: 0, nonShowdown: -40 },
+    });
+  });
+
+  it('starts from nothing without a Zoom', async () => {
+    const account = await stockedAccount();
+
+    const whole = await results(account.token, 'site=pokerstars');
+
+    expect(whole.zoom).toBeNull();
+    expect(whole.start).toEqual({
+      bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
+      amounts: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
+    });
+  });
+
+  it('clamps a Zoom to the Hands there are', async () => {
+    const account = await stockedAccount();
+
+    const clamped = await results(
+      account.token,
+      'site=pokerstars&zoomFrom=-3&zoomTo=40',
+    );
+    const tail = await results(
+      account.token,
+      'site=pokerstars&zoomFrom=4&zoomTo=9',
+    );
+
+    expect(clamped.zoom).toEqual({ from: 1, to: 5 });
+    expect(clamped.hands).toBe(5);
+    expect(clamped.totals.amounts?.result).toBe(40);
+    expect(tail.zoom).toEqual({ from: 4, to: 5 });
+    expect(tail.points.map((point) => point.hand)).toEqual([4, 5]);
+    // Hand 4's -€0.10 and Hand 5's +€0.49.
+    expect(tail.totals.amounts?.result).toBe(39);
+    expect(tail.start.amounts?.result).toBe(1);
+  });
+
+  it('answers the whole series for a Zoom it can’t read or that holds under two Hands', async () => {
+    const account = await stockedAccount();
+    const whole = await results(account.token, 'site=pokerstars');
+
+    for (const zoom of [
+      'zoomFrom=2',
+      'zoomTo=4',
+      'zoomFrom=two&zoomTo=4',
+      'zoomFrom=2.5&zoomTo=4',
+      'zoomFrom=&zoomTo=4',
+      'zoomFrom=3&zoomTo=3',
+      'zoomFrom=4&zoomTo=2',
+      'zoomFrom=5&zoomTo=9',
+    ]) {
+      expect(await results(account.token, `site=pokerstars&${zoom}`)).toEqual(
+        whole,
+      );
+    }
+  });
+
+  it('downsamples a long stretch, keeping its last Hand exact', async () => {
+    const account = await stockedAccount();
+
+    const sampled = await results(
+      account.token,
+      'site=pokerstars&zoomFrom=2&zoomTo=5&points=2',
+    );
+
+    // Hands 2 to 5 in two stretches: the last of each is Hands 3 and 5.
+    expect(sampled.hands).toBe(4);
+    expect(sampled.points.map((point) => point.hand)).toEqual([3, 5]);
+    expect(sampled.points.map((point) => point.amounts?.result)).toEqual([
+      1, 40,
+    ]);
+    expect(sampled.start.amounts?.result).toBe(31);
+    expect(sampled.totals.amounts?.result).toBe(9);
+  });
+
+  it('numbers a Zoom’s Hands among those the filter keeps, and keeps the filter’s currency', async () => {
+    const account = await stockedAccount();
+    const all = await results(account.token);
+
+    // Over every Hand, Hands 5 and 6 are the PokerStars showdown and the
+    // first CoinPoker Hand.
+    const across = await results(account.token, 'zoomFrom=5&zoomTo=6');
+
+    expect(across.zoom).toEqual({ from: 5, to: 6 });
+    expect(across.currency).toBeNull();
+    expect(across.totals.amounts).toBeNull();
+    expect(across.points).toEqual(all.points.slice(4, 6));
+    expect(across.start.bigBlinds.result).toBe(-0.9);
   });
 
   it('has nothing to draw for an empty Library, and none for an anonymous identity', async () => {
@@ -178,6 +341,11 @@ describe('The Library’s Results (e2e)', () => {
         bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
         amounts: null,
       },
+      start: {
+        bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
+        amounts: null,
+      },
+      zoom: null,
       points: [],
     });
     await request(running.httpServer).get('/api/library/results').expect(401);

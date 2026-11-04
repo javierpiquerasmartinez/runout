@@ -57,7 +57,8 @@ export class LibraryController {
 
   /**
    * The running Results over the Hands the Library filter in the query keeps
-   * (the same filter as the list), downsampled to at most `points` points.
+   * (the same filter as the list), downsampled to at most `points` points;
+   * with `zoomFrom` and `zoomTo`, only that stretch of them (a Zoom).
    */
   @Get('results')
   @Header('Cache-Control', 'private, no-cache')
@@ -72,6 +73,8 @@ export class LibraryController {
       account,
       parseLibraryFilter(query),
       query.points,
+      query.zoomFrom,
+      query.zoomTo,
     );
   }
 

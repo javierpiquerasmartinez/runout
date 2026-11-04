@@ -1012,6 +1012,8 @@ export const es = {
   'library.results.unit.amount': 'Cantidad',
   'library.results.mixedCurrencies': 'Estas manos están en más de una moneda, así que solo se suman en ciegas grandes',
   'library.results.hand': 'Mano {hand}',
+  'library.results.zoom': 'Gráfica ampliada entre las manos {from} y {to}',
+  'library.results.zoom.leave': 'Volver',
   'library.notes.title': 'Notas',
   'library.notes.none': 'Nadie ha escrito todavía una nota sobre esta mano.',
   'library.notes.write': 'Añadir una nota sobre esta mano',

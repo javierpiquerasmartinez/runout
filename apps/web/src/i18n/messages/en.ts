@@ -1013,6 +1013,8 @@ export const en: Messages = {
   'library.results.unit.amount': 'Amount',
   'library.results.mixedCurrencies': 'These hands are in more than one currency, so they only add up in big blinds',
   'library.results.hand': 'Hand {hand}',
+  'library.results.zoom': 'Graph zoomed in between hands {from} and {to}',
+  'library.results.zoom.leave': 'Back',
   'library.notes.title': 'Notes',
   'library.notes.none': 'Nobody has written a note on this hand yet.',
   'library.notes.write': 'Add a note about this hand',

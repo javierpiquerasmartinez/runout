@@ -1,5 +1,6 @@
 import type { QueueEntry } from '../room/roomClient'
 import { roomPath } from '../room/roomCode'
+import type { Zoom } from './results'
 
 /*
  * An Account's Library as the server's `GET /library/hands` sends it, one
@@ -32,13 +33,46 @@ export function libraryPageFromSearch(search: string): number {
   return Number.isInteger(page) && page > 1 ? page : 1
 }
 
+/** A query as an address's search: "?" and the query, or nothing when it is empty. */
+function asSearch(query: URLSearchParams): string {
+  const written = query.toString()
+  return written && `?${written}`
+}
+
 /** The address's search with the page written in place of whichever it had; the first page is left out. */
 export function withLibraryPage(search: string, page: number): string {
   const query = new URLSearchParams(search)
   query.delete('page')
   if (page > 1) query.set('page', String(page))
-  const written = query.toString()
-  return written && `?${written}`
+  return asSearch(query)
+}
+
+/*
+ * The Results Graph's Zoom is in the address too, beside the filter, as
+ * `zoomFrom` and `zoomTo` (`from` and `to` are the filter's period). The
+ * server clamps it to the Hands there are.
+ */
+const ZOOM_FROM = 'zoomFrom'
+const ZOOM_TO = 'zoomTo'
+
+/** The Zoom an address keeps, or null when it keeps none it could ask for. */
+export function libraryZoomFromSearch(search: string): Zoom | null {
+  const query = new URLSearchParams(search)
+  const from = Number(query.get(ZOOM_FROM))
+  const to = Number(query.get(ZOOM_TO))
+  return Number.isSafeInteger(from) && Number.isSafeInteger(to) && from >= 1 && to > from ? { from, to } : null
+}
+
+/** The address's search with the Zoom written in place of whichever it had, or with none. */
+export function withLibraryZoom(search: string, zoom: Zoom | null): string {
+  const query = new URLSearchParams(search)
+  query.delete(ZOOM_FROM)
+  query.delete(ZOOM_TO)
+  if (zoom) {
+    query.set(ZOOM_FROM, String(zoom.from))
+    query.set(ZOOM_TO, String(zoom.to))
+  }
+  return asSearch(query)
 }
 
 /*

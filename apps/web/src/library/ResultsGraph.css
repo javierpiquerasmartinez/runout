@@ -44,6 +44,31 @@
   flex-grow: 1;
   min-width: 0;
   height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+.results__chart {
+  flex-grow: 1;
+  min-height: 0;
+  /* A drag across the chart Zooms; it never selects the page's text. */
+  user-select: none;
+}
+/* Under the chart, only with a Zoom: which Hands it shows, and the way back to all of them. */
+.results__zoom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  /* Past the y-axis' labels (their width is set beside the chart's), under the plot. */
+  margin: 6px 0 0 var(--results-y-axis-width);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+/* With the mouse, a point opens its Hand and a drag Zooms into a stretch. */
+@media (pointer: fine) {
+  .results__plot .recharts-surface {
+    cursor: crosshair;
+  }
 }
 /* Recharts' own text and focus outline give way to the app's. */
 .results__plot .recharts-surface {
@@ -173,6 +198,10 @@
   font-size: 10.5px;
   letter-spacing: 0.08em;
   color: var(--text-muted);
+}
+.results__readout-cards {
+  display: flex;
+  gap: 3px;
 }
 .results__readout-line {
   display: flex;

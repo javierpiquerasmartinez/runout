@@ -23,18 +23,37 @@ export type ResultLines = Record<ResultLine, number>
 /** Where the lines stand after one Hand, counted from 1 in played order. */
 export interface ResultsPoint {
   hand: number
+  /** The Hand itself, so it can be opened from the graph. */
+  handId: string
+  /** The Hero's cards in that Hand, as the Library list shows them. */
+  holeCards: string[]
   /** In big blinds of each Hand's own Stake, to the hundredth. */
   bigBlinds: ResultLines
   /** As Amounts, only when every Hand shares one currency. */
   amounts: ResultLines | null
 }
 
-/** The running Results over the Hands a Library filter keeps. */
+/** Where the lines stand, in both units. */
+export type LinesInBothUnits = Pick<ResultsPoint, 'bigBlinds' | 'amounts'>
+
+/** A Zoom: the Hands from `from` to `to`, counted from 1 in played order. */
+export interface Zoom {
+  from: number
+  to: number
+}
+
+/** The running Results over the Hands a Library filter keeps, or over a Zoom of them. */
 export interface Results {
+  /** How many Hands the series covers: all the filter keeps, or the Zoom's. */
   hands: number
-  /** The currency every Hand shares, or null when they mix (or there are none). */
+  /** The currency every Hand the filter keeps shares, or null when they mix (or there are none). */
   currency: string | null
-  totals: Omit<ResultsPoint, 'hand'>
-  /** Downsampled by the server; the last one is the last Hand, equal to the totals. */
+  /** What each line won or lost over the Hands the series covers. */
+  totals: LinesInBothUnits
+  /** Where the lines stood just before the series' first Hand: nothing without a Zoom. */
+  start: LinesInBothUnits
+  /** The stretch the series covers, as the server clamped it, or null for all of it. */
+  zoom: Zoom | null
+  /** Downsampled by the server; the last one is the series' last Hand. Each keeps the running totals from Hand 1. */
   points: ResultsPoint[]
 }

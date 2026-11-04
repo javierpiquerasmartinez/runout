@@ -417,7 +417,11 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - Each line can be shown or hidden.
 - It is in big blinds by default, so Hands at different Stakes and currencies add up.
 - When every filtered Hand shares one currency, I can see it in Amounts, following my Display Unit. When currencies mix, that option is locked with its reason.
-- The total of each line and the number of Hands are shown next to the graph; hovering shows the Hand number and each line's value.
+- The total of each line and the number of Hands are shown next to the graph; hovering shows the Hand number, the Hero's cards in my Deck Style, and each line's value. Hovering never waits on the server.
+- Clicking a point opens that Hand (H7.4), and **Volver** brings me back to the graph as I left it; Cmd/Ctrl+click opens it in a new tab. Hovering and clicking always mean the same Hand: when the graph has too many Hands to draw one point each, a point is the last Hand of the stretch it stands for, so I Zoom in to pick one precisely.
+- Dragging across the graph Zooms into that stretch of Hands, shown by a band while I drag. In a Zoom, each line keeps its running total from my first Hand and the axis shows the real Hand numbers, but the number of Hands, each line's total and the Win Rate are the stretch's own. Under the graph, "Gráfica ampliada entre las manos X e Y" and **Volver** bring back the whole graph in one click, however many times I zoomed in. A drag over fewer than two Hands does nothing.
+- The Zoom is in the address: it stays when I open a Hand and come back, or switch to the list and back, and goes whenever I change the filter. Zooming doesn't add browser history.
+- Zooming and opening Hands from the graph need a mouse for now; on a touch screen, a tap shows the hover box.
 - Each line is drawn in my Graph Colours (H8.10), in the graph, its legend, the hover box and its Win Rate.
 - It follows my Theme and the app's visual style.
 
