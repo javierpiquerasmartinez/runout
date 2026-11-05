@@ -269,7 +269,7 @@ function linesBetween(
 /**
  * The Result, All-in EV, Showdown Result and Rake Generated, as Amounts and
  * in big blinds, summed over the whole set or, with a window, as running
- * sums. A Hand without a Rake Generated adds nothing to it.
+ * sums.
  */
 function sums(over: SQL) {
   const result = sql`${hands.heroResult}`;

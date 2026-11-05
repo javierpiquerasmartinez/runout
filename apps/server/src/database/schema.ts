@@ -308,10 +308,10 @@ export const hands = pgTable(
     heroReachedShowdown: boolean('hero_reached_showdown').notNull(),
     /** The final pot as an Amount, worked out from `content` at import, so the Library sorts on it. */
     finalPot: integer('final_pot').notNull(),
-    /** The Hand's Rake, Fees aside, as an Amount; null for Hands stored before it was kept. */
-    rake: integer('rake'),
-    /** The Hero's share of the Rake, by what they put in the pot, as an Amount; null for Hands stored before it was kept. */
-    heroRakeGenerated: integer('hero_rake_generated'),
+    /** The Hand's Rake, Fees aside, as an Amount, read at import. */
+    rake: integer('rake').notNull(),
+    /** The Hero's share of the Rake, by what they put in the pot, as an Amount, worked out from `content` at import. */
+    heroRakeGenerated: integer('hero_rake_generated').notNull(),
     content: handJsonb('content').notNull(),
     /** The Hand History of this one Hand, exactly as it came in; null for Hands stored before it was kept. */
     handHistory: text('hand_history'),
