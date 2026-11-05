@@ -1,15 +1,100 @@
-/* The landing: a placeholder until it is designed, in the "Bienvenida" board's measures. */
+/*
+ * The landing: a scroll-driven video behind five sections of copy. Provisional,
+ * until the definitive landing is designed; it departs from the "Bienvenida"
+ * board on purpose. Gold on black, always dark: it keeps the dark tokens
+ * whatever the theme.
+ */
+
+:root:has(.landing) {
+  background: #000;
+  color-scheme: dark;
+}
+
+:root:has(.landing) body {
+  background: #000;
+}
 
 .landing {
+  color-scheme: dark;
+  --text-primary: #ecf1ef;
+  --text-secondary: #a7b4b0;
+  --text-muted: #75837f;
+  --color-border: #253230;
+  --brass: #e0a050;
+  --brass-hover: #edb369;
+  --brass-pressed: #c98c3e;
+  --brass-ink: #e0a050;
+  --on-brass: #0b0f0e;
+  --sync: #3fc0a0;
+
+  /*
+   * The table's felt in the source frame (1280×720), measured on its settled
+   * last frames: x 280–1001, y 304–448.
+   */
+  --oval-left: 0.2188;
+  --oval-top: 0.4222;
+  --oval-width: 0.5633;
+  --oval-height: 0.2;
+
+  position: relative;
   min-height: 100vh;
-  max-width: 620px;
-  padding: 56px 60px;
+  background: #000;
+  color: var(--text-primary);
+}
+
+/* ---------- The video, held behind the copy ---------- */
+
+.landing__stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.landing__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Keeps the copy readable over the brightest frames, darker on the left where the copy runs. */
+.landing__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 62%) 0%, rgb(0 0 0 / 30%) 45%, rgb(0 0 0 / 0%) 70%),
+    linear-gradient(180deg, rgb(0 0 0 / 35%) 0%, rgb(0 0 0 / 0%) 25%, rgb(0 0 0 / 0%) 75%, rgb(0 0 0 / 45%) 100%);
+}
+
+/* ---------- The story ---------- */
+
+.landing__story {
+  position: relative;
+  z-index: 1;
+}
+
+.landing__section {
+  position: relative;
+  height: calc(var(--landing-screens, 1) * 100vh);
+}
+
+/* Each section's copy stays on screen while its section scrolls by. */
+.landing__pinned {
+  position: sticky;
+  top: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 34px;
+  justify-content: center;
+  padding: 56px 60px;
 }
 
 .landing__brand {
+  position: absolute;
+  top: 56px;
+  left: 60px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -23,34 +108,93 @@
   padding: 3px 6px;
 }
 
-.landing__intro {
+.landing__copy {
+  max-width: 540px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .landing__title {
-  font-size: 50px;
+  font-size: 52px;
   line-height: 1.06;
-  white-space: pre-line;
-  text-wrap: pretty;
+  color: var(--brass);
+  text-wrap: balance;
+  text-shadow: 0 2px 24px rgb(0 0 0 / 60%);
 }
 
-.landing__lead {
-  max-width: 460px;
-  font-size: 16px;
+.landing__line {
+  max-width: 440px;
+  font-size: 17px;
   line-height: 1.55;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  text-wrap: pretty;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 80%);
+}
+
+.landing__hint {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.landing__hint::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 28px;
+  margin: 10px auto 0;
+  background: linear-gradient(180deg, var(--brass), transparent);
+}
+
+/*
+ * The close is the page's last screen, so at the end of the scroll it lines
+ * up with the video behind it. Its size is the stage's, and the oval is
+ * mapped through the video's cover crop: the frame is drawn at whichever is
+ * larger of the viewport's width and its height scaled to 16:9.
+ */
+.landing__section--close {
+  height: 100vh;
+  container-type: size;
+  --frame-w: max(100cqw, 177.78cqh);
+  --frame-h: max(100cqh, 56.25cqw);
+}
+
+.landing__close {
+  position: absolute;
+  left: calc(50cqw + (var(--oval-left) - 0.5) * var(--frame-w));
+  top: calc(50cqh + (var(--oval-top) - 0.5) * var(--frame-h));
+  width: calc(var(--oval-width) * var(--frame-w));
+  height: calc(var(--oval-height) * var(--frame-h));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.landing__close-title {
+  font-size: clamp(26px, calc(0.05 * var(--frame-h)), 44px);
+  line-height: 1.05;
+  color: var(--brass);
+  text-shadow: 0 2px 18px rgb(0 0 0 / 70%);
 }
 
 .landing__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
+  gap: 12px 24px;
 }
 
-.landing__link {
+.landing__actions .ro-btn {
   text-decoration: none;
 }
 
@@ -64,11 +208,60 @@
   text-decoration: none;
 }
 
-@media (max-width: 560px) {
-  .landing {
-    padding: 40px 16px;
+/*
+ * Portrait screens: the whole frame as a 16:9 band across the width, faded
+ * into black above and below so the table is never cut off. The copy sits
+ * above the band; the close sits below the table.
+ */
+@media (max-aspect-ratio: 6/5) {
+  .landing__frame {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    transform: translateY(-50%);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
   }
+
+  .landing__veil {
+    background: linear-gradient(180deg, rgb(0 0 0 / 30%) 0%, rgb(0 0 0 / 0%) 40%);
+  }
+
+  .landing__pinned {
+    justify-content: flex-start;
+    padding: 120px 16px 0;
+  }
+
+  .landing__brand {
+    top: 40px;
+    left: 16px;
+  }
+
   .landing__title {
-    font-size: 38px;
+    font-size: 36px;
+  }
+
+  .landing__line {
+    font-size: 15.5px;
+  }
+
+  /* The band's bottom edge is half its height, 9/32 of the width, below the middle. */
+  .landing__close {
+    left: 16px;
+    right: 16px;
+    top: calc(50cqh + 28.125cqw + 8px);
+    width: auto;
+    height: auto;
+    justify-content: flex-start;
+  }
+
+  .landing__close-title {
+    font-size: 34px;
+  }
+
+  .landing__actions {
+    flex-direction: column;
+    gap: 16px;
   }
 }

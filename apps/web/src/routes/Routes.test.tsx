@@ -92,7 +92,7 @@ function renderSigningIn(path: string) {
   )
 }
 
-const landing = () => screen.findByRole('heading', { name: /Your hands, your numbers/ })
+const landing = () => screen.findByRole('heading', { name: 'Your hands. Your numbers. Your table.' })
 const login = () => screen.findByRole('main', { name: 'Sign in' })
 const library = () => screen.findByRole('heading', { name: 'All hands' })
 const libraryGraph = async () => {
@@ -113,10 +113,29 @@ describe('Routes · the landing, for visitors', () => {
     renderAt('/', session())
 
     expect(await landing()).toBeTruthy()
+    for (const headline of [
+      "Your graph doesn't lie.",
+      'It all ends up here.',
+      'One table. The whole group. The same hand.',
+      'Invitation only.',
+    ]) {
+      expect(screen.getByRole('heading', { name: headline })).toBeTruthy()
+    }
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
     expect(screen.getByRole('link', { name: 'Have a room code?' }).getAttribute('href')).toBe('/room')
     expect(screen.queryByRole('heading', { name: 'Create a room' })).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('keeps its background video away from assistive technology', async () => {
+    renderAt('/', visitor())
+
+    expect(await landing()).toBeTruthy()
+    const videos = document.querySelectorAll('video')
+    expect(videos.length).toBeGreaterThan(0)
+    for (const video of videos) {
+      expect(video.closest('[aria-hidden="true"]')).not.toBeNull()
+    }
   })
 
   it('is where an unknown path falls back to', async () => {
