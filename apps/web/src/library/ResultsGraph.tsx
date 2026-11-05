@@ -92,6 +92,8 @@ export function ResultsGraph({
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
   const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
+  const rakeTotal =
+    unit === 'amount' && results.rakeGenerated.amounts !== null ? results.rakeGenerated.amounts : results.rakeGenerated.bigBlinds
   const linesOf = (point: LinesInBothUnits): ResultLines =>
     unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
 
@@ -325,6 +327,25 @@ export function ResultsGraph({
               ))}
             </dl>
           </div>
+          {/* The Hero's share of the Rake: not a line, so no swatch, and never signed. */}
+          <div className="results__win-rates results__rake" role="group" aria-label={t('library.results.rake')} title={t('library.results.rake.hint')}>
+            <span className="results__win-rates-title ro-mono">{t('library.results.rake')}</span>
+            <dl>
+              <div className="results__win-rate">
+                <dt>{t('library.results.rake.total')}</dt>
+                <dd className="ro-mono">{formatValue(rakeTotal, unit, results.currency, i18n, 'auto')}</dd>
+              </div>
+              <div className="results__win-rate">
+                <dt>{t('library.results.rake.perHundred')}</dt>
+                <dd className="ro-mono">
+                  {i18n.formatNumber((results.rakeGenerated.bigBlinds / results.hands) * 100, {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}
+                </dd>
+              </div>
+            </dl>
+          </div>
         </div>
       </div>
     </section>
@@ -386,11 +407,17 @@ function Readout({
   )
 }
 
-/** A line's value, signed: "+4.9 BB", "-€0.09". */
-function formatValue(value: number, unit: GraphUnit, currency: string | null, i18n: Translator): string {
-  if (unit === 'amount' && currency) return i18n.formatCurrency(value / 100, currency, { signDisplay: 'exceptZero' })
+/** A line's value, signed: "+4.9 BB", "-€0.09". With `auto`, only a negative one is. */
+function formatValue(
+  value: number,
+  unit: GraphUnit,
+  currency: string | null,
+  i18n: Translator,
+  signDisplay: 'exceptZero' | 'auto' = 'exceptZero',
+): string {
+  if (unit === 'amount' && currency) return i18n.formatCurrency(value / 100, currency, { signDisplay })
   return i18n.t('room.table.bigBlinds', {
-    value: i18n.formatNumber(value, { maximumFractionDigits: 2, signDisplay: 'exceptZero' }),
+    value: i18n.formatNumber(value, { maximumFractionDigits: 2, signDisplay }),
   })
 }
 

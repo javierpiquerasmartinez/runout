@@ -111,6 +111,9 @@
   padding: 12px 8px 0;
   border-top: 1px solid var(--color-divider);
 }
+.results__rake {
+  margin-top: 12px;
+}
 .results__win-rates-title {
   font-size: 10px;
   letter-spacing: 0.14em;
