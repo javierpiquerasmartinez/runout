@@ -15,9 +15,14 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set.');
 const db = drizzle({ client: new pg.Pool({ connectionString: url }), schema });
 try {
-  console.log(
-    `Filled in the Rake and Rake Generated of ${await backfillRake(db)} Hands.`,
-  );
+  const { filled, unreadable } = await backfillRake(db);
+  console.log(`Filled in the Rake and Rake Generated of ${filled} Hands.`);
+  if (unreadable > 0) {
+    console.log(
+      `${unreadable} of them have a Hand History that no longer reads: ` +
+        'they count the Rake and the Fees together as Rake.',
+    );
+  }
 } finally {
   await db.$client.end();
 }

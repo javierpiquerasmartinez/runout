@@ -372,7 +372,7 @@ describe('Hand History import: the fixture corpus', () => {
       const paid =
         hand.collected.reduce((sum, { amount }) => sum + amount, 0) +
         hand.rake +
-        hand.fees! +
+        hand.fees +
         (hand.splash ?? 0);
 
       expect(paid).toBe(overview(hand).finalPot);

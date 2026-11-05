@@ -94,12 +94,12 @@ export async function storedIds(
 
 /**
  * Gives the stored Hands in `ids` (by key) their Hand History from `read`,
- * when they have none, with their content, Rake and Rake Generated worked
- * out again from that text: stored without it, they had the Fees inside the
+ * when they have none, and rewrites their content, Rake and Rake Generated
+ * as read from that text: stored without it, they had the Fees inside the
  * Rake. A Hand's text, once set, is never replaced: it stays the first text
  * it was read from.
  */
-export async function fillHistories(
+export async function fillHistoriesAndReread(
   db: Database | Transaction,
   ids: ReadonlyMap<string, string>,
   { hands: read, histories }: HandsRead,
@@ -135,17 +135,18 @@ export async function fillHistories(
  * Stores the Hands that aren't stored yet, with `importerId` as their
  * Importer and the Hand History each was read from as their text, and
  * returns every Hand's id, in order. A Hand already stored without its text
- * gets it (see `fillHistories`).
+ * gets it (see `fillHistoriesAndReread`).
  */
 export async function storeHands(
   tx: Transaction,
   importerId: string,
-  { hands: read, histories }: HandsRead,
+  handsRead: HandsRead,
   now: Date,
 ): Promise<string[]> {
+  const { hands: read, histories } = handsRead;
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
-  await fillHistories(tx, ids, { hands: read, histories });
+  await fillHistoriesAndReread(tx, ids, handsRead);
   const toStore = read.filter((hand) => !ids.has(keyOf(hand)));
   if (toStore.length > 0) {
     // Another import may have stored one of them a moment ago; the

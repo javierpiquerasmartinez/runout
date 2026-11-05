@@ -15,7 +15,7 @@ import {
   type Stake,
 } from '../hands/hand.js';
 import {
-  fillHistories,
+  fillHistoriesAndReread,
   keyOf,
   withHistories,
   type HandsRead,
@@ -118,7 +118,7 @@ export class ImportsService {
         result.texts,
       ));
       const inLibrary = await this.library.inLibrary(importer, result.hands);
-      await fillHistories(this.db, inLibrary, read);
+      await fillHistoriesAndReread(this.db, inLibrary, read);
       previews = kept.map((hand) => handPreview(hand));
     } else {
       const plan = await this.queue.planImport(
@@ -127,7 +127,7 @@ export class ImportsService {
         result.hands,
         result.texts,
       );
-      await fillHistories(this.db, plan.inQueue, read);
+      await fillHistoriesAndReread(this.db, plan.inQueue, read);
       kept = plan.queued.map(({ hand }) => hand);
       const inLibrary = await this.library.inLibrary(importer, kept);
       previews = plan.queued.map(({ hand, author, heroMatched }) => ({

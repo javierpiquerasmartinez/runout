@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { importHandHistory } from '../import/import.js';
+import { fromStored } from '../hand.js';
 import { heroResult } from './hero-result.js';
 
 function text(name: string) {
@@ -136,10 +137,12 @@ describe('Replay: the Hero’s All-in EV', () => {
     const hand = hands('coinpoker-session.txt').find(
       (h) => h.siteHandId === '160054200061',
     )!;
-    // Stored before Fees were read apart: the whole house take in `rake`.
-    const stored = { ...hand, rake: hand.rake + hand.fees!, fees: undefined };
+    // Stored before Fees were read apart: the Rake and the Fees in `rake`.
+    const { fees, ...stored } = hand;
 
-    expect(heroResult(stored)).toMatchObject({ result: 369, allInEv: 317 });
+    expect(
+      heroResult(fromStored({ ...stored, rake: hand.rake + fees })),
+    ).toMatchObject({ result: 369, allInEv: 317 });
   });
 
   it('equals the Result when an opponent’s cards weren’t shown', () => {

@@ -552,7 +552,7 @@ describe('The Rake Generated beside the Library’s Results (e2e)', () => {
 
 /*
  * Hands stored before 0025 have no Rake nor Rake Generated yet, and one
- * number in their content for everything the house took. The backfill fills
+ * number in their content for the Rake and the Fees together. The backfill fills
  * them in; a re-import of one stored without its text works them out again.
  */
 describe('The Rake Generated of Hands imported before it was kept (e2e)', () => {
@@ -635,7 +635,7 @@ describe('The Rake Generated of Hands imported before it was kept (e2e)', () => 
       amounts: 0,
     });
 
-    expect(await backfillRake(db)).toBeGreaterThanOrEqual(2);
+    expect((await backfillRake(db)).filled).toBeGreaterThanOrEqual(2);
 
     // 17 × 169 / 343 = 8.38, read again from the Hand History.
     expect(await rakeGenerated(withText.token)).toEqual({
@@ -647,7 +647,7 @@ describe('The Rake Generated of Hands imported before it was kept (e2e)', () => 
       bigBlinds: 0.9,
       amounts: 9,
     });
-    expect(await backfillRake(db)).toBe(0);
+    expect((await backfillRake(db)).filled).toBe(0);
   });
 
   it('works them out again from the text when a Hand stored without it is imported again', async () => {

@@ -88,7 +88,7 @@ type Sums = {
 };
 
 /** Where the lines and the Rake Generated stand after one Hand. */
-type Standing = LinesInBothUnits & { rakeGenerated: RakeGenerated };
+type Standing = { point: LinesInBothUnits; rakeGenerated: RakeGenerated };
 
 /** The Results Graph's numbers, answered by the database. */
 @Injectable()
@@ -165,38 +165,30 @@ export class ResultsService {
         `);
         const standings = running.rows.map(
           ({ hand, hand_id, hole_cards, ...sums }) => ({
-            hand,
-            handId: hand_id,
-            holeCards: hole_cards,
-            ...standingOf(sums, oneCurrency),
+            point: {
+              hand,
+              handId: hand_id,
+              holeCards: hole_cards,
+              ...linesOf(sums, oneCurrency),
+            } satisfies ResultsPoint,
+            rakeGenerated: rakeGeneratedOf(sums, oneCurrency),
           }),
         );
         const before =
-          standings[0]?.hand === from - 1 ? standings.shift() : undefined;
+          standings[0]?.point.hand === from - 1 ? standings.shift() : undefined;
         const start: Standing = before ?? zeroStanding(oneCurrency);
         const end: Standing = standings.at(-1) ?? zeroStanding(oneCurrency);
         return {
           hands: span,
           currency: oneCurrency ? currency : null,
-          totals: linesBetween(start, end),
-          start: { bigBlinds: start.bigBlinds, amounts: start.amounts },
+          totals: linesBetween(start.point, end.point),
+          start: {
+            bigBlinds: start.point.bigBlinds,
+            amounts: start.point.amounts,
+          },
           zoom,
           rakeGenerated: rakeBetween(start.rakeGenerated, end.rakeGenerated),
-          points: standings.map(
-            ({
-              hand,
-              handId,
-              holeCards,
-              bigBlinds,
-              amounts,
-            }): ResultsPoint => ({
-              hand,
-              handId,
-              holeCards,
-              bigBlinds,
-              amounts,
-            }),
-          ),
+          points: standings.map(({ point }) => point),
         };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -221,21 +213,40 @@ function zoomOf(rawFrom: unknown, rawTo: unknown, count: number): Zoom | null {
 function zeroStanding(oneCurrency: boolean): Standing {
   const zero = { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 };
   return {
-    bigBlinds: zero,
-    amounts: oneCurrency ? { ...zero } : null,
+    point: { bigBlinds: zero, amounts: oneCurrency ? { ...zero } : null },
     rakeGenerated: { bigBlinds: 0, amounts: oneCurrency ? 0 : null },
   };
 }
 
-/** The Rake Generated from one point to a later one, to the hundredth. */
-function rakeBetween(start: RakeGenerated, end: RakeGenerated): RakeGenerated {
+/** A value in big blinds, and as an Amount only when every Hand shares one currency. */
+type InBothUnits<T> = { bigBlinds: T; amounts: T | null };
+
+/**
+ * From one point to a later one, in both units, each worked out by `minus`:
+ * as an Amount only when both points have one.
+ */
+function between<T>(
+  start: InBothUnits<T>,
+  end: InBothUnits<T>,
+  minus: (later: T, earlier: T) => T,
+): InBothUnits<T> {
   return {
-    bigBlinds: Math.round((end.bigBlinds - start.bigBlinds) * 100) / 100,
+    bigBlinds: minus(end.bigBlinds, start.bigBlinds),
     amounts:
       end.amounts !== null && start.amounts !== null
-        ? end.amounts - start.amounts
+        ? minus(end.amounts, start.amounts)
         : null,
   };
+}
+
+/** How far one number moved to a later one, to the hundredth. */
+function minusToHundredths(later: number, earlier: number): number {
+  return Math.round((later - earlier) * 100) / 100;
+}
+
+/** The Rake Generated from one point to a later one, to the hundredth. */
+function rakeBetween(start: RakeGenerated, end: RakeGenerated): RakeGenerated {
+  return between(start, end, minusToHundredths);
 }
 
 /** What each line won or lost from one point to a later one, to the hundredth. */
@@ -243,21 +254,16 @@ function linesBetween(
   start: LinesInBothUnits,
   end: LinesInBothUnits,
 ): LinesInBothUnits {
-  const minus = (later: ResultLines, earlier: ResultLines): ResultLines => {
+  return between(start, end, (later, earlier) => {
     const line = (key: keyof ResultLines) =>
-      Math.round((later[key] - earlier[key]) * 100) / 100;
+      minusToHundredths(later[key], earlier[key]);
     return {
       result: line('result'),
       allInEv: line('allInEv'),
       showdown: line('showdown'),
       nonShowdown: line('nonShowdown'),
     };
-  };
-  return {
-    bigBlinds: minus(end.bigBlinds, start.bigBlinds),
-    amounts:
-      end.amounts && start.amounts ? minus(end.amounts, start.amounts) : null,
-  };
+  });
 }
 
 /**
@@ -283,11 +289,8 @@ function sums(over: SQL) {
     round(coalesce(sum(${bigBlinds(rakeGenerated)}) ${over}, 0), 2) as rake_generated_bb`;
 }
 
-/**
- * The lines and the Rake Generated from their sums: the Non-showdown Result
- * is whatever the Showdown Result leaves of the Result.
- */
-function standingOf(sums: Sums, oneCurrency: boolean): Standing {
+/** The lines from their sums: the Non-showdown Result is whatever the Showdown Result leaves of the Result. */
+function linesOf(sums: Sums, oneCurrency: boolean): LinesInBothUnits {
   const lines = (
     result: number,
     allInEv: number,
@@ -312,9 +315,13 @@ function standingOf(sums: Sums, oneCurrency: boolean): Standing {
           Number(sums.showdown),
         )
       : null,
-    rakeGenerated: {
-      bigBlinds: Number(sums.rake_generated_bb),
-      amounts: oneCurrency ? Number(sums.rake_generated) : null,
-    },
+  };
+}
+
+/** The Rake Generated from its sums. */
+function rakeGeneratedOf(sums: Sums, oneCurrency: boolean): RakeGenerated {
+  return {
+    bigBlinds: Number(sums.rake_generated_bb),
+    amounts: oneCurrency ? Number(sums.rake_generated) : null,
   };
 }

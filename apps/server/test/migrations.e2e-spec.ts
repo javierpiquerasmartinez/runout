@@ -8,7 +8,12 @@ import { readMigrationFiles } from 'drizzle-orm/migrator';
 import pg from 'pg';
 import { inject } from 'vitest';
 import * as schema from '../src/database/schema.js';
-import { heroSeat, type Hand } from '../src/hands/hand.js';
+import {
+  fromStored,
+  heroSeat,
+  type Hand,
+  type StoredHand,
+} from '../src/hands/hand.js';
 import { importHandHistory } from '../src/hands/import/import.js';
 import { backfillRake } from '../src/hands/rake-backfill.js';
 import { oneHand } from './support/hand-histories.js';
@@ -383,7 +388,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
     }
   });
 
-  it('backfills Rake and Rake Generated: from the Hand History, or else the whole house take', async () => {
+  it('backfills Rake and Rake Generated: from the Hand History, or else the Rake and the Fees together', async () => {
     await migrateUpTo('0024_invitations_and_administrators');
     const client = new pg.Client(databaseUrl);
     await client.connect();
@@ -391,10 +396,11 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
     // Hero put in $4.20 of the $8.65 every player put in.
     const text = oneHand('ggpoker-session.txt', 'RC2104577321').trim();
     const fresh = importHandHistory(text).hands[0];
-    // As Hands were stored before 0025: one number for all the house took.
+    // As Hands were stored before 0025: the Rake and the Fees as one number.
     const { fees, ...stored } = fresh;
-    const before: Hand = { ...stored, rake: fresh.rake + fees! };
-    const withoutText: Hand = { ...before, siteHandId: 'RC2104577399' };
+    const before: StoredHand = { ...stored, rake: fresh.rake + fees };
+    const withoutText: StoredHand = { ...before, siteHandId: 'RC2104577399' };
+    const unreadable: StoredHand = { ...before, siteHandId: 'RC2104577398' };
     try {
       const {
         rows: [identity],
@@ -405,6 +411,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       for (const [hand, history] of [
         [before, text],
         [withoutText, null],
+        [unreadable, 'Not a Hand History any more'],
       ] as const) {
         await client.query(
           `insert into hands (site, site_hand_id, hero_screen_name, hero_seat, importer_id,
@@ -415,7 +422,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
           [
             hand.siteHandId,
             hand.hero.screenName,
-            heroSeat(hand),
+            heroSeat(fromStored(hand)),
             identity.id,
             JSON.stringify(hand),
             history,
@@ -429,8 +436,9 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       });
 
       try {
-        expect(await backfillRake(db)).toBe(2);
-        expect(await backfillRake(db)).toBe(0);
+        // The one whose text no longer reads keeps what it has, and says so.
+        expect(await backfillRake(db)).toEqual({ filled: 3, unreadable: 1 });
+        expect(await backfillRake(db)).toEqual({ filled: 0, unreadable: 0 });
       } finally {
         await db.$client.end();
       }
@@ -452,6 +460,12 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
           content: fresh,
         },
         // 42 × 420 / 865 = 20.39: the Jackpot counts as Rake.
+        {
+          site_hand_id: 'RC2104577398',
+          rake: 42,
+          hero_rake_generated: 20,
+          content: { ...unreadable, fees: 0 },
+        },
         {
           site_hand_id: 'RC2104577399',
           rake: 42,

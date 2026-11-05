@@ -88,7 +88,7 @@ function allInLuck(hand: Hand, replay: Timeline): number | null {
 
   // Rake and Fees come out of every pot alike.
   const total = last.pots.reduce((sum, pot) => sum + pot.amount, 0);
-  const kept = (total - hand.rake - (hand.fees ?? 0)) / total;
+  const kept = (total - hand.rake - hand.fees) / total;
   const shares = potShares(
     name,
     holes,

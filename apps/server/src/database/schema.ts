@@ -5,6 +5,7 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -17,8 +18,33 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import type { Hand } from '../hands/hand.js';
+import { fromStored, type Hand, type StoredHand } from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
+
+/** JSON as node-postgres hands it over: already parsed, or as text. */
+function parsed<T>(value: T | string): T {
+  return typeof value === 'string' ? (JSON.parse(value) as T) : value;
+}
+
+/**
+ * A Hand as jsonb. Read back, one stored before Fees were read apart comes
+ * out with Fees of zero, so no reader has to allow for it.
+ */
+const handJsonb = customType<{ data: Hand; driverData: StoredHand | string }>({
+  dataType: () => 'jsonb',
+  toDriver: (hand) => JSON.stringify(hand),
+  fromDriver: (value) => fromStored(parsed(value)),
+});
+
+/** Hands as jsonb, each read back as `handJsonb` reads one. */
+const handsJsonb = customType<{
+  data: Hand[];
+  driverData: StoredHand[] | string;
+}>({
+  dataType: () => 'jsonb',
+  toDriver: (hands) => JSON.stringify(hands),
+  fromDriver: (value) => parsed(value).map(fromStored),
+});
 
 /**
  * A person as Runout knows them: an Account, signed in with Google or a
@@ -286,7 +312,7 @@ export const hands = pgTable(
     rake: integer('rake'),
     /** The Hero's share of the Rake, by what they put in the pot, as an Amount; null for Hands stored before it was kept. */
     heroRakeGenerated: integer('hero_rake_generated'),
-    content: jsonb('content').$type<Hand>().notNull(),
+    content: handJsonb('content').notNull(),
     /** The Hand History of this one Hand, exactly as it came in; null for Hands stored before it was kept. */
     handHistory: text('hand_history'),
     importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
@@ -384,7 +410,7 @@ export const importPreviews = pgTable(
     importerId: uuid('importer_id')
       .notNull()
       .references(() => identities.id),
-    hands: jsonb('hands').$type<Hand[]>().notNull(),
+    hands: handsJsonb('hands').notNull(),
     /** The Hand History each Hand was read from, in the order of `hands`; null for previews made before it was kept. */
     handHistories: jsonb('hand_histories').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

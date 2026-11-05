@@ -230,7 +230,7 @@ describe('Replay: a Hand Summary of an unusual Hand', () => {
     );
   });
 
-  it('names no rake when the house took only a Fee', () => {
+  it('names no rake when the Hand had a Fee and no Rake', () => {
     // Rake ₮0 and a ₮0.01 Splash Fee: a Fee is never shown as Rake.
     expect(
       handSummary(hand('coinpoker-session.txt', '160064400025'), {
