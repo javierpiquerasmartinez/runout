@@ -45,6 +45,12 @@ export const drawings = {
       <circle {...stroke} cx="12" cy="12" r="3" />
     </>
   ),
+  administration: (
+    <>
+      <path {...stroke} d="M12 3.5 19 6v5.5c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6l7-2.5z" />
+      <path {...stroke} d="m9 12 2.2 2.2L15.2 10" />
+    </>
+  ),
   chevron: <path {...stroke} d="M9.5 5.5 16 12l-6.5 6.5" />,
   expand: <path {...stroke} d="M6 9.5 12 15.5l6-6" />,
   menu: <path {...stroke} d="M4 6.5h16M4 12h16M4 17.5h16" />,

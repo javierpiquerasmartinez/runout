@@ -44,7 +44,7 @@ describe('The Administrator role (e2e)', () => {
       .expect(200);
   });
 
-  it('answers not-found to anyone else: an Account, an anonymous identity, no token', async () => {
+  it('answers not-found to anyone else on every endpoint: an Account, an anonymous identity, no token', async () => {
     const ana = await newAccount(running.httpServer);
     const { body: room } = await request(running.httpServer)
       .post('/api/rooms')
@@ -65,12 +65,21 @@ describe('The Administrator role (e2e)', () => {
       'not-a-token',
       undefined,
     ]) {
-      for (const path of [
-        '/api/admin/invitations',
-        '/api/admin/accounts',
-        '/api/admin/rooms',
-      ]) {
-        const req = request(running.httpServer).get(path);
+      // Every endpoint of the panel, reads and writes alike.
+      for (const [method, path] of [
+        ['get', '/api/admin/invitations'],
+        ['post', '/api/admin/invitations'],
+        ['post', '/api/admin/invitations/x/resend'],
+        ['post', '/api/admin/invitations/x/cancel'],
+        ['get', '/api/admin/accounts'],
+        ['get', '/api/admin/totals'],
+        ['post', '/api/admin/accounts/x/suspension'],
+        ['delete', '/api/admin/accounts/x/suspension'],
+        ['post', '/api/admin/accounts/x/impersonations'],
+        ['get', '/api/admin/rooms'],
+        ['post', '/api/admin/rooms/x/close'],
+      ] as const) {
+        const req = request(running.httpServer)[method](path);
         if (token) req.set('Authorization', `Bearer ${token}`);
         const res = await req.expect(404);
         expect(res.body).toEqual({ reason: 'not-found' });

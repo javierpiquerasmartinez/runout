@@ -3,19 +3,14 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   HttpCode,
   HttpStatus,
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { bearerToken } from '../identity/bearer-token.js';
-import {
-  IdentityService,
-  type Identity,
-  type SignedIn,
-} from '../identity/identity.service.js';
+import type { Identity, SignedIn } from '../identity/identity.service.js';
 import {
   InvitationsService,
   type InvitationSent,
@@ -26,130 +21,95 @@ import {
   type AccountsPage,
   type Totals,
 } from './accounts.service.js';
+import { Administrator, AdministratorGuard } from './administrator.guard.js';
 import { RoomsAdminService } from './rooms-admin.service.js';
 
 /**
  * The Administrator panel's API (ADR 0008). Everyone who isn't an
- * Administrator is answered `not-found`: for them it isn't there.
+ * Administrator is answered `not-found`: for them it isn't there. The guard
+ * covers every endpoint here.
  */
 @Controller('admin')
+@UseGuards(AdministratorGuard)
 export class AdminController {
   constructor(
-    private readonly identities: IdentityService,
     private readonly invitations: InvitationsService,
     private readonly accounts: AccountsService,
     private readonly rooms: RoomsAdminService,
   ) {}
 
-  private administrator(authorization: string | undefined): Promise<Identity> {
-    return this.identities.authenticateAdministrator(
-      bearerToken(authorization),
-    );
-  }
-
   @Get('invitations')
-  async listInvitations(
-    @Headers('authorization') authorization: string | undefined,
-  ): Promise<InvitationView[]> {
-    await this.administrator(authorization);
+  async listInvitations(): Promise<InvitationView[]> {
     return this.invitations.list();
   }
 
   @Post('invitations')
   async invite(
-    @Headers('authorization') authorization: string | undefined,
+    @Administrator() administrator: Identity,
     @Body() body: { email?: unknown; language?: unknown } = {},
   ): Promise<InvitationSent> {
-    return this.invitations.invite(
-      await this.administrator(authorization),
-      body.email,
-      body.language,
-    );
+    return this.invitations.invite(administrator, body.email, body.language);
   }
 
   @Post('invitations/:id/resend')
   @HttpCode(HttpStatus.OK)
   async resend(
-    @Headers('authorization') authorization: string | undefined,
+    @Administrator() administrator: Identity,
     @Param('id') id: string,
   ): Promise<InvitationSent> {
-    return this.invitations.resend(await this.administrator(authorization), id);
+    return this.invitations.resend(administrator, id);
   }
 
   @Post('invitations/:id/cancel')
   @HttpCode(HttpStatus.OK)
-  async cancel(
-    @Headers('authorization') authorization: string | undefined,
-    @Param('id') id: string,
-  ): Promise<InvitationView> {
-    await this.administrator(authorization);
+  async cancel(@Param('id') id: string): Promise<InvitationView> {
     return this.invitations.cancel(id);
   }
 
   @Get('accounts')
   async listAccounts(
-    @Headers('authorization') authorization: string | undefined,
     @Query() query: Record<string, unknown>,
   ): Promise<AccountsPage> {
-    await this.administrator(authorization);
     return this.accounts.list(query);
   }
 
   @Get('totals')
-  async totals(
-    @Headers('authorization') authorization: string | undefined,
-  ): Promise<Totals> {
-    await this.administrator(authorization);
+  async totals(): Promise<Totals> {
     return this.accounts.totals();
   }
 
   @Post('accounts/:id/suspension')
   @HttpCode(HttpStatus.NO_CONTENT)
   async suspend(
-    @Headers('authorization') authorization: string | undefined,
+    @Administrator() administrator: Identity,
     @Param('id') id: string,
   ): Promise<void> {
-    await this.accounts.suspend(await this.administrator(authorization), id);
+    await this.accounts.suspend(administrator, id);
   }
 
   @Delete('accounts/:id/suspension')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async lift(
-    @Headers('authorization') authorization: string | undefined,
-    @Param('id') id: string,
-  ): Promise<void> {
-    await this.administrator(authorization);
+  async lift(@Param('id') id: string): Promise<void> {
     await this.accounts.lift(id);
   }
 
   /** Starts an Impersonation: a Sign-in as that Account, for this Administrator. */
   @Post('accounts/:id/impersonations')
   async impersonate(
-    @Headers('authorization') authorization: string | undefined,
+    @Administrator() administrator: Identity,
     @Param('id') id: string,
   ): Promise<SignedIn> {
-    return this.accounts.impersonate(
-      await this.administrator(authorization),
-      id,
-    );
+    return this.accounts.impersonate(administrator, id);
   }
 
   @Get('rooms')
-  async listRooms(
-    @Headers('authorization') authorization: string | undefined,
-    @Query() query: Record<string, unknown>,
-  ) {
-    await this.administrator(authorization);
+  async listRooms(@Query() query: Record<string, unknown>) {
     return this.rooms.list(query);
   }
 
   @Post('rooms/:code/close')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async closeRoom(
-    @Headers('authorization') authorization: string | undefined,
-    @Param('code') code: string,
-  ): Promise<void> {
-    await this.administrator(authorization);
+  async closeRoom(@Param('code') code: string): Promise<void> {
     await this.rooms.close(code);
   }
 }

@@ -73,7 +73,10 @@
   color: var(--alert-ink);
 }
 
+/* Relative so what is positioned inside, like a visually hidden header, is
+   clipped here too instead of widening the page. */
 .admin-table-wrap {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--color-panel-border);
   border-radius: var(--radius-lg);

@@ -146,7 +146,7 @@ function AccountMenu() {
                 followLink(event)
               }}
             >
-              <Icon name="settings" size={16} />
+              <Icon name="administration" size={16} />
               {t('header.administration')}
             </a>
           )}
