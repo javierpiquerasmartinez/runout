@@ -394,8 +394,8 @@ describe('tableView: Showdown', () => {
     expect(tableView(nineMax, 3, es).payout).toBeNull()
   })
 
-  it('names no rake when the house took only a Fee', () => {
-    // As the split pot, had the house kept a Jackpot and no Rake: the
+  it('names no rake when the Hand had a Fee and no Rake', () => {
+    // As the split pot, had it paid a Jackpot and no Rake: the
     // Hand's rake is the Rake alone, and a Fee is never shown as Rake.
     const states = split.timeline.states.map((state, i, all) =>
       i === all.length - 1 ? { ...state, result: { ...state.result!, rake: 0 } } : state,

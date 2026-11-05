@@ -20,7 +20,7 @@ import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { CLICK_THRESHOLD, graphGesture } from './graphGesture'
 import { libraryHandPath } from './library'
-import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type LinesInBothUnits, type Zoom } from './results'
+import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type Zoom } from './results'
 import './ResultsGraph.css'
 
 /** What the graph adds up in: big blinds always, Amounts only in one currency. */
@@ -92,17 +92,16 @@ export function ResultsGraph({
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
   const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
-  const rakeTotal =
-    unit === 'amount' && results.rakeGenerated.amounts !== null ? results.rakeGenerated.amounts : results.rakeGenerated.bigBlinds
-  const linesOf = (point: LinesInBothUnits): ResultLines =>
-    unit === 'amount' && point.amounts ? point.amounts : point.bigBlinds
+  // As Amounts in the Amounts unit, when they're there; in big blinds otherwise.
+  const inUnit = <T,>(both: { bigBlinds: T; amounts: T | null }): T =>
+    unit === 'amount' && both.amounts !== null ? both.amounts : both.bigBlinds
 
   // Every line starts where it stood before the first Hand drawn: nothing, unless zoomed.
   const data: Point[] = [
-    { hand: results.zoom ? results.zoom.from - 1 : 0, ...linesOf(results.start) },
-    ...results.points.map((point) => ({ hand: point.hand, handId: point.handId, holeCards: point.holeCards, ...linesOf(point) })),
+    { hand: results.zoom ? results.zoom.from - 1 : 0, ...inUnit(results.start) },
+    ...results.points.map((point) => ({ hand: point.hand, handId: point.handId, holeCards: point.holeCards, ...inUnit(point) })),
   ]
-  const totals = linesOf(results.totals)
+  const totals = inUnit(results.totals)
   // Reads the Hand under the pointer the moment it is asked, the way the hover box picks it. Recharts moves
   // the hover box a frame after the mouse, so a press right after a move would otherwise read the Hand before.
   const chart = useRef<HTMLDivElement>(null)
@@ -328,14 +327,14 @@ export function ResultsGraph({
             </dl>
           </div>
           {/* The Hero's share of the Rake: not a line, so no swatch, and never signed. */}
-          <div className="results__win-rates results__rake" role="group" aria-label={t('library.results.rake')} title={t('library.results.rake.hint')}>
-            <span className="results__win-rates-title ro-mono">{t('library.results.rake')}</span>
+          <div className="results__rake" role="group" aria-label={t('library.results.rake.title')} title={t('library.results.rake.hint')}>
+            <span className="results__rake-title ro-mono">{t('library.results.rake.title')}</span>
             <dl>
-              <div className="results__win-rate">
+              <div className="results__rake-figure">
                 <dt>{t('library.results.rake.total')}</dt>
-                <dd className="ro-mono">{formatValue(rakeTotal, unit, results.currency, i18n, 'auto')}</dd>
+                <dd className="ro-mono">{formatValue(inUnit(results.rakeGenerated), unit, results.currency, i18n, 'auto')}</dd>
               </div>
-              <div className="results__win-rate">
+              <div className="results__rake-figure">
                 <dt>{t('library.results.rake.perHundred')}</dt>
                 <dd className="ro-mono">
                   {i18n.formatNumber((results.rakeGenerated.bigBlinds / results.hands) * 100, {

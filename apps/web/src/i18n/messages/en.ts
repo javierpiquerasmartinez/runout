@@ -1005,7 +1005,7 @@ export const en: Messages = {
   'library.results.lines': 'Lines',
   'library.results.winRate': 'BB/100',
   'library.results.winRateHint': 'Win rate: big blinds per 100 hands',
-  'library.results.rake': 'Rake generated',
+  'library.results.rake.title': 'Rake generated',
   'library.results.rake.hint': "Your share of each hand's rake, by what you put in the pot",
   'library.results.rake.total': 'Total',
   'library.results.rake.perHundred': 'BB/100',
