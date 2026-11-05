@@ -42,6 +42,15 @@ export interface Zoom {
   to: number
 }
 
+/**
+ * The Hero's share of the Rake, by what they put in the pot: in big blinds,
+ * and as an Amount only when every Hand shares one currency.
+ */
+export interface RakeGenerated {
+  bigBlinds: number
+  amounts: number | null
+}
+
 /** The running Results over the Hands a Library filter keeps, or over a Zoom of them. */
 export interface Results {
   /** How many Hands the series covers: all the filter keeps, or the Zoom's. */
@@ -54,6 +63,8 @@ export interface Results {
   start: LinesInBothUnits
   /** The stretch the series covers, as the server clamped it, or null for all of it. */
   zoom: Zoom | null
+  /** The Hero's Rake Generated over the Hands the series covers. */
+  rakeGenerated: RakeGenerated
   /** Downsampled by the server; the last one is the series' last Hand. Each keeps the running totals from Hand 1. */
   points: ResultsPoint[]
 }

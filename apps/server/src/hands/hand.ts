@@ -36,13 +36,30 @@ export interface Hand {
    * pots from 1. Hands imported before pots were recorded have no `pot`.
    */
   collected: { screenName: string; amount: number; pot?: number }[];
-  /** Everything the house took: rake, plus any jackpot or other fee. */
+  /** The Rake alone: what the Poker Site charged for the game. */
   rake: number;
+  /**
+   * The Fees: Jackpot, Bingo, Fortune, Tax and Splash Fee, added together,
+   * taken from the pot beside the Rake. What left the pot is the Rake and
+   * the Fees, `rake + fees`.
+   */
+  fees: number;
   /**
    * Money the Poker Site added to the pot that no player put in (a Splash),
    * in the pot from the Initial State. Absent when there was none.
    */
   splash?: number;
+}
+
+/**
+ * A Hand as stored. One stored before Fees were read apart has no `fees`:
+ * its `rake` holds the Rake and the Fees together.
+ */
+export type StoredHand = Omit<Hand, 'fees'> & { fees?: number };
+
+/** The Hand a stored one stands for: one stored without Fees had none. */
+export function fromStored(stored: StoredHand): Hand {
+  return { ...stored, fees: stored.fees ?? 0 };
 }
 
 export type PokerSite = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker';

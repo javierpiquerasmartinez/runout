@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { importHandHistory } from '../import/import.js';
+import { fromStored } from '../hand.js';
 import { heroResult } from './hero-result.js';
 
 function text(name: string) {
@@ -130,6 +131,18 @@ describe('Replay: the Hero’s All-in EV', () => {
     // lose. 41/44 of the ₮7.69 left after rake and Splash Fee is ₮7.17,
     // where the Hero took all ₮7.69.
     expect(heroResult(hand)).toMatchObject({ result: 369, allInEv: 317 });
+  });
+
+  it('counts a stored Hand with no Fees apart as having none', () => {
+    const hand = hands('coinpoker-session.txt').find(
+      (h) => h.siteHandId === '160054200061',
+    )!;
+    // Stored before Fees were read apart: the Rake and the Fees in `rake`.
+    const { fees, ...stored } = hand;
+
+    expect(
+      heroResult(fromStored({ ...stored, rake: hand.rake + fees })),
+    ).toMatchObject({ result: 369, allInEv: 317 });
   });
 
   it('equals the Result when an opponent’s cards weren’t shown', () => {

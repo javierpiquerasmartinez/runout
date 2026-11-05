@@ -93,24 +93,41 @@ export async function storedIds(
 }
 
 /**
- * Gives the stored Hands in `ids` (by key) their Hand History from
- * `histories` (by key), when they have none. A Hand's text, once set, is
- * never replaced: it stays the first text it was read from.
+ * Gives the stored Hands in `ids` (by key) their Hand History from `read`,
+ * when they have none, and rewrites their content, Rake and Rake Generated
+ * as read from that text: stored without it, they had the Fees inside the
+ * Rake. A Hand's text, once set, is never replaced: it stays the first text
+ * it was read from.
  */
-export async function fillHistories(
+export async function fillHistoriesAndReread(
   db: Database | Transaction,
   ids: ReadonlyMap<string, string>,
-  histories: ReadonlyMap<string, string>,
+  { hands: read, histories }: HandsRead,
 ): Promise<void> {
+  const byKey = new Map<string, Hand>();
+  for (const hand of read) {
+    if (!byKey.has(keyOf(hand))) byKey.set(keyOf(hand), hand);
+  }
   const rows = [...ids]
-    .filter(([key]) => histories.has(key))
-    .map(([key, id]) => sql`(${id}::uuid, ${histories.get(key)!})`);
+    .filter(([key]) => histories.has(key) && byKey.has(key))
+    .map(([key, id]) => {
+      const hand = byKey.get(key)!;
+      return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
+        ${hand.rake}::integer, ${heroResult(hand).rakeGenerated}::integer)`;
+    });
   if (rows.length === 0) return;
   const filled = sql`filled`;
   await db
     .update(hands)
-    .set({ handHistory: sql`${filled}.text` })
-    .from(sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text)`)
+    .set({
+      handHistory: sql`${filled}.text`,
+      content: sql`${filled}.content`,
+      rake: sql`${filled}.rake`,
+      heroRakeGenerated: sql`${filled}.rake_generated`,
+    })
+    .from(
+      sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
+    )
     .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)));
 }
 
@@ -118,17 +135,18 @@ export async function fillHistories(
  * Stores the Hands that aren't stored yet, with `importerId` as their
  * Importer and the Hand History each was read from as their text, and
  * returns every Hand's id, in order. A Hand already stored without its text
- * gets it (see `fillHistories`).
+ * gets it (see `fillHistoriesAndReread`).
  */
 export async function storeHands(
   tx: Transaction,
   importerId: string,
-  { hands: read, histories }: HandsRead,
+  handsRead: HandsRead,
   now: Date,
 ): Promise<string[]> {
+  const { hands: read, histories } = handsRead;
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
-  await fillHistories(tx, ids, histories);
+  await fillHistoriesAndReread(tx, ids, handsRead);
   const toStore = read.filter((hand) => !ids.has(keyOf(hand)));
   if (toStore.length > 0) {
     // Another import may have stored one of them a moment ago; the
@@ -137,7 +155,8 @@ export async function storeHands(
       .insert(hands)
       .values(
         toStore.map((hand) => {
-          const { result, allInEv, reachedShowdown } = heroResult(hand);
+          const { result, allInEv, reachedShowdown, rakeGenerated } =
+            heroResult(hand);
           return {
             site: hand.site,
             siteHandId: hand.siteHandId,
@@ -153,6 +172,8 @@ export async function storeHands(
             heroAllInEv: allInEv,
             heroReachedShowdown: reachedShowdown,
             finalPot: finalPot(hand),
+            rake: hand.rake,
+            heroRakeGenerated: rakeGenerated,
             content: hand,
             handHistory: histories.get(keyOf(hand)) ?? null,
             importedAt: now,

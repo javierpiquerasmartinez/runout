@@ -15,7 +15,7 @@ import {
   type Stake,
 } from '../hands/hand.js';
 import {
-  fillHistories,
+  fillHistoriesAndReread,
   keyOf,
   withHistories,
   type HandsRead,
@@ -105,7 +105,7 @@ export class ImportsService {
     const roomId = (await this.roomOf(importer, destination))?.id ?? null;
     const picked = pickedFormat(format);
     const result = importHandHistory(textOf(source), { format: picked });
-    const { histories } = withHistories(result.hands, result.texts);
+    const read = withHistories(result.hands, result.texts);
     let kept: Hand[];
     let previews: HandPreview[];
     let duplicates: Discarded[];
@@ -118,7 +118,7 @@ export class ImportsService {
         result.texts,
       ));
       const inLibrary = await this.library.inLibrary(importer, result.hands);
-      await fillHistories(this.db, inLibrary, histories);
+      await fillHistoriesAndReread(this.db, inLibrary, read);
       previews = kept.map((hand) => handPreview(hand));
     } else {
       const plan = await this.queue.planImport(
@@ -127,7 +127,7 @@ export class ImportsService {
         result.hands,
         result.texts,
       );
-      await fillHistories(this.db, plan.inQueue, histories);
+      await fillHistoriesAndReread(this.db, plan.inQueue, read);
       kept = plan.queued.map(({ hand }) => hand);
       const inLibrary = await this.library.inLibrary(importer, kept);
       previews = plan.queued.map(({ hand, author, heroMatched }) => ({
@@ -147,7 +147,7 @@ export class ImportsService {
         roomId,
         importerId: importer.id,
         hands: kept,
-        handHistories: kept.map((hand) => histories.get(keyOf(hand))!),
+        handHistories: kept.map((hand) => read.histories.get(keyOf(hand))!),
         createdAt: this.clock.now(),
       })
       .returning({ id: importPreviews.id });

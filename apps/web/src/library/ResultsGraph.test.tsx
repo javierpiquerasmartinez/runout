@@ -9,7 +9,8 @@ import { ResultsGraph } from './ResultsGraph'
 
 /**
  * Five Hands at €0.05/€0.10: +€0.31, -€0.30, €0, -€0.10, then +€0.49 at
- * Showdown, an all-in whose All-in EV was +€0.20.
+ * Showdown, an all-in whose All-in EV was +€0.20. The Hero generated €0.13
+ * of Rake over them.
  */
 const euros: Results = {
   hands: 5,
@@ -23,6 +24,7 @@ const euros: Results = {
     amounts: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 },
   },
   zoom: null,
+  rakeGenerated: { bigBlinds: 1.3, amounts: 13 },
   points: [
     {
       hand: 3,
@@ -43,7 +45,7 @@ const euros: Results = {
 
 /**
  * The same Hands zoomed into Hands 2 to 4 of 1.500: -€0.30, €0 and -€0.10,
- * after +€0.31 before the stretch.
+ * after +€0.31 before the stretch, with €0.04 of Rake Generated.
  */
 const zoomed: Results = {
   hands: 3,
@@ -57,6 +59,7 @@ const zoomed: Results = {
     amounts: { result: 31, allInEv: 31, showdown: 0, nonShowdown: 31 },
   },
   zoom: { from: 1200, to: 1202 },
+  rakeGenerated: { bigBlinds: 0.4, amounts: 4 },
   points: [
     {
       hand: 1202,
@@ -95,6 +98,12 @@ function winRate(line: string) {
   return within(box).getByText(line).nextElementSibling?.textContent
 }
 
+/** A row of the Rake Generated box under the Win Rate: "Total" or "BB/100". */
+function rakeGenerated(row: string) {
+  const box = screen.getByRole('group', { name: 'Rake generated' })
+  return within(box).getByText(row).nextElementSibling?.textContent
+}
+
 describe('ResultsGraph', () => {
   it('shows the Win Rate of the Result and of All-in EV, in big blinds per 100 Hands whatever the unit', async () => {
     renderGraph(euros, { ...DEFAULT_PREFERENCES, displayUnit: 'amount' })
@@ -123,6 +132,27 @@ describe('ResultsGraph', () => {
     expect(within(legendEntry('All-in EV')).getByText('+1 BB')).toBeTruthy()
     expect(within(legendEntry('Showdown')).getByText('+4.9 BB')).toBeTruthy()
     expect(within(legendEntry('Non-showdown')).getByText('-0.9 BB')).toBeTruthy()
+  })
+
+  it('shows the Rake Generated in the graph’s unit, and per 100 Hands in big blinds', async () => {
+    renderGraph(euros)
+
+    // 1.3 BB over 5 Hands, unsigned.
+    expect(rakeGenerated('Total')).toBe('1.3 BB')
+    expect(rakeGenerated('BB/100')).toBe('26.0')
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Amount' }))
+
+    expect(rakeGenerated('Total')).toBe('€0.13')
+    expect(rakeGenerated('BB/100')).toBe('26.0')
+  })
+
+  it('says what the Rake Generated is, without a swatch', () => {
+    renderGraph(euros)
+
+    const box = screen.getByRole('group', { name: 'Rake generated' })
+    expect(box.getAttribute('title')).toBe("Your share of each hand's rake, by what you put in the pot")
+    expect(box.querySelector('.results__swatch')).toBeNull()
   })
 
   describe('with the mouse', () => {
@@ -208,6 +238,9 @@ describe('ResultsGraph', () => {
       // -4 BB and -2 BB over 3 Hands.
       expect(winRate('Result')).toBe('-133.3')
       expect(winRate('All-in EV')).toBe('-66.7')
+      // 0.4 BB over 3 Hands.
+      expect(rakeGenerated('Total')).toBe('0.4 BB')
+      expect(rakeGenerated('BB/100')).toBe('13.3')
     })
 
     it('says which Hands it shows, and leaves them from a button', async () => {

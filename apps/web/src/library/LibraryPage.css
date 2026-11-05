@@ -298,13 +298,20 @@
     overflow-y: auto;
   }
 }
+/*
+ * It grows into the viewport's height and shrinks no lower than its side
+ * column (the legend, the Win Rates and the Rake Generated): a shorter
+ * viewport scrolls instead. The chart takes its height from the card and adds
+ * none of its own, or it would hold the card at whatever height it last had.
+ */
 .library__main[data-view='graph'] .results {
   flex-grow: 1;
-  min-height: 360px;
 }
 .library__main[data-view='graph'] .results__body {
   flex-grow: 1;
-  min-height: 0;
+}
+.library__main[data-view='graph'] .results__chart {
+  contain: size;
 }
 .library__main[data-view='graph'] .results__plot {
   height: auto;

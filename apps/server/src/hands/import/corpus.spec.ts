@@ -108,8 +108,9 @@ const CORPUS: CorpusEntry[] = [
           { screenName: 'Hero', cards: ['Ah', '10c'] },
         ],
         collected: [{ screenName: '0be55d17', amount: 823, pot: 0 }],
-        // Everything the house took: rake and the jackpot fee.
-        rake: 42,
+        // The Rake alone; the Jackpot is a Fee.
+        rake: 32,
+        fees: 10,
       },
       {
         siteHandId: 'HD1180452290',
@@ -191,6 +192,7 @@ const CORPUS: CorpusEntry[] = [
         returned: [],
         collected: [{ screenName: 'iMapleAA', amount: 224, pot: 0 }],
         rake: 16,
+        fees: 0,
       },
       {
         siteHandId: '20954312-7732-1757700090',
@@ -198,7 +200,9 @@ const CORPUS: CorpusEntry[] = [
         // Winamax doesn't print uncalled bets; they are worked out.
         returned: [{ screenName: 'iMapleAA', amount: 20 }],
         showdown: false,
+        // "No rake".
         rake: 0,
+        fees: 0,
       },
       {
         siteHandId: '20954312-7733-1757700200',
@@ -239,8 +243,9 @@ const CORPUS: CorpusEntry[] = [
         // CoinPoker prints a Showdown marker even when nobody is left to show.
         showdown: false,
         collected: [{ screenName: 'ebe47eca', amount: 24, pot: 0 }],
-        // The house takes the Splash Fee too.
-        rake: 1,
+        // The Splash Fee is a Fee, not Rake.
+        rake: 0,
+        fees: 1,
       },
       {
         siteHandId: '159855200579',
@@ -251,7 +256,8 @@ const CORPUS: CorpusEntry[] = [
           { screenName: 'f8fd19a3', amount: 9, pot: 0 },
           { screenName: '15bc32e9', amount: 9, pot: 0 },
         ],
-        rake: 2,
+        rake: 1,
+        fees: 1,
       },
       {
         siteHandId: '159855200581',
@@ -259,7 +265,8 @@ const CORPUS: CorpusEntry[] = [
         showdown: true,
         // The Splash goes to the winner without being in what they collected.
         collected: [{ screenName: '24dfed21', amount: 325, pot: 0 }],
-        rake: 18,
+        rake: 17,
+        fees: 1,
       },
       {
         siteHandId: '159855200582',
@@ -274,7 +281,8 @@ const CORPUS: CorpusEntry[] = [
           { screenName: 'fed88a1d', cards: ['2c', 'Ah'] },
           { screenName: 'f66f4b74', cards: ['8s', '9c'] },
         ],
-        rake: 3,
+        rake: 2,
+        fees: 1,
       },
       {
         siteHandId: '160054200061',
@@ -297,7 +305,8 @@ const CORPUS: CorpusEntry[] = [
           },
         ]) as Hand['actions'],
         collected: [{ screenName: 'Hero', amount: 769, pot: 0 }],
-        rake: 41,
+        rake: 40,
+        fees: 1,
       },
       {
         siteHandId: '159950300403',
@@ -363,6 +372,7 @@ describe('Hand History import: the fixture corpus', () => {
       const paid =
         hand.collected.reduce((sum, { amount }) => sum + amount, 0) +
         hand.rake +
+        hand.fees +
         (hand.splash ?? 0);
 
       expect(paid).toBe(overview(hand).finalPot);

@@ -103,6 +103,7 @@ type Play = Pick<
   | 'shown'
   | 'collected'
   | 'rake'
+  | 'fees'
 >;
 
 const AMOUNT = String.raw`(\S+?)`;
@@ -124,8 +125,11 @@ const POST = new RegExp(
 /** Markers that open preflop, or say nothing the Actions don't. */
 const PREFLOP_MARKERS = new Set(['HOLE CARDS', 'ANTE/BLINDS', 'PRE-FLOP']);
 
-/** What the house takes, as the summary's `Total pot` line itemises it. */
-const FEES = /\| (?:Rake|Jackpot|Bingo|Fortune|Tax|Splash Fee) (\S+)/g;
+/**
+ * The Rake and the Fees, as the summary's `Total pot` line itemises them.
+ * "No rake" matches neither: zero of both.
+ */
+const RAKE_AND_FEES = /\| (Rake|Jackpot|Bingo|Fortune|Tax|Splash Fee) (\S+)/g;
 
 /**
  * Everything after the seats: blinds, Actions Street by Street, the board,
@@ -142,6 +146,7 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
     shown: [],
     collected: [],
     rake: 0,
+    fees: 0,
   };
   // Longest first, so a name that prefixes another can't steal its lines.
   const names = seats
@@ -172,7 +177,10 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
 
     if (inSummary) {
       if (line.startsWith('Total pot ')) {
-        for (const fee of line.matchAll(FEES)) play.rake += amount(fee[1]);
+        for (const [, kind, taken] of line.matchAll(RAKE_AND_FEES)) {
+          if (kind === 'Rake') play.rake += amount(taken);
+          else play.fees += amount(taken);
+        }
       }
       continue;
     }

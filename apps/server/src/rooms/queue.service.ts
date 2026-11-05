@@ -23,7 +23,7 @@ import {
   type Stake,
 } from '../hands/hand.js';
 import {
-  fillHistories,
+  fillHistoriesAndReread,
   handKey,
   keyOf,
   storeHands,
@@ -275,8 +275,9 @@ export class QueueService {
     tx: Transaction,
     room: Room,
     importer: Identity,
-    { hands: read, histories }: HandsRead,
+    handsRead: HandsRead,
   ): Promise<QueueEntry[]> {
+    const { hands: read, histories } = handsRead;
     if (read.length === 0) return [];
     const now = this.clock.now();
     // Serialises appends to one Room, so two imports never share a position.
@@ -290,7 +291,7 @@ export class QueueService {
       [],
       tx,
     );
-    await fillHistories(tx, inQueue, histories);
+    await fillHistoriesAndReread(tx, inQueue, handsRead);
     if (queued.length === 0) return [];
 
     const handIds = await storeHands(

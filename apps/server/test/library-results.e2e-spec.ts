@@ -1,5 +1,17 @@
+import { inArray, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
 import request from 'supertest';
-import { freshHandHistory } from './support/hand-histories.js';
+import { inject } from 'vitest';
+import type { Database } from '../src/database/database.js';
+import * as schema from '../src/database/schema.js';
+import { backfillRake } from '../src/hands/rake-backfill.js';
+import {
+  fixture,
+  freshHandHistory,
+  oneHand,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -16,6 +28,7 @@ interface Results {
   totals: { bigBlinds: Lines; amounts: Lines | null };
   start: { bigBlinds: Lines; amounts: Lines | null };
   zoom: { from: number; to: number } | null;
+  rakeGenerated: { bigBlinds: number; amounts: number | null };
   points: {
     hand: number;
     handId: string;
@@ -346,8 +359,310 @@ describe('The Library’s Results (e2e)', () => {
         amounts: null,
       },
       zoom: null,
+      rakeGenerated: { bigBlinds: 0, amounts: null },
       points: [],
     });
     await request(running.httpServer).get('/api/library/results').expect(401);
+  });
+});
+
+/**
+ * CoinPoker Hand #159855200581 seen from the player who called down
+ * (fbfabc70), with a ₮4 Splash in place of ₮0.40 so that counting it would
+ * show. The Hero puts in ₮1.69 of the ₮3.43 the players put in; the Rake is
+ * ₮0.17 and the Splash Fee ₮0.01.
+ */
+function coinPokerSplash(): string {
+  const swapped = oneHand('coinpoker-session.txt', '159855200581')
+    .replaceAll('fbfabc70', 'SWAP')
+    .replaceAll('Hero', 'fbfabc70')
+    .replaceAll('SWAP', 'Hero')
+    .replace('Dealt to fbfabc70 [As 3d]', 'Dealt to fbfabc70')
+    .replace(/Dealt to Hero(?=\r?\n)/, 'Dealt to Hero [5s 7h]')
+    .replace('SPLASH dropped ₮0.40', 'SPLASH dropped ₮4.00')
+    .replace('collected ₮3.25', 'collected ₮7.25')
+    .replace('Total pot ₮3.83', 'Total pot ₮7.43')
+    .replace('won (₮3.25)', 'won (₮7.25)');
+  return withFreshHandIds(swapped);
+}
+
+/*
+ * The Hero's Rake Generated in each Hand is their share of its Rake, by what
+ * they put in the pot: worked out by hand below, to the nearest hundredth.
+ */
+describe('The Rake Generated beside the Library’s Results (e2e)', () => {
+  let running: RunningApp;
+
+  beforeEach(async () => {
+    running = await startApp();
+  });
+
+  afterEach(async () => {
+    await running.close();
+  });
+
+  async function importText(token: string, text: string): Promise<void> {
+    const preview = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text })
+      .expect(201);
+    await request(running.httpServer)
+      .post('/api/library/imports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ previews: [preview.body.id as string] })
+      .expect(201);
+  }
+
+  /** An Account whose Library holds the given Hand Histories. */
+  async function accountWith(...texts: string[]): Promise<{ token: string }> {
+    const account = await newAccount(running.httpServer);
+    for (const text of texts) await importText(account.token, text);
+    return account;
+  }
+
+  async function results(token: string, query: string = ''): Promise<Results> {
+    const res = await request(running.httpServer)
+      .get(`/api/library/results?${query}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return res.body as Results;
+  }
+
+  it('counts the Rake of a GGPoker Hand, not its Jackpot', async () => {
+    // $0.32 of Rake and a $0.10 Jackpot; the Hero put in $4.20 of $8.65:
+    // 32 × 420 / 865 = 15.54.
+    const account = await accountWith(
+      oneHand('ggpoker-session.txt', 'RC2104577321'),
+    );
+
+    expect((await results(account.token)).rakeGenerated).toEqual({
+      bigBlinds: 1.6,
+      amounts: 16,
+    });
+  });
+
+  it('counts nothing for a Winamax Hand with “No rake”', async () => {
+    const account = await accountWith(
+      oneHand('winamax-session.txt', '20954312-7732-1757700090'),
+    );
+
+    expect((await results(account.token)).rakeGenerated).toEqual({
+      bigBlinds: 0,
+      amounts: 0,
+    });
+  });
+
+  it('leaves a CoinPoker Splash and its Splash Fee out', async () => {
+    // 17 × 169 / 343 = 8.38; with the Splash in the pot it would be 3.87,
+    // and with the Splash Fee as Rake 8.87.
+    const account = await accountWith(coinPokerSplash());
+
+    expect((await results(account.token)).rakeGenerated).toEqual({
+      bigBlinds: 0.8,
+      amounts: 8,
+    });
+  });
+
+  it('leaves out an uncalled bet returned to the Hero', async () => {
+    // $3.75 put in, $2.20 of it handed back: 12 × 155 / 320 = 5.81, at
+    // $0.10/$0.25.
+    const account = await accountWith(
+      oneHand('ggpoker-session.txt', 'HD1180452377'),
+    );
+
+    expect((await results(account.token)).rakeGenerated).toEqual({
+      bigBlinds: 0.24,
+      amounts: 6,
+    });
+  });
+
+  it('shares out a side-pot Hand over everything the Hero put in', async () => {
+    // €11.25 of the €31.15 every player put in, across both pots:
+    // 61 × 1125 / 3115 = 22.03.
+    const account = await accountWith(
+      oneHand('winamax-session.txt', '20954312-7733-1757700200'),
+    );
+
+    expect((await results(account.token)).rakeGenerated).toEqual({
+      bigBlinds: 2.2,
+      amounts: 22,
+    });
+  });
+
+  it('counts nothing for a Hand folded preflop with no Rake', async () => {
+    // The Hero folds their big blind; only a ₮0.01 Splash Fee is taken.
+    const account = await accountWith(
+      withFreshHandIds(oneHand('coinpoker-session.txt', '160064400025')),
+    );
+
+    const folded = await results(account.token);
+
+    expect(folded.hands).toBe(1);
+    expect(folded.rakeGenerated).toEqual({ bigBlinds: 0, amounts: 0 });
+  });
+
+  /**
+   * An Account with Winamax's three Hands (€0.08, nothing, €0.22) and then
+   * GGPoker's ($0.16, nothing, $0.06), in played order.
+   */
+  async function mixedAccount(): Promise<{ token: string }> {
+    return accountWith(
+      fixture('winamax-session.txt'),
+      fixture('ggpoker-session.txt'),
+    );
+  }
+
+  it('adds mixed currencies up in big blinds only', async () => {
+    const account = await mixedAccount();
+
+    const all = await results(account.token);
+
+    // 0.8 + 2.2 at €0.10, 1.6 at $0.10 and 0.24 at $0.25.
+    expect(all.currency).toBeNull();
+    expect(all.rakeGenerated).toEqual({ bigBlinds: 4.84, amounts: null });
+  });
+
+  it('follows the filter, and becomes a Zoom’s own', async () => {
+    const account = await mixedAccount();
+
+    const gg = await results(account.token, 'site=ggpoker');
+    const winamaxStart = await results(
+      account.token,
+      'site=winamax&zoomFrom=1&zoomTo=2',
+    );
+    const across = await results(account.token, 'zoomFrom=3&zoomTo=4');
+
+    expect(gg.rakeGenerated).toEqual({ bigBlinds: 1.84, amounts: 22 });
+    expect(winamaxStart.rakeGenerated).toEqual({ bigBlinds: 0.8, amounts: 8 });
+    // Winamax's side-pot Hand and GGPoker's first.
+    expect(across.rakeGenerated).toEqual({ bigBlinds: 3.8, amounts: null });
+  });
+
+  it('counts every Hand toward BB/100, raked or not', async () => {
+    const account = await accountWith(fixture('ggpoker-session.txt'));
+
+    const gg = await results(account.token);
+
+    // One of the three Hands had no Rake: 1.84 × 100 / 3.
+    expect(gg.hands).toBe(3);
+    expect((gg.rakeGenerated.bigBlinds / gg.hands) * 100).toBeCloseTo(61.33, 2);
+  });
+});
+
+/*
+ * Hands stored before 0025 have no Rake nor Rake Generated yet, and one
+ * number in their content for the Rake and the Fees together. The backfill fills
+ * them in; a re-import of one stored without its text works them out again.
+ */
+describe('The Rake Generated of Hands imported before it was kept (e2e)', () => {
+  let running: RunningApp;
+  let db: Database;
+
+  beforeEach(async () => {
+    running = await startApp();
+    db = drizzle({
+      client: new pg.Pool({ connectionString: inject('databaseUrl') }),
+      schema,
+    });
+  });
+
+  afterEach(async () => {
+    await db.$client.end();
+    await running.close();
+  });
+
+  async function importText(token: string, text: string): Promise<void> {
+    const preview = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text })
+      .expect(201);
+    await request(running.httpServer)
+      .post('/api/library/imports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ previews: [preview.body.id as string] })
+      .expect(201);
+  }
+
+  async function rakeGenerated(
+    token: string,
+  ): Promise<Results['rakeGenerated']> {
+    const res = await request(running.httpServer)
+      .get('/api/library/results')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return (res.body as Results).rakeGenerated;
+  }
+
+  /**
+   * Stores `token`'s Hands as they were before 0025: no Rake, no Rake
+   * Generated, and the Splash Fee inside the Rake. Only this test's Hands,
+   * as other files share the database.
+   */
+  async function storeAsBefore(
+    token: string,
+    { withText }: { withText: boolean },
+  ): Promise<void> {
+    const list = await request(running.httpServer)
+      .get('/api/library/hands')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const ids = (list.body.hands as { id: string }[]).map((hand) => hand.id);
+    const content = schema.hands.content;
+    await db
+      .update(schema.hands)
+      .set({
+        rake: null,
+        heroRakeGenerated: null,
+        content: sql`(${content} - 'fees') || jsonb_build_object('rake',
+          (${content}->>'rake')::int + coalesce((${content}->>'fees')::int, 0))`,
+        ...(withText ? {} : { handHistory: null }),
+      })
+      .where(inArray(schema.hands.id, ids));
+  }
+
+  it('counts them once the backfill has run, the Splash Fee as Rake only without a Hand History', async () => {
+    // ₮0.17 of Rake and a ₮0.01 Splash Fee; the Hero put in ₮1.69 of ₮3.43.
+    const withText = await newAccount(running.httpServer);
+    const withoutText = await newAccount(running.httpServer);
+    await importText(withText.token, coinPokerSplash());
+    await importText(withoutText.token, coinPokerSplash());
+    await storeAsBefore(withText.token, { withText: true });
+    await storeAsBefore(withoutText.token, { withText: false });
+    expect(await rakeGenerated(withText.token)).toEqual({
+      bigBlinds: 0,
+      amounts: 0,
+    });
+
+    expect((await backfillRake(db)).filled).toBeGreaterThanOrEqual(2);
+
+    // 17 × 169 / 343 = 8.38, read again from the Hand History.
+    expect(await rakeGenerated(withText.token)).toEqual({
+      bigBlinds: 0.8,
+      amounts: 8,
+    });
+    // 18 × 169 / 343 = 8.87: the Splash Fee counts as Rake.
+    expect(await rakeGenerated(withoutText.token)).toEqual({
+      bigBlinds: 0.9,
+      amounts: 9,
+    });
+    expect((await backfillRake(db)).filled).toBe(0);
+  });
+
+  it('works them out again from the text when a Hand stored without it is imported again', async () => {
+    const account = await newAccount(running.httpServer);
+    const text = coinPokerSplash();
+    await importText(account.token, text);
+    await storeAsBefore(account.token, { withText: false });
+    await backfillRake(db);
+    expect((await rakeGenerated(account.token)).amounts).toBe(9);
+
+    await importText(account.token, text);
+
+    expect(await rakeGenerated(account.token)).toEqual({
+      bigBlinds: 0.8,
+      amounts: 8,
+    });
   });
 });

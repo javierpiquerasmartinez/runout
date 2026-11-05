@@ -104,8 +104,16 @@ A Hand in a Room's Queue that is in nobody's Library. It is discarded, with its 
 ### Results
 
 **Result**:
-What the Hero won or lost in a Hand, after rake.
+What the Hero won or lost in a Hand, after Rake and Fees.
 _Avoid_: Profit, winnings, net
+
+**Rake**:
+What the Poker Site keeps from a Hand's pot as its charge for the game. It leaves out the **Fees**: Jackpot, Bingo, Fortune, Tax, Splash Fee and anything else the Poker Site takes for something other than the game. Wherever Runout says "Rake", it means this alone.
+_Avoid_: Commission, house take (for Rake and Fees together)
+
+**Rake Generated**:
+The Hero's share of a Hand's Rake, in proportion to what they put in the pot (an uncalled bet returned to them doesn't count), over every pot of the Hand together. What a Poker Site's rakeback is worked out from. Shown beside the Results Graph as a total and per 100 Hands, over every Hand the graph shows, raked or not.
+_Avoid_: Rake paid, contributed rake, rakeback
 
 **All-in EV**:
 The Hero's Result with luck taken out: when an all-in leaves no betting before the river with the Hero still in (all-in themselves, or covering whoever is) and every opponent still in has shown their cards, their share of each pot by equity instead of what they actually won. Otherwise it equals the Result.

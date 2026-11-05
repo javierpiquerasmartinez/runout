@@ -86,6 +86,7 @@ beforeEach(() => {
     totals: { bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } },
     start: { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 } },
     zoom: null,
+    rakeGenerated: { bigBlinds: 1.2, amounts: 12 },
     points: [{ hand: 3, handId: 'hand-3', holeCards: ['4s', '10c'], bigBlinds: { result: 3.9, allInEv: 2.5, showdown: 4.9, nonShowdown: -1 }, amounts: { result: 39, allInEv: 25, showdown: 49, nonShowdown: -10 } }],
   }
   pages = {
@@ -693,7 +694,7 @@ describe('LibraryPage', () => {
     it('draws nothing when no Hand matches, inviting to import instead', async () => {
       pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
       const nothing = { bigBlinds: { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }, amounts: null }
-      results = { hands: 0, currency: null, totals: nothing, start: nothing, zoom: null, points: [] }
+      results = { hands: 0, currency: null, totals: nothing, start: nothing, zoom: null, rakeGenerated: { bigBlinds: 0, amounts: null }, points: [] }
       renderGraph()
 
       expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()

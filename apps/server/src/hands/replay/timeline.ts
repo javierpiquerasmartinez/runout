@@ -88,7 +88,7 @@ export interface HandResult {
    * everything and every winner, rather than a guess at who won which.
    */
   pots: PaidPot[];
-  /** What the room kept. */
+  /** The Rake alone: what the room kept for the game, Fees aside. */
   rake: number;
 }
 

@@ -105,37 +105,49 @@
   padding: 0;
   list-style: none;
 }
-/* At the foot of the side column, below the lines it summarises. */
-.results__win-rates {
-  margin-top: auto;
+/* The Win Rates, then the Rake Generated, look alike at the foot of the side column. */
+.results__win-rates,
+.results__rake {
   padding: 12px 8px 0;
   border-top: 1px solid var(--color-divider);
 }
-.results__win-rates-title {
+/* At the foot of the side column, below the lines it summarises. */
+.results__win-rates {
+  margin-top: auto;
+}
+.results__rake {
+  margin-top: 12px;
+}
+.results__win-rates-title,
+.results__rake-title {
   font-size: 10px;
   letter-spacing: 0.14em;
   color: var(--text-muted);
 }
-.results__win-rates dl {
+.results__win-rates dl,
+.results__rake dl {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 8px 0 0;
 }
-.results__win-rate {
+.results__win-rate,
+.results__rake-figure {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   font-size: 13px;
 }
-.results__win-rate dt {
+.results__win-rate dt,
+.results__rake-figure dt {
   display: inline-flex;
   align-items: center;
   gap: 9px;
   color: var(--text-secondary);
 }
-.results__win-rate dd {
+.results__win-rate dd,
+.results__rake-figure dd {
   margin: 0;
   font-weight: 600;
   color: var(--text-primary);

@@ -18,6 +18,12 @@ export interface HeroResult {
   allInEv: number;
   /** Whether the Hero was still in the Hand when it reached Showdown. */
   reachedShowdown: boolean;
+  /**
+   * The Hero's share of the Hand's Rake, by what they put in the pot over
+   * the whole Hand against what every player put in, as an Amount: bets
+   * handed back are left out, and so is a Splash, which no player put in.
+   */
+  rakeGenerated: number;
 }
 
 /**
@@ -31,10 +37,18 @@ export function heroResult(hand: Hand): HeroResult {
   const start = seats.find((seat) => seat.screenName === name)!;
   const end = states.at(-1)!.players.find((p) => p.screenName === name)!;
   const result = end.stack - start.startingStack;
+  const putIn = end.committed;
+  const everyonePutIn = states
+    .at(-1)!
+    .players.reduce((sum, player) => sum + player.committed, 0);
   return {
     result,
     allInEv: result - (allInLuck(hand, replay) ?? 0),
     reachedShowdown: showdown && !end.folded,
+    rakeGenerated:
+      hand.rake === 0 || everyonePutIn === 0
+        ? 0
+        : Math.round((hand.rake * putIn) / everyonePutIn),
   };
 }
 
@@ -72,9 +86,9 @@ function allInLuck(hand: Hand, replay: Timeline): number | null {
     holes.set(screenName, cards);
   }
 
-  // Rake comes out of every pot alike.
+  // Rake and Fees come out of every pot alike.
   const total = last.pots.reduce((sum, pot) => sum + pot.amount, 0);
-  const kept = (total - hand.rake) / total;
+  const kept = (total - hand.rake - hand.fees) / total;
   const shares = potShares(
     name,
     holes,
