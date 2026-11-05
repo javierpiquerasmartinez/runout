@@ -7,7 +7,7 @@ import { loginPath } from './LoginPage'
 import { story, videoTimeAt, type StorySection } from './scrollStory'
 import './LandingPage.css'
 
-/** The landing's clip, re-encoded for scrubbing; the recipe sits next to the files in `public/`. */
+/** The landing's clip, re-encoded for scrubbing by `scripts/landing-trails.sh`. */
 const video = {
   webm: '/landing-trails.webm',
   mp4: '/landing-trails.mp4',
@@ -114,7 +114,7 @@ function ScrubbedVideo() {
   useEffect(() => {
     const element = ref.current
     if (!element) return
-    let cancelled = false
+    const download = new AbortController()
     let frame = 0
     let source: string | null = null
 
@@ -126,22 +126,22 @@ function ScrubbedVideo() {
     }
 
     const url = element.canPlayType('video/webm; codecs="vp9"') ? video.webm : video.mp4
-    fetch(url)
+    fetch(url, { signal: download.signal })
       .then((response) => (response.ok ? response.blob() : null))
       .then((blob) => {
-        if (cancelled || !blob) return
+        if (download.signal.aborted || !blob) return
         source = URL.createObjectURL(blob)
         element.src = source
         element.addEventListener('loadeddata', () => {
-          if (!cancelled) frame = requestAnimationFrame(follow)
+          if (!download.signal.aborted) frame = requestAnimationFrame(follow)
         }, { once: true })
       })
       .catch(() => {
-        // The poster stays; the story still reads without the video.
+        // Left, or failed: the poster stays and the story still reads without the video.
       })
 
     return () => {
-      cancelled = true
+      download.abort()
       cancelAnimationFrame(frame)
       if (source) URL.revokeObjectURL(source)
     }
