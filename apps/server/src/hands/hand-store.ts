@@ -93,24 +93,41 @@ export async function storedIds(
 }
 
 /**
- * Gives the stored Hands in `ids` (by key) their Hand History from
- * `histories` (by key), when they have none. A Hand's text, once set, is
- * never replaced: it stays the first text it was read from.
+ * Gives the stored Hands in `ids` (by key) their Hand History from `read`,
+ * when they have none, with their content, Rake and Rake Generated worked
+ * out again from that text: stored without it, they had the Fees inside the
+ * Rake. A Hand's text, once set, is never replaced: it stays the first text
+ * it was read from.
  */
 export async function fillHistories(
   db: Database | Transaction,
   ids: ReadonlyMap<string, string>,
-  histories: ReadonlyMap<string, string>,
+  { hands: read, histories }: HandsRead,
 ): Promise<void> {
+  const byKey = new Map<string, Hand>();
+  for (const hand of read) {
+    if (!byKey.has(keyOf(hand))) byKey.set(keyOf(hand), hand);
+  }
   const rows = [...ids]
-    .filter(([key]) => histories.has(key))
-    .map(([key, id]) => sql`(${id}::uuid, ${histories.get(key)!})`);
+    .filter(([key]) => histories.has(key) && byKey.has(key))
+    .map(([key, id]) => {
+      const hand = byKey.get(key)!;
+      return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
+        ${hand.rake}::integer, ${heroResult(hand).rakeGenerated}::integer)`;
+    });
   if (rows.length === 0) return;
   const filled = sql`filled`;
   await db
     .update(hands)
-    .set({ handHistory: sql`${filled}.text` })
-    .from(sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text)`)
+    .set({
+      handHistory: sql`${filled}.text`,
+      content: sql`${filled}.content`,
+      rake: sql`${filled}.rake`,
+      heroRakeGenerated: sql`${filled}.rake_generated`,
+    })
+    .from(
+      sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
+    )
     .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)));
 }
 
@@ -128,7 +145,7 @@ export async function storeHands(
 ): Promise<string[]> {
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
-  await fillHistories(tx, ids, histories);
+  await fillHistories(tx, ids, { hands: read, histories });
   const toStore = read.filter((hand) => !ids.has(keyOf(hand)));
   if (toStore.length > 0) {
     // Another import may have stored one of them a moment ago; the

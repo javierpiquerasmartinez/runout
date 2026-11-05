@@ -31,3 +31,14 @@ export function withFreshHandIds(text: string): string {
     },
   );
 }
+
+/** The Hand History of one Hand of a fixture, by its hand ID. */
+export function oneHand(name: string, siteHandId: string): string {
+  const hand = fixture(name)
+    .split(
+      /(?=^(?:Poker Hand #|Winamax Poker|CoinPoker Hand #|PokerStars Hand #))/m,
+    )
+    .find((text) => text.includes(siteHandId));
+  if (!hand) throw new Error(`No Hand ${siteHandId} in ${name}`);
+  return hand;
+}

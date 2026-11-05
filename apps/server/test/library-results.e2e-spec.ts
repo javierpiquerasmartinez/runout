@@ -1,7 +1,15 @@
+import { inArray, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
 import request from 'supertest';
+import { inject } from 'vitest';
+import type { Database } from '../src/database/database.js';
+import * as schema from '../src/database/schema.js';
+import { backfillRake } from '../src/hands/rake-backfill.js';
 import {
   fixture,
   freshHandHistory,
+  oneHand,
   withFreshHandIds,
 } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
@@ -358,17 +366,6 @@ describe('The Library’s Results (e2e)', () => {
   });
 });
 
-/** The Hand History of one Hand of a fixture, by its hand ID. */
-function oneHand(name: string, siteHandId: string): string {
-  const hand = fixture(name)
-    .split(
-      /(?=^(?:Poker Hand #|Winamax Poker|CoinPoker Hand #|PokerStars Hand #))/m,
-    )
-    .find((text) => text.includes(siteHandId));
-  if (!hand) throw new Error(`No Hand ${siteHandId} in ${name}`);
-  return hand;
-}
-
 /**
  * CoinPoker Hand #159855200581 seen from the player who called down
  * (fbfabc70), with a ₮4 Splash in place of ₮0.40 so that counting it would
@@ -550,5 +547,122 @@ describe('The Rake Generated beside the Library’s Results (e2e)', () => {
     // One of the three Hands had no Rake: 1.84 × 100 / 3.
     expect(gg.hands).toBe(3);
     expect((gg.rakeGenerated.bigBlinds / gg.hands) * 100).toBeCloseTo(61.33, 2);
+  });
+});
+
+/*
+ * Hands stored before 0025 have no Rake nor Rake Generated yet, and one
+ * number in their content for everything the house took. The backfill fills
+ * them in; a re-import of one stored without its text works them out again.
+ */
+describe('The Rake Generated of Hands imported before it was kept (e2e)', () => {
+  let running: RunningApp;
+  let db: Database;
+
+  beforeEach(async () => {
+    running = await startApp();
+    db = drizzle({
+      client: new pg.Pool({ connectionString: inject('databaseUrl') }),
+      schema,
+    });
+  });
+
+  afterEach(async () => {
+    await db.$client.end();
+    await running.close();
+  });
+
+  async function importText(token: string, text: string): Promise<void> {
+    const preview = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text })
+      .expect(201);
+    await request(running.httpServer)
+      .post('/api/library/imports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ previews: [preview.body.id as string] })
+      .expect(201);
+  }
+
+  async function rakeGenerated(
+    token: string,
+  ): Promise<Results['rakeGenerated']> {
+    const res = await request(running.httpServer)
+      .get('/api/library/results')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return (res.body as Results).rakeGenerated;
+  }
+
+  /**
+   * Stores `token`'s Hands as they were before 0025: no Rake, no Rake
+   * Generated, and the Splash Fee inside the Rake. Only this test's Hands,
+   * as other files share the database.
+   */
+  async function storeAsBefore(
+    token: string,
+    { withText }: { withText: boolean },
+  ): Promise<void> {
+    const list = await request(running.httpServer)
+      .get('/api/library/hands')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const ids = (list.body.hands as { id: string }[]).map((hand) => hand.id);
+    const content = schema.hands.content;
+    await db
+      .update(schema.hands)
+      .set({
+        rake: null,
+        heroRakeGenerated: null,
+        content: sql`(${content} - 'fees') || jsonb_build_object('rake',
+          (${content}->>'rake')::int + coalesce((${content}->>'fees')::int, 0))`,
+        ...(withText ? {} : { handHistory: null }),
+      })
+      .where(inArray(schema.hands.id, ids));
+  }
+
+  it('counts them once the backfill has run, the Splash Fee as Rake only without a Hand History', async () => {
+    // ₮0.17 of Rake and a ₮0.01 Splash Fee; the Hero put in ₮1.69 of ₮3.43.
+    const withText = await newAccount(running.httpServer);
+    const withoutText = await newAccount(running.httpServer);
+    await importText(withText.token, coinPokerSplash());
+    await importText(withoutText.token, coinPokerSplash());
+    await storeAsBefore(withText.token, { withText: true });
+    await storeAsBefore(withoutText.token, { withText: false });
+    expect(await rakeGenerated(withText.token)).toEqual({
+      bigBlinds: 0,
+      amounts: 0,
+    });
+
+    expect(await backfillRake(db)).toBeGreaterThanOrEqual(2);
+
+    // 17 × 169 / 343 = 8.38, read again from the Hand History.
+    expect(await rakeGenerated(withText.token)).toEqual({
+      bigBlinds: 0.8,
+      amounts: 8,
+    });
+    // 18 × 169 / 343 = 8.87: the Splash Fee counts as Rake.
+    expect(await rakeGenerated(withoutText.token)).toEqual({
+      bigBlinds: 0.9,
+      amounts: 9,
+    });
+    expect(await backfillRake(db)).toBe(0);
+  });
+
+  it('works them out again from the text when a Hand stored without it is imported again', async () => {
+    const account = await newAccount(running.httpServer);
+    const text = coinPokerSplash();
+    await importText(account.token, text);
+    await storeAsBefore(account.token, { withText: false });
+    await backfillRake(db);
+    expect((await rakeGenerated(account.token)).amounts).toBe(9);
+
+    await importText(account.token, text);
+
+    expect(await rakeGenerated(account.token)).toEqual({
+      bigBlinds: 0.8,
+      amounts: 8,
+    });
   });
 });

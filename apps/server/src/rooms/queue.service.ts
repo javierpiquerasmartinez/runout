@@ -290,7 +290,7 @@ export class QueueService {
       [],
       tx,
     );
-    await fillHistories(tx, inQueue, histories);
+    await fillHistories(tx, inQueue, { hands: read, histories });
     if (queued.length === 0) return [];
 
     const handIds = await storeHands(
