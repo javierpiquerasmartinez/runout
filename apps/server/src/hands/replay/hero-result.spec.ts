@@ -132,6 +132,16 @@ describe('Replay: the Hero’s All-in EV', () => {
     expect(heroResult(hand)).toMatchObject({ result: 369, allInEv: 317 });
   });
 
+  it('counts a stored Hand with no Fees apart as having none', () => {
+    const hand = hands('coinpoker-session.txt').find(
+      (h) => h.siteHandId === '160054200061',
+    )!;
+    // Stored before Fees were read apart: the whole house take in `rake`.
+    const stored = { ...hand, rake: hand.rake + hand.fees!, fees: undefined };
+
+    expect(heroResult(stored)).toMatchObject({ result: 369, allInEv: 317 });
+  });
+
   it('equals the Result when an opponent’s cards weren’t shown', () => {
     const mucked = text('pokerstars-edge-cases.txt').replace(
       'Olive6: shows [Jh Js] (a full house, Jacks full of Fives)',

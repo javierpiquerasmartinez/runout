@@ -70,7 +70,7 @@ export interface HandResult {
   /** The hands shown at Showdown; a mucked hand, the Hero's included, isn't one. */
   revealed: { screenName: string; cards: string[]; madeHand: MadeHand }[]
   pots: PaidPot[]
-  /** What the room kept. */
+  /** The Rake alone: what the room kept for the game, Fees aside. */
   rake: number
 }
 

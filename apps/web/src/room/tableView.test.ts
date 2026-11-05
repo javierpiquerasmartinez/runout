@@ -394,6 +394,20 @@ describe('tableView: Showdown', () => {
     expect(tableView(nineMax, 3, es).payout).toBeNull()
   })
 
+  it('names no rake when the house took only a Fee', () => {
+    // As the split pot, had the house kept a Jackpot and no Rake: the
+    // Hand's rake is the Rake alone, and a Fee is never shown as Rake.
+    const states = split.timeline.states.map((state, i, all) =>
+      i === all.length - 1 ? { ...state, result: { ...state.result!, rake: 0 } } : state,
+    )
+    const feeOnly = { ...split, timeline: { ...split.timeline, states } }
+
+    expect(tableView(feeOnly, last(feeOnly), en).payout).toEqual({
+      pots: [{ label: 'Pot', amount: '59.5 BB', winners: ['Hero4 wins 29.8 BB', 'Aspen1 wins 29.7 BB'] }],
+      rake: null,
+    })
+  })
+
   it('keeps a mucked hand face down', () => {
     expect(seat(split, 'Willow4')).toMatchObject({ cards: null, outcome: null, winner: false })
   })

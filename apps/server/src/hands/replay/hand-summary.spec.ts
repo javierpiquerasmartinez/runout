@@ -124,7 +124,7 @@ describe('Replay: a Hand Summary', () => {
         'Flop (21bb) 5♦ 4♦ 2♣: SB bet 5,9bb, Hero call',
         'Turn (32,8bb) T♣: SB check, Hero bet 9bb, SB all-in 24,1bb, Hero call',
         'River (81bb) A♣',
-        'Showdown: SB muestra K♦ T♥ · Hero gana 76,9bb (rake 4,1bb)',
+        'Showdown: SB muestra K♦ T♥ · Hero gana 76,9bb (rake 4bb)',
         'Resultado Hero: +36,9bb',
       ].join('\n'),
     );
@@ -224,8 +224,27 @@ describe('Replay: a Hand Summary of an unusual Hand', () => {
         'Flop (9,5bb) 6♣ 5♣ T♥: BB check, CO bet 4,1bb, BB call',
         'Turn (17,7bb) 2♥: BB check, CO bet 10,3bb, BB call',
         'River (38,3bb) Q♦: BB check, CO check',
-        'Showdown: BB muestra 5♠ 7♥, CO muestra K♠ T♠ · CO gana 36,5bb (rake 1,8bb)',
+        'Showdown: BB muestra 5♠ 7♥, CO muestra K♠ T♠ · CO gana 36,5bb (rake 1,7bb)',
         'Resultado Hero: -0,5bb',
+      ].join('\n'),
+    );
+  });
+
+  it('names no rake when the house took only a Fee', () => {
+    // Rake ₮0 and a ₮0.01 Splash Fee: a Fee is never shown as Rake.
+    expect(
+      handSummary(hand('coinpoker-session.txt', '160064400025'), {
+        language: 'es',
+        timeZone: madrid,
+      }),
+    ).toBe(
+      [
+        'CoinPoker · NL10 (0,05 ₮/0,10 ₮) · 6-max · 19/10/2026',
+        'Hero BB 100bb · K♣ 5♦',
+        '',
+        'Preflop: UTG fold, HJ fold, CO raise 2,5bb, BTN fold, SB fold, Hero fold',
+        'CO gana 2,4bb',
+        'Resultado Hero: -1bb',
       ].join('\n'),
     );
   });

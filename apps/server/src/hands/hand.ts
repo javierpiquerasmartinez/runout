@@ -36,8 +36,14 @@ export interface Hand {
    * pots from 1. Hands imported before pots were recorded have no `pot`.
    */
   collected: { screenName: string; amount: number; pot?: number }[];
-  /** Everything the house took: rake, plus any jackpot or other fee. */
+  /** The Rake alone: what the Poker Site charged for the game. */
   rake: number;
+  /**
+   * Everything else the house took from the pot: Jackpot, Bingo, Fortune,
+   * Tax and Splash Fee, added together. What left the pot is `rake + fees`.
+   * Absent on Hands stored before Fees were read apart: take it as zero.
+   */
+  fees?: number;
   /**
    * Money the Poker Site added to the pot that no player put in (a Splash),
    * in the pot from the Initial State. Absent when there was none.
