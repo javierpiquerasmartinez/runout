@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Re-encodes the landing's source clip into the scrubbable assets next to this file.
+# Re-encodes the landing's source clip into the scrubbable assets in apps/web/public.
 #
-#   bash apps/web/public/landing-trails.sh path/to/source.mp4
+#   bash apps/web/scripts/landing-trails.sh path/to/source.mp4
 #
 # The source is the 20 s, 1280x720, 24 fps clip (H.264 + AAC) that used to sit at
 # apps/web/public/video.mp4; it is kept out of git. The landing seeks the video on
@@ -10,7 +10,7 @@
 set -euo pipefail
 
 SRC="${1:?usage: landing-trails.sh <source.mp4>}"
-OUT="$(cd "$(dirname "$0")" && pwd)"
+OUT="$(cd "$(dirname "$0")/../public" && pwd)"
 PASSLOG="$(mktemp -d)/vp9"
 
 # H.264 fallback: closed GOP of 6, no B-frames, no scene-cut keyframes, faststart.
