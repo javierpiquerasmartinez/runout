@@ -345,4 +345,36 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       await client.end();
     }
   });
+
+  it('keeps Hands stored before Rake Generated, with no Rake yet', async () => {
+    await migrateUpTo('0024_invitations_and_administrators');
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    try {
+      const {
+        rows: [identity],
+      } = await client.query<{ id: string }>(
+        `insert into identities (google_subject, email, created_at)
+         values ('ana-subject', 'ana@example.com', now()) returning id`,
+      );
+      await client.query(
+        `insert into hands (site, site_hand_id, hero_screen_name, hero_seat, importer_id,
+           source_format, played_at, small_blind, big_blind, currency, hero_result,
+           hero_all_in_ev, hero_reached_showdown, final_pot, content, imported_at)
+         values ('pokerstars', '262120750636', 'iMapleAA', 5, $1, 'pokerstars', now(),
+           5, 10, 'EUR', 49, 49, true, 105, '{}', now())`,
+        [identity.id],
+      );
+
+      await migrateWith(MIGRATIONS_FOLDER);
+
+      const { rows } = await client.query<{
+        rake: number | null;
+        hero_rake_generated: number | null;
+      }>('select rake, hero_rake_generated from hands');
+      expect(rows).toEqual([{ rake: null, hero_rake_generated: null }]);
+    } finally {
+      await client.end();
+    }
+  });
 });

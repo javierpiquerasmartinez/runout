@@ -137,7 +137,8 @@ export async function storeHands(
       .insert(hands)
       .values(
         toStore.map((hand) => {
-          const { result, allInEv, reachedShowdown } = heroResult(hand);
+          const { result, allInEv, reachedShowdown, rakeGenerated } =
+            heroResult(hand);
           return {
             site: hand.site,
             siteHandId: hand.siteHandId,
@@ -153,6 +154,8 @@ export async function storeHands(
             heroAllInEv: allInEv,
             heroReachedShowdown: reachedShowdown,
             finalPot: finalPot(hand),
+            rake: hand.rake,
+            heroRakeGenerated: rakeGenerated,
             content: hand,
             handHistory: histories.get(keyOf(hand)) ?? null,
             importedAt: now,

@@ -54,11 +54,22 @@ export interface Results {
   /** The stretch the series covers, clamped to the Hands there are, or null for all of them. */
   zoom: Zoom | null;
   /**
+   * The Hero's Rake Generated over the Hands the series covers. Hands
+   * stored before it was kept add nothing to it.
+   */
+  rakeGenerated: RakeGenerated;
+  /**
    * At most the points asked for, evenly spread over the Hands the series
    * covers in played order; the last one is always its last Hand. Each keeps
    * the running totals from the first Hand the filter keeps.
    */
   points: ResultsPoint[];
+}
+
+/** Rake Generated in both units: big blinds to the hundredth, and as an Amount only when every Hand shares one currency. */
+export interface RakeGenerated {
+  bigBlinds: number;
+  amounts: number | null;
 }
 
 /** Where the lines stand, in both units. */
@@ -72,7 +83,12 @@ type Sums = {
   result_bb: string;
   all_in_ev_bb: string;
   showdown_bb: string;
+  rake_generated: string;
+  rake_generated_bb: string;
 };
+
+/** Where the lines and the Rake Generated stand after one Hand. */
+type Standing = LinesInBothUnits & { rakeGenerated: RakeGenerated };
 
 /** The Results Graph's numbers, answered by the database. */
 @Injectable()
@@ -147,27 +163,40 @@ export class ResultsService {
             )
           order by hand
         `);
-        const series: ResultsPoint[] = running.rows.map(
+        const standings = running.rows.map(
           ({ hand, hand_id, hole_cards, ...sums }) => ({
             hand,
             handId: hand_id,
             holeCards: hole_cards,
-            ...linesOf(sums, oneCurrency),
+            ...standingOf(sums, oneCurrency),
           }),
         );
         const before =
-          series[0]?.hand === from - 1 ? series.shift() : undefined;
-        const start = before
-          ? { bigBlinds: before.bigBlinds, amounts: before.amounts }
-          : zeroLines(oneCurrency);
-        const end = series.at(-1) ?? zeroLines(oneCurrency);
+          standings[0]?.hand === from - 1 ? standings.shift() : undefined;
+        const start: Standing = before ?? zeroStanding(oneCurrency);
+        const end: Standing = standings.at(-1) ?? zeroStanding(oneCurrency);
         return {
           hands: span,
           currency: oneCurrency ? currency : null,
           totals: linesBetween(start, end),
-          start,
+          start: { bigBlinds: start.bigBlinds, amounts: start.amounts },
           zoom,
-          points: series,
+          rakeGenerated: rakeBetween(start.rakeGenerated, end.rakeGenerated),
+          points: standings.map(
+            ({
+              hand,
+              handId,
+              holeCards,
+              bigBlinds,
+              amounts,
+            }): ResultsPoint => ({
+              hand,
+              handId,
+              holeCards,
+              bigBlinds,
+              amounts,
+            }),
+          ),
         };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -188,10 +217,25 @@ function zoomOf(rawFrom: unknown, rawTo: unknown, count: number): Zoom | null {
   return zoom.to - zoom.from + 1 >= 2 ? zoom : null;
 }
 
-/** Every line at nothing, as before the first Hand. */
-function zeroLines(oneCurrency: boolean): LinesInBothUnits {
+/** Every line and the Rake Generated at nothing, as before the first Hand. */
+function zeroStanding(oneCurrency: boolean): Standing {
   const zero = { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 };
-  return { bigBlinds: zero, amounts: oneCurrency ? { ...zero } : null };
+  return {
+    bigBlinds: zero,
+    amounts: oneCurrency ? { ...zero } : null,
+    rakeGenerated: { bigBlinds: 0, amounts: oneCurrency ? 0 : null },
+  };
+}
+
+/** The Rake Generated from one point to a later one, to the hundredth. */
+function rakeBetween(start: RakeGenerated, end: RakeGenerated): RakeGenerated {
+  return {
+    bigBlinds: Math.round((end.bigBlinds - start.bigBlinds) * 100) / 100,
+    amounts:
+      end.amounts !== null && start.amounts !== null
+        ? end.amounts - start.amounts
+        : null,
+  };
 }
 
 /** What each line won or lost from one point to a later one, to the hundredth. */
@@ -217,13 +261,15 @@ function linesBetween(
 }
 
 /**
- * The Result, All-in EV and Showdown Result, as Amounts and in big blinds,
- * summed over the whole set or, with a window, as running sums.
+ * The Result, All-in EV, Showdown Result and Rake Generated, as Amounts and
+ * in big blinds, summed over the whole set or, with a window, as running
+ * sums. A Hand without a Rake Generated adds nothing to it.
  */
 function sums(over: SQL) {
   const result = sql`${hands.heroResult}`;
   const allInEv = sql`${hands.heroAllInEv}`;
   const showdown = sql`case when ${hands.heroReachedShowdown} then ${hands.heroResult} else 0 end`;
+  const rakeGenerated = sql`${hands.heroRakeGenerated}`;
   const bigBlinds = (amount: SQL) =>
     sql`${amount}::numeric / ${hands.bigBlind}`;
   return sql`
@@ -232,11 +278,16 @@ function sums(over: SQL) {
     coalesce(sum(${showdown}) ${over}, 0) as showdown,
     round(coalesce(sum(${bigBlinds(result)}) ${over}, 0), 2) as result_bb,
     round(coalesce(sum(${bigBlinds(allInEv)}) ${over}, 0), 2) as all_in_ev_bb,
-    round(coalesce(sum(${bigBlinds(showdown)}) ${over}, 0), 2) as showdown_bb`;
+    round(coalesce(sum(${bigBlinds(showdown)}) ${over}, 0), 2) as showdown_bb,
+    coalesce(sum(${rakeGenerated}) ${over}, 0) as rake_generated,
+    round(coalesce(sum(${bigBlinds(rakeGenerated)}) ${over}, 0), 2) as rake_generated_bb`;
 }
 
-/** The lines from their sums: the Non-showdown Result is whatever the Showdown Result leaves of the Result. */
-function linesOf(sums: Sums, oneCurrency: boolean): LinesInBothUnits {
+/**
+ * The lines and the Rake Generated from their sums: the Non-showdown Result
+ * is whatever the Showdown Result leaves of the Result.
+ */
+function standingOf(sums: Sums, oneCurrency: boolean): Standing {
   const lines = (
     result: number,
     allInEv: number,
@@ -261,5 +312,9 @@ function linesOf(sums: Sums, oneCurrency: boolean): LinesInBothUnits {
           Number(sums.showdown),
         )
       : null,
+    rakeGenerated: {
+      bigBlinds: Number(sums.rake_generated_bb),
+      amounts: oneCurrency ? Number(sums.rake_generated) : null,
+    },
   };
 }
