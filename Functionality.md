@@ -499,7 +499,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.7 — Sign in with Google.** As a player, I want to sign in with my Google account, so my Hands and results are not tied to one browser.
 
-- Without an Account, `/` shows a short landing: the brand, what Runout is, a **Iniciar sesión** button and a "¿Tienes un código de sala?" link to `/room`.
+- Without an Account, `/` shows a landing told over a video my scroll drives: a golden ribbon waves like a graph, plunges and draws a poker table. Under the brand and its beta tag, it says what Runout does for me (Results, the Library, Rooms), that it is invitation-only, and ends on the lit table with a **Iniciar sesión** button and a "¿Tienes un código de sala?" link to `/room`. If my system asks for reduced motion, I get a still of the table instead of the video.
 - **Iniciar sesión** takes me to `/login`, which says Runout is invitation-only and offers Google, the email and password form (H8.11) and a way back. I can also sign in from a Room's link (H1.4).
 - Signing in on `/login` takes me to my Library, wherever I was sent there from. Signed in, `/` and `/login` take me to my Library too.
 - Google finds my Account by my Google account, or else by its email: an Account created with a password gets Google linked the first time, so both reach the same Account. A Google account whose email another Account already has is refused, never merged.
