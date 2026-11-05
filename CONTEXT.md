@@ -1,6 +1,6 @@
 # Runout
 
-A web room where a small study group replays the same poker hand together, in real time, while talking over their own voice channel. Everything in code and docs is in English; the UI is localised (Spanish by default, English too).
+Where a poker player keeps their own Hands, sees how they are doing and studies them: on their own, or replaying them in sync with others in a Room while they talk over their own voice channel. Everything in code and docs is in English; the UI is localised (Spanish by default, English too).
 
 ## Language
 

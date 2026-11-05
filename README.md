@@ -1,6 +1,6 @@
 # Runout
 
-A web room where a group of poker players review the same hand together, synced in real time. The product spec lives in [Functionality.md](Functionality.md) and the design in [Design.html](Design.html).
+Where a poker player keeps their own hands, sees their results and studies them: on their own, or replaying them in sync with others in a room. The product spec lives in [Functionality.md](Functionality.md) and the design in [Design.html](Design.html).
 
 ## Structure
 

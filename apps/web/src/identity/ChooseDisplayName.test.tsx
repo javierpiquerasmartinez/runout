@@ -34,7 +34,7 @@ describe('FirstDisplayName', () => {
     const session = renderGate({ displayName: null })
 
     expect(screen.queryByText('The screen asked for')).toBeNull()
-    await userEvent.type(screen.getByLabelText('What should the group call you?'), ' Javi ')
+    await userEvent.type(screen.getByLabelText('Your name in rooms'), ' Javi ')
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
 
     await waitFor(() => expect(session.rememberDisplayName).toHaveBeenCalledWith('Javi'))

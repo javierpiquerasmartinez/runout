@@ -29,7 +29,7 @@ export class EmailWriter {
       input.language === 'es'
         ? {
             subject: 'Te han invitado a Runout',
-            lead: `${input.from} te ha invitado a Runout, para repasar manos de póker en grupo.`,
+            lead: `${input.from} te ha invitado a Runout, para guardar tus manos de póker, ver tus resultados y estudiarlas, a solas o en grupo.`,
             action: 'Crear tu cuenta',
             expiry: `El enlace es solo para ti y caduca el ${expires}.`,
             ignore:
@@ -37,7 +37,7 @@ export class EmailWriter {
           }
         : {
             subject: "You're invited to Runout",
-            lead: `${input.from} has invited you to Runout, to review poker hands as a group.`,
+            lead: `${input.from} has invited you to Runout, to keep your poker hands, see your results and study them, on your own or as a group.`,
             action: 'Create your account',
             expiry: `The link is for you only and expires on ${expires}.`,
             ignore:
