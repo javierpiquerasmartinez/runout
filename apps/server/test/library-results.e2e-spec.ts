@@ -5,7 +5,6 @@ import request from 'supertest';
 import { inject } from 'vitest';
 import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
-import { backfillRake } from '../src/hands/rake-backfill.js';
 import {
   fixture,
   freshHandHistory,
@@ -551,9 +550,9 @@ describe('The Rake Generated beside the Library’s Results (e2e)', () => {
 });
 
 /*
- * Hands stored before 0025 have no Rake nor Rake Generated yet, and one
- * number in their content for the Rake and the Fees together. The backfill fills
- * them in; a re-import of one stored without its text works them out again.
+ * Hands stored before 0025 without their Hand History had one number in
+ * their content for the Rake and the Fees together, and the backfill counted
+ * it all as Rake. A re-import of one works them out again from its text.
  */
 describe('The Rake Generated of Hands imported before it was kept (e2e)', () => {
   let running: RunningApp;
@@ -596,13 +595,14 @@ describe('The Rake Generated of Hands imported before it was kept (e2e)', () => 
   }
 
   /**
-   * Stores `token`'s Hands as they were before 0025: no Rake, no Rake
-   * Generated, and the Splash Fee inside the Rake. Only this test's Hands,
-   * as other files share the database.
+   * Stores `token`'s Hands as the backfill left those stored before 0025
+   * without their Hand History: the Splash Fee inside the Rake, and a Rake
+   * Generated worked out from that. Only this test's Hands, as other files
+   * share the database.
    */
-  async function storeAsBefore(
+  async function storeAsBackfilledWithoutText(
     token: string,
-    { withText }: { withText: boolean },
+    heroRakeGenerated: number,
   ): Promise<void> {
     const list = await request(running.httpServer)
       .get('/api/library/hands')
@@ -610,56 +610,30 @@ describe('The Rake Generated of Hands imported before it was kept (e2e)', () => 
       .expect(200);
     const ids = (list.body.hands as { id: string }[]).map((hand) => hand.id);
     const content = schema.hands.content;
+    const rakeAndFees = sql`(${content}->>'rake')::int + (${content}->>'fees')::int`;
     await db
       .update(schema.hands)
       .set({
-        rake: null,
-        heroRakeGenerated: null,
-        content: sql`(${content} - 'fees') || jsonb_build_object('rake',
-          (${content}->>'rake')::int + coalesce((${content}->>'fees')::int, 0))`,
-        ...(withText ? {} : { handHistory: null }),
+        rake: rakeAndFees,
+        heroRakeGenerated,
+        content: sql`${content} || jsonb_build_object('rake', ${rakeAndFees}, 'fees', 0)`,
+        handHistory: null,
       })
       .where(inArray(schema.hands.id, ids));
   }
 
-  it('counts them once the backfill has run, the Splash Fee as Rake only without a Hand History', async () => {
-    // ₮0.17 of Rake and a ₮0.01 Splash Fee; the Hero put in ₮1.69 of ₮3.43.
-    const withText = await newAccount(running.httpServer);
-    const withoutText = await newAccount(running.httpServer);
-    await importText(withText.token, coinPokerSplash());
-    await importText(withoutText.token, coinPokerSplash());
-    await storeAsBefore(withText.token, { withText: true });
-    await storeAsBefore(withoutText.token, { withText: false });
-    expect(await rakeGenerated(withText.token)).toEqual({
-      bigBlinds: 0,
-      amounts: 0,
-    });
-
-    expect((await backfillRake(db)).filled).toBeGreaterThanOrEqual(2);
-
-    // 17 × 169 / 343 = 8.38, read again from the Hand History.
-    expect(await rakeGenerated(withText.token)).toEqual({
-      bigBlinds: 0.8,
-      amounts: 8,
-    });
-    // 18 × 169 / 343 = 8.87: the Splash Fee counts as Rake.
-    expect(await rakeGenerated(withoutText.token)).toEqual({
-      bigBlinds: 0.9,
-      amounts: 9,
-    });
-    expect((await backfillRake(db)).filled).toBe(0);
-  });
-
   it('works them out again from the text when a Hand stored without it is imported again', async () => {
+    // ₮0.17 of Rake and a ₮0.01 Splash Fee; the Hero put in ₮1.69 of ₮3.43.
     const account = await newAccount(running.httpServer);
     const text = coinPokerSplash();
     await importText(account.token, text);
-    await storeAsBefore(account.token, { withText: false });
-    await backfillRake(db);
+    // 18 × 169 / 343 = 8.87: the Splash Fee counted as Rake.
+    await storeAsBackfilledWithoutText(account.token, 9);
     expect((await rakeGenerated(account.token)).amounts).toBe(9);
 
     await importText(account.token, text);
 
+    // 17 × 169 / 343 = 8.38, read again from the Hand History.
     expect(await rakeGenerated(account.token)).toEqual({
       bigBlinds: 0.8,
       amounts: 8,
