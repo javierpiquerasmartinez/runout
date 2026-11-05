@@ -6,13 +6,13 @@ Domain terms (Account, Room, Master, Guest, Hand, Hero, Author, Library, Room Ha
 
 ## Product summary
 
-Runout is a web Room where several players review the same poker Hand at once, synchronised in real time. The Master steps through the Hand Action by Action and everyone else sees exactly the same table on their own screen.
+Runout is where a poker player keeps their own Hands, sees how they are doing and studies them. Their Library holds the Hands they import into it, and its Results Graph shows whether they are winning. The aim is that the Tracker stops being the only place their history lives (ADR 0004).
 
-It is also where each player keeps their own Hands. Their Library holds the Hands they import into it, and its Results Graph shows whether they are winning. The aim is that the Tracker stops being the only place their history lives (ADR 0004).
+They can study those Hands on their own or with others. A Room is where several players review the same Hand at once, synchronised in real time: the Master steps through the Hand Action by Action and everyone else sees exactly the same table on their own screen.
 
-It solves the problem of a group that already meets every week and today shares a screen over Discord or Zoom. That format turns one person into the operator and everyone else into spectators: nobody else can point, go back or bring their own Hands without breaking the session. The picture also arrives compressed, and reading a stack in big blinds off a rescaled video is harder than it looks.
+The Room solves the problem of a group that already meets every week and today shares a screen over Discord or Zoom. That format turns one person into the operator and everyone else into spectators: nobody else can point, go back or bring their own Hands without breaking the session. The picture also arrives compressed, and reading a stack in big blinds off a rescaled video is harder than it looks.
 
-The target user is a study group of three to eight online cash players who already use a Tracker (PokerTracker 4, Hold'em Manager 3 or Hand2Note) and export text Hand Histories. It is not a solver: it computes no strategy. In a Room it organises the conversation the group already has, and in the Library it keeps and measures each player's Hands.
+The target user is an online cash player who already uses a Tracker (PokerTracker 4, Hold'em Manager 3 or Hand2Note) and exports text Hand Histories, often but not always part of a study group of three to eight players. It is not a solver: it computes no strategy. In the Library it keeps and measures each player's Hands, and in a Room it organises the conversation their group already has.
 
 The difference from screen sharing is that the Hand History is data, not pixels: each Participant sees it rendered on their own screen, with their own deck and Display Unit, and the Queue is built by the whole group instead of one person.
 

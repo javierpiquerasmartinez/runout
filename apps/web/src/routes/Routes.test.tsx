@@ -92,7 +92,7 @@ function renderSigningIn(path: string) {
   )
 }
 
-const landing = () => screen.findByRole('heading', { name: /The group, the same hand/ })
+const landing = () => screen.findByRole('heading', { name: /Your hands, your numbers/ })
 const login = () => screen.findByRole('main', { name: 'Sign in' })
 const library = () => screen.findByRole('heading', { name: 'All hands' })
 const libraryGraph = async () => {
@@ -303,7 +303,7 @@ describe('Routes · typing a Room Code', () => {
     renderAt('/room', session())
 
     expect(await screen.findByRole('textbox', { name: 'Room code' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: /The group, the same hand/ })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /Your hands, your numbers/ })).toBeNull()
   })
 
   it("leads from /room to the Room's door", async () => {
