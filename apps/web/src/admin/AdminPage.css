@@ -95,7 +95,14 @@
   text-align: left;
   border-bottom: 1px solid var(--color-divider);
   white-space: nowrap;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+/* Every row is as tall as one holding the compact action buttons, so a row
+   doesn't shrink when its actions go away (a cancelled Invitation). A cell's
+   height is its minimum: rows with a second line still grow. */
+.admin-table td {
+  height: calc(var(--control-compact) + 2 * var(--space-2));
 }
 
 .admin-table th {
