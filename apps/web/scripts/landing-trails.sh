@@ -11,7 +11,9 @@ set -euo pipefail
 
 SRC="${1:?usage: landing-trails.sh <source.mp4>}"
 OUT="$(cd "$(dirname "$0")/../public" && pwd)"
-PASSLOG="$(mktemp -d)/vp9"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+PASSLOG="$WORK/vp9"
 
 # H.264 fallback: closed GOP of 6, no B-frames, no scene-cut keyframes, faststart.
 ffmpeg -y -v error -i "$SRC" -an \
