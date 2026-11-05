@@ -9,8 +9,10 @@
  * Range fill is no accent: it only fills the Combos a Range holds in the Lab's matrix.
  *
  * Dark is the default theme; [data-theme='light'] on <html> switches to the light counterpart.
+ * [data-theme='dark'] on any element keeps that element dark whatever the theme.
  */
-:root {
+:root,
+[data-theme='dark'] {
   color-scheme: dark;
 
   /* Backgrounds and surfaces */

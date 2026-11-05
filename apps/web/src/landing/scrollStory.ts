@@ -9,13 +9,14 @@
 
 export type StorySection = 'opening' | 'results' | 'library' | 'rooms' | 'close'
 
-/** The time of the clip's last frame: 480 frames at 24 fps. */
-export const lastFrame = 479 / 24
+/** When the clip's last frame shows, in seconds: 480 frames at 24 fps. */
+export const lastFrameSeconds = 479 / 24
 
 /**
- * In order down the page: how tall each section is, in viewport heights,
- * and the video time it starts on. The heights are the tuning knob for how
- * unhurried the story feels; the close is one screen, the page's last.
+ * In order down the page: how tall each section is, in screens (the
+ * viewport's height with the browser's bars showing, `svh`), and the video
+ * time it starts on, in seconds. The heights are the tuning knob for how
+ * unhurried the story feels; the close is the page's last screen.
  */
 export const story: readonly { section: StorySection; screens: number; startsAt: number }[] = [
   { section: 'opening', screens: 1.25, startsAt: 0 },
@@ -25,12 +26,18 @@ export const story: readonly { section: StorySection; screens: number; startsAt:
   { section: 'close', screens: 1, startsAt: 12 },
 ]
 
-/** How far the page scrolls, in viewport heights: everything but the last screen. */
-const scrollScreens = story.reduce((total, { screens }) => total + screens, 0) - 1
+/**
+ * How far the story scrolls, in screens: until the close's top reaches the
+ * top of the screen. Progress is measured against this, so the browser's
+ * bars coming and going never stretch it.
+ */
+const scrollScreens = story.slice(0, -1).reduce((total, { screens }) => total + screens, 0)
 
 /**
- * The scroll progress at which a section starts: when its top reaches the
- * middle of the viewport, which is where its copy sits.
+ * The scroll progress at which a section starts: when its top crosses the
+ * middle of the screen. Each section's copy is held on screen while it
+ * scrolls by, so this is halfway between the last copy leaving and this one
+ * arriving, and each phase of the clip plays out centred on its copy.
  */
 export function sectionStart(section: StorySection): number {
   let top = 0
@@ -44,7 +51,7 @@ export function sectionStart(section: StorySection): number {
 /** Each section's start, then the end of the scroll: the knots of the mapping. */
 const knots = [
   ...story.map(({ section, startsAt }) => ({ progress: sectionStart(section), time: startsAt })),
-  { progress: 1, time: lastFrame },
+  { progress: 1, time: lastFrameSeconds },
 ]
 
 /**
@@ -62,5 +69,5 @@ export function videoTimeAt(progress: number): number {
       return from.time + ((p - from.progress) / (to.progress - from.progress)) * (to.time - from.time)
     }
   }
-  return lastFrame
+  return lastFrameSeconds
 }
