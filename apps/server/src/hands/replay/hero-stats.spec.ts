@@ -196,3 +196,201 @@ describe('Replay: the Hero’s Stats', () => {
     ]);
   });
 });
+
+describe('Replay: the Hero’s Flop Check-raise', () => {
+  // Expected values are read by hand off each Hand History.
+  it('counts a check, a bet behind and the Hero’s raise', () => {
+    // Hero checks the flop to 9b7c2e44's bet and raises.
+    const hand = only(oneHand('ggpoker-session.txt', 'HD1180452377'));
+
+    expect(heroStats(hand)['check-raise-flop']).toEqual({
+      opportunities: 1,
+      taken: 1,
+    });
+  });
+
+  it('counts a check and a fold to the bet as a chance passed up', () => {
+    const folded = oneHand('ggpoker-session.txt', 'HD1180452377')
+      .replace(
+        /Hero: raises \$2\.2 to \$3\r?\n9b7c2e44: folds\r?\nUncalled bet \(\$2\.2\) returned to Hero\r?\nHero: shows \[9s 8s\] \(high card Ten\)/,
+        'Hero: folds\nUncalled bet ($0.8) returned to 9b7c2e44',
+      )
+      .replace(
+        'Hero collected $3.08 from pot',
+        '9b7c2e44 collected $1.48 from pot',
+      )
+      .replace('Total pot $3.2', 'Total pot $1.6')
+      .replace(
+        'Seat 1: Hero (big blind) won ($3.08)',
+        'Seat 1: Hero (big blind) folded on the Flop',
+      )
+      .replace(
+        'Seat 3: 9b7c2e44 folded on the Flop',
+        'Seat 3: 9b7c2e44 won ($1.48)',
+      );
+
+    expect(heroStats(only(folded))['check-raise-flop']).toEqual({
+      opportunities: 1,
+      taken: 0,
+    });
+  });
+
+  it('gives no chance when the Hero bets, checks behind, or faces an all-in they can only call', () => {
+    // iMapleAA checks behind on the flop: nobody bets.
+    const checkedThrough = hands('pokerstars-showdown.txt')[0];
+    // Hero6 bets the flop and calls Olive6's raise.
+    const bet = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+    // HeroAI checks to Aces2's all-in, which their Stack only matches.
+    const allIn = only(oneHand('pokerstars-all-ins.txt', '262140000102'));
+
+    expect(
+      [checkedThrough, bet, allIn].map(
+        (hand) => heroStats(hand)['check-raise-flop'],
+      ),
+    ).toEqual([
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+    ]);
+  });
+});
+
+describe('Replay: the Hero’s AFq', () => {
+  // Expected values are read by hand off each Hand History.
+  it('counts every postflop bet, raise, call and fold, and the bets and raises among them', () => {
+    // Hero6 bets the flop, calls the raise, then calls the turn all-in.
+    const hand = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+
+    expect(heroStats(hand).afq).toEqual({ opportunities: 3, taken: 1 });
+  });
+
+  it('leaves checks out and counts a fold', () => {
+    // Hero4 bets the flop, checks the turn and calls the river.
+    const checked = only(oneHand('pokerstars-edge-cases.txt', '262130000104'));
+    // iMapleAA checks the flop and river and calls the turn.
+    const called = hands('pokerstars-showdown.txt')[0];
+    // HeroAI checks the flop and folds to Aces2's bet, given a smaller one.
+    const folded = oneHand('pokerstars-all-ins.txt', '262140000102').replace(
+      /Aces2: bets \$48\.50 and is all-in\r?\nHeroAI: calls \$48\.50 and is all-in[\s\S]*?Aces2 collected \$97\.50 from pot/,
+      'Aces2: bets $1\nHeroAI: folds\nUncalled bet ($1) returned to Aces2\nAces2 collected $2.93 from pot',
+    );
+
+    expect(
+      [checked, called, only(folded)].map((hand) => heroStats(hand).afq),
+    ).toEqual([
+      { opportunities: 2, taken: 1 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 1, taken: 0 },
+    ]);
+  });
+
+  it('counts nothing for a Hand over before the flop, or all in before it', () => {
+    // HeroHU raises and takes the blinds; HeroAI is all in preflop.
+    const preflop = only(oneHand('pokerstars-edge-cases.txt', '262130000101'));
+    const allIn = only(oneHand('pokerstars-all-ins.txt', '262140000101'));
+
+    expect([preflop, allIn].map((hand) => heroStats(hand).afq)).toEqual([
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+    ]);
+  });
+});
+
+describe('Replay: the Hero’s Showdown Stats', () => {
+  // Expected values are read by hand off each Hand History.
+  it('counts a preflop all-in that goes to Showdown as a flop seen', () => {
+    // HeroAI gets it in preflop with Kings and wins at Showdown.
+    const hand = only(oneHand('pokerstars-all-ins.txt', '262140000101'));
+
+    expect(heroStats(hand)).toMatchObject({
+      wtsd: { opportunities: 1, taken: 1 },
+      wsd: { opportunities: 1, taken: 1 },
+      wwsf: { opportunities: 1, taken: 1 },
+    });
+  });
+
+  it('counts a Hand won only through side pots as won at Showdown', () => {
+    // Hero9max loses the main pot to Elm_UTG but takes both side pots.
+    const hand = only(oneHand('pokerstars-edge-cases.txt', '262130000102'));
+
+    expect(heroStats(hand)).toMatchObject({
+      wtsd: { opportunities: 1, taken: 1 },
+      wsd: { opportunities: 1, taken: 1 },
+      wwsf: { opportunities: 1, taken: 1 },
+    });
+  });
+
+  it('counts a split pot as won, and a Showdown lost as not', () => {
+    // Hero4 splits the pot with Aspen1; Hero6 loses to a bigger full house;
+    // Hero loses a preflop all-in with Ace-ten.
+    const split = only(oneHand('pokerstars-edge-cases.txt', '262130000104'));
+    const lost = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+    const allInLost = only(oneHand('ggpoker-session.txt', 'RC2104577321'));
+
+    expect(
+      [split, lost, allInLost].map((hand) => {
+        const { wtsd, wsd, wwsf } = heroStats(hand);
+        return { wtsd, wsd, wwsf };
+      }),
+    ).toEqual([
+      {
+        wtsd: { opportunities: 1, taken: 1 },
+        wsd: { opportunities: 1, taken: 1 },
+        wwsf: { opportunities: 1, taken: 1 },
+      },
+      {
+        wtsd: { opportunities: 1, taken: 1 },
+        wsd: { opportunities: 1, taken: 0 },
+        wwsf: { opportunities: 1, taken: 0 },
+      },
+      {
+        wtsd: { opportunities: 1, taken: 1 },
+        wsd: { opportunities: 1, taken: 0 },
+        wwsf: { opportunities: 1, taken: 0 },
+      },
+    ]);
+  });
+
+  it('counts a flop seen without Showdown, won or folded', () => {
+    // Hero check-raises the flop and takes it there; then, edited, folds.
+    const won = oneHand('ggpoker-session.txt', 'HD1180452377');
+    const folded = won
+      .replace(
+        /Hero: raises \$2\.2 to \$3\r?\n9b7c2e44: folds\r?\nUncalled bet \(\$2\.2\) returned to Hero\r?\nHero: shows \[9s 8s\] \(high card Ten\)/,
+        'Hero: folds\nUncalled bet ($0.8) returned to 9b7c2e44',
+      )
+      .replace(
+        'Hero collected $3.08 from pot',
+        '9b7c2e44 collected $1.48 from pot',
+      );
+
+    expect(
+      [only(won), only(folded)].map((hand) => {
+        const { wtsd, wsd, wwsf } = heroStats(hand);
+        return { wtsd, wsd, wwsf };
+      }),
+    ).toEqual([
+      {
+        wtsd: { opportunities: 1, taken: 0 },
+        wsd: { opportunities: 0, taken: 0 },
+        wwsf: { opportunities: 1, taken: 1 },
+      },
+      {
+        wtsd: { opportunities: 1, taken: 0 },
+        wsd: { opportunities: 0, taken: 0 },
+        wwsf: { opportunities: 1, taken: 0 },
+      },
+    ]);
+  });
+
+  it('gives no chance when the Hero folds before the flop', () => {
+    // iMapleAA folds the big blind to a raise.
+    const hand = hands('pokerstars-session.txt')[0];
+
+    expect(heroStats(hand)).toMatchObject({
+      wtsd: { opportunities: 0, taken: 0 },
+      wsd: { opportunities: 0, taken: 0 },
+      wwsf: { opportunities: 0, taken: 0 },
+    });
+  });
+});
