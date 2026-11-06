@@ -82,6 +82,62 @@ describe('StatsView', () => {
     expect(within(tip).getByText('412 / 1838')).toBeTruthy()
   })
 
+  it('shows the re-raise Stats after PFR in Preflop, each named in full', async () => {
+    renderStats({
+      hands: 40,
+      stats: {
+        ...stats.stats,
+        'three-bet': { opportunities: 40, taken: 3 },
+        'fold-to-three-bet': { opportunities: 8, taken: 5 },
+        'four-bet': { opportunities: 10, taken: 1 },
+        'fold-to-four-bet': { opportunities: 2, taken: 1 },
+        squeeze: { opportunities: 16, taken: 1 },
+      },
+    })
+
+    const preflop = screen.getByRole('group', { name: 'Preflop' })
+    const tiles = within(preflop)
+      .getAllByRole('button')
+      .map((tile) => tile.textContent)
+    expect(tiles).toEqual([
+      'VPIP 22.4%',
+      'PFR 18.3%',
+      '3-bet 7.5%',
+      'Fold to 3-bet 62.5%',
+      '4-bet 10.0%',
+      'Fold to 4-bet 50.0%',
+      'Squeeze 6.3%',
+    ])
+    const names = {
+      '3-bet 7.5%': 'Re-raise the first raise preflop',
+      'Fold to 3-bet 62.5%': 'Fold to a re-raise of your open',
+      '4-bet 10.0%': 'Re-raise a 3-bet',
+      'Fold to 4-bet 50.0%': 'Fold to a re-raise of your 3-bet',
+      'Squeeze 6.3%': 'Re-raise a raise that has been called',
+    }
+    for (const [tile, name] of Object.entries(names)) {
+      await userEvent.hover(screen.getByRole('button', { name: tile }))
+      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
+      await userEvent.unhover(screen.getByRole('button', { name: tile }))
+    }
+  })
+
+  it('names the re-raise Stats in Spanish too', async () => {
+    renderStats(
+      {
+        hands: 1,
+        stats: { ...stats.stats, squeeze: { opportunities: 1, taken: 1 } },
+      },
+      'es',
+    )
+
+    await userEvent.hover(screen.getByRole('button', { name: 'Squeeze 100,0 %' }))
+
+    expect(
+      within(screen.getByRole('tooltip')).getByText('Resube una subida que ya han pagado'),
+    ).toBeTruthy()
+  })
+
   it('says there was no chance rather than “0 / 0”', async () => {
     renderStats({ hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
 

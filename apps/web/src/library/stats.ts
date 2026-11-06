@@ -62,4 +62,19 @@ export interface StatTile {
 export const STAT_TILES: StatTile[] = [
   { key: 'vpip', abbreviation: 'VPIP', group: 'preflop', name: 'library.stats.name.vpip' },
   { key: 'pfr', abbreviation: 'PFR', group: 'preflop', name: 'library.stats.name.pfr' },
+  { key: 'three-bet', abbreviation: '3-bet', group: 'preflop', name: 'library.stats.name.three-bet' },
+  {
+    key: 'fold-to-three-bet',
+    abbreviation: 'Fold to 3-bet',
+    group: 'preflop',
+    name: 'library.stats.name.fold-to-three-bet',
+  },
+  { key: 'four-bet', abbreviation: '4-bet', group: 'preflop', name: 'library.stats.name.four-bet' },
+  {
+    key: 'fold-to-four-bet',
+    abbreviation: 'Fold to 4-bet',
+    group: 'preflop',
+    name: 'library.stats.name.fold-to-four-bet',
+  },
+  { key: 'squeeze', abbreviation: 'Squeeze', group: 'preflop', name: 'library.stats.name.squeeze' },
 ]
