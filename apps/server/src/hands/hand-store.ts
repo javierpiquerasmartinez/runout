@@ -1,8 +1,9 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
-import { hands } from '../database/schema.js';
+import { handStats, hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 import { heroResult } from './replay/hero-result.js';
+import { heroStats, STAT_KEYS } from './replay/hero-stats.js';
 import { finalPot } from './replay/overview.js';
 
 /*
@@ -190,10 +191,34 @@ export async function storeHands(
       })
       .returning(keyColumns);
     for (const row of stored) ids.set(rowKey(row), row.id);
+    await storeStats(
+      tx,
+      stored.map((row) => ({
+        id: row.id,
+        hand: toStore.find((hand) => keyOf(hand) === rowKey(row))!,
+      })),
+    );
     const missing = toStore.filter((hand) => !ids.has(keyOf(hand)));
     if (missing.length > 0) {
       for (const [key, id] of await storedIds(tx, missing)) ids.set(key, id);
     }
   }
   return read.map((hand) => ids.get(keyOf(hand))!);
+}
+
+/**
+ * Writes the Hero's Stat rows of Hands just stored: one per Stat they had
+ * an opportunity at (see `heroStats`).
+ */
+async function storeStats(
+  tx: Transaction,
+  stored: { id: string; hand: Hand }[],
+): Promise<void> {
+  const rows = stored.flatMap(({ id, hand }) => {
+    const stats = heroStats(hand);
+    return STAT_KEYS.filter((stat) => stats[stat].opportunities > 0).map(
+      (stat) => ({ handId: id, stat, ...stats[stat] }),
+    );
+  });
+  if (rows.length > 0) await tx.insert(handStats).values(rows);
 }

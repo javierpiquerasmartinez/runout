@@ -190,6 +190,13 @@
       "when": 1793887449175,
       "tag": "0026_rake_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793964585949,
+      "tag": "0027_hand_stats",
+      "breakpoints": true
     }
   ]
 }

@@ -170,6 +170,7 @@ describe('Room Hands are discarded on close (e2e)', () => {
         marks: 0,
         queueEntries: 0,
         playbacks: 0,
+        stats: 0,
       });
     });
 
@@ -250,6 +251,7 @@ describe('Room Hands are discarded on close (e2e)', () => {
         marks: 0,
         queueEntries: 0,
         playbacks: 0,
+        stats: 0,
       });
     });
   });
@@ -286,6 +288,7 @@ describe('Room Hands are discarded on close (e2e)', () => {
         marks: await count('marks', 'hand_id'),
         queueEntries: await count('queue_entries', 'hand_id'),
         playbacks: await count('playbacks', 'hand_id'),
+        stats: await count('hand_stats', 'hand_id'),
       };
     } finally {
       await client.end();
