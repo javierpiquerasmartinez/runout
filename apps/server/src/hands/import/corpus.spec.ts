@@ -29,6 +29,7 @@ const USD_10_25 = { ...USD_05_10, smallBlind: 10, bigBlind: 25 };
 const EUR_05_10 = { ...USD_05_10, currency: 'EUR' };
 // USDT has no ISO 4217 code: its ticker stands in for one.
 const USDT_05_10 = { ...USD_05_10, currency: 'USDT' };
+const USDT_10_25 = { ...USD_10_25, currency: 'USDT' };
 
 const CORPUS: CorpusEntry[] = [
   {
@@ -330,7 +331,7 @@ const CORPUS: CorpusEntry[] = [
     hands: [
       {
         siteHandId: '172668000015',
-        stake: { ...USDT_05_10, smallBlind: 10, bigBlind: 25 },
+        stake: USDT_10_25,
         posts: [
           { screenName: '85579140', kind: 'ante', amount: 6 },
           { screenName: 'a1607a17', kind: 'ante', amount: 6 },
@@ -341,6 +342,7 @@ const CORPUS: CorpusEntry[] = [
           { screenName: 'a1607a17', kind: 'small-blind', amount: 10 },
           { screenName: 'Hero', kind: 'big-blind', amount: 25 },
         ],
+        returned: [{ screenName: 'a1607a17', amount: 43 }],
         collected: [{ screenName: 'a1607a17', amount: 80, pot: 0 }],
         rake: 4,
         fees: 2,
@@ -348,7 +350,7 @@ const CORPUS: CorpusEntry[] = [
       {
         // Five seats, five antes, and an all-in called short on the river.
         siteHandId: '172684300013',
-        stake: { ...USDT_05_10, smallBlind: 10, bigBlind: 25 },
+        stake: USDT_10_25,
         posts: [
           { screenName: 'ffae5470', kind: 'ante', amount: 6 },
           { screenName: '91d01ae5', kind: 'ante', amount: 6 },
