@@ -62,4 +62,7 @@ export interface StatTile {
 export const STAT_TILES: StatTile[] = [
   { key: 'vpip', abbreviation: 'VPIP', group: 'preflop', name: 'library.stats.name.vpip' },
   { key: 'pfr', abbreviation: 'PFR', group: 'preflop', name: 'library.stats.name.pfr' },
+  { key: 'cold-call', abbreviation: 'Cold Call', group: 'preflop', name: 'library.stats.name.cold-call' },
+  { key: 'fold-bb-to-steal', abbreviation: 'Fold BB to Steal', group: 'preflop', name: 'library.stats.name.fold-bb-to-steal' },
+  { key: 'steal', abbreviation: 'ATS', group: 'preflop', name: 'library.stats.name.steal' },
 ]

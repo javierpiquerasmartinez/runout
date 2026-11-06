@@ -82,6 +82,32 @@ describe('StatsView', () => {
     expect(within(tip).getByText('412 / 1838')).toBeTruthy()
   })
 
+  it('ends Preflop with Cold Call, Fold BB to Steal and Attempt to Steal, each named in full', async () => {
+    renderStats({
+      hands: 1860,
+      stats: {
+        ...stats.stats,
+        'cold-call': { opportunities: 690, taken: 58 },
+        'fold-bb-to-steal': { opportunities: 214, taken: 88 },
+        steal: { opportunities: 432, taken: 171 },
+      },
+    })
+
+    const preflop = screen.getByRole('group', { name: 'Preflop' })
+    const tiles = within(preflop).getAllByRole('button').map((tile) => tile.textContent)
+    expect(tiles.slice(-3)).toEqual(['Cold Call 8.4%', 'Fold BB to Steal 41.1%', 'ATS 39.6%'])
+    const named = [
+      ['Cold Call 8.4%', 'Cold call'],
+      ['Fold BB to Steal 41.1%', 'Fold big blind to steal'],
+      ['ATS 39.6%', 'Attempt to steal'],
+    ]
+    for (const [tile, fullName] of named) {
+      await userEvent.hover(within(preflop).getByRole('button', { name: tile }))
+      expect(within(screen.getByRole('tooltip')).getByText(fullName)).toBeTruthy()
+      await userEvent.unhover(within(preflop).getByRole('button', { name: tile }))
+    }
+  })
+
   it('says there was no chance rather than “0 / 0”', async () => {
     renderStats({ hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
 
