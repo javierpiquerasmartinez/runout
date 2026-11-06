@@ -40,6 +40,26 @@
   .library-hand__side {
     overflow-y: auto;
   }
+  /*
+   * The bar floats over the stage's top corners, which the centred table
+   * leaves empty, so the table gets the whole height above the Street log.
+   * Only its buttons take clicks; the space between them is the table's.
+   */
+  .library-hand__stage {
+    position: relative;
+  }
+  .library-hand__bar {
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    right: 18px;
+    z-index: 1;
+    margin: 0;
+    pointer-events: none;
+  }
+  .library-hand__bar > * {
+    pointer-events: auto;
+  }
   .library-hand .room-stage__play {
     container-type: size;
   }
