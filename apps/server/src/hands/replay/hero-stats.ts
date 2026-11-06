@@ -1,4 +1,5 @@
-import type { Action, Hand, Street } from '../hand.js';
+import type { Action, Hand, Post, Street } from '../hand.js';
+import { positions, type Position } from './positions.js';
 import { timeline, type TableState } from './timeline.js';
 
 /**
@@ -73,6 +74,84 @@ export function heroStats(hand: Hand): HeroStats {
     pfr: {
       opportunities: raised || couldRaise(name, decisions[0].before) ? 1 : 0,
       taken: raised,
+    },
+    ...stealAndBlindStats(hand, decisions),
+  };
+}
+
+type Decision = { action: Action; before: TableState };
+
+/** The Positions a raise folded to them is a steal from. */
+const STEALING: ReadonlySet<Position | undefined> = new Set([
+  'CO',
+  'BTN',
+  'SB',
+]);
+
+/** The posts that put a player's money in at the open's level. */
+const BLINDS: ReadonlySet<Post['kind']> = new Set([
+  'small-blind',
+  'big-blind',
+  'small-and-big-blinds',
+  'straddle',
+]);
+
+/**
+ * Attempt to Steal, Fold BB to Steal and Cold Call, all read off the
+ * Hero's first preflop decision and the Actions before it.
+ */
+function stealAndBlindStats(
+  hand: Hand,
+  decisions: Decision[],
+): Pick<HeroStats, 'steal' | 'fold-bb-to-steal' | 'cold-call'> {
+  const name = hand.hero.screenName;
+  const positionOf = positions(hand);
+  const [first] = decisions;
+  const preflop = hand.actions.filter((action) => action.street === 'preflop');
+  // Others' Actions before the Hero's first decision. A check (a player who
+  // posted a big blind to come in) puts nothing in voluntarily.
+  const before = preflop.slice(
+    0,
+    preflop.findIndex((action) => action.screenName === name),
+  );
+  const putIn = before.filter(
+    (action) => action.type !== 'fold' && action.type !== 'check',
+  );
+  const raising = (action: Action) =>
+    action.type === 'bet' || action.type === 'raise';
+
+  // Folded to the Hero in the cutoff, button or small blind.
+  const stealChance =
+    STEALING.has(positionOf.get(name)) &&
+    putIn.length === 0 &&
+    couldRaise(name, first.before);
+  // The Hero's big blind facing a lone open raise from one of those
+  // Positions: no caller and no re-raise between it and the Hero.
+  const [open] = putIn;
+  const stolenFrom =
+    positionOf.get(name) === 'BB' &&
+    putIn.length === 1 &&
+    raising(open) &&
+    STEALING.has(positionOf.get(open.screenName));
+  // Facing a raise with nothing in voluntarily: this is the Hero's first
+  // decision. A blind (a straddle too) already has money in at the open's
+  // level, so only a 3-bet or more gives them a cold call, as in PT4.
+  const blind = hand.posts.some(
+    (post) => post.screenName === name && BLINDS.has(post.kind),
+  );
+  const coldCallChance = before.filter(raising).length >= (blind ? 2 : 1);
+  return {
+    steal: {
+      opportunities: stealChance ? 1 : 0,
+      taken: stealChance && raising(first.action) ? 1 : 0,
+    },
+    'fold-bb-to-steal': {
+      opportunities: stolenFrom ? 1 : 0,
+      taken: stolenFrom && first.action.type === 'fold' ? 1 : 0,
+    },
+    'cold-call': {
+      opportunities: coldCallChance ? 1 : 0,
+      taken: coldCallChance && first.action.type === 'call' ? 1 : 0,
     },
   };
 }

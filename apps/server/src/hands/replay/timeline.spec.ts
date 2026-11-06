@@ -276,6 +276,48 @@ describe('Replay: a Hand’s Timeline', () => {
     ]);
   });
 
+  describe('with two big blinds posted', () => {
+    // CoinPoker Hand #159855200582: the Hero has the button (seat 2),
+    // f66f4b74 the small blind, fed88a1d the big blind, and 572c791a, new at
+    // the table, posts a big blind out of turn to come in.
+    const [twoBigBlinds] = hands('coinpoker-session.txt').filter(
+      (hand) => hand.siteHandId === '159855200582',
+    );
+    const positionsOf = (hand: typeof twoBigBlinds) =>
+      timeline(hand).seats.map((seat) => [seat.screenName, seat.position]);
+
+    it('names the big blind after the small blind, and the newcomer by their seat', () => {
+      expect(positionsOf(twoBigBlinds)).toEqual([
+        ['9cfbf73f', 'CO'],
+        ['Hero', 'BTN'],
+        ['f66f4b74', 'SB'],
+        ['fed88a1d', 'BB'],
+        ['572c791a', 'UTG'],
+        ['3af1bf82', 'HJ'],
+      ]);
+    });
+
+    it('finds the big blind after the small blind with a dead button, whichever post comes first', () => {
+      // The Hero's seat 2 empty, the button dead on it, and the newcomer's
+      // post listed before the big blind's.
+      const deadButton = {
+        ...twoBigBlinds,
+        seats: twoBigBlinds.seats.map((seat) =>
+          seat.seat === 2 ? { ...seat, sittingOut: true } : seat,
+        ),
+        posts: [...twoBigBlinds.posts].reverse(),
+      };
+
+      expect(positionsOf(deadButton)).toEqual([
+        ['9cfbf73f', 'BTN'],
+        ['f66f4b74', 'SB'],
+        ['fed88a1d', 'BB'],
+        ['572c791a', 'HJ'],
+        ['3af1bf82', 'CO'],
+      ]);
+    });
+  });
+
   it('puts antes and a dead small blind straight into the pot, not in front of the player', () => {
     // The showdown Hand again, now with €0.01 antes and Cedar31lse posting
     // small and big blinds (€0.15, of which €0.05 is dead) to come in.

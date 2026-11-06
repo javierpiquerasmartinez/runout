@@ -228,6 +228,27 @@ describe('The Library’s Stats (e2e)', () => {
     });
   });
 
+  it('sums the steal and blind Stats', async () => {
+    const account = await stockedAccount();
+
+    const { stats: stars } = await stats(account.token, 'site=pokerstars');
+
+    expect({
+      steal: stars.steal,
+      'fold-bb-to-steal': stars['fold-bb-to-steal'],
+      'cold-call': stars['cold-call'],
+    }).toEqual({
+      // Folded to in the cutoff or on the button four times: three raises,
+      // one fold.
+      steal: { opportunities: 4, taken: 3 },
+      // The big blind folded to the button's raise.
+      'fold-bb-to-steal': { opportunities: 1, taken: 1 },
+      // A blind calling the open would not count, and nothing else faced a
+      // raise first.
+      'cold-call': { opportunities: 0, taken: 0 },
+    });
+  });
+
   it('has nothing to count for an empty Library, and nothing for an anonymous identity', async () => {
     const account = await newAccount(running.httpServer);
 
