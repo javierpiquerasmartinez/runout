@@ -323,6 +323,51 @@ const CORPUS: CorpusEntry[] = [
     discarded: ['run-it-twice'],
   },
   {
+    // From NL25 up CoinPoker plays with an ante, written in the header as a
+    // third Amount: `(₮0.10/₮0.25/₮0.06)`. The Stake is the blinds alone.
+    file: 'coinpoker-ante.txt',
+    format: 'coinpoker',
+    hands: [
+      {
+        siteHandId: '172668000015',
+        stake: { ...USDT_05_10, smallBlind: 10, bigBlind: 25 },
+        posts: [
+          { screenName: '85579140', kind: 'ante', amount: 6 },
+          { screenName: 'a1607a17', kind: 'ante', amount: 6 },
+          { screenName: 'Hero', kind: 'ante', amount: 6 },
+          { screenName: '4ca84f30', kind: 'ante', amount: 6 },
+          { screenName: '9c771390', kind: 'ante', amount: 6 },
+          { screenName: '2e870d29', kind: 'ante', amount: 6 },
+          { screenName: 'a1607a17', kind: 'small-blind', amount: 10 },
+          { screenName: 'Hero', kind: 'big-blind', amount: 25 },
+        ],
+        collected: [{ screenName: 'a1607a17', amount: 80, pot: 0 }],
+        rake: 4,
+        fees: 2,
+      },
+      {
+        // Five seats, five antes, and an all-in called short on the river.
+        siteHandId: '172684300013',
+        stake: { ...USDT_05_10, smallBlind: 10, bigBlind: 25 },
+        posts: [
+          { screenName: 'ffae5470', kind: 'ante', amount: 6 },
+          { screenName: '91d01ae5', kind: 'ante', amount: 6 },
+          { screenName: 'Hero', kind: 'ante', amount: 6 },
+          { screenName: '12ce8028', kind: 'ante', amount: 6 },
+          { screenName: '06285290', kind: 'ante', amount: 6 },
+          { screenName: '06285290', kind: 'small-blind', amount: 10 },
+          { screenName: 'ffae5470', kind: 'big-blind', amount: 25 },
+        ],
+        returned: [{ screenName: '12ce8028', amount: 156 }],
+        showdown: true,
+        collected: [{ screenName: '12ce8028', amount: 2518, pot: 0 }],
+        rake: 133,
+        fees: 2,
+      },
+    ],
+    discarded: [],
+  },
+  {
     // PokerTracker 4's forum layout has no exact Amounts to replay.
     file: 'pokertracker-forum.txt',
     format: null,

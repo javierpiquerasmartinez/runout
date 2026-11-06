@@ -34,11 +34,14 @@ export function parseCoinPokerHand(block: string): Hand {
   const header = lines[0].match(HEADER);
   if (!header) throw new Discard('malformed');
   const [, siteHandId, rest] = header;
+  // From NL25 up the stakes carry an ante as a third Amount: `(₮0.10/₮0.25/₮0.06)`.
   const game = rest.match(
-    /^(\S+) \((\S+)\/(\S+)\) (\d{4}\/\d{2}\/\d{2} \d{1,2}:\d{2}:\d{2}) (\w+)$/,
+    /^(\S+) \(([^/\s]+)\/([^/\s]+)(?:\/([^/\s]+))?\) (\d{4}\/\d{2}\/\d{2} \d{1,2}:\d{2}:\d{2}) (\w+)$/,
   );
   if (!game) throw new Discard('malformed');
-  const [, name, smallBlind, bigBlind, time, zone] = game;
+  const [, name, smallBlind, bigBlind, ante, time, zone] = game;
+  // The antes posted are read from their lines; the header's must be an Amount.
+  if (ante !== undefined) amount(ante);
   // Omaha ("PLO") and the rest of CoinPoker's games.
   if (name !== 'NLH') throw unreadGame(rest);
   const table = lines[1]?.match(
