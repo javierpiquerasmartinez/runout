@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { I18nProvider } from '../i18n'
 import type { Locale } from '../i18n/catalogue'
 import { STAT_KEYS, type LibraryStats } from './stats'
+import type { StatCriterion } from './libraryFilter'
 import { StatsView } from './StatsView'
 
 /** 1,860 Hands where the Hero put money in 412 times out of 1,838 and raised 334 times out of 1,830; nothing else counted. */
@@ -16,10 +17,13 @@ const stats: LibraryStats = {
   } as LibraryStats['stats'],
 }
 
+/** Where a Stat's links lead, as the Library would write it. */
+const statHref = ({ key, side }: StatCriterion) => `/library?stat=${key}:${side}`
+
 function renderStats(of: LibraryStats = stats, locale: Locale = 'en') {
   render(
     <I18nProvider initialLocale={locale}>
-      <StatsView stats={of} />
+      <StatsView stats={of} statHref={statHref} />
     </I18nProvider>,
   )
   return screen.getByRole('region', { name: locale === 'en' ? 'Stats' : 'Estadísticas' })
@@ -88,5 +92,44 @@ describe('StatsView', () => {
     await userEvent.hover(screen.getByRole('button', { name: 'PFR —' }))
 
     expect(within(screen.getByRole('tooltip')).getByText('No opportunities')).toBeTruthy()
+  })
+
+  it('links to the Hands behind the opportunities and behind the times taken', async () => {
+    renderStats()
+
+    await userEvent.hover(screen.getByRole('button', { name: 'VPIP 22.4%' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByRole('link', { name: 'Opportunities (1,838)' }).getAttribute('href')).toBe('/library?stat=vpip:opportunity')
+    expect(within(tip).getByRole('link', { name: 'You did it (412)' }).getAttribute('href')).toBe('/library?stat=vpip:taken')
+  })
+
+  it('names the links in the person’s language', async () => {
+    renderStats(stats, 'es')
+
+    await userEvent.hover(screen.getByRole('button', { name: 'PFR 18,3\u00a0%' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByRole('link', { name: 'Oportunidades (1830)' }).getAttribute('href')).toBe('/library?stat=pfr:opportunity')
+    expect(within(tip).getByRole('link', { name: 'Lo hiciste (334)' }).getAttribute('href')).toBe('/library?stat=pfr:taken')
+  })
+
+  it('keeps the tooltip open while the keyboard moves on to its links', async () => {
+    renderStats()
+
+    await userEvent.tab()
+    await userEvent.tab()
+
+    expect(document.activeElement).toBe(within(screen.getByRole('tooltip')).getByRole('link', { name: 'Opportunities (1,838)' }))
+    await userEvent.tab()
+    expect(document.activeElement?.textContent).toBe('You did it (412)')
+  })
+
+  it('has no links where there was no chance', async () => {
+    renderStats({ hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
+
+    await userEvent.hover(screen.getByRole('button', { name: 'PFR —' }))
+
+    expect(within(screen.getByRole('tooltip')).queryByRole('link')).toBeNull()
   })
 })

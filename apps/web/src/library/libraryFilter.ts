@@ -1,4 +1,5 @@
 import type { QueueEntry } from '../room/roomClient'
+import { STAT_KEYS, type StatKey } from './stats'
 
 type Stake = QueueEntry['stake']
 
@@ -24,7 +25,17 @@ export interface LibraryFilter {
   markedOnly: boolean
   /** Tag ids: a Hand carrying any of them is kept. */
   tags: string[]
+  /** Only the Hands behind one Stat: those where the Hero had its opportunity, or took it. */
+  stat: StatCriterion | null
 }
+
+/** One Stat and a side, written `vpip:taken` in the query and the address. */
+export interface StatCriterion {
+  key: StatKey
+  side: StatSide
+}
+
+export type StatSide = 'opportunity' | 'taken'
 
 /** Every Hand of the Library: nothing narrows it, not even the period. */
 export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
@@ -35,6 +46,7 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   stakes: [],
   markedOnly: false,
   tags: [],
+  stat: null,
 }
 
 export type QuickRange = 'today' | 'yesterday' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
@@ -90,6 +102,7 @@ export function differsFromDefault(filter: LibraryFilter, now: Date = new Date()
   const byDefault = defaultLibraryFilter(now)
   return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) => {
     const part = filter[key]
+    if (key === 'stat') return part !== null
     return Array.isArray(part) ? part.length > 0 : part !== byDefault[key]
   })
 }
@@ -139,7 +152,15 @@ export function libraryFilterFromSearch(search: string, now: Date = new Date()):
     stakes: query.getAll('stake').filter(Boolean),
     markedOnly: query.get('marked') === 'true',
     tags: query.getAll('tag').filter(Boolean),
+    stat: statCriterion(query.get('stat')),
   }
+}
+
+/** `vpip:taken` as a Stat criterion; anything else, as an old or hand-edited address may hold, is none. */
+function statCriterion(text: string | null): StatCriterion | null {
+  const [key, side, ...rest] = text?.split(':') ?? []
+  if (rest.length > 0 || !(STAT_KEYS as readonly string[]).includes(key) || (side !== 'opportunity' && side !== 'taken')) return null
+  return { key: key as StatKey, side }
 }
 
 /** The filter's parameters, in one order for the server and the address alike; only the days are written differently. */
@@ -152,6 +173,7 @@ function writeFilter(filter: LibraryFilter, writeDay: (day: string, end: 'from' 
   for (const stake of filter.stakes) query.append('stake', stake)
   if (filter.markedOnly) query.set('marked', 'true')
   for (const tag of filter.tags) query.append('tag', tag)
+  if (filter.stat) query.set('stat', `${filter.stat.key}:${filter.stat.side}`)
   return query
 }
 

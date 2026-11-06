@@ -111,6 +111,7 @@ describe('differsFromDefault', () => {
     expect(differsFromDefault({ ...today, tags: ['t1'] }, now)).toBe(true)
     expect(differsFromDefault({ ...today, sites: [] }, now)).toBe(false)
     expect(differsFromDefault({ ...today, heroes: ['Hero'] }, now)).toBe(true)
+    expect(differsFromDefault({ ...today, stat: { key: 'vpip', side: 'opportunity' } }, now)).toBe(true)
   })
 })
 
@@ -132,13 +133,14 @@ describe('the filter in the address', () => {
     stakes: ['no-limit:5:10:EUR', 'no-limit:25:50:EUR'],
     markedOnly: true,
     tags: ['t1', 't2'],
+    stat: { key: 'three-bet', side: 'taken' },
   }
 
   it('writes the viewer’s days as they are, and reads back the same filter', () => {
     const search = librarySearch(everything, now)
 
     expect(search).toBe(
-      '?from=2026-10-15&to=2026-10-21&site=pokerstars&site=coinpoker&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&stake=no-limit%3A25%3A50%3AEUR&marked=true&tag=t1&tag=t2',
+      '?from=2026-10-15&to=2026-10-21&site=pokerstars&site=coinpoker&hero=iMapleAA&stake=no-limit%3A5%3A10%3AEUR&stake=no-limit%3A25%3A50%3AEUR&marked=true&tag=t1&tag=t2&stat=three-bet%3Ataken',
     )
     expect(libraryFilterFromSearch(search, now)).toEqual(everything)
   })

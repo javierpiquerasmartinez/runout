@@ -1,5 +1,7 @@
-import { useId, useState } from 'react'
+import { useId, useState, type FocusEvent, type MouseEvent } from 'react'
 import { useI18n } from '../i18n'
+import { isPlainClick, navigate } from '../routing'
+import type { StatCriterion, StatSide } from './libraryFilter'
 import { STAT_GROUPS, STAT_TILES, type LibraryStats, type StatCount, type StatTile } from './stats'
 import './StatsView.css'
 
@@ -8,9 +10,10 @@ import './StatsView.css'
  * Library filter keeps, a band of tiles per group (Preflop, Postflop,
  * Showdown), every tile alike whatever its sample. Hovering or focusing a
  * tile names the Stat in full and gives its count, so the person judges the
- * sample themselves.
+ * sample themselves, and links to the Hands behind its opportunities and
+ * behind the times it was taken, at the address `statHref` writes.
  */
-export function StatsView({ stats }: { stats: LibraryStats }) {
+export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: (criterion: StatCriterion) => string }) {
   const { t, formatNumber } = useI18n()
   return (
     <section className="stats" aria-label={t('library.stats.title')}>
@@ -20,13 +23,23 @@ export function StatsView({ stats }: { stats: LibraryStats }) {
       {STAT_GROUPS.map((group) => {
         const tiles = STAT_TILES.filter((tile) => tile.group === group)
         if (tiles.length === 0) return null
-        return <StatBand key={group} title={t(`library.stats.group.${group}`)} tiles={tiles} stats={stats} />
+        return <StatBand key={group} title={t(`library.stats.group.${group}`)} tiles={tiles} stats={stats} statHref={statHref} />
       })}
     </section>
   )
 }
 
-function StatBand({ title, tiles, stats }: { title: string; tiles: StatTile[]; stats: LibraryStats }) {
+function StatBand({
+  title,
+  tiles,
+  stats,
+  statHref,
+}: {
+  title: string
+  tiles: StatTile[]
+  stats: LibraryStats
+  statHref: (criterion: StatCriterion) => string
+}) {
   const titleId = useId()
   return (
     <div className="stats__band" role="group" aria-labelledby={titleId}>
@@ -35,7 +48,7 @@ function StatBand({ title, tiles, stats }: { title: string; tiles: StatTile[]; s
       </h2>
       <div className="stats__tiles">
         {tiles.map((tile) => (
-          <StatTileView key={tile.key} tile={tile} count={stats.stats[tile.key]} />
+          <StatTileView key={tile.key} tile={tile} count={stats.stats[tile.key]} statHref={statHref} />
         ))}
       </div>
     </div>
@@ -43,7 +56,15 @@ function StatBand({ title, tiles, stats }: { title: string; tiles: StatTile[]; s
 }
 
 /** One Stat: its abbreviation and percentage, with its tooltip under it on hover or focus. */
-function StatTileView({ tile, count }: { tile: StatTile; count: StatCount }) {
+function StatTileView({
+  tile,
+  count,
+  statHref,
+}: {
+  tile: StatTile
+  count: StatCount
+  statHref: (criterion: StatCriterion) => string
+}) {
   const { t, formatNumber } = useI18n()
   const tipId = useId()
   const [hovered, setHovered] = useState(false)
@@ -53,16 +74,29 @@ function StatTileView({ tile, count }: { tile: StatTile; count: StatCount }) {
   const value = none
     ? '—'
     : formatNumber(count.taken / count.opportunities, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  // Focus moving from the tile to the tooltip's links keeps it open.
+  const leave = (event: FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
+  }
+  const follow = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!isPlainClick(event)) return
+    event.preventDefault()
+    navigate(event.currentTarget.getAttribute('href')!)
+  }
+  const link = (side: StatSide, n: number) => (
+    <a className="stats__tip-link" href={statHref({ key: tile.key, side })} onClick={follow}>
+      {t(`library.stats.link.${side}`, { count: formatNumber(n) })}
+    </a>
+  )
   return (
-    <div className="stats__stat" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <button
-        type="button"
-        className="stats__tile"
-        data-empty={none || undefined}
-        aria-describedby={open ? tipId : undefined}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-      >
+    <div
+      className="stats__stat"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={leave}
+    >
+      <button type="button" className="stats__tile" data-empty={none || undefined} aria-describedby={open ? tipId : undefined}>
         <span className="stats__abbr ro-mono">{tile.abbreviation}</span>{' '}
         <span className="stats__value ro-serif">{value}</span>
       </button>
@@ -75,6 +109,12 @@ function StatTileView({ tile, count }: { tile: StatTile; count: StatCount }) {
                 ? t('library.stats.noChance')
                 : t('library.stats.count', { taken: formatNumber(count.taken), opportunities: formatNumber(count.opportunities) })}
             </span>
+            {!none && (
+              <span className="stats__tip-links">
+                {link('opportunity', count.opportunities)}
+                {link('taken', count.taken)}
+              </span>
+            )}
           </div>
         </div>
       )}
