@@ -250,6 +250,31 @@ describe('The Library’s Stats (e2e)', () => {
     expect(all.stats['three-bet']).toEqual({ opportunities: 0, taken: 0 });
   });
 
+  it('sums the C-bet Stats', async () => {
+    const account = await stockedAccount();
+
+    // iMapleAA bets one flop as the preflop raiser (12:28:26) and checks two
+    // back (12:28:29, and the showdown Hand); every turn bet is the caller's.
+    const all = await stats(account.token, 'site=pokerstars');
+
+    const none = { opportunities: 0, taken: 0 };
+    expect({
+      flop: all.stats['cbet-flop'],
+      foldFlop: all.stats['fold-to-cbet-flop'],
+      turn: all.stats['cbet-turn'],
+      foldTurn: all.stats['fold-to-cbet-turn'],
+      river: all.stats['cbet-river'],
+      foldRiver: all.stats['fold-to-cbet-river'],
+    }).toEqual({
+      flop: { opportunities: 3, taken: 1 },
+      foldFlop: none,
+      turn: none,
+      foldTurn: none,
+      river: none,
+      foldRiver: none,
+    });
+  });
+
   it('has nothing to count for an empty Library, and nothing for an anonymous identity', async () => {
     const account = await newAccount(running.httpServer);
 

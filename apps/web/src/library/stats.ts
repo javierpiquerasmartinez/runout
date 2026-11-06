@@ -62,12 +62,18 @@ export interface StatTile {
 export const STAT_TILES: StatTile[] = [
   { key: 'vpip', abbreviation: 'VPIP', group: 'preflop', name: 'library.stats.name.vpip' },
   { key: 'pfr', abbreviation: 'PFR', group: 'preflop', name: 'library.stats.name.pfr' },
+  { key: 'cbet-flop', abbreviation: 'Flop C-bet', group: 'postflop', name: 'library.stats.name.cbet-flop' },
+  { key: 'fold-to-cbet-flop', abbreviation: 'Fold to Flop C-bet', group: 'postflop', name: 'library.stats.name.fold-to-cbet-flop' },
   {
     key: 'check-raise-flop',
     abbreviation: 'Flop Check-raise',
     group: 'postflop',
     name: 'library.stats.name.check-raise-flop',
   },
+  { key: 'cbet-turn', abbreviation: 'Turn C-bet', group: 'postflop', name: 'library.stats.name.cbet-turn' },
+  { key: 'fold-to-cbet-turn', abbreviation: 'Fold to Turn C-bet', group: 'postflop', name: 'library.stats.name.fold-to-cbet-turn' },
+  { key: 'cbet-river', abbreviation: 'River C-bet', group: 'postflop', name: 'library.stats.name.cbet-river' },
+  { key: 'fold-to-cbet-river', abbreviation: 'Fold to River C-bet', group: 'postflop', name: 'library.stats.name.fold-to-cbet-river' },
   /** Counted per postflop Action, not per Hand: its opportunities can outnumber the Hands. */
   { key: 'afq', abbreviation: 'AFq', group: 'postflop', name: 'library.stats.name.afq' },
   { key: 'wwsf', abbreviation: 'WWSF', group: 'showdown', name: 'library.stats.name.wwsf' },
