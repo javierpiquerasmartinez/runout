@@ -9,6 +9,7 @@ import { fakeSession } from '../test/fakeSession'
 import { libraryOpenedFrom, type LibraryHand, type LibraryPage as Page } from './library'
 import { LibraryPage } from './LibraryPage'
 import type { Results } from './results'
+import { STAT_KEYS, type LibraryStats } from './stats'
 
 const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryHand => ({
   id,
@@ -52,6 +53,9 @@ let requests: string[]
 let results: Results
 /** Results Graph reads, as `/api/library/results?site=pokerstars`. */
 let resultsRequests: string[]
+let stats: LibraryStats
+/** Stats reads, as `/api/library/stats?site=pokerstars`. */
+let statsRequests: string[]
 /** Mark changes, as `PUT /api/library/hands/h1/mark`. */
 let markRequests: string[]
 /** Tag changes, as `PUT /api/library/tags/t1/hands {"handIds":["h1"]}`. */
@@ -72,6 +76,15 @@ let addReply: () => Response
 beforeEach(() => {
   requests = []
   resultsRequests = []
+  statsRequests = []
+  stats = {
+    hands: 3,
+    stats: {
+      ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }])),
+      vpip: { opportunities: 3, taken: 1 },
+      pfr: { opportunities: 2, taken: 1 },
+    } as LibraryStats['stats'],
+  }
   markRequests = []
   tagRequests = []
   tagReply = () => Response.json({})
@@ -122,6 +135,10 @@ beforeEach(() => {
           page.hands = page.hands.map((hand) => (hand.id === handId ? { ...hand, marked } : hand))
         }
         return Response.json({ handId, marked })
+      }
+      if (url.startsWith('/api/library/stats')) {
+        statsRequests.push(url)
+        return Response.json(stats)
       }
       if (url.startsWith('/api/library/results')) {
         resultsRequests.push(url)
@@ -299,6 +316,73 @@ describe('LibraryPage', () => {
       expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
     })
 
+    it('switches to the Stats at /library/stats', async () => {
+      renderLibrary()
+      const view = await screen.findByRole('radiogroup', { name: 'View' })
+      await screen.findByRole('table', { name: 'All hands' })
+      expect(statsRequests).toEqual([])
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Stats' }))
+
+      expect(window.location.pathname).toBe('/library/stats')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+      expect(within(shown).getByText('3 hands')).toBeTruthy()
+      expect(within(shown).getByRole('button', { name: 'VPIP 33.3%' })).toBeTruthy()
+      expect(screen.queryByRole('table', { name: 'All hands' })).toBeNull()
+      expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+      expect(within(view).getByRole('radio', { name: 'Stats' }).getAttribute('aria-checked')).toBe('true')
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Graph' }))
+
+      expect(window.location.pathname).toBe('/library/graph')
+      expect(await screen.findByRole('region', { name: 'Results' })).toBeTruthy()
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+    })
+
+    it('keeps the filter when switching to the Stats and back', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await choose(filters, 'Poker site', 'PokerStars')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Stats' }))
+
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?site=pokerstars'))
+      await choose(filters, 'Hero', 'iMapleAA')
+      await waitFor(() => expect(statsRequests.at(-1)).toBe(`/api/library/stats?${lastFilterQuery()}`))
+      expect(lastFilterQuery()).toBe('site=pokerstars&hero=iMapleAA')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Hands' }))
+
+      expect(window.location.pathname).toBe('/library')
+      expect(window.location.search).toBe('?period=all&site=pokerstars&hero=iMapleAA')
+      expect(chosen(filters, 'Hero')).toBe('iMapleAA')
+    })
+
+    it('shows no Stats for an empty Library, inviting to import instead', async () => {
+      pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
+      stats = { ...stats, hands: 0 }
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+
+      expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()
+      await waitFor(() => expect(statsRequests).toHaveLength(1))
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+    })
+
+    it('shows no Stats when the filters match nothing, offering to clear them', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await screen.findByRole('region', { name: 'Stats' })
+      pages['1'] = { ...pages['1'], total: 0, hands: [] }
+      stats = { ...stats, hands: 0 }
+
+      await choose(filters, 'Hero', 'Hero')
+
+      expect(await screen.findByText('No hands match these filters.')).toBeTruthy()
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
+    })
+
     it('starts again from the first page when the address brings another filter', async () => {
       renderLibrary()
       await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
@@ -326,7 +410,7 @@ describe('LibraryPage', () => {
       expect(chosen(filters, 'Poker site')).toBe('PokerStars')
     })
 
-    it.each(['/library', '/library/graph'])('reads the filter back from the address at %s, as after a reload', async (path) => {
+    it.each(['/library', '/library/graph', '/library/stats'])('reads the filter back from the address at %s, as after a reload', async (path) => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?period=all&hero=iMapleAA&marked=true&tag=t2`)
 
       const filters = await screen.findByRole('group', { name: 'Filters' })

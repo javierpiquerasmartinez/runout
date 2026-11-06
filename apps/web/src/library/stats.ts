@@ -1,0 +1,65 @@
+import type { MessageKey } from '../i18n/catalogue'
+
+/*
+ * The Hero's Stats over the Hands a Library filter keeps, as the server's
+ * `GET /library/stats` sends them (ADR 0001: no shared code).
+ */
+
+/** Every Stat's stable key, in the order the server sends and the Stats view shows them. */
+export const STAT_KEYS = [
+  'vpip',
+  'pfr',
+  'three-bet',
+  'fold-to-three-bet',
+  'four-bet',
+  'fold-to-four-bet',
+  'squeeze',
+  'cold-call',
+  'fold-bb-to-steal',
+  'steal',
+  'cbet-flop',
+  'fold-to-cbet-flop',
+  'check-raise-flop',
+  'cbet-turn',
+  'fold-to-cbet-turn',
+  'cbet-river',
+  'fold-to-cbet-river',
+  'afq',
+  'wwsf',
+  'wtsd',
+  'wsd',
+] as const
+
+export type StatKey = (typeof STAT_KEYS)[number]
+
+/** How many times the Hero had the chance to make a Stat's decision, and how many times they made it. */
+export interface StatCount {
+  opportunities: number
+  taken: number
+}
+
+export interface LibraryStats {
+  /** How many Hands the Stats cover: as many as the list and the Results Graph count. */
+  hands: number
+  /** Every Stat, zero opportunities where the Hero never had the chance. */
+  stats: Record<StatKey, StatCount>
+}
+
+export type StatGroup = 'preflop' | 'postflop' | 'showdown'
+
+export const STAT_GROUPS: StatGroup[] = ['preflop', 'postflop', 'showdown']
+
+export interface StatTile {
+  key: StatKey
+  /** As players write it, the same in every language. */
+  abbreviation: string
+  group: StatGroup
+  /** Its full name, translated, for the tooltip. */
+  name: MessageKey
+}
+
+/** The Stats the view shows, in its order. A Stat the server doesn't work out yet has no tile. */
+export const STAT_TILES: StatTile[] = [
+  { key: 'vpip', abbreviation: 'VPIP', group: 'preflop', name: 'library.stats.name.vpip' },
+  { key: 'pfr', abbreviation: 'PFR', group: 'preflop', name: 'library.stats.name.pfr' },
+]
