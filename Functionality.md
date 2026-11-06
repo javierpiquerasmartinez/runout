@@ -370,11 +370,11 @@ What makes a session outlive itself. Notes are in the MVP because without them t
 
 ## E7 · Library and Results
 
-The Library is a person's own repository: the Hands they imported into it, whatever their Hero, and nothing else (ADR 0004). Hands seen in other people's Rooms are not in it. It has two views over the same filtered Hands: the list of Hands, and the Results Graph, which shows how they are doing over time. The Library needs an Account.
+The Library is a person's own repository: the Hands they imported into it, whatever their Hero, and nothing else (ADR 0004). Hands seen in other people's Rooms are not in it. It has three views over the same filtered Hands: the list of Hands, the Results Graph, which shows how they are doing over time, and the Hero's Stats, which show how they play. The Library needs an Account.
 
 **H7.1 — Import into my Library.** As a player, I want to import Hand History files or pasted text into my Library, so my Hands are kept in Runout.
 
-- **Importar manos** sits in the Library's title row, on the right, so it is always in sight without scrolling, in both views. An empty Library also invites me to import.
+- **Importar manos** sits in the Library's title row, on the right, so it is always in sight without scrolling, in every view. An empty Library also invites me to import.
 - The flow, preview and 20 MB limit are those of Room import (E2). I can import several files one after the other to bring in more than 20 MB.
 - The preview marks each Hand as new, already in my Library, or discarded with its reason. Hands already in my Library are not added twice, so my Results are not inflated.
 - Hands whose Hero is not me (a friend's export, a forum Hand) are accepted, as are CoinPoker Hands whose Hero is written `Hero`.
@@ -386,21 +386,22 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - The list view, at `/library`, lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands. Its headers sort it another way (H7.10).
 - Each row shows the hole cards, the Positions involved, Hero, Poker Site, Stake, final pot, Final Street, Showdown, my Result, the date and my Tags.
 - The title row says how many Hands match the current filters. With Hands selected, the selection actions (tag, remove, add to the Room) appear in it next to **Importar manos**.
-- A **Manos | Gráfica** switch below the filters moves between the list and the Results Graph (H7.5). Each view has its own address, so the back button and links return to the view I was on.
+- A **Manos | Gráfica | Estadísticas** switch below the filters moves between the list, the Results Graph (H7.5) and the Stats (H7.11). Each view has its own address, so the back button and links return to the view I was on.
 - An empty Library, or filters that match nothing, show an empty state that invites me to import, whichever view I'm on.
 - Anonymous Participants cannot reach a Library: without an Account, its addresses send me to `/login`.
 
 **H7.3 — Filter my Library.** As a player, I want to narrow my Library, to find a specific kind of spot or stretch of play.
 
-- The filters sit on top, above both views. The side column, with **Todas las manos**, **Marcadas** and my Tags, stays in both views.
+- The filters sit on top, above every view. The side column, with **Todas las manos**, **Marcadas** and my Tags, stays in every view.
 - Filters are period (from–to dates in my time zone, plus quick ranges: today, this week from Monday, this month, this year, all time), Poker Site, Hero, Stake, Marked only and Tags (any of the chosen ones).
 - I can tick several Poker Sites, Heroes and Stakes: a Hand matching any of a filter's values is kept. Closed, a filter names its first value and how many more ("PokerStars +2"). A filter with more than 8 options offers a search.
 - The filters' dropdowns are drawn in Runout's style, not the browser's or the operating system's, and work by keyboard.
-- The period starts as today, in both views and when picking Hands for a Room. Clearing the filters goes back to today.
+- The period starts as today, in every view and when picking Hands for a Room. Clearing the filters goes back to today.
 - When only the period leaves nothing to show, the Library says so ("Ninguna mano hoy.") and offers **Ver todo**.
 - Poker Site, Hero, Stake and Tag options are those present in my Library.
+- A Stat's links (H7.11) add one more criterion: the Hands where the Hero had that Stat's chance, or those where they took it. It shows among the filters as a chip naming the Stat and the side ("3-bet · lo hiciste"), and removing the chip drops it. There is no other way to set it for now.
 - Filters combine and clear in one go.
-- The same filters apply to the list and the Results Graph, so both always describe the same Hands. Switching views keeps them.
+- The same filters, the Stat criterion included, apply to the list, the Results Graph and the Stats, so all three always describe the same Hands. Switching views keeps them.
 - The filters are part of the address, so a reload or a shared link keeps them. A bare `/library` is today's Hands, whatever day it is opened. Links from when each filter took one value still open the same Hands.
 - The page of the list is part of the address too.
 
@@ -458,6 +459,25 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - Hands that tie go newest first, whichever the direction.
 - The sort is part of the address, next to the filters, so a reload, a shared link or switching views keeps it; the default, newest first, leaves the address bare. Changing the sort goes back to the first page with nothing selected. Changing the filters keeps the sort.
 - The Results Graph always runs in played order. Picking Hands for a Room sorts the same way.
+
+**H7.11 — See my Stats.** As a player, I want my Stats as a view of my Library, so I see how I play and find my leaks after a session, without a separate Tracker.
+
+- It is the Library's Estadísticas view, at `/library/stats`, over the Hands the filters keep (H7.3). Above the Stats it says how many Hands they cover, the same count as the list and the Results Graph for the same filters.
+- It shows 21 Stats in three bands, in this order:
+  - **Preflop:** VPIP, PFR, 3-bet, Fold to 3-bet, 4-bet, Fold to 4-bet, Squeeze, Cold Call, Fold BB to Steal, ATS (Attempt to Steal).
+  - **Postflop:** Flop C-bet, Fold to Flop C-bet, Flop Check-raise, Turn C-bet, Fold to Turn C-bet, River C-bet, Fold to River C-bet, AFq.
+  - **Showdown:** WWSF, WTSD, W$SD.
+- Each Stat is a tile with its abbreviation, the same in Spanish and English as players use them, and its percentage with one decimal ("22,4 %"). A Stat I never had the chance to make shows "—", never a 0 %. Every tile looks the same whatever its sample: nothing is dimmed and there is no threshold.
+- Hovering or focusing a tile shows its full name in my language and how many times I made the decision out of how many I could ("57 / 312"), so I judge the sample myself. A Stat with no chance says so instead.
+- The tooltip links to the Hands behind the number: **Oportunidades (312)** and **Lo hiciste (57)** open the list on the Hands where I had the chance, or where I took it, with that Stat criterion's chip and every other filter and the sort kept (H7.3). The list then counts as many Hands as the link said, and going back returns to the Stats. With the chip on, the Results Graph and the Stats narrow to those Hands too, even if that makes the Stat I came from read 100 %.
+- Every Stat but AFq counts at most one chance per Hand. AFq counts my postflop bets and raises out of my postflop bets, raises, calls and folds, Action by Action; checks don't count.
+- The definitions follow PokerTracker 4's, with Runout's own rules where no Tracker documents the case (straddles, antes, walks, short all-ins), as [docs/research/hero-stats.md](docs/research/hero-stats.md) records them.
+- Stats are worked out when a Hand is imported and go when it is removed from my Library. Hands imported before the Stats existed count too, once worked out on the server (`db:backfill-stats`); a Hand stored without its Hand History gets its Stats again when it is imported again.
+- They are the Hero's Stats only, Hero by Hero as the Hero filter picks, and they ignore the Results Graph's Zoom.
+- They are post-session only, over my Library. Runout never shows them at a table while playing: it is not a HUD ([docs/research/hud-feasibility.md](docs/research/hud-feasibility.md)).
+- On a desktop screen every Stat fits under the filters without scrolling; on a phone the Stats scroll for now.
+- An empty Library, or filters that match nothing, show the same empty states as the other views (H7.2).
+- It follows my Theme and the app's visual style.
 
 ## E8 · Accounts and preferences
 
@@ -754,7 +774,7 @@ Deliberately out, with the reason:
 | Background import of whole Tracker databases beyond 20 MB per upload | A separate component; several uploads cover it for now |
 | Tournaments and tables of more than nine seats | The group plays cash; widening it without need complicates the table |
 | Aggregate group statistics | Not enough data until sessions accumulate |
-| Statistics such as VPIP, PFR or winrate by Position, and currency conversion | The Results Graph answers the first question, whether you are winning; the rest can follow |
+| Opponent Stats, a HUD over a poker client, Stats broken down by Position or by kind of pot, and currency conversion | The Hero's own Stats over their Library (H7.11) answer how they play; a HUD can't be built in a browser and carries Poker Site policy risk, and the rest can follow |
 | Keeping Room Hands after their Room closes | A Hand that should last is imported into a Library before the Room closes |
 | Sharing a Library or Tags with other people | A Library is one person's repository; the group shares Hands through Rooms |
 | Sign-in methods other than Google and a password, two-factor authentication, changing an Account's email | Google and a password cover a small invited group |
