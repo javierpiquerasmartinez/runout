@@ -13,7 +13,8 @@ import { readHand } from './stars-layout.js';
 /*
  * CoinPoker's layout, as its client exports it: PokerStars' with its own
  * header, Amounts in USDT ("₮0.10"), the Hero written as `Hero` and every
- * opponent under a name hashed for that Hand alone. A few lines are its own:
+ * opponent under a name hashed for that Hand alone. From NL25 up the header
+ * also carries the ante, posted as PokerStars does. A few lines are its own:
  * `ALLIN`, `RETURN`, a `STRADDLE` posted after the hole cards and a Splash
  * (`SPLASH dropped`). They are rewritten as PokerStars writes them before
  * the rest is read.
@@ -34,13 +35,18 @@ export function parseCoinPokerHand(block: string): Hand {
   const header = lines[0].match(HEADER);
   if (!header) throw new Discard('malformed');
   const [, siteHandId, rest] = header;
+  // From NL25 up the header adds an ante to the blinds as a third Amount:
+  // `(₮0.10/₮0.25/₮0.06)`.
   const game = rest.match(
-    /^(\S+) \((\S+)\/(\S+)\) (\d{4}\/\d{2}\/\d{2} \d{1,2}:\d{2}:\d{2}) (\w+)$/,
+    /^(\S+) \(([^/\s]+)\/([^/\s]+)(?:\/([^/\s]+))?\) (\d{4}\/\d{2}\/\d{2} \d{1,2}:\d{2}:\d{2}) (\w+)$/,
   );
   if (!game) throw new Discard('malformed');
-  const [, name, smallBlind, bigBlind, time, zone] = game;
+  const [, name, smallBlind, bigBlind, ante, time, zone] = game;
   // Omaha ("PLO") and the rest of CoinPoker's games.
   if (name !== 'NLH') throw unreadGame(rest);
+  // The antes posted are read from their own lines; the header's is only
+  // checked to be an Amount, and `amount` discards it as malformed if not.
+  if (ante !== undefined) void amount(ante);
   const table = lines[1]?.match(
     /^Table '(.+)' (\d+)-max Seat #(\d+) is the button$/,
   );

@@ -1,0 +1,100 @@
+CoinPoker Hand #172668000015: NLH (₮0.10/₮0.25/₮0.06) 2026/11/06 18:29:23 CET
+Table '202104' 6-max Seat #1 is the button
+Seat 1: 85579140 (₮32.47 in chips)
+Seat 2: a1607a17 (₮25.20 in chips)
+Seat 3: Hero (₮25 in chips)
+Seat 4: 4ca84f30 (₮26.28 in chips)
+Seat 5: 9c771390 (₮25.30 in chips)
+Seat 6: 2e870d29 (₮29.25 in chips)
+85579140: posts ante ₮0.06
+a1607a17: posts ante ₮0.06
+Hero: posts ante ₮0.06
+4ca84f30: posts ante ₮0.06
+9c771390: posts ante ₮0.06
+2e870d29: posts ante ₮0.06
+a1607a17: posts small blind ₮0.10
+Hero: posts big blind ₮0.25
+*** HOLE CARDS ***
+Dealt to 85579140
+Dealt to a1607a17
+Dealt to Hero [Qd 2c]
+Dealt to 4ca84f30
+Dealt to 9c771390
+Dealt to 2e870d29
+4ca84f30: folds
+9c771390: folds
+2e870d29: folds
+85579140: folds
+a1607a17: calls ₮0.15
+Hero: checks
+*** FLOP *** [Ac 8d Jc]
+a1607a17: bets ₮0.43
+Hero: folds
+a1607a17: RETURN ₮0.43
+*** SHOWDOWN ***
+a1607a17 collected ₮0.80 from pot
+*** SUMMARY ***
+Total pot ₮0.86 | Rake ₮0.04 | Splash Fee ₮0.02
+Hand was run once
+Board [ Ac 8d Jc ]
+Game ended: 2026/11/06 18:30:16 CET
+Seat 1: 85579140 folded before Flop (didn't bet)
+Seat 2: a1607a17 won (₮0.80)
+Seat 3: Hero folded on the Flop
+Seat 4: 4ca84f30 folded before Flop (didn't bet)
+Seat 5: 9c771390 folded before Flop (didn't bet)
+Seat 6: 2e870d29 folded before Flop (didn't bet)
+
+CoinPoker Hand #172684300013: NLH (₮0.10/₮0.25/₮0.06) 2026/11/06 18:42:48 CET
+Table '202103' 6-max Seat #4 is the button
+Seat 6: 06285290 (₮13.05 in chips)
+Seat 1: ffae5470 (₮25 in chips)
+Seat 2: 91d01ae5 (₮43.57 in chips)
+Seat 3: Hero (₮30.04 in chips)
+Seat 4: 12ce8028 (₮26.01 in chips)
+ffae5470: posts ante ₮0.06
+91d01ae5: posts ante ₮0.06
+Hero: posts ante ₮0.06
+12ce8028: posts ante ₮0.06
+06285290: posts ante ₮0.06
+06285290: posts small blind ₮0.10
+ffae5470: posts big blind ₮0.25
+*** HOLE CARDS ***
+Dealt to 06285290
+Dealt to ffae5470
+Dealt to 91d01ae5
+Dealt to Hero [Qs 5h]
+Dealt to 12ce8028
+91d01ae5: folds
+Hero: folds
+12ce8028: raises ₮0.25 to ₮0.50
+06285290: calls ₮0.40
+ffae5470: folds
+*** FLOP *** [5s Jc 7d]
+06285290: checks
+12ce8028: bets ₮0.55
+06285290: calls ₮0.55
+*** TURN *** [5s Jc 7d] [5d]
+06285290: checks
+12ce8028: bets ₮2.38
+06285290: calls ₮2.38
+*** RIVER *** [5s Jc 7d 5d] [2c]
+06285290: checks
+12ce8028: bets ₮11.12
+06285290: ALLIN ₮9.56
+12ce8028: RETURN ₮1.56
+*** SHOWDOWN ***
+12ce8028: shows [6c 5c] (Three Of A Kind)
+12ce8028 collected ₮25.18 from pot
+06285290: shows [Js 3s] (Two Pair)
+*** SUMMARY ***
+Total pot ₮26.53 | Rake ₮1.33 | Splash Fee ₮0.02
+Hand was run once
+Board [ 5s Jc 7d 5d 2c ]
+Game ended: 2026/11/06 18:43:46 CET
+Seat 6: 06285290 showed [Js 3s] and lost with Two Pair
+Seat 1: ffae5470 folded before Flop (didn't bet)
+Seat 2: 91d01ae5 folded before Flop (didn't bet)
+Seat 3: Hero folded before Flop (didn't bet)
+Seat 4: 12ce8028 showed [6c 5c] and won (₮25.18) with Three Of A Kind
+
