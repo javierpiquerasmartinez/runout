@@ -26,6 +26,27 @@
   border-left: 1px solid var(--color-panel-border);
   background: var(--color-panel);
 }
+/*
+ * The replayer never scrolls the page: the Library frame is exactly the
+ * viewport's height, the table scales to what is left above the Playback
+ * bar, and a long list of Notes scrolls inside its own column.
+ */
+@media (min-width: 901px) {
+  .library:has(> .library-hand) {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+  .library-hand__side {
+    overflow-y: auto;
+  }
+  .library-hand .room-stage__play {
+    container-type: size;
+  }
+  .library-hand .poker-table {
+    width: min(100cqw, 820px, 100cqh * 820 / 606);
+  }
+}
 .library-hand__no-notes,
 .library-hand__failure {
   margin: 0;
