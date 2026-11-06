@@ -124,7 +124,7 @@ The Hero's Result in Hands where the Hero reached Showdown. The rest is their **
 _Avoid_: Red line, blue line
 
 **Results Graph**:
-The running total over a person's Library, Hand by Hand: Result, All-in EV, Showdown Result and Non-showdown Result. Filtered the same way as the Library's list of Hands (period, Poker Site, Hero, Stake, Marks, Tags), and shown in big blinds unless every Hand in the period shares one currency.
+The running total over a person's Library, Hand by Hand: Result, All-in EV, Showdown Result and Non-showdown Result. Filtered the same way as the Library's list of Hands (period, Poker Site, Hero, Stake, Marks, Tags, a Stat), and shown in big blinds unless every Hand in the period shares one currency.
 _Avoid_: Chart, winrate graph
 
 **Zoom**:
@@ -134,6 +134,10 @@ _Avoid_: Range (that is the Lab's), selection, window
 **Win Rate**:
 A Result line per 100 Hands, in big blinds whatever the currency, over the Hands the Results Graph shows: the Result's, and the All-in EV's. Written as BB/100.
 _Avoid_: bb/100 (as a name), winnings rate
+
+**Stat**:
+How often the Hero made one particular decision, over the Hands where they had the chance to make it: PFR is the times they raised preflop out of the times they could. A frequency, never a Result. Worked out after the session over a person's Library, filtered the same way as the Results Graph; never shown at a table while playing. The Library can also be filtered by one Stat: the Hands where the Hero had its chance, or those where they took it.
+_Avoid_: HUD, metric, KPI
 
 ### Room and queue
 
