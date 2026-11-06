@@ -56,6 +56,8 @@ let resultsRequests: string[]
 let stats: LibraryStats
 /** Stats reads, as `/api/library/stats?site=pokerstars`. */
 let statsRequests: string[]
+/** What the server answers a Stats read with, unless the test says otherwise. */
+let statsReply: () => Response | Promise<Response>
 /** Mark changes, as `PUT /api/library/hands/h1/mark`. */
 let markRequests: string[]
 /** Tag changes, as `PUT /api/library/tags/t1/hands {"handIds":["h1"]}`. */
@@ -84,7 +86,13 @@ beforeEach(() => {
       vpip: { opportunities: 3, taken: 1 },
       pfr: { opportunities: 2, taken: 1 },
     } as LibraryStats['stats'],
+    handsWith: {
+      ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunity: 0, taken: 0 }])),
+      vpip: { opportunity: 3, taken: 1 },
+      pfr: { opportunity: 2, taken: 1 },
+    } as LibraryStats['handsWith'],
   }
+  statsReply = () => Response.json(stats)
   markRequests = []
   tagRequests = []
   tagReply = () => Response.json({})
@@ -138,7 +146,7 @@ beforeEach(() => {
       }
       if (url.startsWith('/api/library/stats')) {
         statsRequests.push(url)
-        return Response.json(stats)
+        return statsReply()
       }
       if (url.startsWith('/api/library/results')) {
         resultsRequests.push(url)
@@ -357,6 +365,14 @@ describe('LibraryPage', () => {
       expect(window.location.pathname).toBe('/library')
       expect(window.location.search).toBe('?period=all&site=pokerstars&hero=iMapleAA')
       expect(chosen(filters, 'Hero')).toBe('iMapleAA')
+    })
+
+    it('says so when the Stats can’t be read', async () => {
+      statsReply = () => Promise.reject(new TypeError('Failed to fetch'))
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+
+      expect((await screen.findByRole('alert')).textContent).toBe("We couldn't reach the server. Try again.")
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
     })
 
     it('shows no Stats for an empty Library, inviting to import instead', async () => {

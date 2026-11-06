@@ -92,7 +92,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [results, setResults] = useState<Results | null>(null)
-  const [stats, setStats] = useState<LibraryStats | null>(null)
+  const [stats, setStats] = useState<{ state: 'loaded'; stats: LibraryStats } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [importing, setImporting] = useState(false)
   // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
@@ -144,9 +144,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     if (view !== 'stats') return
     let cancelled = false
     api<LibraryStats>(`/library/stats?${libraryFilterQuery(filter)}`, { token })
-      .then((read) => !cancelled && setStats(read))
-      // Stats that can't be read are left out; the list says what went wrong.
-      .catch(() => !cancelled && setStats(null))
+      .then((read) => !cancelled && setStats({ state: 'loaded', stats: read }))
+      // Stats that can't be read say why, as the list does.
+      .catch((error: unknown) => !cancelled && setStats({ state: 'failed', reason: reasonOf(error) }))
     return () => {
       cancelled = true
     }
@@ -380,7 +380,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)}
             />
           )}
-          {view === 'stats' && page && page.total > 0 && stats && stats.hands > 0 && <StatsView stats={stats} statHref={statHref} />}
+          {view === 'stats' && stats?.state === 'failed' && (
+            <p className="library__failure" role="alert">
+              {t(`reason.${stats.reason}`)}
+            </p>
+          )}
+          {view === 'stats' && page && page.total > 0 && stats?.state === 'loaded' && stats.stats.hands > 0 && (
+            <StatsView stats={stats.stats} statHref={statHref} />
+          )}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{noMatches.message}</p>
