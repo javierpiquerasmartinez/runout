@@ -86,6 +86,53 @@ describe('StatsView', () => {
     expect(within(tip).getByText('412 / 1838')).toBeTruthy()
   })
 
+  it('shows the C-bet Stats in the Postflop group, named in full', async () => {
+    const cbets: LibraryStats = {
+      hands: 1860,
+      stats: {
+        ...stats.stats,
+        'cbet-flop': { opportunities: 268, taken: 152 },
+        'fold-to-cbet-flop': { opportunities: 221, taken: 96 },
+        'cbet-turn': { opportunities: 131, taken: 61 },
+        'fold-to-cbet-turn': { opportunities: 88, taken: 39 },
+        'cbet-river': { opportunities: 48, taken: 22 },
+      },
+    }
+    const view = renderStats(cbets)
+
+    const postflop = within(view).getByRole('group', { name: 'Postflop' })
+    for (const name of [
+      'Flop C-bet 56.7%',
+      'Fold to Flop C-bet 43.4%',
+      'Turn C-bet 46.6%',
+      'Fold to Turn C-bet 44.3%',
+      'River C-bet 45.8%',
+      'Fold to River C-bet —',
+    ]) {
+      expect(within(postflop).getByRole('button', { name })).toBeTruthy()
+    }
+    await userEvent.hover(screen.getByRole('button', { name: 'Fold to Turn C-bet 44.3%' }))
+    expect(within(screen.getByRole('tooltip')).getByText('Fold to turn continuation bet')).toBeTruthy()
+  })
+
+  it('names each C-bet Stat in Spanish', async () => {
+    renderStats(stats, 'es')
+
+    for (const [abbreviation, name] of [
+      ['Flop C-bet', 'Apuesta de continuación en el flop'],
+      ['Fold to Flop C-bet', 'Se retira ante una apuesta de continuación en el flop'],
+      ['Turn C-bet', 'Apuesta de continuación en el turn'],
+      ['Fold to Turn C-bet', 'Se retira ante una apuesta de continuación en el turn'],
+      ['River C-bet', 'Apuesta de continuación en el river'],
+      ['Fold to River C-bet', 'Se retira ante una apuesta de continuación en el river'],
+    ]) {
+      const tile = screen.getByRole('button', { name: `${abbreviation} —` })
+      await userEvent.hover(tile)
+      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
+      await userEvent.unhover(tile)
+    }
+  })
+
   it('says there was no chance rather than “0 / 0”', async () => {
     renderStats({ hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
 

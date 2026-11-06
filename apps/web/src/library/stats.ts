@@ -62,4 +62,10 @@ export interface StatTile {
 export const STAT_TILES: StatTile[] = [
   { key: 'vpip', abbreviation: 'VPIP', group: 'preflop', name: 'library.stats.name.vpip' },
   { key: 'pfr', abbreviation: 'PFR', group: 'preflop', name: 'library.stats.name.pfr' },
+  { key: 'cbet-flop', abbreviation: 'Flop C-bet', group: 'postflop', name: 'library.stats.name.cbet-flop' },
+  { key: 'fold-to-cbet-flop', abbreviation: 'Fold to Flop C-bet', group: 'postflop', name: 'library.stats.name.fold-to-cbet-flop' },
+  { key: 'cbet-turn', abbreviation: 'Turn C-bet', group: 'postflop', name: 'library.stats.name.cbet-turn' },
+  { key: 'fold-to-cbet-turn', abbreviation: 'Fold to Turn C-bet', group: 'postflop', name: 'library.stats.name.fold-to-cbet-turn' },
+  { key: 'cbet-river', abbreviation: 'River C-bet', group: 'postflop', name: 'library.stats.name.cbet-river' },
+  { key: 'fold-to-cbet-river', abbreviation: 'Fold to River C-bet', group: 'postflop', name: 'library.stats.name.fold-to-cbet-river' },
 ]
