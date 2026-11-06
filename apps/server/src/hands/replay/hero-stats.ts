@@ -83,6 +83,7 @@ export function heroStats(hand: Hand): HeroStats {
       taken: raised,
     },
     ...stealAndBlindStats(hand, decisions),
+    ...reRaiseStats(hand, states),
   };
 }
 
@@ -238,6 +239,118 @@ function showdownStats(
     wsd: { opportunities: reachedShowdown, taken: reachedShowdown && wonMoney },
     wwsf: { opportunities: sawFlop, taken: sawFlop && wonMoney },
   };
+}
+
+type ReRaiseKey =
+  | 'three-bet'
+  | 'fold-to-three-bet'
+  | 'four-bet'
+  | 'fold-to-four-bet'
+  | 'squeeze';
+
+/** A preflop Action, with how the betting stood when its player made it. */
+interface PreflopDecision {
+  action: Action;
+  before: TableState;
+  /**
+   * How many raises came before it: 1 is an open raise, 2 a 3-bet. Blinds
+   * and straddles are posts, so the first raise over a straddle is an open.
+   * A short all-in raise counts too.
+   */
+  raises: number;
+  /** Who made each of those raises, in order. */
+  raisers: string[];
+  /** How many calls the last raise had before this Action. */
+  callers: number;
+  /**
+   * Whether the betting is open to a raise from this player: they haven't
+   * acted yet, or it has gone up by at least a full raise since they did.
+   * A short all-in raise alone doesn't reopen it for those who have acted.
+   */
+  reopened: boolean;
+}
+
+/**
+ * The Hero's 3-bet, Fold to 3-bet, 4-bet, Fold to 4-bet and Squeeze: each
+ * the first time the Hero faces that spot preflop, at most one opportunity
+ * per Hand.
+ */
+function reRaiseStats(
+  hand: Hand,
+  states: TableState[],
+): Record<ReRaiseKey, StatCount> {
+  const name = hand.hero.screenName;
+  const mine = preflopDecisions(hand, states).filter(
+    (decision) => decision.action.screenName === name,
+  );
+  const raise = (decision: PreflopDecision) =>
+    decision.action.type === 'raise' || decision.action.type === 'bet';
+  // A re-raise Stat: the Hero faced it and either raised, or could have.
+  const reRaise = (decision: PreflopDecision | undefined): StatCount => {
+    if (!decision) return NONE;
+    if (raise(decision)) return { opportunities: 1, taken: 1 };
+    const could = decision.reopened && couldRaise(name, decision.before);
+    return { opportunities: could ? 1 : 0, taken: 0 };
+  };
+  // A fold Stat: the Hero faced it, and folded or didn't.
+  const fold = (decision: PreflopDecision | undefined): StatCount =>
+    decision
+      ? { opportunities: 1, taken: decision.action.type === 'fold' ? 1 : 0 }
+      : NONE;
+  const facingOpen = mine.find((decision) => decision.raises === 1);
+  const facingThreeBet = mine.find((decision) => decision.raises === 2);
+  return {
+    'three-bet': reRaise(facingOpen),
+    squeeze: reRaise(
+      facingOpen && facingOpen.callers > 0 ? facingOpen : undefined,
+    ),
+    'four-bet': reRaise(facingThreeBet),
+    'fold-to-three-bet': fold(
+      facingThreeBet?.raisers[0] === name ? facingThreeBet : undefined,
+    ),
+    'fold-to-four-bet': fold(
+      mine.find(
+        (decision) => decision.raises >= 3 && decision.raisers[1] === name,
+      ),
+    ),
+  };
+}
+
+/** Every preflop Action, in order, with how the betting stood for it. */
+function preflopDecisions(hand: Hand, states: TableState[]): PreflopDecision[] {
+  const decisions: PreflopDecision[] = [];
+  const level = (state: TableState) =>
+    Math.max(...state.players.map((player) => player.bet));
+  // What a full raise adds: the big blind, or the straddle, to begin with.
+  let fullRaise = Math.max(level(states[0]), hand.stake.bigBlind);
+  const raisers: string[] = [];
+  let callers = 0;
+  // Each player's last Action: the level after it and a full raise then.
+  const acted = new Map<string, { level: number; fullRaise: number }>();
+  states.forEach((state, index) => {
+    const { action } = state;
+    if (action?.street !== 'preflop') return;
+    const before = states[index - 1];
+    const last = acted.get(action.screenName);
+    decisions.push({
+      action,
+      before,
+      raises: raisers.length,
+      raisers: [...raisers],
+      callers,
+      reopened: !last || level(before) - last.level >= last.fullRaise,
+    });
+    if (action.type === 'raise' || action.type === 'bet') {
+      const added = level(state) - level(before);
+      if (added >= fullRaise) fullRaise = added;
+      raisers.push(action.screenName);
+      callers = 0;
+    } else if (action.type === 'call' && raisers.length > 0) {
+      callers += 1;
+    }
+    acted.set(action.screenName, { level: level(state), fullRaise });
+  });
+  return decisions;
 }
 
 /** Each postflop Street, with its C-bet Stat and its Fold to C-bet Stat. */

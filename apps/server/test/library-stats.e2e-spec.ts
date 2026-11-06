@@ -247,7 +247,37 @@ describe('The Library’s Stats (e2e)', () => {
     const all = await stats(account.token, 'site=pokerstars');
 
     expect(Object.keys(all.stats)).toEqual(STAT_KEYS);
-    expect(all.stats['three-bet']).toEqual({ opportunities: 0, taken: 0 });
+    expect(all.stats.squeeze).toEqual({ opportunities: 0, taken: 0 });
+  });
+
+  it('sums the preflop re-raise Stats', async () => {
+    const account = await stockedAccount();
+
+    const reRaises = (of: Stats) => ({
+      'three-bet': of.stats['three-bet'],
+      'fold-to-three-bet': of.stats['fold-to-three-bet'],
+      'four-bet': of.stats['four-bet'],
+      'fold-to-four-bet': of.stats['fold-to-four-bet'],
+      squeeze: of.stats.squeeze,
+    });
+    const none = { opportunities: 0, taken: 0 };
+
+    // iMapleAA folds the big blind to a raise: one 3-bet passed up.
+    expect(reRaises(await stats(account.token, 'site=pokerstars'))).toEqual({
+      'three-bet': { opportunities: 1, taken: 0 },
+      'fold-to-three-bet': none,
+      'four-bet': none,
+      'fold-to-four-bet': none,
+      squeeze: none,
+    });
+    // Hero folds to an open twice, and calls a 3-bet of their own open.
+    expect(reRaises(await stats(account.token, 'site=coinpoker'))).toEqual({
+      'three-bet': { opportunities: 2, taken: 0 },
+      'fold-to-three-bet': { opportunities: 1, taken: 0 },
+      'four-bet': { opportunities: 1, taken: 0 },
+      'fold-to-four-bet': none,
+      squeeze: none,
+    });
   });
 
   it('sums the C-bet Stats', async () => {

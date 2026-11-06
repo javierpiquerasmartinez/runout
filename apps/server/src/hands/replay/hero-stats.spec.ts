@@ -397,6 +397,192 @@ describe('Replay: the Hero’s Showdown Stats', () => {
   });
 });
 
+/** The Hero's re-raise Stats in a Hand: 3-bet, 4-bet, the folds to them and Squeeze. */
+function reRaises(hand: ReturnType<typeof only>) {
+  const stats = heroStats(hand);
+  return {
+    'three-bet': stats['three-bet'],
+    'fold-to-three-bet': stats['fold-to-three-bet'],
+    'four-bet': stats['four-bet'],
+    'fold-to-four-bet': stats['fold-to-four-bet'],
+    squeeze: stats.squeeze,
+  };
+}
+
+const took = { opportunities: 1, taken: 1 };
+const didnt = { opportunities: 1, taken: 0 };
+const none = { opportunities: 0, taken: 0 };
+
+describe('Replay: the Hero’s preflop re-raise Stats', () => {
+  it('counts a 3-bet taken and one passed up', () => {
+    // Hero re-raises c19e0a88's open from the small blind.
+    const reRaised = only(oneHand('ggpoker-session.txt', 'RC2104577321'));
+    // Hero folds the big blind to ebe47eca's open.
+    const folded = only(oneHand('coinpoker-session.txt', '160064400025'));
+
+    expect([reRaised, folded].map(reRaises)).toMatchObject([
+      { 'three-bet': took },
+      { 'three-bet': didnt },
+    ]);
+  });
+
+  it('counts each re-raise Stat taken, passed up or never there, on real Hands', () => {
+    const hands = [
+      // Hero 3-bets c19e0a88's open, then calls 0be55d17's all-in 4-bet.
+      oneHand('ggpoker-session.txt', 'RC2104577321'),
+      // Hero opens, 8b0b5f9d 3-bets, Hero calls.
+      oneHand('coinpoker-session.txt', '160054200061'),
+      // a9373981 opens, 7160fe9f 3-bets, Hero folds the small blind. The
+      // import discards the Hand for running it twice, so it ends preflop.
+      oneHand('coinpoker-session.txt', '159583401409').replace(
+        /adf6e033: folds[\s\S]*$/,
+        'adf6e033: folds\n',
+      ),
+      // HeroAI opens, Aces2 3-bets all in, HeroAI calls: no 4-bet chance.
+      oneHand('pokerstars-all-ins.txt', '262140000101'),
+      // Hero9max calls Elm_UTG's all-in open; Oak_BB's full 3-bet
+      // reopens the betting, and Hero9max 4-bets.
+      oneHand('pokerstars-edge-cases.txt', '262130000102'),
+      // Hero raises a limp: an open, not a 3-bet.
+      oneHand('pokerstars-edge-cases.txt', '262130000104'),
+    ].map((handHistory) => reRaises(only(handHistory)));
+
+    expect(hands).toEqual([
+      {
+        'three-bet': took,
+        'fold-to-three-bet': none,
+        'four-bet': none,
+        'fold-to-four-bet': didnt,
+        squeeze: none,
+      },
+      {
+        'three-bet': none,
+        'fold-to-three-bet': didnt,
+        'four-bet': didnt,
+        'fold-to-four-bet': none,
+        squeeze: none,
+      },
+      {
+        'three-bet': none,
+        'fold-to-three-bet': none,
+        'four-bet': didnt,
+        'fold-to-four-bet': none,
+        squeeze: none,
+      },
+      {
+        'three-bet': none,
+        'fold-to-three-bet': didnt,
+        'four-bet': none,
+        'fold-to-four-bet': none,
+        squeeze: none,
+      },
+      {
+        'three-bet': didnt,
+        'fold-to-three-bet': none,
+        'four-bet': took,
+        'fold-to-four-bet': none,
+        squeeze: none,
+      },
+      {
+        'three-bet': none,
+        'fold-to-three-bet': none,
+        'four-bet': none,
+        'fold-to-four-bet': none,
+        squeeze: none,
+      },
+    ]);
+  });
+
+  it('counts a fold to a 3-bet and to a 4-bet as taken', () => {
+    // Hand #160054200061 with Hero folding to the 3-bet.
+    const foldedToThreeBet = oneHand(
+      'coinpoker-session.txt',
+      '160054200061',
+    ).replace(/Hero: calls ₮0\.75[\s\S]*$/, 'Hero: folds\n');
+    // Hand #RC2104577321 with Hero folding to the 4-bet.
+    const foldedToFourBet = oneHand(
+      'ggpoker-session.txt',
+      'RC2104577321',
+    ).replace(/Hero: calls \$3\.2[\s\S]*$/, 'Hero: folds\n');
+
+    expect(
+      [foldedToThreeBet, foldedToFourBet].map((h) => reRaises(only(h))),
+    ).toMatchObject([
+      { 'fold-to-three-bet': took, 'four-bet': didnt },
+      { 'fold-to-four-bet': took },
+    ]);
+  });
+
+  it('counts a squeeze as both a 3-bet and a Squeeze', () => {
+    // Hand #262130000102 seen from Oak_BB, who re-raises Elm_UTG's open
+    // after Hero9max and Spruce9 called it.
+    const squeezed = oneHand(
+      'pokerstars-edge-cases.txt',
+      '262130000102',
+    ).replace('Dealt to Hero9max [Ah Ad]', 'Dealt to Oak_BB [Qs Qc]');
+
+    expect(reRaises(only(squeezed))).toEqual({
+      'three-bet': took,
+      'fold-to-three-bet': none,
+      'four-bet': none,
+      'fold-to-four-bet': none,
+      squeeze: took,
+    });
+  });
+
+  it('counts the first raise over a straddle as an open, not a 3-bet', () => {
+    // Olive6 straddles, Cedar2 calls, Hero6 raises: an open.
+    const opened = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+    // Hero straddles, a0d3f6e1 opens, Hero re-raises: a 3-bet.
+    const reRaised = only(oneHand('ggpoker-session.txt', 'HD1180452290'));
+
+    expect([opened, reRaised].map(reRaises)).toMatchObject([
+      { 'three-bet': none, squeeze: none },
+      { 'three-bet': took, squeeze: none },
+    ]);
+  });
+
+  describe('a short all-in raise', () => {
+    // Hand #RC2104577321 with Hero's Stack cut to $0.30: Hero's all-in
+    // re-raise adds $0.05, short of the $0.15 a full raise takes.
+    const shortThreeBet = oneHand('ggpoker-session.txt', 'RC2104577321')
+      .replace('Seat 2: Hero ($10 in chips)', 'Seat 2: Hero ($0.3 in chips)')
+      .replace(
+        /Hero: raises \$0\.75 to \$1\r?\n[\s\S]*$/,
+        [
+          'Hero: raises $0.05 to $0.3 and is all-in',
+          '0be55d17: calls $0.2',
+          'c19e0a88: calls $0.05',
+          '',
+        ].join('\n'),
+      );
+    const seenBy = (screenName: string) =>
+      shortThreeBet
+        .replace('Dealt to Hero [Ah Tc]', 'Dealt to Hero ')
+        .replace(`Dealt to ${screenName} `, `Dealt to ${screenName} [Kc Qc]`);
+
+    it('counts as a raise for whoever made it', () => {
+      expect(reRaises(only(shortThreeBet))).toMatchObject({
+        'three-bet': took,
+      });
+    });
+
+    it('reopens the betting for a player yet to act', () => {
+      expect(reRaises(only(seenBy('0be55d17')))).toMatchObject({
+        'three-bet': none,
+        'four-bet': didnt,
+      });
+    });
+
+    it('doesn’t reopen it for the raiser it answers', () => {
+      expect(reRaises(only(seenBy('c19e0a88')))).toMatchObject({
+        'fold-to-three-bet': didnt,
+        'four-bet': none,
+      });
+    });
+  });
+});
+
 describe('Replay: the Hero’s C-bet Stats', () => {
   // Expected values are read by hand off each Hand History.
   const cbetStats = (hand: ReturnType<typeof only>) => {
