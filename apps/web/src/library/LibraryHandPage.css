@@ -43,8 +43,10 @@
   .library-hand .room-stage__play {
     container-type: size;
   }
+  /* Scaled as one picture, as in the Room (RoomPage.css says why). */
   .library-hand .poker-table {
-    width: min(100cqw, 820px, 100cqh * 820 / 606);
+    width: 820px;
+    zoom: min(1, tan(atan2(100cqw, 820px)), tan(atan2(100cqh, 606px)));
   }
 }
 .library-hand__no-notes,
