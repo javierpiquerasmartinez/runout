@@ -23,7 +23,9 @@ function only(handHistory: string) {
 /** The Hand History of one Hand of a fixture, by its hand ID. */
 function oneHand(name: string, siteHandId: string): string {
   return text(name)
-    .split(/(?=^(?:Poker Hand #|CoinPoker Hand #|PokerStars Hand #))/m)
+    .split(
+      /(?=^(?:Poker Hand #|CoinPoker Hand #|PokerStars Hand #|Winamax Poker ))/m,
+    )
     .find((block) => block.includes(siteHandId))!;
 }
 
@@ -193,6 +195,128 @@ describe('Replay: the Hero’s Stats', () => {
         vpip: { opportunities: 1, taken: 0 },
         pfr: { opportunities: 0, taken: 0 },
       },
+    ]);
+  });
+});
+
+describe('Replay: the Hero’s steal and blind Stats', () => {
+  // Expected values are read by hand off each Hand History.
+  const hand = (name: string, siteHandId: string) =>
+    hands(name).find((h) => h.siteHandId === siteHandId)!;
+
+  it('counts an Attempt to Steal when it is folded to the Hero in the cutoff, button or small blind', () => {
+    expect(
+      [
+        // Folded to the Hero in the cutoff, who raises.
+        hand('pokerstars-session.txt', '262120711267'),
+        // Heads-up, the Hero raises from the button.
+        hand('pokerstars-all-ins.txt', '262140000101'),
+        // Folded to the Hero in the cutoff, who folds.
+        hand('pokerstars-session.txt', '262120715010'),
+        // The Hero on the button behind a player who posted a big blind to
+        // come in and checked: still folded to, and the Hero folds.
+        hand('coinpoker-session.txt', '159855200582'),
+        // A limper in front: the Hero's raise from the button is no steal.
+        hand('pokerstars-edge-cases.txt', '262130000104'),
+        // A raise in front of the Hero's small blind.
+        hand('winamax-session.txt', '20954312-7731-1757700000'),
+        // The Hero in the big blind.
+        hand('ggpoker-session.txt', 'HD1180452377'),
+      ].map((h) => heroStats(h).steal),
+    ).toEqual([
+      { opportunities: 1, taken: 1 },
+      { opportunities: 1, taken: 1 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+    ]);
+  });
+
+  it('counts a Fold BB to Steal when the Hero’s big blind faces a lone raise from the cutoff, button or small blind', () => {
+    // Winamax Hand #20954312-7731 seen from Cedar31's big blind: Birch Woods
+    // raises from the button, iMapleAA calls from the small blind.
+    const stealCalled = only(
+      oneHand('winamax-session.txt', '20954312-7731').replace(
+        'Dealt to iMapleAA [Th 9h]',
+        'Dealt to Cedar31 [7c 2d]',
+      ),
+    );
+
+    expect(
+      [
+        // The button raises, the small blind folds, the Hero folds.
+        hand('pokerstars-session.txt', '262120715506'),
+        // The cutoff raises, the Hero folds.
+        hand('coinpoker-session.txt', '160064400025'),
+        // The cutoff raises, the Hero calls.
+        hand('ggpoker-session.txt', 'HD1180452377'),
+        // Heads-up, the button raises and the Hero calls.
+        hand('pokerstars-all-ins.txt', '262140000102'),
+        // A steal facing a caller is no steal to the big blind.
+        stealCalled,
+        // Nobody raises before the Hero's big blind.
+        hand('coinpoker-session.txt', '159950300403'),
+        // The Hero is not the big blind.
+        hand('pokerstars-session.txt', '262120711267'),
+      ].map((h) => heroStats(h)['fold-bb-to-steal']),
+    ).toEqual([
+      { opportunities: 1, taken: 1 },
+      { opportunities: 1, taken: 1 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+    ]);
+  });
+
+  it('counts a Cold Call when the Hero calls a raise with no money in voluntarily, not a blind calling the open', () => {
+    // Hand #262130000102 seen from Ash4, who folds to Elm_UTG's raise.
+    const foldedToRaise = only(
+      oneHand('pokerstars-edge-cases.txt', '262130000102').replace(
+        'Dealt to Hero9max [Ah Ad]',
+        'Dealt to Ash4 [7h 2c]',
+      ),
+    );
+    // GG Hand #RC2104577321 seen from 0be55d17's big blind, who faces the
+    // Hero's 3-bet with nothing in voluntarily and re-raises.
+    const blindFacing3Bet = only(
+      oneHand('ggpoker-session.txt', 'RC2104577321')
+        .replace('Dealt to Hero [Ah Tc]', 'Dealt to Hero')
+        .replace(/Dealt to 0be55d17 ?(?=\r?\n)/, 'Dealt to 0be55d17 [Qd Qs]'),
+    );
+    // Hand #262130000104 seen from Aspen1, who limps, then calls the raise.
+    const limpedFirst = only(
+      oneHand('pokerstars-edge-cases.txt', '262130000104').replace(
+        'Dealt to Hero4 [Ad Jc]',
+        'Dealt to Aspen1 [Ah Jd]',
+      ),
+    );
+
+    expect(
+      [
+        // The Hero calls Elm_UTG's all-in raise.
+        hand('pokerstars-edge-cases.txt', '262130000102'),
+        foldedToRaise,
+        blindFacing3Bet,
+        // The big blind calls the open: no cold call.
+        hand('ggpoker-session.txt', 'HD1180452377'),
+        // The small blind calls the open: no cold call.
+        hand('winamax-session.txt', '20954312-7731-1757700000'),
+        limpedFirst,
+        // The Hero opens.
+        hand('pokerstars-session.txt', '262120711267'),
+      ].map((h) => heroStats(h)['cold-call']),
+    ).toEqual([
+      { opportunities: 1, taken: 1 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 1, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
+      { opportunities: 0, taken: 0 },
     ]);
   });
 });
