@@ -1,4 +1,4 @@
-import type { Action, Hand } from '../hand.js';
+import type { Action, Hand, Street } from '../hand.js';
 import { timeline, type TableState } from './timeline.js';
 
 /**
@@ -49,9 +49,10 @@ const NONE: StatCount = { opportunities: 0, taken: 0 };
  * opportunity.
  */
 export function heroStats(hand: Hand): HeroStats {
-  const stats = Object.fromEntries(
-    STAT_KEYS.map((key) => [key, NONE]),
-  ) as HeroStats;
+  const stats = {
+    ...(Object.fromEntries(STAT_KEYS.map((key) => [key, NONE])) as HeroStats),
+    ...continuationBets(hand),
+  };
   const name = hand.hero.screenName;
   const { states } = timeline(hand);
   // Each preflop decision of the Hero, with the table as it stood before it.
@@ -74,6 +75,58 @@ export function heroStats(hand: Hand): HeroStats {
       taken: raised,
     },
   };
+}
+
+/** Each postflop Street, with its C-bet Stat and its Fold to C-bet Stat. */
+const CBET_STREETS = [
+  ['flop', 'cbet-flop', 'fold-to-cbet-flop'],
+  ['turn', 'cbet-turn', 'fold-to-cbet-turn'],
+  ['river', 'cbet-river', 'fold-to-cbet-river'],
+] as const satisfies [Street, StatKey, StatKey][];
+
+/**
+ * The C-bet Stats, from either side of the preflop aggressor (whoever made
+ * the last preflop raise). On each Street they have a C-bet opportunity when
+ * they act before anybody bets, and they take it by betting; on the turn and
+ * the river only after a C-bet on the Street before. A Hero facing that
+ * C-bet as the Street's first bet, with nobody raising it before them, has a
+ * Fold to C-bet opportunity. Multiway pots count like heads-up ones.
+ */
+function continuationBets(hand: Hand): Partial<HeroStats> {
+  const hero = hand.hero.screenName;
+  const aggressive = (action: Action) =>
+    action.type === 'bet' || action.type === 'raise';
+  const aggressor = hand.actions
+    .filter((action) => action.street === 'preflop' && aggressive(action))
+    .at(-1)?.screenName;
+  const stats: Partial<HeroStats> = {};
+  if (aggressor === undefined) return stats;
+  for (const [street, cbetKey, foldKey] of CBET_STREETS) {
+    const actions = hand.actions.filter((action) => action.street === street);
+    const firstBet = actions.findIndex(aggressive);
+    const chance = actions.findIndex(
+      (action) => action.screenName === aggressor,
+    );
+    // Gone, all in, or bet into first (a donk bet): no C-bet from here on.
+    if (chance === -1 || (firstBet !== -1 && firstBet < chance)) break;
+    const cbet = firstBet === chance;
+    if (aggressor === hero) {
+      stats[cbetKey] = { opportunities: 1, taken: cbet ? 1 : 0 };
+    }
+    if (!cbet) break;
+    const after = actions.slice(firstBet + 1);
+    const answer = after.findIndex((action) => action.screenName === hero);
+    const raised = after.findIndex(aggressive);
+    // Facing a raise of the C-bet instead is no Fold to C-bet opportunity;
+    // the Hero's own raise of it is their answer.
+    if (answer !== -1 && (raised === -1 || answer <= raised)) {
+      stats[foldKey] = {
+        opportunities: 1,
+        taken: after[answer].type === 'fold' ? 1 : 0,
+      };
+    }
+  }
+  return stats;
 }
 
 /**
