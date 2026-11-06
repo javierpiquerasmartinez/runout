@@ -183,6 +183,91 @@ describe('Filtering the Library and Marking from it (e2e)', () => {
     }
   });
 
+  describe('the Stat criterion', () => {
+    async function counted(token: string, query: string) {
+      const [listed, results, stats] = await Promise.all(
+        ['hands', 'results', 'stats'].map((endpoint) =>
+          request(running.httpServer)
+            .get(`/api/library/${endpoint}?${query}`)
+            .set('Authorization', `Bearer ${token}`)
+            .expect(200),
+        ),
+      );
+      return {
+        list: (listed.body as LibraryPage).total,
+        results: results.body.hands as number,
+        stats: stats.body as {
+          hands: number;
+          stats: Record<string, { opportunities: number; taken: number }>;
+        },
+      };
+    }
+
+    // iMapleAA opens twice, folds first in, and folds the big blind to a raise.
+    it('narrows the list, the Results and the Stats to the Hands with the Stat’s opportunity, or with it taken', async () => {
+      const account = await stockedAccount();
+
+      const taken = await counted(
+        account.token,
+        'site=pokerstars&stat=vpip:taken',
+      );
+      expect(taken.list).toBe(2);
+      expect(taken.results).toBe(2);
+      expect(taken.stats.hands).toBe(2);
+      expect(taken.stats.stats.vpip).toEqual({ opportunities: 2, taken: 2 });
+
+      const opportunity = await counted(
+        account.token,
+        'site=pokerstars&stat=pfr:opportunity',
+      );
+      expect(opportunity.list).toBe(4);
+      expect(opportunity.results).toBe(4);
+      expect(opportunity.stats.stats.pfr).toEqual({
+        opportunities: 4,
+        taken: 2,
+      });
+
+      const none = await counted(account.token, 'stat=three-bet:opportunity');
+      expect(none.list).toBe(0);
+      expect(none.stats.hands).toBe(0);
+    });
+
+    it('lists as many Hands as the Stats counted for each side', async () => {
+      const account = await stockedAccount();
+      const { stats } = await counted(account.token, '');
+
+      for (const key of ['vpip', 'pfr']) {
+        expect(
+          (await counted(account.token, `stat=${key}:opportunity`)).list,
+          key,
+        ).toBe(stats.stats[key].opportunities);
+        expect(
+          (await counted(account.token, `stat=${key}:taken`)).list,
+          key,
+        ).toBe(stats.stats[key].taken);
+      }
+    });
+
+    it('refuses an unknown Stat, an unknown side or more than one Stat', async () => {
+      const account = await newAccount(running.httpServer);
+
+      for (const query of [
+        'stat=vpip',
+        'stat=nope:taken',
+        'stat=vpip:maybe',
+        'stat=vpip:taken:again',
+        'stat=vpip:taken&stat=pfr:taken',
+      ]) {
+        for (const endpoint of ['hands', 'results', 'stats']) {
+          await request(running.httpServer)
+            .get(`/api/library/${endpoint}?${query}`)
+            .set('Authorization', `Bearer ${account.token}`)
+            .expect(400, { reason: 'invalid-library-filter' });
+        }
+      }
+    });
+  });
+
   describe('Marks', () => {
     function mark(token: string, handId: string) {
       return request(running.httpServer)
