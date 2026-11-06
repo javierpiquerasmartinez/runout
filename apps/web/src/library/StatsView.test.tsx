@@ -82,6 +82,48 @@ describe('StatsView', () => {
     expect(within(tip).getByText('412 / 1838')).toBeTruthy()
   })
 
+  it('shows Flop Check-raise and AFq under Postflop, and WWSF, WTSD and W$SD under Showdown', () => {
+    const view = renderStats({
+      hands: 1860,
+      stats: {
+        ...stats.stats,
+        'check-raise-flop': { opportunities: 160, taken: 18 },
+        afq: { opportunities: 2450, taken: 980 },
+        wwsf: { opportunities: 520, taken: 241 },
+        wtsd: { opportunities: 520, taken: 146 },
+        wsd: { opportunities: 146, taken: 77 },
+      },
+    })
+
+    const postflop = within(view).getByRole('group', { name: 'Postflop' })
+    expect(within(postflop).getByRole('button', { name: 'Flop Check-raise 11.3%' })).toBeTruthy()
+    expect(within(postflop).getByRole('button', { name: 'AFq 40.0%' })).toBeTruthy()
+    const showdown = within(view).getByRole('group', { name: 'Showdown' })
+    expect(
+      within(showdown)
+        .getAllByRole('button')
+        .map((tile) => tile.textContent),
+    ).toEqual(['WWSF 46.3%', 'WTSD 28.1%', 'W$SD 52.7%'])
+  })
+
+  it('gives AFq’s count in Actions, more than the Hands it covers', async () => {
+    renderStats({ hands: 1860, stats: { ...stats.stats, afq: { opportunities: 2450, taken: 980 } } })
+
+    await userEvent.hover(screen.getByRole('button', { name: 'AFq 40.0%' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('Aggression frequency, postflop')).toBeTruthy()
+    expect(within(tip).getByText('980 / 2,450')).toBeTruthy()
+  })
+
+  it('names the Showdown Stats in full in Spanish', async () => {
+    renderStats({ hands: 1, stats: { ...stats.stats, wsd: { opportunities: 2, taken: 1 } } }, 'es')
+
+    await userEvent.hover(screen.getByRole('button', { name: 'W$SD 50,0 %' }))
+
+    expect(within(screen.getByRole('tooltip')).getByText('Gana dinero en el showdown')).toBeTruthy()
+  })
+
   it('shows the C-bet Stats in the Postflop group, named in full', async () => {
     const cbets: LibraryStats = {
       hands: 1860,

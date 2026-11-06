@@ -194,6 +194,53 @@ describe('The Library’s Stats (e2e)', () => {
     );
   });
 
+  it('sums Flop Check-raise, AFq and the Showdown Stats, AFq adding several Actions per Hand', async () => {
+    const account = await newAccount(running.httpServer);
+    // Four Heroes' Hands: a preflop win, a preflop all-in won through side
+    // pots, a Showdown lost after a bet and two calls, a split pot after a
+    // bet and a call.
+    await importText(
+      account.token,
+      freshHandHistory('pokerstars-edge-cases.txt'),
+    );
+    // A preflop all-in lost, a preflop win, a flop check-raise that wins.
+    await importText(account.token, freshHandHistory('ggpoker-session.txt'));
+
+    const pick = ({ hands, stats }: Stats) => ({
+      hands,
+      'check-raise-flop': stats['check-raise-flop'],
+      afq: stats.afq,
+      wtsd: stats.wtsd,
+      wsd: stats.wsd,
+      wwsf: stats.wwsf,
+    });
+
+    expect(pick(await stats(account.token, 'site=pokerstars'))).toEqual({
+      hands: 4,
+      'check-raise-flop': { opportunities: 0, taken: 0 },
+      afq: { opportunities: 5, taken: 2 },
+      wtsd: { opportunities: 3, taken: 3 },
+      wsd: { opportunities: 3, taken: 2 },
+      wwsf: { opportunities: 3, taken: 2 },
+    });
+    expect(pick(await stats(account.token, 'site=ggpoker'))).toEqual({
+      hands: 3,
+      'check-raise-flop': { opportunities: 1, taken: 1 },
+      afq: { opportunities: 1, taken: 1 },
+      wtsd: { opportunities: 2, taken: 1 },
+      wsd: { opportunities: 1, taken: 0 },
+      wwsf: { opportunities: 2, taken: 1 },
+    });
+    expect(pick(await stats(account.token))).toEqual({
+      hands: 7,
+      'check-raise-flop': { opportunities: 1, taken: 1 },
+      afq: { opportunities: 6, taken: 3 },
+      wtsd: { opportunities: 5, taken: 4 },
+      wsd: { opportunities: 4, taken: 2 },
+      wwsf: { opportunities: 5, taken: 3 },
+    });
+  });
+
   it('answers every Stat, with zero opportunities where the Hero had none', async () => {
     const account = await stockedAccount();
 
