@@ -199,6 +199,7 @@ describe('Filtering the Library and Marking from it (e2e)', () => {
         stats: stats.body as {
           hands: number;
           stats: Record<string, { opportunities: number; taken: number }>;
+          handsWith: Record<string, { opportunity: number; taken: number }>;
         },
       };
     }
@@ -245,6 +246,28 @@ describe('Filtering the Library and Marking from it (e2e)', () => {
           (await counted(account.token, `stat=${key}:taken`)).list,
           key,
         ).toBe(stats.stats[key].taken);
+      }
+    });
+
+    it('lists as many Hands as the Stats say had each side, AFq too with several Actions per Hand', async () => {
+      const account = await newAccount(running.httpServer);
+      await importText(
+        account.token,
+        freshHandHistory('pokerstars-edge-cases.txt'),
+      );
+      const { stats } = await counted(account.token, '');
+      // AFq adds several Actions per Hand, so its sums outrun its Hands.
+      expect(stats.stats.afq.opportunities).toBeGreaterThan(
+        stats.handsWith.afq.opportunity,
+      );
+
+      for (const key of ['vpip', 'pfr', 'afq', 'wtsd']) {
+        for (const side of ['opportunity', 'taken'] as const) {
+          expect(
+            (await counted(account.token, `stat=${key}:${side}`)).list,
+            `${key}:${side}`,
+          ).toBe(stats.handsWith[key][side]);
+        }
       }
     });
 

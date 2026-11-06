@@ -15,6 +15,11 @@ const stats: LibraryStats = {
     vpip: { opportunities: 1838, taken: 412 },
     pfr: { opportunities: 1830, taken: 334 },
   } as LibraryStats['stats'],
+  handsWith: {
+    ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunity: 0, taken: 0 }])),
+    vpip: { opportunity: 1838, taken: 412 },
+    pfr: { opportunity: 1830, taken: 334 },
+  } as LibraryStats['handsWith'],
 }
 
 /** Where a Stat's links lead, as the Library would write it. */
@@ -53,6 +58,7 @@ describe('StatsView', () => {
 
   it('shows “—” for a Stat the Hero never had the chance at', () => {
     renderStats({
+      ...stats,
       hands: 1,
       stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } },
     })
@@ -88,7 +94,7 @@ describe('StatsView', () => {
 
   it('shows Flop Check-raise and AFq under Postflop, and WWSF, WTSD and W$SD under Showdown', () => {
     const view = renderStats({
-      hands: 1860,
+      ...stats,
       stats: {
         ...stats.stats,
         'check-raise-flop': { opportunities: 160, taken: 18 },
@@ -111,7 +117,7 @@ describe('StatsView', () => {
   })
 
   it('gives AFq’s count in Actions, more than the Hands it covers', async () => {
-    renderStats({ hands: 1860, stats: { ...stats.stats, afq: { opportunities: 2450, taken: 980 } } })
+    renderStats({ ...stats, stats: { ...stats.stats, afq: { opportunities: 2450, taken: 980 } } })
 
     await userEvent.hover(screen.getByRole('button', { name: 'AFq 40.0%' }))
 
@@ -121,7 +127,7 @@ describe('StatsView', () => {
   })
 
   it('names the Showdown Stats in full in Spanish', async () => {
-    renderStats({ hands: 1, stats: { ...stats.stats, wsd: { opportunities: 2, taken: 1 } } }, 'es')
+    renderStats({ ...stats, hands: 1, stats: { ...stats.stats, wsd: { opportunities: 2, taken: 1 } } }, 'es')
 
     await userEvent.hover(screen.getByRole('button', { name: 'W$SD 50,0 %' }))
 
@@ -130,6 +136,7 @@ describe('StatsView', () => {
 
   it('shows the re-raise Stats after PFR in Preflop, each named in full', async () => {
     renderStats({
+      ...stats,
       hands: 40,
       stats: {
         ...stats.stats,
@@ -174,6 +181,7 @@ describe('StatsView', () => {
   it('names the re-raise Stats in Spanish too', async () => {
     renderStats(
       {
+        ...stats,
         hands: 1,
         stats: { ...stats.stats, squeeze: { opportunities: 1, taken: 1 } },
       },
@@ -189,7 +197,7 @@ describe('StatsView', () => {
 
   it('shows the C-bet Stats in the Postflop group, named in full', async () => {
     const cbets: LibraryStats = {
-      hands: 1860,
+      ...stats,
       stats: {
         ...stats.stats,
         'cbet-flop': { opportunities: 268, taken: 152 },
@@ -236,7 +244,7 @@ describe('StatsView', () => {
 
   it('ends Preflop with Cold Call, Fold BB to Steal and Attempt to Steal, each named in full', async () => {
     renderStats({
-      hands: 1860,
+      ...stats,
       stats: {
         ...stats.stats,
         'cold-call': { opportunities: 690, taken: 58 },
@@ -261,7 +269,7 @@ describe('StatsView', () => {
   })
 
   it('says there was no chance rather than “0 / 0”', async () => {
-    renderStats({ hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
+    renderStats({ ...stats, hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
 
     await userEvent.hover(screen.getByRole('button', { name: 'PFR —' }))
 
@@ -276,6 +284,21 @@ describe('StatsView', () => {
     const tip = screen.getByRole('tooltip')
     expect(within(tip).getByRole('link', { name: 'Opportunities (1,838)' }).getAttribute('href')).toBe('/library?stat=vpip:opportunity')
     expect(within(tip).getByRole('link', { name: 'You did it (412)' }).getAttribute('href')).toBe('/library?stat=vpip:taken')
+  })
+
+  it('counts AFq’s links in Hands, as Manos will list them, not in Actions', async () => {
+    renderStats({
+      ...stats,
+      stats: { ...stats.stats, afq: { opportunities: 2450, taken: 980 } },
+      handsWith: { ...stats.handsWith, afq: { opportunity: 610, taken: 402 } },
+    })
+
+    await userEvent.hover(screen.getByRole('button', { name: 'AFq 40.0%' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('980 / 2,450')).toBeTruthy()
+    expect(within(tip).getByRole('link', { name: 'Opportunities (610)' }).getAttribute('href')).toBe('/library?stat=afq:opportunity')
+    expect(within(tip).getByRole('link', { name: 'You did it (402)' }).getAttribute('href')).toBe('/library?stat=afq:taken')
   })
 
   it('names the links in the person’s language', async () => {
@@ -300,7 +323,7 @@ describe('StatsView', () => {
   })
 
   it('has no links where there was no chance', async () => {
-    renderStats({ hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
+    renderStats({ ...stats, hands: 1, stats: { ...stats.stats, pfr: { opportunities: 0, taken: 0 } } })
 
     await userEvent.hover(screen.getByRole('button', { name: 'PFR —' }))
 

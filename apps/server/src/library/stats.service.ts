@@ -20,6 +20,19 @@ export interface LibraryStats {
    * chance at. Counts, not percentages.
    */
   stats: HeroStats;
+  /**
+   * Every Stat, with how many of those Hands had its opportunity and how
+   * many had it taken: the Hands the `stat=` criterion keeps for each side,
+   * so the count a Stat's link shows is the count the list then holds. Apart
+   * from the sums because a Stat such as AFq counts several Actions per Hand.
+   */
+  handsWith: Record<StatKey, StatHands>;
+}
+
+/** How many Hands had a Stat's opportunity, and how many had it taken. */
+export interface StatHands {
+  opportunity: number;
+  taken: number;
 }
 
 /** The Library's Stats, answered by the database. */
@@ -43,11 +56,15 @@ export class StatsService {
           stat: StatKey;
           opportunities: number;
           taken: number;
+          handsWithOpportunity: number;
+          handsWithTaken: number;
         }>(sql`
           select
             ${handStats.stat} as stat,
             sum(${handStats.opportunities})::int as opportunities,
-            sum(${handStats.taken})::int as taken
+            sum(${handStats.taken})::int as taken,
+            count(*) filter (where ${handStats.opportunities} > 0)::int as "handsWithOpportunity",
+            count(*) filter (where ${handStats.taken} > 0)::int as "handsWithTaken"
           from ${libraryEntries}
           inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
           inner join ${handStats} on ${eq(handStats.handId, hands.id)}
@@ -64,7 +81,16 @@ export class StatsService {
             },
           ]),
         ) as HeroStats;
-        return { hands: counted.rows[0].hands, stats };
+        const handsWith = Object.fromEntries(
+          STAT_KEYS.map((key) => [
+            key,
+            {
+              opportunity: byKey.get(key)?.handsWithOpportunity ?? 0,
+              taken: byKey.get(key)?.handsWithTaken ?? 0,
+            },
+          ]),
+        ) as Record<StatKey, StatHands>;
+        return { hands: counted.rows[0].hands, stats, handsWith };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
     );

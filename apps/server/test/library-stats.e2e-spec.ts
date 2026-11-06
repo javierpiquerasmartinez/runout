@@ -13,6 +13,7 @@ interface StatCount {
 interface Stats {
   hands: number;
   stats: Record<string, StatCount>;
+  handsWith: Record<string, { opportunity: number; taken: number }>;
 }
 
 const STAT_KEYS = [
@@ -241,6 +242,10 @@ describe('The Library’s Stats (e2e)', () => {
       wsd: { opportunities: 4, taken: 2 },
       wwsf: { opportunities: 5, taken: 3 },
     });
+    // AFq's Hands, not its Actions: the count Manos lists behind its links.
+    expect(
+      (await stats(account.token, 'site=pokerstars')).handsWith.afq,
+    ).toEqual({ opportunity: 2, taken: 2 });
   });
 
   it('answers every Stat, with zero opportunities where the Hero had none', async () => {
@@ -335,6 +340,9 @@ describe('The Library’s Stats (e2e)', () => {
       hands: 0,
       stats: Object.fromEntries(
         STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }]),
+      ),
+      handsWith: Object.fromEntries(
+        STAT_KEYS.map((key) => [key, { opportunity: 0, taken: 0 }]),
       ),
     });
     const master = await newAccount(running.httpServer);

@@ -43,6 +43,18 @@ export interface LibraryStats {
   hands: number
   /** Every Stat, zero opportunities where the Hero never had the chance. */
   stats: Record<StatKey, StatCount>
+  /**
+   * Every Stat, with how many of those Hands had its opportunity and how many
+   * had it taken: what the list holds behind each of the Stat's links. Apart
+   * from the counts because AFq counts several Actions per Hand.
+   */
+  handsWith: Record<StatKey, StatHands>
+}
+
+/** How many Hands had a Stat's opportunity, and how many had it taken. */
+export interface StatHands {
+  opportunity: number
+  taken: number
 }
 
 export type StatGroup = 'preflop' | 'postflop' | 'showdown'

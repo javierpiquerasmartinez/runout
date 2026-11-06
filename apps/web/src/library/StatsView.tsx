@@ -2,7 +2,7 @@ import { useId, useState, type FocusEvent, type MouseEvent } from 'react'
 import { useI18n } from '../i18n'
 import { isPlainClick, navigate } from '../routing'
 import type { StatCriterion, StatSide } from './libraryFilter'
-import { STAT_GROUPS, STAT_TILES, type LibraryStats, type StatCount, type StatTile } from './stats'
+import { STAT_GROUPS, STAT_TILES, type LibraryStats, type StatCount, type StatHands, type StatTile } from './stats'
 import './StatsView.css'
 
 /**
@@ -48,7 +48,7 @@ function StatBand({
       </h2>
       <div className="stats__tiles">
         {tiles.map((tile) => (
-          <StatTileView key={tile.key} tile={tile} count={stats.stats[tile.key]} statHref={statHref} />
+          <StatTileView key={tile.key} tile={tile} count={stats.stats[tile.key]} handsWith={stats.handsWith[tile.key]} statHref={statHref} />
         ))}
       </div>
     </div>
@@ -59,10 +59,12 @@ function StatBand({
 function StatTileView({
   tile,
   count,
+  handsWith,
   statHref,
 }: {
   tile: StatTile
   count: StatCount
+  handsWith: StatHands
   statHref: (criterion: StatCriterion) => string
 }) {
   const { t, formatNumber } = useI18n()
@@ -83,9 +85,10 @@ function StatTileView({
     event.preventDefault()
     navigate(event.currentTarget.getAttribute('href')!)
   }
-  const link = (side: StatSide, n: number) => (
+  // The links count Hands, as the list behind them does, not the Stat's own counts.
+  const link = (side: StatSide) => (
     <a className="stats__tip-link" href={statHref({ key: tile.key, side })} onClick={follow}>
-      {t(`library.stats.link.${side}`, { count: formatNumber(n) })}
+      {t(`library.stats.link.${side}`, { count: formatNumber(handsWith[side]) })}
     </a>
   )
   return (
@@ -111,8 +114,8 @@ function StatTileView({
             </span>
             {!none && (
               <span className="stats__tip-links">
-                {link('opportunity', count.opportunities)}
-                {link('taken', count.taken)}
+                {link('opportunity')}
+                {link('taken')}
               </span>
             )}
           </div>
