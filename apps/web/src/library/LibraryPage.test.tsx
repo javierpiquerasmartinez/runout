@@ -421,6 +421,61 @@ describe('LibraryPage', () => {
     })
   })
 
+  describe('from a Stat to its Hands', () => {
+    it('opens the Hands behind a Stat from its tooltip, keeping every other filter', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&site=pokerstars&marked=true')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+
+      await userEvent.hover(within(shown).getByRole('button', { name: 'VPIP 33.3%' }))
+      await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'You did it (1)' }))
+
+      expect(window.location.pathname).toBe('/library')
+      expect(new URLSearchParams(window.location.search).get('stat')).toBe('vpip:taken')
+      await waitFor(() => expect(lastFilterQuery()).toBe('site=pokerstars&marked=true&stat=vpip%3Ataken'))
+      expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Marked hands' })).toBeTruthy()
+    })
+
+    it('opens the Hands where the Hero had the chance from the other link', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+
+      await userEvent.hover(within(shown).getByRole('button', { name: 'PFR 50.0%' }))
+      await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'Opportunities (2)' }))
+
+      await waitFor(() => expect(lastFilterQuery()).toBe('stat=pfr%3Aopportunity'))
+    })
+
+    it.each(['/library', '/library/graph', '/library/stats'])('names the Stat and the side in the filters bar at %s, as after a reload, and reads only those Hands', async (path) => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?period=all&hero=iMapleAA&stat=vpip:taken`)
+
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(within(filters).getByText('VPIP · you did it')).toBeTruthy()
+      expect(lastFilterQuery()).toBe('hero=iMapleAA&stat=vpip%3Ataken')
+      if (path.endsWith('graph')) await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?hero=iMapleAA&stat=vpip%3Ataken'))
+      if (path.endsWith('stats')) await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?hero=iMapleAA&stat=vpip%3Ataken'))
+    })
+
+    it('clears the Stat criterion when its chip is removed, keeping the view and the other filters', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&site=pokerstars&stat=pfr:opportunity')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Remove filter PFR · opportunities' }))
+
+      expect(window.location.pathname).toBe('/library/stats')
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      expect(within(filters).queryByText('PFR · opportunities')).toBeNull()
+      await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?site=pokerstars'))
+    })
+
+    it('leaves out a Stat criterion it cannot read from the address', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=nope:taken')
+
+      await screen.findByRole('group', { name: 'Filters' })
+      expect(lastFilterQuery()).toBe('')
+    })
+  })
+
   describe('filters', () => {
     it('offers only the Poker Sites, Heroes and Stakes the Library holds', async () => {
       renderLibrary()

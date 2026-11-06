@@ -43,6 +43,7 @@ import {
   librarySearch,
   periodOf,
   type LibraryFilter,
+  type StatCriterion,
 } from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
 import {
@@ -191,6 +192,8 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const changeFilter = (next: LibraryFilter) => redirect(`${path}${withLibrarySort(librarySearch(next), sort)}`)
   const changeSort = (by: LibrarySortColumn) =>
     redirect(`${path}${withLibraryPage(withLibrarySort(search, nextLibrarySort(sort, by)), 1)}`)
+  // A Stat's links open Manos on the Hands behind it, every other filter and the sort kept; going back returns to the Stats.
+  const statHref = (stat: StatCriterion) => `${libraryViewPath('list')}${withLibrarySort(librarySearch({ ...filter, stat }), sort)}`
   // Every view keeps the filter; going back returns to the view left.
   const showView = (next: LibraryView) => {
     // The graph and the Stats show no rows to select.
@@ -377,7 +380,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)}
             />
           )}
-          {view === 'stats' && page && page.total > 0 && stats && stats.hands > 0 && <StatsView stats={stats} />}
+          {view === 'stats' && page && page.total > 0 && stats && stats.hands > 0 && <StatsView stats={stats} statHref={statHref} />}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{noMatches.message}</p>
