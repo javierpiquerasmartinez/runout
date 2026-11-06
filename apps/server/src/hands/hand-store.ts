@@ -95,10 +95,10 @@ export async function storedIds(
 
 /**
  * Gives the stored Hands in `ids` (by key) their Hand History from `read`,
- * when they have none, and rewrites their content, Rake and Rake Generated
- * as read from that text: stored without it, they had the Fees inside the
- * Rake. A Hand's text, once set, is never replaced: it stays the first text
- * it was read from.
+ * when they have none, and rewrites their content, Rake, Rake Generated and
+ * Stat rows as read from that text: stored without it, they had the Fees
+ * inside the Rake. A Hand's text, once set, is never replaced: it stays the
+ * first text it was read from.
  */
 export async function fillHistoriesAndReread(
   db: Database | Transaction,
@@ -109,27 +109,36 @@ export async function fillHistoriesAndReread(
   for (const hand of read) {
     if (!byKey.has(keyOf(hand))) byKey.set(keyOf(hand), hand);
   }
-  const rows = [...ids]
-    .filter(([key]) => histories.has(key) && byKey.has(key))
-    .map(([key, id]) => {
-      const hand = byKey.get(key)!;
-      return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
+  const toFill = [...ids].filter(
+    ([key]) => histories.has(key) && byKey.has(key),
+  );
+  const rows = toFill.map(([key, id]) => {
+    const hand = byKey.get(key)!;
+    return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
         ${hand.rake}::integer, ${heroResult(hand).rakeGenerated}::integer)`;
-    });
+  });
   if (rows.length === 0) return;
   const filled = sql`filled`;
-  await db
-    .update(hands)
-    .set({
-      handHistory: sql`${filled}.text`,
-      content: sql`${filled}.content`,
-      rake: sql`${filled}.rake`,
-      heroRakeGenerated: sql`${filled}.rake_generated`,
-    })
-    .from(
-      sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
-    )
-    .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)));
+  const keyById = new Map(toFill.map(([key, id]) => [id, key]));
+  await db.transaction(async (tx) => {
+    const reread = await tx
+      .update(hands)
+      .set({
+        handHistory: sql`${filled}.text`,
+        content: sql`${filled}.content`,
+        rake: sql`${filled}.rake`,
+        heroRakeGenerated: sql`${filled}.rake_generated`,
+      })
+      .from(
+        sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
+      )
+      .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)))
+      .returning({ id: hands.id });
+    await replaceStats(
+      tx,
+      reread.map(({ id }) => ({ id, hand: byKey.get(keyById.get(id)!)! })),
+    );
+  });
 }
 
 /**

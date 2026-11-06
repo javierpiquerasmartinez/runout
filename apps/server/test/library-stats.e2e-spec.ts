@@ -1,4 +1,6 @@
+import pg from 'pg';
 import request from 'supertest';
+import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -367,6 +369,36 @@ describe('The Library’s Stats (e2e)', () => {
       vpip: { opportunities: 4, taken: 2 },
       pfr: { opportunities: 4, taken: 2 },
     });
+  });
+
+  it('works them out again from the text when a Hand stored without it is imported again', async () => {
+    const account = await newAccount(running.httpServer);
+    const text = freshHandHistory('pokerstars-showdown.txt');
+    await importText(account.token, text);
+    const imported = await stats(account.token);
+    // As a Hand stored before Runout kept its text, and before Stats: no
+    // Hand History and no Stat rows.
+    const [handId] = await starsHandIds(account.token);
+    const db = new pg.Client(inject('databaseUrl'));
+    await db.connect();
+    try {
+      await db.query('delete from hand_stats where hand_id = $1', [handId]);
+      await db.query('update hands set hand_history = null where id = $1', [
+        handId,
+      ]);
+    } finally {
+      await db.end();
+    }
+    expect((await stats(account.token)).stats.vpip).toEqual({
+      opportunities: 0,
+      taken: 0,
+    });
+
+    await importText(account.token, text);
+
+    const reread = await stats(account.token);
+    expect(reread.stats.vpip).toEqual({ opportunities: 1, taken: 1 });
+    expect(reread).toEqual(imported);
   });
 
   it('rejects a filter it can’t read, as the list does', async () => {
