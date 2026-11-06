@@ -9,6 +9,7 @@ import { fakeSession } from '../test/fakeSession'
 import { libraryOpenedFrom, type LibraryHand, type LibraryPage as Page } from './library'
 import { LibraryPage } from './LibraryPage'
 import type { Results } from './results'
+import { STAT_KEYS, type LibraryStats } from './stats'
 
 const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryHand => ({
   id,
@@ -52,6 +53,11 @@ let requests: string[]
 let results: Results
 /** Results Graph reads, as `/api/library/results?site=pokerstars`. */
 let resultsRequests: string[]
+let stats: LibraryStats
+/** Stats reads, as `/api/library/stats?site=pokerstars`. */
+let statsRequests: string[]
+/** What the server answers a Stats read with, unless the test says otherwise. */
+let statsReply: () => Response | Promise<Response>
 /** Mark changes, as `PUT /api/library/hands/h1/mark`. */
 let markRequests: string[]
 /** Tag changes, as `PUT /api/library/tags/t1/hands {"handIds":["h1"]}`. */
@@ -72,6 +78,21 @@ let addReply: () => Response
 beforeEach(() => {
   requests = []
   resultsRequests = []
+  statsRequests = []
+  stats = {
+    hands: 3,
+    stats: {
+      ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }])),
+      vpip: { opportunities: 3, taken: 1 },
+      pfr: { opportunities: 2, taken: 1 },
+    } as LibraryStats['stats'],
+    handsWith: {
+      ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunity: 0, taken: 0 }])),
+      vpip: { opportunity: 3, taken: 1 },
+      pfr: { opportunity: 2, taken: 1 },
+    } as LibraryStats['handsWith'],
+  }
+  statsReply = () => Response.json(stats)
   markRequests = []
   tagRequests = []
   tagReply = () => Response.json({})
@@ -122,6 +143,10 @@ beforeEach(() => {
           page.hands = page.hands.map((hand) => (hand.id === handId ? { ...hand, marked } : hand))
         }
         return Response.json({ handId, marked })
+      }
+      if (url.startsWith('/api/library/stats')) {
+        statsRequests.push(url)
+        return statsReply()
       }
       if (url.startsWith('/api/library/results')) {
         resultsRequests.push(url)
@@ -299,6 +324,81 @@ describe('LibraryPage', () => {
       expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
     })
 
+    it('switches to the Stats at /library/stats', async () => {
+      renderLibrary()
+      const view = await screen.findByRole('radiogroup', { name: 'View' })
+      await screen.findByRole('table', { name: 'All hands' })
+      expect(statsRequests).toEqual([])
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Stats' }))
+
+      expect(window.location.pathname).toBe('/library/stats')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+      expect(within(shown).getByText('3 hands')).toBeTruthy()
+      expect(within(shown).getByRole('button', { name: 'VPIP 33.3%' })).toBeTruthy()
+      expect(screen.queryByRole('table', { name: 'All hands' })).toBeNull()
+      expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+      expect(within(view).getByRole('radio', { name: 'Stats' }).getAttribute('aria-checked')).toBe('true')
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Graph' }))
+
+      expect(window.location.pathname).toBe('/library/graph')
+      expect(await screen.findByRole('region', { name: 'Results' })).toBeTruthy()
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+    })
+
+    it('keeps the filter when switching to the Stats and back', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await choose(filters, 'Poker site', 'PokerStars')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Stats' }))
+
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?site=pokerstars'))
+      await choose(filters, 'Hero', 'iMapleAA')
+      await waitFor(() => expect(statsRequests.at(-1)).toBe(`/api/library/stats?${lastFilterQuery()}`))
+      expect(lastFilterQuery()).toBe('site=pokerstars&hero=iMapleAA')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Hands' }))
+
+      expect(window.location.pathname).toBe('/library')
+      expect(window.location.search).toBe('?period=all&site=pokerstars&hero=iMapleAA')
+      expect(chosen(filters, 'Hero')).toBe('iMapleAA')
+    })
+
+    it('says so when the Stats can’t be read', async () => {
+      statsReply = () => Promise.reject(new TypeError('Failed to fetch'))
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+
+      expect((await screen.findByRole('alert')).textContent).toBe("We couldn't reach the server. Try again.")
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+    })
+
+    it('shows no Stats for an empty Library, inviting to import instead', async () => {
+      pages['1'] = { ...libraryPage({ total: 0, page: 1, pageSize: 50, hands: [] }), counts: { all: 0, marked: 0 } }
+      stats = { ...stats, hands: 0 }
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+
+      expect(await screen.findByText('Your library is empty. Import your hand histories to keep them here.')).toBeTruthy()
+      await waitFor(() => expect(statsRequests).toHaveLength(1))
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+    })
+
+    it('shows no Stats when the filters match nothing, offering to clear them', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await screen.findByRole('region', { name: 'Stats' })
+      pages['1'] = { ...pages['1'], total: 0, hands: [] }
+      stats = { ...stats, hands: 0 }
+
+      await choose(filters, 'Hero', 'Hero')
+
+      expect(await screen.findByText('No hands match these filters.')).toBeTruthy()
+      expect(screen.queryByRole('region', { name: 'Stats' })).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
+    })
+
     it('starts again from the first page when the address brings another filter', async () => {
       renderLibrary()
       await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
@@ -326,7 +426,7 @@ describe('LibraryPage', () => {
       expect(chosen(filters, 'Poker site')).toBe('PokerStars')
     })
 
-    it.each(['/library', '/library/graph'])('reads the filter back from the address at %s, as after a reload', async (path) => {
+    it.each(['/library', '/library/graph', '/library/stats'])('reads the filter back from the address at %s, as after a reload', async (path) => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?period=all&hero=iMapleAA&marked=true&tag=t2`)
 
       const filters = await screen.findByRole('group', { name: 'Filters' })
@@ -334,6 +434,61 @@ describe('LibraryPage', () => {
       expect(chosen(filters, 'Hero')).toBe('iMapleAA')
       expect(screen.getByRole('heading', { name: 'Marked hands' })).toBeTruthy()
       expect(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: /Multiway/ }).getAttribute('aria-pressed')).toBe('true')
+    })
+  })
+
+  describe('from a Stat to its Hands', () => {
+    it('opens the Hands behind a Stat from its tooltip, keeping every other filter', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&site=pokerstars&marked=true')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+
+      await userEvent.hover(within(shown).getByRole('button', { name: 'VPIP 33.3%' }))
+      await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'You did it (1)' }))
+
+      expect(window.location.pathname).toBe('/library')
+      expect(new URLSearchParams(window.location.search).get('stat')).toBe('vpip:taken')
+      await waitFor(() => expect(lastFilterQuery()).toBe('site=pokerstars&marked=true&stat=vpip%3Ataken'))
+      expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Marked hands' })).toBeTruthy()
+    })
+
+    it('opens the Hands where the Hero had the chance from the other link', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+
+      await userEvent.hover(within(shown).getByRole('button', { name: 'PFR 50.0%' }))
+      await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'Opportunities (2)' }))
+
+      await waitFor(() => expect(lastFilterQuery()).toBe('stat=pfr%3Aopportunity'))
+    })
+
+    it.each(['/library', '/library/graph', '/library/stats'])('names the Stat and the side in the filters bar at %s, as after a reload, and reads only those Hands', async (path) => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?period=all&hero=iMapleAA&stat=vpip:taken`)
+
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(within(filters).getByText('VPIP · you did it')).toBeTruthy()
+      expect(lastFilterQuery()).toBe('hero=iMapleAA&stat=vpip%3Ataken')
+      if (path.endsWith('graph')) await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?hero=iMapleAA&stat=vpip%3Ataken'))
+      if (path.endsWith('stats')) await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?hero=iMapleAA&stat=vpip%3Ataken'))
+    })
+
+    it('clears the Stat criterion when its chip is removed, keeping the view and the other filters', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&site=pokerstars&stat=pfr:opportunity')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Remove filter PFR · opportunities' }))
+
+      expect(window.location.pathname).toBe('/library/stats')
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      expect(within(filters).queryByText('PFR · opportunities')).toBeNull()
+      await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?site=pokerstars'))
+    })
+
+    it('leaves out a Stat criterion it cannot read from the address', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=nope:taken')
+
+      await screen.findByRole('group', { name: 'Filters' })
+      expect(lastFilterQuery()).toBe('')
     })
   })
 

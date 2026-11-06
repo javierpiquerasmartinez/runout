@@ -5,13 +5,14 @@ import { LibraryNotesController } from './library-notes.controller.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
 import { ResultsService } from './results.service.js';
+import { StatsService } from './stats.service.js';
 import { TagsController } from './tags.controller.js';
 import { TagsService } from './tags.service.js';
 
 @Module({
   imports: [IdentityModule, RoomsModule],
   controllers: [LibraryController, LibraryNotesController, TagsController],
-  providers: [LibraryService, ResultsService, TagsService],
+  providers: [LibraryService, ResultsService, StatsService, TagsService],
   exports: [LibraryService],
 })
 export class LibraryModule {}

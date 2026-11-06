@@ -1,0 +1,107 @@
+/* The Library's Estadísticas view: a band of tiles per group, all on one desktop screen. */
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+.stats__hands {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.stats__group {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.stats__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+/* A tile and its tooltip, which opens under it on hover or focus. */
+.stats__stat {
+  position: relative;
+  display: flex;
+}
+.stats__tile {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  /* A two-line abbreviation keeps the values of a row level. */
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 10px;
+  background: var(--color-panel);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.stats__tile:hover {
+  border-color: var(--color-border-hover);
+}
+.stats__tile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--brass);
+}
+.stats__abbr {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  /* Long abbreviations ("Fold to Flop C-bet") wrap rather than lose their end. */
+  overflow-wrap: anywhere;
+}
+.stats__value {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.stats__tile[data-empty] .stats__value {
+  color: var(--text-muted);
+}
+.stats__tip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  /* Bridges the gap, so the pointer can reach what the tooltip holds. */
+  padding-top: 6px;
+}
+.stats__tip-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-raised);
+}
+.stats__tip-name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+.stats__tip-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.stats__tip-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 2px;
+}
+.stats__tip-link {
+  font-size: 12px;
+  color: var(--brass-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

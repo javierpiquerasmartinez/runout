@@ -21,6 +21,7 @@ import {
   type Removal,
 } from './library.service.js';
 import { ResultsService, type Results } from './results.service.js';
+import { StatsService, type LibraryStats } from './stats.service.js';
 
 @Controller('library')
 export class LibraryController {
@@ -28,6 +29,7 @@ export class LibraryController {
     private readonly identities: IdentityService,
     private readonly library: LibraryService,
     private readonly results: ResultsService,
+    private readonly stats: StatsService,
     private readonly gateway: RoomGateway,
   ) {}
 
@@ -76,6 +78,23 @@ export class LibraryController {
       query.zoomFrom,
       query.zoomTo,
     );
+  }
+
+  /**
+   * The Hero's Stats over the Hands the Library filter in the query keeps
+   * (the same filter as the list and the Results), with how many Hands that
+   * is.
+   */
+  @Get('stats')
+  @Header('Cache-Control', 'private, no-cache')
+  async heroStats(
+    @Headers('authorization') authorization: string | undefined,
+    @Query() query: Record<string, unknown>,
+  ): Promise<LibraryStats> {
+    const account = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    return this.stats.stats(account, parseLibraryFilter(query));
   }
 
   /**

@@ -1,8 +1,9 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
-import { hands } from '../database/schema.js';
+import { handStats, hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 import { heroResult } from './replay/hero-result.js';
+import { heroStats, STAT_KEYS } from './replay/hero-stats.js';
 import { finalPot } from './replay/overview.js';
 
 /*
@@ -94,10 +95,10 @@ export async function storedIds(
 
 /**
  * Gives the stored Hands in `ids` (by key) their Hand History from `read`,
- * when they have none, and rewrites their content, Rake and Rake Generated
- * as read from that text: stored without it, they had the Fees inside the
- * Rake. A Hand's text, once set, is never replaced: it stays the first text
- * it was read from.
+ * when they have none, and rewrites their content, Rake, Rake Generated and
+ * Stat rows as read from that text: stored without it, they had the Fees
+ * inside the Rake. A Hand's text, once set, is never replaced: it stays the
+ * first text it was read from.
  */
 export async function fillHistoriesAndReread(
   db: Database | Transaction,
@@ -108,27 +109,36 @@ export async function fillHistoriesAndReread(
   for (const hand of read) {
     if (!byKey.has(keyOf(hand))) byKey.set(keyOf(hand), hand);
   }
-  const rows = [...ids]
-    .filter(([key]) => histories.has(key) && byKey.has(key))
-    .map(([key, id]) => {
-      const hand = byKey.get(key)!;
-      return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
+  const toFill = [...ids].filter(
+    ([key]) => histories.has(key) && byKey.has(key),
+  );
+  const rows = toFill.map(([key, id]) => {
+    const hand = byKey.get(key)!;
+    return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
         ${hand.rake}::integer, ${heroResult(hand).rakeGenerated}::integer)`;
-    });
+  });
   if (rows.length === 0) return;
   const filled = sql`filled`;
-  await db
-    .update(hands)
-    .set({
-      handHistory: sql`${filled}.text`,
-      content: sql`${filled}.content`,
-      rake: sql`${filled}.rake`,
-      heroRakeGenerated: sql`${filled}.rake_generated`,
-    })
-    .from(
-      sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
-    )
-    .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)));
+  const keyById = new Map(toFill.map(([key, id]) => [id, key]));
+  await db.transaction(async (tx) => {
+    const reread = await tx
+      .update(hands)
+      .set({
+        handHistory: sql`${filled}.text`,
+        content: sql`${filled}.content`,
+        rake: sql`${filled}.rake`,
+        heroRakeGenerated: sql`${filled}.rake_generated`,
+      })
+      .from(
+        sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
+      )
+      .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)))
+      .returning({ id: hands.id });
+    await replaceStats(
+      tx,
+      reread.map(({ id }) => ({ id, hand: byKey.get(keyById.get(id)!)! })),
+    );
+  });
 }
 
 /**
@@ -190,10 +200,42 @@ export async function storeHands(
       })
       .returning(keyColumns);
     for (const row of stored) ids.set(rowKey(row), row.id);
+    await replaceStats(
+      tx,
+      stored.map((row) => ({
+        id: row.id,
+        hand: toStore.find((hand) => keyOf(hand) === rowKey(row))!,
+      })),
+    );
     const missing = toStore.filter((hand) => !ids.has(keyOf(hand)));
     if (missing.length > 0) {
       for (const [key, id] of await storedIds(tx, missing)) ids.set(key, id);
     }
   }
   return read.map((hand) => ids.get(keyOf(hand))!);
+}
+
+/**
+ * Writes the Hero's Stat rows of the stored Hands given, each worked out from
+ * the Hand given with it, in place of any rows they had: one per Stat they
+ * had an opportunity at (see `heroStats`).
+ */
+export async function replaceStats(
+  db: Database | Transaction,
+  stored: { id: string; hand: Hand }[],
+): Promise<void> {
+  if (stored.length === 0) return;
+  await db.delete(handStats).where(
+    inArray(
+      handStats.handId,
+      stored.map(({ id }) => id),
+    ),
+  );
+  const rows = stored.flatMap(({ id, hand }) => {
+    const stats = heroStats(hand);
+    return STAT_KEYS.filter((stat) => stats[stat].opportunities > 0).map(
+      (stat) => ({ handId: id, stat, ...stats[stat] }),
+    );
+  });
+  if (rows.length > 0) await db.insert(handStats).values(rows);
 }

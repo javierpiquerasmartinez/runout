@@ -1,7 +1,14 @@
 import { and, eq, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
-import { hands, libraryEntries, marks, tagLinks } from '../database/schema.js';
+import {
+  handStats,
+  hands,
+  libraryEntries,
+  marks,
+  tagLinks,
+} from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { PokerSite, Stake } from '../hands/hand.js';
+import { STAT_KEYS, type StatKey } from '../hands/replay/hero-stats.js';
 import { Rejected } from '../rejection/rejection.js';
 
 /**
@@ -13,7 +20,8 @@ import { Rejected } from '../rejection/rejection.js';
  * local days into them; `to` is exclusive), `site`, `hero` and `stake`
  * repeated for each value allowed, `stake` written `limit:small:big:currency`,
  * `marked=true`, and `tag` repeated with the id of each Tag allowed (a Hand
- * carrying any of them is kept).
+ * carrying any of them is kept), and `stat` once, written `<key>:opportunity`
+ * or `<key>:taken`.
  */
 export interface LibraryFilter {
   from: Date | null;
@@ -24,6 +32,14 @@ export interface LibraryFilter {
   markedOnly: boolean;
   /** Tag ids: a Hand carrying any of them is kept. Only the viewer's own Tags match. */
   tags: string[];
+  /** Only the Hands where the Hero had this Stat's opportunity, or took it. */
+  stat: StatCriterion | null;
+}
+
+/** One Stat and a side: the Hands that count toward its opportunities, or toward its taken. */
+export interface StatCriterion {
+  key: StatKey;
+  side: 'opportunity' | 'taken';
 }
 
 /** What a Library holds to filter by, whatever the filter. */
@@ -55,6 +71,7 @@ export function parseLibraryFilter(
     stakes: list(query.stake).map(stakeOf),
     markedOnly: marked === 'true',
     tags: list(query.tag).map(tagId),
+    stat: statCriterion(query.stat),
   };
 }
 
@@ -92,6 +109,15 @@ export function libraryFilterWhere(
   if (filter.tags.length > 0) {
     conditions.push(
       sql`exists (select 1 from ${tagLinks} where ${tagLinks.identityId} = ${identityId} and ${tagLinks.handId} = ${hands.id} and ${inArray(tagLinks.tagId, filter.tags)})`,
+    );
+  }
+  if (filter.stat) {
+    const counted =
+      filter.stat.side === 'taken'
+        ? sql`${handStats.taken} > 0`
+        : sql`${handStats.opportunities} > 0`;
+    conditions.push(
+      sql`exists (select 1 from ${handStats} where ${handStats.handId} = ${hands.id} and ${handStats.stat} = ${filter.stat.key} and ${counted})`,
     );
   }
   return and(...conditions)!;
@@ -141,6 +167,22 @@ function instant(raw: unknown): Date | null {
     throw new Rejected('invalid-library-filter');
   }
   return date;
+}
+
+const STATS: ReadonlySet<string> = new Set(STAT_KEYS);
+
+function statCriterion(raw: unknown): StatCriterion | null {
+  const value = single(raw);
+  if (value === undefined) return null;
+  const [key, side, ...rest] = value.split(':');
+  if (
+    rest.length > 0 ||
+    !STATS.has(key) ||
+    (side !== 'opportunity' && side !== 'taken')
+  ) {
+    throw new Rejected('invalid-library-filter');
+  }
+  return { key: key as StatKey, side };
 }
 
 function tagId(value: string): string {

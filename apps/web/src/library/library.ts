@@ -12,19 +12,27 @@ export const libraryPath = '/library'
 /** Where the Library shows its Results Graph instead of its Hands. */
 export const libraryGraphPath = `${libraryPath}/graph`
 
-/** What the Library shows under its filters: its Hands, or their Results Graph. */
-export type LibraryView = 'list' | 'graph'
+/** Where the Library shows the Hero's Stats instead of its Hands. */
+export const libraryStatsPath = `${libraryPath}/stats`
+
+/** What the Library shows under its filters: its Hands, their Results Graph, or the Hero's Stats over them. */
+export type LibraryView = 'list' | 'graph' | 'stats'
+
+const VIEW_PATHS: Record<LibraryView, string> = {
+  list: libraryPath,
+  graph: libraryGraphPath,
+  stats: libraryStatsPath,
+}
 
 /** Where the Library shows this view. */
 export function libraryViewPath(view: LibraryView): string {
-  return view === 'graph' ? libraryGraphPath : libraryPath
+  return VIEW_PATHS[view]
 }
 
 /** The view a Library path shows, or null for any other path. */
 export function libraryViewFromPath(path: string): LibraryView | null {
-  if (path === libraryPath) return 'list'
-  if (path === libraryGraphPath) return 'graph'
-  return null
+  const found = Object.entries(VIEW_PATHS).find(([, viewPath]) => viewPath === path)
+  return found ? (found[0] as LibraryView) : null
 }
 
 /** The list's page an address keeps: the first unless it says another. */

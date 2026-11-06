@@ -43,6 +43,7 @@ import {
   librarySearch,
   periodOf,
   type LibraryFilter,
+  type StatCriterion,
 } from './libraryFilter'
 import { LibraryFilters } from './LibraryFilters'
 import {
@@ -56,6 +57,8 @@ import {
 import { LibraryTags, TagSelection } from './LibraryTags'
 import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
+import type { LibraryStats } from './stats'
+import { StatsView } from './StatsView'
 import './LibraryPage.css'
 
 /**
@@ -64,9 +67,9 @@ import './LibraryPage.css'
  * filter. It predates ADR 0004, so neither its
  * "Compartidas" collection nor its Author column is built: every Hand here is
  * the Account's own, whatever its Hero, so the Hero takes the Author's place.
- * The filter and the sort live in the address, so the list at `/library` and the Results
- * Graph at `/library/graph` describe the same Hands, and a reload or a shared
- * link keeps them. Opened from a Room, it leads back there and adds the
+ * The filter and the sort live in the address, so the list at `/library`, the Results
+ * Graph at `/library/graph` and the Stats at `/library/stats` describe the
+ * same Hands, and a reload or a shared link keeps them. Opened from a Room, it leads back there and adds the
  * selected Hands to the Room's Queue, as the board's "Añadir a la sala" does;
  * there it is only ever the list.
  */
@@ -89,6 +92,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState<{ state: 'loaded'; page: Page } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [results, setResults] = useState<Results | null>(null)
+  const [stats, setStats] = useState<{ state: 'loaded'; stats: LibraryStats } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [importing, setImporting] = useState(false)
   // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
@@ -102,8 +106,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   if (lastFilteredBy !== filteredBy) {
     setLastFilteredBy(filteredBy)
     setSelected([])
-    // The graph of other Hands mustn't stay beside the new list.
+    // The graph or the Stats of other Hands mustn't stay beside the new list.
     setResults(null)
+    setStats(null)
   }
 
   useEffect(() => {
@@ -133,6 +138,19 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       cancelled = true
     }
   }, [token, filter, zoomFrom, zoomTo, revision, view])
+
+  // The Stats read the same filter too, so they count the same Hands as the list and the graph.
+  useEffect(() => {
+    if (view !== 'stats') return
+    let cancelled = false
+    api<LibraryStats>(`/library/stats?${libraryFilterQuery(filter)}`, { token })
+      .then((read) => !cancelled && setStats({ state: 'loaded', stats: read }))
+      // Stats that can't be read say why, as the list does.
+      .catch((error: unknown) => !cancelled && setStats({ state: 'failed', reason: reasonOf(error) }))
+    return () => {
+      cancelled = true
+    }
+  }, [token, filter, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
   // Back from a Hand, the list lands as far down as it was left, once its Hands are there again.
@@ -174,9 +192,11 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const changeFilter = (next: LibraryFilter) => redirect(`${path}${withLibrarySort(librarySearch(next), sort)}`)
   const changeSort = (by: LibrarySortColumn) =>
     redirect(`${path}${withLibraryPage(withLibrarySort(search, nextLibrarySort(sort, by)), 1)}`)
-  // Either view keeps the filter; going back returns to the view left.
+  // A Stat's links open Manos on the Hands behind it, every other filter and the sort kept; going back returns to the Stats.
+  const statHref = (stat: StatCriterion) => `${libraryViewPath('list')}${withLibrarySort(librarySearch({ ...filter, stat }), sort)}`
+  // Every view keeps the filter; going back returns to the view left.
   const showView = (next: LibraryView) => {
-    // The graph shows no rows to select.
+    // The graph and the Stats show no rows to select.
     setSelected([])
     navigate(`${libraryViewPath(next)}${search}`)
   }
@@ -346,6 +366,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               options={[
                 { value: 'list', label: t('library.view.hands') },
                 { value: 'graph', label: t('library.view.graph') },
+                { value: 'stats', label: t('library.view.stats') },
               ]}
               value={view}
               onChange={showView}
@@ -358,6 +379,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               onZoom={(zoom) => redirect(`${path}${withLibraryZoom(search, zoom)}`)}
               onLeaveZoom={() => redirect(`${path}${withLibraryZoom(search, null)}`)}
             />
+          )}
+          {view === 'stats' && stats?.state === 'failed' && (
+            <p className="library__failure" role="alert">
+              {t(`reason.${stats.reason}`)}
+            </p>
+          )}
+          {view === 'stats' && page && page.total > 0 && stats?.state === 'loaded' && stats.stats.hands > 0 && (
+            <StatsView stats={stats.stats} statHref={statHref} />
           )}
           {page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
