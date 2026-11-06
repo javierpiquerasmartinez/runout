@@ -186,8 +186,13 @@
   width: 320px;
   border-right: 1px solid var(--color-panel-border);
 }
+/* Taller than a 13" laptop's viewport once a Hand ends: it scrolls itself, never the page. */
 .room-side {
+  /* Positioned, like the Queue's list, so visually hidden text far down it is
+     placed inside its scroll box; placed against the page, it scrolled the page. */
+  position: relative;
   width: 300px;
+  overflow-y: auto;
   border-left: 1px solid var(--color-panel-border);
 }
 
@@ -333,6 +338,7 @@
 }
 
 .room-queue__list {
+  position: relative;
   flex-grow: 1;
   min-height: 0;
   overflow-y: auto;
@@ -600,6 +606,24 @@
   width: min(100%, 820px);
   aspect-ratio: 820 / 606;
   container-type: inline-size;
+}
+
+/*
+ * While the Room is exactly the viewport's height, a stage smaller than the
+ * board scales the whole table down as one picture, so a 13" laptop sees it
+ * whole. Only zoom will do: seats, bets, cards and the pot are sized in px
+ * for 820 × 606 (tableLayout.ts), so narrowing the table alone makes them
+ * collide. tan(atan2(a, b)) is a / b as a plain number. A page that grows
+ * with its content (narrow layouts) keeps the width rule.
+ */
+@media (min-width: 761px) {
+  .room .room-stage__play {
+    container-type: size;
+  }
+  .room .poker-table {
+    width: 820px;
+    zoom: min(1, tan(atan2(100cqw, 820px)), tan(atan2(100cqh, 606px)));
+  }
 }
 
 .poker-table__felt {

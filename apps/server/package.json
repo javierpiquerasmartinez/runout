@@ -23,7 +23,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:local": "node scripts/local-db.ts",
-    "db:backfill-stats": "nest build && node dist/backfill-stats.js"
+    "db:backfill-stats": "nest build && node dist/backfill-stats.js",
+    "e2e:stack": "pnpm build && node scripts/e2e-stack.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

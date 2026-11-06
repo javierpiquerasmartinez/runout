@@ -75,6 +75,7 @@ The server persists to Postgres through [Drizzle](https://orm.drizzle.team): Neo
 
 - `pnpm test` runs the unit tests.
 - `pnpm --filter @runout/server test:e2e` boots the real server against a real Postgres. Each run starts its own throwaway Postgres on a free port, applies every migration, and deletes it at the end, so it needs no database setup and never touches your local data. Use `startApp()` from `apps/server/test/support/app.ts` to boot the app in a test; it returns the app's `TestClock`, which you `advance()` to trigger time-based rules.
+- `pnpm --filter @runout/web test:e2e` runs the browser tests in `apps/web/e2e` with [Playwright](https://playwright.dev) in Chromium, for what jsdom can't check because it lays nothing out. Today that is the replayer's layout: on a Library Hand and in a Room, at 1440×760, 1280×640, 1000×620, 1000×900 and 1920×1000, the page never scrolls, the transport bar stays on screen, and stepping through every Action of every seeded Hand no two pieces of the table (bets, board cards, the pot, the dealer button, seat plates, cards and statuses) overlap by more than 1 px. Playwright starts everything itself, on ports of its own so a running `pnpm dev` is left alone: the server, built and started by `pnpm --filter @runout/server e2e:stack` against a throwaway Postgres (deleted at the end) in Test mode, on port 3183; and Vite with `VITE_DEV_SIGN_IN` on, on http://127.0.0.1:5183. `e2e/seed.ts` signs in as Tester A, imports fixture Hand Histories into their Library and makes one Room per viewport before the tests run, and each test signs in through the Test mode button. The first time, install the browser with `pnpm --filter @runout/web exec playwright install chromium`. A failure names the Hand, the step and the overlapping pieces, and leaves a trace in `apps/web/test-results/` (`pnpm --filter @runout/web exec playwright show-trace <path>`).
 
 The visual system (tokens, fonts, icon sprite and components from the design-system boards of Design.html) is on show at http://localhost:5173/design-system, in both languages and both themes.
 
@@ -95,3 +96,4 @@ The visual system (tokens, fonts, icon sprite and components from the design-sys
 | `pnpm test` | Unit tests (Vitest) for both apps and the shared package |
 | `pnpm lint` | Oxlint for both apps and the shared package |
 | `pnpm --filter @runout/server test:e2e` | Backend end-to-end tests (HTTP + WS) |
+| `pnpm --filter @runout/web test:e2e` | Browser tests (Playwright, Chromium): the replayer's layout |
