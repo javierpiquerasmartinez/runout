@@ -69,6 +69,7 @@ The server persists to Postgres through [Drizzle](https://orm.drizzle.team): Neo
 - **Local Postgres.** `pnpm --filter @runout/server db:local` runs a Postgres that matches `.env.example` on port 5432, without Docker. It keeps its data in `apps/server/.data/postgres`; stop it with Ctrl+C. Any other Postgres works too: point `DATABASE_URL` at it.
 - **Changing the schema.** Edit `apps/server/src/database/schema.ts`, then run `pnpm --filter @runout/server db:generate` to write a versioned SQL migration into `apps/server/drizzle/`. Review it and commit it with the schema change. Never edit a migration that has already been applied anywhere; write a new one.
 - **Applying migrations.** `pnpm --filter @runout/server db:migrate` applies pending migrations to the database at `DATABASE_URL`. Run it locally after pulling, and against Neon (with Neon's `DATABASE_URL`, `sslmode=require`) before deploying a server that needs the new schema.
+- **Backfilling the Stats.** Migration `0027_hand_stats` keeps the Hero's Stats in each Hand, written at import; Hands stored before it have none, and count no opportunity in Estadísticas. After applying it, run `pnpm --filter @runout/server db:backfill-stats` once against the same `DATABASE_URL` to work them out from each Hand's stored content. It replaces a Hand's rows rather than adding to them, so it can run again safely, and says how many Hands it went through.
 
 ## Tests
 

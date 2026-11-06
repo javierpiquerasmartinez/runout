@@ -6,7 +6,17 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { readMigrationFiles } from 'drizzle-orm/migrator';
 import pg from 'pg';
+import request from 'supertest';
 import { inject } from 'vitest';
+import * as schema from '../src/database/schema.js';
+import { heroSeat } from '../src/hands/hand.js';
+import { importHandHistory } from '../src/hands/import/import.js';
+import { heroResult } from '../src/hands/replay/hero-result.js';
+import { finalPot } from '../src/hands/replay/overview.js';
+import { backfillStats } from '../src/hands/stats-backfill.js';
+import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
+import { fixture, withFreshHandIds } from './support/hand-histories.js';
 import { MIGRATIONS_FOLDER } from './support/migrations.js';
 
 describe('Test database (e2e)', () => {
@@ -418,6 +428,130 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
         { column_name: 'rake', is_nullable: 'YES' },
       ]);
     } finally {
+      await client.end();
+    }
+  });
+
+  /** Imports `text` into the Library of the Account behind `token`. */
+  async function importText(
+    running: RunningApp,
+    token: string,
+    text: string,
+  ): Promise<void> {
+    const preview = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text })
+      .expect(201);
+    await request(running.httpServer)
+      .post('/api/library/imports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ previews: [preview.body.id as string] })
+      .expect(201);
+  }
+
+  async function libraryStats(running: RunningApp, token: string) {
+    const res = await request(running.httpServer)
+      .get('/api/library/stats')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return res.body as {
+      hands: number;
+      stats: Record<string, { opportunities: number; taken: number }>;
+    };
+  }
+
+  it('gives the Hands stored before Stats their Stat rows once the backfill has run, the same rows each time', async () => {
+    await migrateUpTo('0026_rake_not_null');
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    // iMapleAA opens with a raise twice, folds first in and folds the big
+    // blind to a raise.
+    const text = fixture('pokerstars-session.txt');
+    const read = importHandHistory(text);
+    let running: RunningApp | undefined;
+    let fresh: RunningApp | undefined;
+    try {
+      const {
+        rows: [identity],
+      } = await client.query<{ id: string }>(
+        `insert into identities (google_subject, email, created_at)
+         values ('ana-subject', 'ana@example.com', now()) returning id`,
+      );
+      for (const [index, hand] of read.hands.entries()) {
+        const result = heroResult(hand);
+        await client.query(
+          `insert into hands (site, site_hand_id, hero_screen_name, hero_seat, importer_id,
+             source_format, played_at, small_blind, big_blind, currency, hero_result,
+             hero_all_in_ev, hero_reached_showdown, final_pot, rake, hero_rake_generated,
+             content, hand_history, imported_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+             $16, $17, $18, now())`,
+          [
+            hand.site,
+            hand.siteHandId,
+            hand.hero.screenName,
+            heroSeat(hand),
+            identity.id,
+            hand.sourceFormat,
+            hand.playedAt,
+            hand.stake.smallBlind,
+            hand.stake.bigBlind,
+            hand.stake.currency,
+            result.result,
+            result.allInEv,
+            result.reachedShowdown,
+            finalPot(hand),
+            hand.rake,
+            result.rakeGenerated,
+            JSON.stringify(hand),
+            read.texts[index],
+          ],
+        );
+      }
+      await migrateWith(MIGRATIONS_FOLDER);
+      running = await startApp({ databaseUrl });
+      // The same Hands into a Library: they are already stored, so the
+      // Library keeps them as they are, with no Stat rows yet.
+      const ana = await newAccount(running.httpServer);
+      await importText(running, ana.token, text);
+      const before = await libraryStats(running, ana.token);
+      expect(before.hands).toBe(4);
+      expect(before.stats.vpip).toEqual({ opportunities: 0, taken: 0 });
+
+      const db = drizzle({
+        client: new pg.Pool({ connectionString: databaseUrl }),
+        schema,
+      });
+      const statRows = async () =>
+        (
+          await client.query(
+            'select hand_id, stat, opportunities, taken from hand_stats order by hand_id, stat',
+          )
+        ).rows;
+      let once: unknown[];
+      try {
+        expect(await backfillStats(db)).toBe(4);
+        once = await statRows();
+        expect(await backfillStats(db)).toBe(4);
+      } finally {
+        await db.$client.end();
+      }
+      expect(once.length).toBeGreaterThan(0);
+      expect(await statRows()).toEqual(once);
+
+      const after = await libraryStats(running, ana.token);
+      expect(after.hands).toBe(4);
+      expect(after.stats.vpip).toEqual({ opportunities: 4, taken: 2 });
+      expect(after.stats.pfr).toEqual({ opportunities: 4, taken: 2 });
+      // Counted like the same Hands newly imported.
+      fresh = await startApp();
+      const bea = await newAccount(fresh.httpServer);
+      await importText(fresh, bea.token, withFreshHandIds(text));
+      expect(after).toEqual(await libraryStats(fresh, bea.token));
+    } finally {
+      await running?.close();
+      await fresh?.close();
       await client.end();
     }
   });

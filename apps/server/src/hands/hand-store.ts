@@ -191,7 +191,7 @@ export async function storeHands(
       })
       .returning(keyColumns);
     for (const row of stored) ids.set(rowKey(row), row.id);
-    await storeStats(
+    await replaceStats(
       tx,
       stored.map((row) => ({
         id: row.id,
@@ -207,18 +207,26 @@ export async function storeHands(
 }
 
 /**
- * Writes the Hero's Stat rows of Hands just stored: one per Stat they had
- * an opportunity at (see `heroStats`).
+ * Writes the Hero's Stat rows of the stored Hands given, each worked out from
+ * the Hand given with it, in place of any rows they had: one per Stat they
+ * had an opportunity at (see `heroStats`).
  */
-async function storeStats(
-  tx: Transaction,
+export async function replaceStats(
+  db: Database | Transaction,
   stored: { id: string; hand: Hand }[],
 ): Promise<void> {
+  if (stored.length === 0) return;
+  await db.delete(handStats).where(
+    inArray(
+      handStats.handId,
+      stored.map(({ id }) => id),
+    ),
+  );
   const rows = stored.flatMap(({ id, hand }) => {
     const stats = heroStats(hand);
     return STAT_KEYS.filter((stat) => stats[stat].opportunities > 0).map(
       (stat) => ({ handId: id, stat, ...stats[stat] }),
     );
   });
-  if (rows.length > 0) await tx.insert(handStats).values(rows);
+  if (rows.length > 0) await db.insert(handStats).values(rows);
 }
