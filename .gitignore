@@ -16,3 +16,7 @@ skills-lock.json
 
 # Landing video source clip (re-encoded into apps/web/public/landing-trails.*)
 apps/web/public/video.mp4
+
+# Playwright (apps/web/e2e)
+test-results/
+playwright-report/
