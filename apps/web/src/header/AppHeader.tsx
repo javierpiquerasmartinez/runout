@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { adminPath } from '../admin/admin'
 import { calendarPath } from '../calendar/calendar'
 import { useI18n } from '../i18n'
@@ -60,9 +60,30 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
   )
 }
 
-/** "Biblioteca · Salas · Laboratorio · Calendario", the section this person is in marked. */
+/**
+ * "Biblioteca · Salas · Laboratorio · Calendario", the section this person is
+ * in marked. Where they don't all fit (a phone), they scroll sideways, opening
+ * with the current one in view, and fade out on the side where more are hidden.
+ */
 function SectionNav({ current }: { current?: Section }) {
   const { t } = useI18n()
+  const nav = useRef<HTMLElement>(null)
+
+  useLayoutEffect(() => {
+    const element = nav.current
+    if (!element) return
+    const marked = element.querySelector<HTMLElement>('[aria-current="page"]')
+    if (marked) {
+      const end = marked.offsetLeft + marked.offsetWidth
+      if (end > element.scrollLeft + element.clientWidth) element.scrollLeft = end - element.clientWidth
+      else if (marked.offsetLeft < element.scrollLeft) element.scrollLeft = marked.offsetLeft
+    }
+    markHiddenSections(element)
+    const resized = () => markHiddenSections(element)
+    window.addEventListener('resize', resized)
+    return () => window.removeEventListener('resize', resized)
+  }, [current])
+
   const sections: { section: Section; href: string; label: string }[] = [
     { section: 'library', href: libraryPath, label: t('header.nav.library') },
     { section: 'rooms', href: roomsPath, label: t('header.nav.rooms') },
@@ -70,7 +91,7 @@ function SectionNav({ current }: { current?: Section }) {
     { section: 'calendar', href: calendarPath, label: t('header.nav.calendar') },
   ]
   return (
-    <nav className="app-header__nav" aria-label={t('header.nav')}>
+    <nav ref={nav} className="app-header__nav" aria-label={t('header.nav')} onScroll={(event) => markHiddenSections(event.currentTarget)}>
       {sections.map(({ section, href, label }) => (
         <a
           key={section}
@@ -84,6 +105,12 @@ function SectionNav({ current }: { current?: Section }) {
       ))}
     </nav>
   )
+}
+
+/** Marks the sides of the scrolled sections where some are out of view, so they fade out there. */
+function markHiddenSections(nav: HTMLElement) {
+  nav.toggleAttribute('data-hidden-start', nav.scrollLeft > 0)
+  nav.toggleAttribute('data-hidden-end', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1)
 }
 
 /** Back to the Room still going on behind this page: live, so in sync teal. */

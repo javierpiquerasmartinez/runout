@@ -9,6 +9,37 @@ import { AppHeader } from './AppHeader'
 
 afterEach(() => window.history.replaceState(null, '', '/'))
 
+/**
+ * Gives elements the layout jsdom lacks, each measure worked out per element,
+ * and a scrollLeft that keeps what is set; returns what puts jsdom back.
+ */
+function layOut(measures: Record<'clientWidth' | 'offsetLeft' | 'offsetWidth', (element: HTMLElement) => number>) {
+  const scrolled = new WeakMap<Element, number>()
+  const originals = (['clientWidth', 'offsetLeft', 'offsetWidth', 'scrollLeft'] as const).map((name) => [name, Object.getOwnPropertyDescriptor(name === 'clientWidth' || name === 'scrollLeft' ? Element.prototype : HTMLElement.prototype, name)] as const)
+  for (const [name, measure] of Object.entries(measures)) {
+    Object.defineProperty(name === 'clientWidth' ? Element.prototype : HTMLElement.prototype, name, {
+      configurable: true,
+      get(this: HTMLElement) {
+        return measure(this)
+      },
+    })
+  }
+  Object.defineProperty(Element.prototype, 'scrollLeft', {
+    configurable: true,
+    get(this: Element) {
+      return scrolled.get(this) ?? 0
+    },
+    set(this: Element, value: number) {
+      scrolled.set(this, value)
+    },
+  })
+  return () => {
+    for (const [name, descriptor] of originals) {
+      Object.defineProperty(name === 'clientWidth' || name === 'scrollLeft' ? Element.prototype : HTMLElement.prototype, name, descriptor!)
+    }
+  }
+}
+
 function renderHeader(session: SessionContextValue = fakeSession()) {
   render(
     <I18nProvider initialLocale="en">
@@ -124,6 +155,44 @@ describe('AppHeader · getting around', () => {
     expect(links[2].getAttribute('href')).toBe('/lab/analysis')
     expect(links[2].getAttribute('aria-current')).toBe('page')
     expect(links[0].getAttribute('aria-current')).toBeNull()
+  })
+
+  it('scrolls the sections sideways to keep the current one in view when they do not all fit', () => {
+    // jsdom has no layout: the sections are laid out 90 px wide, 4 px apart, in a nav 200 px wide.
+    const restore = layOut({
+      clientWidth: (element) => (element.tagName === 'NAV' ? 200 : 0),
+      offsetLeft: (element) => (element.tagName === 'A' ? [...element.parentElement!.children].indexOf(element) * 94 : 0),
+      offsetWidth: (element) => (element.tagName === 'A' ? 90 : 0),
+    })
+    try {
+      render(
+        <I18nProvider initialLocale="en">
+          <SessionContext.Provider value={fakeSession()}>
+            <AppHeader current="calendar" />
+          </SessionContext.Provider>
+        </I18nProvider>,
+      )
+
+      // The Calendar runs from 282 to 372: the nav shows 172 to 372.
+      expect(screen.getByRole('navigation', { name: 'Sections' }).scrollLeft).toBe(172)
+    } finally {
+      restore()
+    }
+  })
+
+  it('leaves the sections unscrolled when the current one is in view', () => {
+    const restore = layOut({
+      clientWidth: (element) => (element.tagName === 'NAV' ? 200 : 0),
+      offsetLeft: (element) => (element.tagName === 'A' ? [...element.parentElement!.children].indexOf(element) * 94 : 0),
+      offsetWidth: (element) => (element.tagName === 'A' ? 90 : 0),
+    })
+    try {
+      renderHeader()
+
+      expect(screen.getByRole('navigation', { name: 'Sections' }).scrollLeft).toBe(0)
+    } finally {
+      restore()
+    }
   })
 
   it('leads the brand to the Library', () => {
