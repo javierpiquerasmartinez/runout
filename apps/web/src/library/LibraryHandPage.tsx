@@ -204,7 +204,7 @@ function HandNotes({ handId }: { handId: string }) {
                 <p className="room-notes__body">{note.body}</p>
                 <div className="room-notes__controls">
                   <IconButton
-                    icon="note"
+                    icon="edit"
                     label={t('room.notes.edit', { name: note.writer.displayName })}
                     size="compact"
                     onClick={() => setEditing(note.id)}

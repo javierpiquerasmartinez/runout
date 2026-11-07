@@ -1636,14 +1636,13 @@
 .room-facts {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
   margin: 0;
 }
 .room-facts__row {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 28px;
 }
 .room-facts__row dt {
   width: 92px;
