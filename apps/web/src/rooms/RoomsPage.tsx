@@ -60,12 +60,10 @@ export function RoomsPage() {
  * there are none or the server could not say (the panels are a way in anyway).
  */
 function useOpenRooms(token: string | null): { list: OpenRoom[] | undefined; set: (rooms: OpenRoom[]) => void } {
-  const [list, setList] = useState<OpenRoom[] | undefined>(undefined)
+  // Without a token there is nobody to ask for: no Rooms.
+  const [list, setList] = useState<OpenRoom[] | undefined>(token ? undefined : [])
   useEffect(() => {
-    if (!token) {
-      setList([])
-      return
-    }
+    if (!token) return
     let current = true
     api<OpenRoom[]>('/rooms', { token })
       .then((rooms) => current && setList(rooms))
