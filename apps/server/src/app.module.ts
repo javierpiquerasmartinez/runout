@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module.js';
+import { CalendarModule } from './calendar/calendar.module.js';
 import { ClockModule } from './clock/clock.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HandsModule } from './hands/hands.module.js';
@@ -21,6 +22,7 @@ import { RoomsModule } from './rooms/rooms.module.js';
     RoomsModule,
     LibraryModule,
     LabModule,
+    CalendarModule,
     ImportsModule,
     HandsModule,
     AdminModule,
