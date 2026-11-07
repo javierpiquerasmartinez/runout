@@ -16,6 +16,7 @@ import {
   periodPath,
   periodSpan,
   previousPeriod,
+  switchView,
   todayOf,
   todayPeriod,
   weekDays,
@@ -188,6 +189,18 @@ describe('moving between periods', () => {
     expect(todayPeriod('month', '2026-11-07')).toEqual(month(2026, 11))
     expect(todayPeriod('week', '2026-11-07')).toEqual(week('2026-11-02'))
     expect(todayPeriod('week', '2027-01-01')).toEqual(week('2026-12-28'))
+  })
+
+  it("switches a month to the week of its first day, or to today's week in the current month", () => {
+    expect(switchView(month(2026, 12), '2026-11-07')).toEqual(week('2026-11-30'))
+    expect(switchView(month(2027, 2), '2026-11-07')).toEqual(week('2027-02-01'))
+    expect(switchView(month(2026, 11), '2026-11-07')).toEqual(week('2026-11-02'))
+    expect(switchView(month(2026, 11), '2026-11-30')).toEqual(week('2026-11-30'))
+  })
+
+  it('switches a week to the month of its Monday', () => {
+    expect(switchView(week('2026-11-30'), '2026-11-07')).toEqual(month(2026, 11))
+    expect(switchView(week('2026-12-28'), '2026-11-07')).toEqual(month(2026, 12))
   })
 })
 

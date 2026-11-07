@@ -67,7 +67,9 @@ export function Routes() {
   // The Calendar opens on the current month, and so does any period it can't show.
   if (isCalendarPath(path)) {
     const period = periodFromPath(path)
-    if (period?.view !== 'month') return <Redirect to={periodPath(todayPeriod('month', todayOf()))} />
+    if (!period) return <Redirect to={periodPath(todayPeriod('month', todayOf()))} />
+    // A week written on another day than its Monday is shown at its Monday's address.
+    if (path !== periodPath(period)) return <Redirect to={periodPath(period)} />
     return <CalendarPage period={period} />
   }
   // One screen for both views, so switching keeps its state; it reads which from the path.
