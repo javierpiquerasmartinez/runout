@@ -11,6 +11,7 @@ import {
   milestonePath,
   openedFromCalendar,
   isPending,
+  dayTally,
   mondayOf,
   monthGrid,
   nextPeriod,
@@ -321,5 +322,14 @@ describe("a day's Milestones", () => {
     expect(isPending(milestone('Today', 1), '2026-11-10')).toBe(false)
     expect(isPending(milestone('Tomorrow', 1), '2026-11-09')).toBe(false)
     expect(isPending(milestone('Done', 1, true), '2026-11-11')).toBe(false)
+  })
+})
+
+describe("a day's tally on a narrow screen", () => {
+  it('counts its Milestones, and tones it by what slipped and what is done', () => {
+    expect(dayTally([], '2026-11-11')).toEqual({ count: 0, pending: 0, tone: 'empty' })
+    expect(dayTally([milestone('Open', 1), milestone('Done', 2, true)], '2026-11-10')).toEqual({ count: 2, pending: 0, tone: 'open' })
+    expect(dayTally([milestone('Slipped', 1), milestone('Done', 2, true)], '2026-11-11')).toEqual({ count: 2, pending: 1, tone: 'pending' })
+    expect(dayTally([milestone('Done', 1, true), milestone('Also', 2, true)], '2026-11-11')).toEqual({ count: 2, pending: 0, tone: 'done' })
   })
 })

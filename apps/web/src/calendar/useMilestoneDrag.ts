@@ -144,7 +144,7 @@ function swallowNextClick() {
 }
 
 /** Whether the screen is under the narrow breakpoint, following it as it changes. */
-function useNarrowScreen(): boolean {
+export function useNarrowScreen(): boolean {
   return useSyncExternalStore(
     (changed) => {
       const query = window.matchMedia?.(NARROW_SCREEN)

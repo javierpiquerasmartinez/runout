@@ -27,7 +27,8 @@ import { CreateMilestoneDialog } from './CreateMilestoneDialog'
 import { DraggedMilestone } from './DraggedMilestone'
 import { MonthGrid } from './MonthGrid'
 import { WeekGrid } from './WeekGrid'
-import { useMilestoneDrag } from './useMilestoneDrag'
+import { MonthCounts } from './MonthCounts'
+import { useMilestoneDrag, useNarrowScreen } from './useMilestoneDrag'
 import './CalendarPage.css'
 
 /**
@@ -35,6 +36,8 @@ import './CalendarPage.css'
  * week, with previous, next and "Hoy" to move between periods and Mes/Semana
  * to switch views, each move a new address.
  * A day's empty space and "Nuevo hito" open the dialog that creates one.
+ * On a narrow screen the month shows how many Milestones each day has, a tap
+ * on a day opening its week, and the week lists its days one under another.
  */
 export function CalendarPage({ period }: { period: Period }) {
   const i18n = useI18n()
@@ -43,6 +46,7 @@ export function CalendarPage({ period }: { period: Period }) {
   const span = periodSpan(period)
   const { milestones, loading, hasAny, failed, add, setDone, move, unsaved } = useMilestones(span)
   const { dragged, onPointerDown, onDragStart } = useMilestoneDrag({ milestones, onMove: move })
+  const narrow = useNarrowScreen()
   const [creatingOn, setCreatingOn] = useState<CalendarDate | null>(null)
 
   const byDay = useMemo(() => {
@@ -72,13 +76,15 @@ export function CalendarPage({ period }: { period: Period }) {
           </div>
           <h1 className="calendar-page__heading ro-serif">{heading}</h1>
           <span className="calendar-page__spacer" />
-          <SegmentedControl
-            label={t('calendar.view')}
-            options={views}
-            value={period.view}
-            onChange={(view) => view !== period.view && navigate(periodPath(switchView(period, today)))}
-          />
-          <Button size="compact" onClick={() => setCreatingOn(today)}>
+          <span className="calendar-page__views">
+            <SegmentedControl
+              label={t('calendar.view')}
+              options={views}
+              value={period.view}
+              onChange={(view) => view !== period.view && navigate(periodPath(switchView(period, today)))}
+            />
+          </span>
+          <Button size="compact" className="calendar-page__new" onClick={() => setCreatingOn(today)}>
             <Icon name="add" size={14} />
             {t('calendar.newMilestone')}
           </Button>
@@ -93,9 +99,10 @@ export function CalendarPage({ period }: { period: Period }) {
             {t(unsaved.message, { title: unsaved.title })}
           </p>
         )}
-        {period.view === 'month' && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} />}
-        {period.view === 'week' && <WeekGrid monday={period.monday} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} />}
-        {hasAny === false && (
+        {period.view === 'month' && narrow && <MonthCounts month={period.month} today={today} milestones={byDay} />}
+        {period.view === 'month' && !narrow && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} />}
+        {period.view === 'week' && <WeekGrid monday={period.monday} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} narrow={narrow} />}
+        {hasAny === false && !(narrow && period.view === 'month') && (
           <div className="calendar-page__hint">
             <p>{t('calendar.emptyHint')}</p>
           </div>

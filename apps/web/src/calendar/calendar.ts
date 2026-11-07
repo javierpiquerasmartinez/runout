@@ -251,3 +251,22 @@ export function cellMilestones(milestones: readonly Milestone[]): { shown: Miles
 export function isPending(milestone: Milestone, today: CalendarDate): boolean {
   return !milestone.done && milestone.date < today
 }
+
+/**
+ * How a day of the month sums up its Milestones on a narrow screen: how many,
+ * how many slipped, and the count's tone (brass when any slipped, muted when
+ * all are done, plain otherwise; none when there are no Milestones).
+ */
+export interface DayTally {
+  count: number
+  pending: number
+  tone: 'empty' | 'open' | 'pending' | 'done'
+}
+
+/** A day's Milestones summed up for a narrow screen's month. */
+export function dayTally(milestones: readonly Milestone[], today: CalendarDate): DayTally {
+  const count = milestones.length
+  const pending = milestones.filter((milestone) => isPending(milestone, today)).length
+  const tone = count === 0 ? 'empty' : pending > 0 ? 'pending' : milestones.every(({ done }) => done) ? 'done' : 'open'
+  return { count, pending, tone }
+}

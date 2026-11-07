@@ -543,6 +543,23 @@
   font-weight: 600;
 }
 
+/*
+ * On a phone the last part alone can't always make room (a week across a year
+ * and a long title): the parts between the first and the last give way too,
+ * reluctantly, cut with an ellipsis. The first keeps its whole name.
+ */
+@media (max-width: 760px) {
+  .ro-breadcrumb__step:not(:first-child, .ro-breadcrumb__step--current) {
+    min-width: 0;
+    flex-shrink: 0.25;
+  }
+  .ro-breadcrumb__step:not(:first-child, .ro-breadcrumb__step--current) .ro-breadcrumb__link {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* ---------- Avatar ---------- */
 
 .ro-avatar {

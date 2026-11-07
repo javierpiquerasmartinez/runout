@@ -1,5 +1,5 @@
 import type { I18n } from '../i18n/context'
-import { addDays, dayOfMonth, firstOfMonth, intlDate, monthOf, type CalendarDate, type Month } from './calendar'
+import { addDays, dayOfMonth, firstOfMonth, intlDate, monthOf, type CalendarDate, type DayTally, type Month } from './calendar'
 
 type Formatter = Pick<I18n, 'formatDate' | 'locale'>
 
@@ -40,4 +40,28 @@ export function weekHeading({ formatDate, t }: Formatter & Pick<I18n, 't'>, mond
 /** "lun", "Mon": a day of the week as a column is headed. */
 export function weekdayShort({ formatDate }: Formatter, date: CalendarDate): string {
   return formatDate(intlDate(date), { weekday: 'short', timeZone: 'UTC' })
+}
+
+/** "L", "M": a day of the week as a narrow screen's month heads its column. */
+export function weekdayNarrow({ formatDate }: Formatter, date: CalendarDate): string {
+  return formatDate(intlDate(date), { weekday: 'narrow', timeZone: 'UTC' })
+}
+
+/** "lunes", "Monday": a day of the week as a narrow screen's week heads it. */
+export function weekdayLong({ formatDate }: Formatter, date: CalendarDate): string {
+  return formatDate(intlDate(date), { weekday: 'long', timeZone: 'UTC' })
+}
+
+/**
+ * "martes, 3 de noviembre, 2 hitos, 1 pendiente": a day of a narrow screen's
+ * month named with how many Milestones it has and how many slipped.
+ */
+export function dayWithTally(i18n: Formatter & Pick<I18n, 't'>, date: CalendarDate, today: CalendarDate, { count, pending }: DayTally): string {
+  const { t } = i18n
+  const name = dayName(i18n, date)
+  const day = date === today ? t('calendar.day.today', { day: name }) : name
+  if (count === 0) return t('calendar.day.none', { day })
+  const withCount = t(count === 1 ? 'calendar.day.milestones.one' : 'calendar.day.milestones.other', { day, count })
+  if (pending === 0) return withCount
+  return t(pending === 1 ? 'calendar.day.pending.one' : 'calendar.day.pending.other', { day: withCount, count: pending })
 }

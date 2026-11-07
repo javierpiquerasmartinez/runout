@@ -848,3 +848,109 @@ describe('CalendarPage · dragging Milestones between days', () => {
     expect(moves()).toEqual([])
   })
 })
+
+describe('CalendarPage · on a narrow screen', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 760px)', addEventListener() {}, removeEventListener() {} }))
+  })
+
+  /** A day of the month on a narrow screen: its number, then how many Milestones it has. */
+  const dayLink = (name: string) => screen.getByRole('link', { name })
+  const count = (link: HTMLElement) => link.querySelector('[data-count]')?.textContent ?? null
+
+  it('shows how many Milestones each day of the month has, and which have slipped, instead of their titles', async () => {
+    planned('2026-11-03', 'Slipped')
+    planned('2026-11-03', 'Reviewed', true)
+    planned('2026-11-07', 'Squeeze')
+    planned('2026-10-27', 'Old', true)
+    renderAt('/calendar/month/2026-11')
+
+    const tuesday = await screen.findByRole('link', { name: 'Tuesday, November 3, 2 milestones, 1 pending' })
+    expect(count(tuesday)).toBe('2')
+    expect(count(dayLink('Saturday, November 7, today, 1 milestone'))).toBe('1')
+    expect(count(dayLink('Tuesday, October 27, 1 milestone'))).toBe('1')
+    expect(count(dayLink('Wednesday, November 4, no milestones'))).toBeNull()
+    expect(screen.queryByText('Slipped')).toBeNull()
+    expect(screen.queryByRole('grid')).toBeNull()
+    expect(screen.getByText('Tap a day to see its week.')).toBeTruthy()
+  })
+
+  it('opens the week holding the day tapped, a new entry that back undoes', async () => {
+    const user = userEvent.setup()
+    planned('2026-11-19', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+
+    await user.click(await screen.findByRole('link', { name: 'Thursday, November 19, 1 milestone' }))
+
+    expect((await heading()).textContent).toBe('Nov 16 – 22, 2026')
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-16')
+    expect(await within(column('Thursday, November 19')).findByText('Squeeze')).toBeTruthy()
+    expect(dialog()).toBeNull()
+
+    window.history.back()
+    expect(await screen.findByRole('link', { name: 'Thursday, November 19, 1 milestone' })).toBeTruthy()
+  })
+
+  it('says the days of the month in Spanish', async () => {
+    planned('2026-11-03', 'Repaso')
+    renderAt('/calendar/month/2026-11', 'es')
+
+    expect(await screen.findByRole('link', { name: 'martes, 3 de noviembre, 1 hito, 1 pendiente' })).toBeTruthy()
+    expect(dayLink('sábado, 7 de noviembre, hoy, sin hitos')).toBeTruthy()
+    expect(screen.getByText('Toca un día para ver su semana.')).toBeTruthy()
+  })
+
+  it('lists the week day by day, each with its Milestones or saying there are none', async () => {
+    planned('2026-11-02', 'Squeeze')
+    renderAt('/calendar/week/2026-11-02')
+
+    expect(await within(column('Monday, November 2')).findByText('Squeeze')).toBeTruthy()
+    expect(within(column('Sunday, November 8')).getByText('Nothing planned.')).toBeTruthy()
+    expect(within(column('Monday, November 2')).queryByText('Nothing planned.')).toBeNull()
+    expect(column('Saturday, November 7, today')).toBeTruthy()
+  })
+
+  it('creates on the day whose empty space is tapped in the week, and from its +', async () => {
+    const user = userEvent.setup()
+    planned('2026-11-04', 'Squeeze')
+    renderAt('/calendar/week/2026-11-02')
+    await within(column('Wednesday, November 4')).findByText('Squeeze')
+
+    await user.click(column('Wednesday, November 4'))
+    expect(dateField().value).toBe('2026-11-04')
+    await user.type(titleField(), 'Thin value')
+    await user.click(within(dialog()!).getByRole('button', { name: 'Create milestone' }))
+    await waitFor(() => expect(dialog()).toBeNull())
+    expect(within(column('Wednesday, November 4')).getByText('Thin value')).toBeTruthy()
+
+    await user.click(within(column('Sunday, November 8')).getByRole('button', { name: 'New milestone on Sunday, November 8' }))
+    expect(dateField().value).toBe('2026-11-08')
+  })
+
+  it('opens a Milestone of the week list when tapped, without creating', async () => {
+    const user = userEvent.setup()
+    planned('2026-11-04', 'Squeeze')
+    renderAt('/calendar/week/2026-11-02')
+
+    await user.click(await within(column('Wednesday, November 4')).findByText('Squeeze'))
+
+    expect(dialog()).toBeNull()
+    expect(window.location.pathname).toBe('/calendar/milestones/m1')
+  })
+
+  it('keeps "New milestone", Month/Week, previous, next and Today', async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/month/2026-11')
+    await heading()
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+    expect((await heading()).textContent).toBe('December 2026')
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+    await user.click(screen.getByRole('radio', { name: 'Week' }))
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-02')
+    await user.click(screen.getByRole('button', { name: 'Previous week' }))
+    expect((await heading()).textContent).toBe('Oct 26 – Nov 1, 2026')
+    await user.click(screen.getByRole('button', { name: 'New milestone' }))
+    expect(dateField().value).toBe('2026-11-07')
+  })
+})
