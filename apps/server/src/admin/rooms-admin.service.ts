@@ -111,11 +111,24 @@ export class RoomsAdminService {
 
   /** Closes an open Room the way its Master would; `room-not-found` if it isn't open. */
   async close(code: string): Promise<void> {
+    await this.gateway.closeAsAdministrator(await this.openRoomId(code));
+  }
+
+  /**
+   * Ends Live in an open Room, as its 30 minutes without a Master would: a
+   * way out of a stuck Live that keeps its Room Hands and Notes. `not-live`
+   * when it is in Free Review, `room-not-found` if it isn't open.
+   */
+  async endLive(code: string): Promise<void> {
+    await this.gateway.endLiveAsAdministrator(await this.openRoomId(code));
+  }
+
+  private async openRoomId(code: string): Promise<string> {
     const [room] = await this.db
       .select({ id: rooms.id, status: rooms.status })
       .from(rooms)
       .where(eq(rooms.code, normalizeRoomCode(code)));
     if (!room || room.status !== 'open') throw new Rejected('room-not-found');
-    await this.gateway.closeAsAdministrator(room.id);
+    return room.id;
   }
 }

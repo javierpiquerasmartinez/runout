@@ -12,7 +12,8 @@ import { useAdminApi } from './useAdminApi'
 
 /**
  * The Rooms tab: every Room, open or closed, the stalest first, so the ones
- * left behind stand out. An open one can be closed, as its Master would.
+ * left behind stand out. An open one can be closed, as its Master would,
+ * and a Live one brought back to Free Review, as a way out of a stuck Live.
  */
 export function RoomsTab() {
   const { t, formatDate, formatRelative, formatNumber } = useI18n()
@@ -23,6 +24,7 @@ export function RoomsTab() {
   const [page, setPage] = useState<RoomsPage | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)
   const [closing, setClosing] = useState<AdminRoom | null>(null)
+  const [endingLive, setEndingLive] = useState<AdminRoom | null>(null)
 
   const reload = useCallback(() => {
     const query = new URLSearchParams({ status, sort: 'lastActivityAt', direction, page: String(pageNumber) })
@@ -39,6 +41,16 @@ export function RoomsTab() {
     setClosing(null)
     try {
       await admin(`/rooms/${room.code}/close`, { method: 'POST' })
+      reload()
+    } catch (error) {
+      setFailure(reasonOf(error))
+    }
+  }
+
+  async function endLive(room: AdminRoom) {
+    setEndingLive(null)
+    try {
+      await admin(`/rooms/${room.code}/end-live`, { method: 'POST' })
       reload()
     } catch (error) {
       setFailure(reasonOf(error))
@@ -114,6 +126,11 @@ export function RoomsTab() {
                     <td>{date(room.createdAt)}</td>
                     <td>{formatRelative(new Date(room.lastActivityAt))}</td>
                     <td>
+                      {room.status === 'open' && room.state === 'live' && (
+                        <Button size="compact" variant="ghost" onClick={() => setEndingLive(room)}>
+                          {t('admin.rooms.endLive')}
+                        </Button>
+                      )}
                       {room.status === 'open' && (
                         <Button size="compact" variant="ghost" onClick={() => setClosing(room)}>
                           {t('admin.rooms.close')}
@@ -142,6 +159,18 @@ export function RoomsTab() {
           actions={
             <Button variant="destructive" onClick={() => void close(closing)}>
               {t('admin.rooms.close')}
+            </Button>
+          }
+        />
+      )}
+      {endingLive && (
+        <RoomDialog
+          title={t('admin.rooms.endLive.title')}
+          body={t('admin.rooms.endLive.body', { name: endingLive.name })}
+          onClose={() => setEndingLive(null)}
+          actions={
+            <Button variant="primary" onClick={() => void endLive(endingLive)}>
+              {t('admin.rooms.endLive')}
             </Button>
           }
         />

@@ -988,6 +988,18 @@ export class RoomGateway
     this.publish(roomId, 'live.ended', {});
   }
 
+  /**
+   * An Administrator ends Live with no Master involved, exactly as the 30
+   * minutes without one would: everyone stays where it ended. `not-live`
+   * when the Room is in Free Review.
+   */
+  async endLiveAsAdministrator(roomId: string): Promise<void> {
+    await this.inOrder(roomId, async () => {
+      if (!(await this.playback.end(roomId))) throw new Rejected('not-live');
+      this.liveEnded(roomId);
+    });
+  }
+
   /** Ends Live in a Room that has gone too long without a Master connected. */
   private async endAbandonedLive(roomId: string): Promise<void> {
     await this.inOrder(roomId, async () => {

@@ -264,11 +264,12 @@ describe('the Rooms tab', () => {
   let calls: ApiCall[]
 
   beforeEach(() => {
-    const room = (code: string, name: string, status: string) => ({
+    let juevesState = 'live'
+    const room = (code: string, name: string, status: string, state = 'free-review') => ({
       code,
       name,
       status,
-      state: 'free-review',
+      state,
       master: administrator,
       participants: 3,
       queueLength: 12,
@@ -279,12 +280,20 @@ describe('the Rooms tab', () => {
     calls = fakeApi({
       'GET /admin/rooms': (call) => {
         const status = new URLSearchParams(call.search).get('status')
-        const rooms = [room('RNT4K9PX', 'Martes NL50', 'open'), room('ABCD2345', 'Viernes', 'closed')].filter(
+        const rooms = [
+          room('RNT4K9PX', 'Martes NL50', 'open'),
+          room('EFGH6789', 'Jueves', 'open', juevesState),
+          room('ABCD2345', 'Viernes', 'closed'),
+        ].filter(
           (each) => status === 'all' || each.status === status,
         )
         return Response.json({ total: rooms.length, page: 1, pageSize: 50, rooms })
       },
       'POST /admin/rooms/RNT4K9PX/close': () => new Response(null, { status: 204 }),
+      'POST /admin/rooms/EFGH6789/end-live': () => {
+        juevesState = 'free-review'
+        return new Response(null, { status: 204 })
+      },
     })
   })
 
@@ -292,14 +301,14 @@ describe('the Rooms tab', () => {
     renderTab('rooms')
 
     const rows = await screen.findAllByRole('row')
-    expect(rows).toHaveLength(2)
+    expect(rows).toHaveLength(3)
     expect(rows[1].textContent).toMatch(/Martes NL50.*RNT4-K9PX.*Javier.*Open.*3.*12/)
     expect(calls[0].search).toContain('status=open')
     expect(calls[0].search).toContain('sort=lastActivityAt&direction=asc')
 
     await userEvent.click(screen.getByRole('radio', { name: 'All' }))
-    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3))
-    expect(within(screen.getAllByRole('row')[2]).queryByRole('button', { name: 'Close room' })).toBeNull()
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(4))
+    expect(within(screen.getAllByRole('row')[3]).queryByRole('button', { name: 'Close room' })).toBeNull()
   })
 
   it('closes an open Room after a confirmation', async () => {
@@ -311,5 +320,20 @@ describe('the Rooms tab', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close room' }))
 
     await waitFor(() => expect(calls.some((call) => call.path === '/admin/rooms/RNT4K9PX/close')).toBe(true))
+  })
+
+  it('ends Live in a Live Room after a confirmation, and only there', async () => {
+    renderTab('rooms')
+    const [, martes, jueves] = await screen.findAllByRole('row')
+    expect(within(martes).queryByRole('button', { name: 'End live' })).toBeNull()
+    expect(within(jueves).getByText('Live')).toBeTruthy()
+
+    await userEvent.click(within(jueves).getByRole('button', { name: 'End live' }))
+    expect(within(screen.getByRole('dialog')).getByText(/“Jueves” goes back to free review/)).toBeTruthy()
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'End live' }))
+
+    await waitFor(() => expect(within(screen.getAllByRole('row')[2]).getByText('Free review')).toBeTruthy())
+    expect(calls.some((call) => call.path === '/admin/rooms/EFGH6789/end-live')).toBe(true)
+    expect(within(screen.getAllByRole('row')[2]).queryByRole('button', { name: 'End live' })).toBeNull()
   })
 })

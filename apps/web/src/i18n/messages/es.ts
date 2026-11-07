@@ -1269,4 +1269,7 @@ export const es = {
   'admin.rooms.close': 'Cerrar sala',
   'admin.rooms.confirm.title': '¿Cerrar la sala?',
   'admin.rooms.confirm.body': '«{name}» se cerrará para todos, como si la cerrara su Master. Sus manos de sala se descartan.',
+  'admin.rooms.endLive': 'Terminar directo',
+  'admin.rooms.endLive.title': '¿Terminar el directo?',
+  'admin.rooms.endLive.body': '«{name}» vuelve a revisión libre para todos, cada uno en la mano donde terminó. La sala sigue abierta con sus manos y notas.',
 }

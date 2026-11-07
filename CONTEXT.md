@@ -15,7 +15,7 @@ An Administrator's offer to one email address to create an Account, sent to it a
 _Avoid_: Invite code, registration code, invitación (UI only)
 
 **Administrator**:
-An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms and Impersonates people. A role of the Account, not of any Room; it has nothing to do with being Master.
+An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms, ends Live in them and Impersonates people. A role of the Account, not of any Room; it has nothing to do with being Master.
 _Avoid_: Admin, superuser, owner, Master
 
 **Suspension**:
