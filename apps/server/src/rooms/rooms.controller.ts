@@ -12,8 +12,8 @@ import { RoomsService, type RoomSummary } from './rooms.service.js';
 
 /** An open Room someone has been in, as the welcome screen lists it. */
 interface OpenRoomView extends RoomSummary {
-  /** Whether anyone is connected to it right now. */
-  live: boolean;
+  /** How many Participants are connected to it right now. */
+  connected: number;
   /** When they first arrived in it, kept across rejoins, as an ISO instant. */
   joinedAt: string;
 }
@@ -63,7 +63,7 @@ export class RoomsController {
     return open.map((room) => ({
       code: room.code,
       name: room.name,
-      live: this.gateway.isLive(room.id),
+      connected: this.gateway.connectedCount(room.id),
       joinedAt: room.joinedAt.toISOString(),
     }));
   }

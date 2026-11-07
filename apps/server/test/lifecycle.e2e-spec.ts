@@ -79,10 +79,10 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       const res = await request(running.httpServer)
         .get('/api/rooms')
         .set('Authorization', `Bearer ${token}`);
-      const room = (res.body as { code: string; live: boolean }[]).find(
+      const room = (res.body as { code: string; connected: number }[]).find(
         (open) => open.code === code,
       );
-      if (!room?.live) return;
+      if (!room?.connected) return;
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     throw new Error(`Room ${code} still has someone connected`);
@@ -113,7 +113,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
     it('lets a Guest walk out and tells the Room', async () => {
       const { marta, masterSocket, martaSocket } = await roomOfTwo();
 
-      martaSocket.send('room.leave');
+      martaSocket.send('room.exit');
 
       expect(await masterSocket.next('room.participantLeft')).toEqual({
         identityId: marta.id,
@@ -124,10 +124,10 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
     it('refuses to let the Master simply leave', async () => {
       const { master, masterSocket, martaSocket } = await roomOfTwo();
 
-      masterSocket.send('room.leave');
+      masterSocket.send('room.exit');
 
       expect(await masterSocket.next('rejected')).toEqual({
-        command: 'room.leave',
+        command: 'room.exit',
         reason: 'master-must-choose',
       });
       expect(martaSocket.all('room.participantLeft')).toEqual([]);
@@ -140,7 +140,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       masterSocket.send('room.handOver', { identityId: marta.id });
       await masterSocket.next('room.masterChanged');
       await martaSocket.next('room.masterChanged');
-      masterSocket.send('room.leave');
+      masterSocket.send('room.exit');
 
       expect(await martaSocket.next('room.participantLeft')).toEqual({
         identityId: master.id,
@@ -373,7 +373,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
         {
           code: first.code,
           name: 'Martes NL50',
-          live: true,
+          connected: 3,
           joinedAt: expect.any(String),
         },
       ]);
@@ -393,7 +393,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       expect(code).toBeDefined();
     });
 
-    it('says a Room is no longer live once everyone has gone', async () => {
+    it('counts nobody connected once everyone has gone', async () => {
       const { code, master, masterSocket, martaSocket } = await roomOfTwo();
 
       await Promise.all([masterSocket.close(), martaSocket.close()]);
@@ -404,7 +404,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
         .set('Authorization', `Bearer ${master.token}`)
         .expect(200);
       expect(mine.body).toEqual([
-        expect.objectContaining({ code, live: false }),
+        expect.objectContaining({ code, connected: 0 }),
       ]);
     });
   });

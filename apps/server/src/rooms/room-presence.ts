@@ -211,9 +211,9 @@ export class RoomPresence<Connection> {
       .map(([roomId]) => roomId);
   }
 
-  /** Whether anyone at all is connected to the Room right now. */
-  isLive(roomId: string): boolean {
-    return (this.rooms.get(roomId)?.present.size ?? 0) > 0;
+  /** How many Participants are connected to the Room right now. */
+  connectedCount(roomId: string): number {
+    return this.rooms.get(roomId)?.present.size ?? 0;
   }
 
   /** Who holds the Master role of a Room, while anyone is present in it. */

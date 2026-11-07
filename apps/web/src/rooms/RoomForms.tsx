@@ -19,8 +19,8 @@ const ROOM_NAME_MAX_LENGTH = 60
 
 /** An open Room this person has been in, as the server lists it. */
 interface OpenRoom extends RoomSummary {
-  /** Whether anyone is connected to it right now. */
-  live: boolean
+  /** How many Participants are connected to it right now. */
+  connected: number
   /** When they first arrived in it, kept across rejoins, as an ISO instant. */
   joinedAt: string
 }
@@ -46,7 +46,7 @@ export function RoomForms({ focusCreate = null }: { focusCreate?: number | null 
 
 /**
  * "Tus salas recientes" from the welcome board: the open Rooms this person
- * has been in, the live ones marked. A closed Room never reopens, so it is
+ * has been in, those with someone connected marked. A closed Room never reopens, so it is
  * not listed; neither is one they were removed from.
  */
 export function RecentRooms({ token }: { token: string }) {
@@ -91,14 +91,18 @@ export function RecentRooms({ token }: { token: string }) {
             <a
               href={roomPath(room.code)}
               className="recent-room"
-              data-live={room.live || undefined}
+              data-connected={room.connected > 0 || undefined}
               aria-label={t('rooms.recent.open', { name: room.name })}
               onClick={followLink}
             >
               <span className="recent-room__dot" aria-hidden="true" />
               <span className="recent-room__name">{room.name}</span>
-              {room.live ? (
-                <span className="recent-room__live">{t('rooms.recent.live')}</span>
+              {room.connected > 0 ? (
+                <span className="recent-room__connected">
+                  {t(room.connected === 1 ? 'rooms.recent.connected.one' : 'rooms.recent.connected.other', {
+                    count: room.connected,
+                  })}
+                </span>
               ) : (
                 <span className="recent-room__when ro-mono">{inRoomSince(room.joinedAt)}</span>
               )}

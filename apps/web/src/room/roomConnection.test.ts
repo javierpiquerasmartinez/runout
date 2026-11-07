@@ -241,7 +241,7 @@ describe('RoomConnection', () => {
 
     connection.close()
 
-    expect(latest().of('room.leave')).toHaveLength(1)
+    expect(latest().of('room.exit')).toHaveLength(1)
     expect(latest().closed).toBe(true)
     clock.advance(60_000)
     expect(sockets).toHaveLength(1)

@@ -104,11 +104,11 @@ describe('Anonymous identities last one Room (e2e)', () => {
         const res = await request(running.httpServer)
           .get('/api/rooms')
           .set('Authorization', `Bearer ${token}`);
-        return (res.body as { code: string; live: boolean }[]).find(
+        return (res.body as { code: string; connected: number }[]).find(
           (open) => open.code === code,
-        )?.live;
+        )?.connected;
       })
-      .toBe(false);
+      .toBe(0);
   }
 
   /** What is still stored for an identity, read straight from the database. */

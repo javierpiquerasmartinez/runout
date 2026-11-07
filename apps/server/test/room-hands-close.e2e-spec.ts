@@ -263,11 +263,11 @@ describe('Room Hands are discarded on close (e2e)', () => {
         const res = await request(running.httpServer)
           .get('/api/rooms')
           .set('Authorization', `Bearer ${token}`);
-        return (res.body as { code: string; live: boolean }[]).find(
+        return (res.body as { code: string; connected: number }[]).find(
           (open) => open.code === code,
-        )?.live;
+        )?.connected;
       })
-      .toBe(false);
+      .toBe(0);
   }
 
   /** What is still stored about a Hand, read straight from the database. */

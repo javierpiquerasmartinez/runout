@@ -157,7 +157,7 @@
   border-radius: 50%;
   background: var(--color-border-strong);
 }
-.recent-room[data-live] .recent-room__dot {
+.recent-room[data-connected] .recent-room__dot {
   background: var(--sync);
 }
 
@@ -169,7 +169,7 @@
   white-space: nowrap;
 }
 
-.recent-room__live {
+.recent-room__connected {
   margin-left: auto;
   flex-shrink: 0;
   font-size: 12px;

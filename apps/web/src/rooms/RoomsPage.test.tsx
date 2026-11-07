@@ -10,7 +10,7 @@ import { RoomsPage } from './RoomsPage'
 interface OpenRoom {
   code: string
   name: string
-  live: boolean
+  connected: number
   joinedAt: string
 }
 
@@ -111,19 +111,19 @@ describe('RoomsPage · joining a Room by its code', () => {
 describe('RoomsPage · the Rooms you can go back to', () => {
   it('lists the open Rooms the server gives, with a way into each', async () => {
     openRooms = [
-      { code: 'RNT4K9PX', name: 'Martes NL50', live: true, joinedAt: new Date().toISOString() },
+      { code: 'RNT4K9PX', name: 'Martes NL50', connected: 3, joinedAt: new Date().toISOString() },
       {
         code: 'RNT7H2QD',
         name: '3-bet pots',
-        live: false,
+        connected: 0,
         joinedAt: new Date(Date.now() - 21 * 24 * 3_600_000).toISOString(),
       },
     ]
     renderRooms()
 
-    const live = await screen.findByRole('link', { name: 'Back to “Martes NL50”' })
-    expect(live.getAttribute('href')).toBe('/room/RNT4K9PX')
-    expect(live.textContent).toContain('live now')
+    const busy = await screen.findByRole('link', { name: 'Back to “Martes NL50”' })
+    expect(busy.getAttribute('href')).toBe('/room/RNT4K9PX')
+    expect(busy.textContent).toContain('3 connected')
     const quiet = screen.getByRole('link', { name: 'Back to “3-bet pots”' })
     expect(quiet.textContent).toContain('21 days ago')
   })

@@ -204,9 +204,9 @@ export class RoomGateway
     this.closure.watch(roomId);
   }
 
-  /** Whether anyone is connected to the Room right now. */
-  isLive(roomId: string): boolean {
-    return this.presence.isLive(roomId);
+  /** How many Participants are connected to the Room right now. */
+  connectedCount(roomId: string): number {
+    return this.presence.connectedCount(roomId);
   }
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -349,11 +349,11 @@ export class RoomGateway
    * `master-must-choose` until they have handed the role over or closed the
    * Room, so a Room is never left without anyone driving it.
    */
-  @SubscribeMessage('room.leave')
+  @SubscribeMessage('room.exit')
   leaveRoom(
     @ConnectedSocket() socket: WebSocket,
   ): Promise<WsResponse<RejectedEvent> | undefined> {
-    return this.rejecting('room.leave', async () => {
+    return this.rejecting('room.exit', async () => {
       const { identity, roomId } = await this.inRoom(socket);
       if (await this.rooms.isMaster(roomId, identity.id)) {
         throw new Rejected('master-must-choose');
@@ -719,13 +719,13 @@ export class RoomGateway
 
   /** A Room nobody is connected to any more starts its abandonment period. */
   private watchIfEmpty(roomId: string): void {
-    if (!this.presence.isLive(roomId)) this.closure.watch(roomId);
+    if (this.presence.connectedCount(roomId) === 0) this.closure.watch(roomId);
   }
 
   /** Closes a Room that has sat empty for the whole abandonment period. */
   private async closeAbandoned(roomId: string): Promise<void> {
     // Someone arrived while the closure was on its way to running.
-    if (this.presence.isLive(roomId)) return;
+    if (this.presence.connectedCount(roomId) > 0) return;
     if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
   }
 
