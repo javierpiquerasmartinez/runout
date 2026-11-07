@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, lte, type SQL } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { isUuid } from '../database/uuid.js';
@@ -120,34 +120,27 @@ export class MilestonesService {
   /**
    * Changes whichever of a Milestone's title, description, date and done are
    * sent, with the rules of creating; the rest stay as they were. Another
-   * Account's Milestone is `milestone-not-found`, before the body is read.
+   * Account's Milestone is `milestone-not-found`, even when the body is
+   * refused: only a refused body costs a second read.
    */
   async change(
     account: Identity,
     milestoneId: string,
     body: MilestoneChange,
   ): Promise<Milestone> {
-    await this.get(account, milestoneId);
-    const changes: Partial<
-      Pick<Milestone, 'title' | 'description' | 'date' | 'done'>
-    > = {};
-    if (body.title !== undefined) changes.title = titleOf(body.title);
-    if (body.description !== undefined) {
-      changes.description = descriptionOf(body.description);
+    const owned = ownedBy(account, milestoneId);
+    let changes: MilestoneFields;
+    try {
+      changes = changesOf(body);
+    } catch (refused) {
+      // Not being there wins over a refused body.
+      await this.get(account, milestoneId);
+      throw refused;
     }
-    if (body.date !== undefined) {
-      changes.date = calendarDate(body.date, 'invalid-milestone-date');
-    }
-    if (body.done !== undefined) changes.done = doneOf(body.done);
     const [changed] = await this.db
       .update(milestones)
       .set({ ...changes, updatedAt: this.clock.now() })
-      .where(
-        and(
-          eq(milestones.id, milestoneId),
-          eq(milestones.identityId, account.id),
-        ),
-      )
+      .where(owned)
       .returning(selection);
     if (!changed) throw new Rejected('milestone-not-found');
     return changed;
@@ -158,34 +151,53 @@ export class MilestonesService {
    * or one already deleted, is `milestone-not-found`.
    */
   async delete(account: Identity, milestoneId: string): Promise<void> {
-    if (!isUuid(milestoneId)) throw new Rejected('milestone-not-found');
     const deleted = await this.db
       .delete(milestones)
-      .where(
-        and(
-          eq(milestones.id, milestoneId),
-          eq(milestones.identityId, account.id),
-        ),
-      )
+      .where(ownedBy(account, milestoneId))
       .returning({ id: milestones.id });
     if (deleted.length === 0) throw new Rejected('milestone-not-found');
   }
 
   /** One of the Account's Milestones; `milestone-not-found` for anyone else's. */
   async get(account: Identity, milestoneId: string): Promise<Milestone> {
-    if (!isUuid(milestoneId)) throw new Rejected('milestone-not-found');
     const [row] = await this.db
       .select(selection)
       .from(milestones)
-      .where(
-        and(
-          eq(milestones.id, milestoneId),
-          eq(milestones.identityId, account.id),
-        ),
-      );
+      .where(ownedBy(account, milestoneId));
     if (!row) throw new Rejected('milestone-not-found');
     return row;
   }
+}
+
+/** The fields of a Milestone a change can set. */
+type MilestoneFields = Partial<
+  Pick<Milestone, 'title' | 'description' | 'date' | 'done'>
+>;
+
+/**
+ * Picks out the Milestone with this id among the Account's own;
+ * `milestone-not-found` when the id can't be any Milestone's.
+ */
+function ownedBy(account: Identity, milestoneId: string): SQL | undefined {
+  if (!isUuid(milestoneId)) throw new Rejected('milestone-not-found');
+  return and(
+    eq(milestones.id, milestoneId),
+    eq(milestones.identityId, account.id),
+  );
+}
+
+/** Whichever fields a change sends, each checked with the rules of creating. */
+function changesOf(body: MilestoneChange): MilestoneFields {
+  const changes: MilestoneFields = {};
+  if (body.title !== undefined) changes.title = titleOf(body.title);
+  if (body.description !== undefined) {
+    changes.description = descriptionOf(body.description);
+  }
+  if (body.date !== undefined) {
+    changes.date = calendarDate(body.date, 'invalid-milestone-date');
+  }
+  if (body.done !== undefined) changes.done = doneOf(body.done);
+  return changes;
 }
 
 /** Whether a Milestone is done; `invalid-milestone-done` when not a boolean. */
