@@ -319,3 +319,13 @@ _Avoid_: Filter, checked rows
 **Narrowing**:
 The Selection a side kept on a Street, which cuts its Range down to those Combos, at their Frequency, for every later Street of the Analysis. A Street with no Selection keeps the whole Range. Each side narrows on its own.
 _Avoid_: Filter (that is the list of Ranges), range reading, line
+
+### Calendar
+
+**Calendar**:
+The section where a person plans what they are going to study, one day at a time, with Milestones. It belongs to one Account and nobody else sees it, and like the Lab it has nothing to do with Rooms or the Library: nothing in it comes from a Hand or a Range or goes into one. The UI calls it "Calendario".
+_Avoid_: Agenda, schedule, planner, study plan
+
+**Milestone**:
+Something a person means to study on one particular day: a title, an optional description, and whether it is done. It falls on a date of the calendar, never on a time or an instant, so it stays on its day wherever the person is. Several can fall on the same day; none spans days or repeats. It can be planned on, or moved to, any day, past ones too, and one in the past that is not done is still pending. The UI calls it "Hito".
+_Avoid_: Event, task, session, goal, entry
