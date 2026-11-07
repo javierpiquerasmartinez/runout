@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { adminPath } from '../admin/admin'
+import { calendarPath } from '../calendar/calendar'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useImpersonationLock } from '../identity/impersonationLock'
@@ -17,10 +18,10 @@ import { Icon } from '../ui/Icon'
 import './AppHeader.css'
 
 /** The screens of the header's navigation. */
-type Section = 'library' | 'rooms' | 'lab'
+type Section = 'library' | 'rooms' | 'lab' | 'calendar'
 
 /**
- * The header of the Account side (the Library, the Rooms screen, the Lab, Settings) and of
+ * The header of the Account side (the Library, the Rooms screen, the Lab, the Calendar, Settings) and of
  * Settings opened from a Room. An Account gets the brand leading to its
  * Library, the navigation with the `current` section marked, `where` for a
  * screen outside it, a way back (to a Room still held, say), "Nueva sala" and
@@ -59,13 +60,14 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
   )
 }
 
-/** "Biblioteca · Salas · Laboratorio", the section this person is in marked. */
+/** "Biblioteca · Salas · Laboratorio · Calendario", the section this person is in marked. */
 function SectionNav({ current }: { current?: Section }) {
   const { t } = useI18n()
   const sections: { section: Section; href: string; label: string }[] = [
     { section: 'library', href: libraryPath, label: t('header.nav.library') },
     { section: 'rooms', href: roomsPath, label: t('header.nav.rooms') },
     { section: 'lab', href: labAnalysisPath, label: t('header.nav.lab') },
+    { section: 'calendar', href: calendarPath, label: t('header.nav.calendar') },
   ]
   return (
     <nav className="app-header__nav" aria-label={t('header.nav')}>

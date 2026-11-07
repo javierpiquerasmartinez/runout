@@ -1,6 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   addDays,
+  dayOfMonth,
+  intlDate,
   calendarPath,
   cellMilestones,
   isCalendarPath,
@@ -30,7 +32,7 @@ const month = (year: number, month: number): Period => ({ view: 'month', month: 
 const week = (monday: string): Period => ({ view: 'week', monday })
 
 describe('calendar dates', () => {
-  it('reads real dates written YYYY-MM-DD and nothing else', () => {
+  it('read real dates written YYYY-MM-DD and nothing else', () => {
     expect(parseDate('2026-11-07')).toBe('2026-11-07')
     expect(parseDate('2028-02-29')).toBe('2028-02-29')
     for (const text of ['2026-02-29', '2026-02-30', '2026-13-01', '2026-00-10', '2026-11-7', '07/11/2026', '', '2026-11-07T00:00']) {
@@ -38,7 +40,7 @@ describe('calendar dates', () => {
     }
   })
 
-  it('adds and takes away days across months, years and February', () => {
+  it('add and take away days across months, years and February', () => {
     expect(addDays('2026-11-07', 1)).toBe('2026-11-08')
     expect(addDays('2026-11-30', 1)).toBe('2026-12-01')
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
@@ -48,26 +50,34 @@ describe('calendar dates', () => {
     expect(addDays('2026-11-07', -7)).toBe('2026-10-31')
   })
 
-  it('takes today from the local clock', () => {
+  it('say their day of the month', () => {
+    expect(dayOfMonth('2026-11-07')).toBe(7)
+    expect(dayOfMonth('2026-11-30')).toBe(30)
+  })
+
+  it('become the UTC midnight Intl formats in UTC', () => {
+    expect(intlDate('2026-11-07').toISOString()).toBe('2026-11-07T00:00:00.000Z')
+  })
+
+  it('take today from the local clock', () => {
     expect(todayOf(new Date(2026, 10, 7, 23, 59))).toBe('2026-11-07')
     expect(todayOf(new Date(2026, 0, 1, 0, 0))).toBe('2026-01-01')
   })
 })
 
 describe('across a daylight-saving change', () => {
-  let zone: string | undefined
-
+  // Madrid moves its clocks on 29 March and 25 October 2026.
   beforeAll(() => {
-    zone = process.env.TZ
-    process.env.TZ = 'Europe/Madrid'
+    vi.stubEnv('TZ', 'Europe/Madrid')
   })
 
   afterAll(() => {
-    if (zone === undefined) delete process.env.TZ
-    else process.env.TZ = zone
+    vi.unstubAllEnvs()
   })
 
   it('never moves a day', () => {
+    // The zone took: the clocks do change in it.
+    expect(new Date(2026, 2, 28, 12).getTimezoneOffset()).not.toBe(new Date(2026, 2, 30, 12).getTimezoneOffset())
     expect(addDays('2026-03-28', 1)).toBe('2026-03-29')
     expect(addDays('2026-03-29', 1)).toBe('2026-03-30')
     expect(addDays('2026-10-25', 1)).toBe('2026-10-26')

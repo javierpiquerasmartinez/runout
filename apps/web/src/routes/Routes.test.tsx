@@ -34,6 +34,7 @@ beforeEach(() => {
       if (path.endsWith('/notes')) return Response.json({ notes: [], marked: false })
       if (path === '/hands/split-pot') return Response.json(splitPot)
       if (path === '/lab/ranges') return Response.json([])
+      if (path === '/calendar/milestones') return Response.json({ milestones: [], hasAny: false })
       return Response.json({ reason: 'not-found' }, { status: 404 })
     }),
   )
@@ -288,6 +289,33 @@ describe('Routes · the Lab, only for an Account', () => {
     ['/lab/ranges', 'an anonymous identity', anonymous],
     ['/lab/ranges/some-range', 'no identity', visitor],
     ['/lab/ranges/some-range', 'an anonymous identity', anonymous],
+  ])('sends %s with %s to /login', async (path, _, session) => {
+    renderAt(path, session())
+
+    expect(await login()).toBeTruthy()
+    expect(window.location.pathname).toBe('/login')
+  })
+})
+
+describe('Routes · the Calendar, only for an Account', () => {
+  it('shows the current month to an Account, with Calendar marked in the header', async () => {
+    renderAt('/calendar', account())
+
+    expect(await screen.findByRole('grid')).toBeTruthy()
+    expect(window.location.pathname).toMatch(/^\/calendar\/month\/\d{4}-\d{2}$/)
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    expect(within(nav).getByRole('link', { current: 'page' }).textContent).toBe('Calendar')
+  })
+
+  it.each([
+    ['/calendar', 'no identity', visitor],
+    ['/calendar', 'an anonymous identity', anonymous],
+    ['/calendar/month/2026-11', 'no identity', visitor],
+    ['/calendar/month/2026-11', 'an anonymous identity', anonymous],
+    ['/calendar/week/2026-11-09', 'no identity', visitor],
+    ['/calendar/week/2026-11-09', 'an anonymous identity', anonymous],
+    ['/calendar/milestones/some-milestone', 'no identity', visitor],
+    ['/calendar/milestones/some-milestone', 'an anonymous identity', anonymous],
   ])('sends %s with %s to /login', async (path, _, session) => {
     renderAt(path, session())
 

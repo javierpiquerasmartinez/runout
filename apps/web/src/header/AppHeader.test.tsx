@@ -93,6 +93,22 @@ describe('AppHeader · getting around', () => {
     expect(rooms.getAttribute('href')).toBe('/rooms')
   })
 
+  it('leads to the Calendar after the Lab, marked as current inside it', () => {
+    render(
+      <I18nProvider initialLocale="es">
+        <SessionContext.Provider value={fakeSession()}>
+          <AppHeader current="calendar" />
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+
+    const links = within(screen.getByRole('navigation', { name: 'Secciones' })).getAllByRole('link')
+    expect(links.map((link) => link.textContent)).toEqual(['Biblioteca', 'Salas', 'Laboratorio', 'Calendario'])
+    expect(links[3].getAttribute('href')).toBe('/calendar')
+    expect(links[3].getAttribute('aria-current')).toBe('page')
+    expect(links[2].getAttribute('aria-current')).toBeNull()
+  })
+
   it('leads to the Lab after Rooms, marked as current inside it', () => {
     render(
       <I18nProvider initialLocale="en">
@@ -104,7 +120,7 @@ describe('AppHeader · getting around', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Sections' })
     const links = within(nav).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Library', 'Rooms', 'Lab'])
+    expect(links.map((link) => link.textContent)).toEqual(['Library', 'Rooms', 'Lab', 'Calendar'])
     expect(links[2].getAttribute('href')).toBe('/lab/analysis')
     expect(links[2].getAttribute('aria-current')).toBe('page')
     expect(links[0].getAttribute('aria-current')).toBeNull()

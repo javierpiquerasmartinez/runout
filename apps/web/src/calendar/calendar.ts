@@ -96,6 +96,16 @@ export function todayOf(now: Date = new Date()): CalendarDate {
   return `${pad(now.getFullYear(), 4)}-${pad(now.getMonth() + 1, 2)}-${pad(now.getDate(), 2)}`
 }
 
+/** The day of the month, from 1 to 31. */
+export function dayOfMonth(date: CalendarDate): number {
+  return Number(date.slice(8, 10))
+}
+
+/** The date as the UTC midnight that starts it: format it with `timeZone: 'UTC'` and Intl names the same day anywhere. */
+export function intlDate(date: CalendarDate): Date {
+  return new Date(toUtc(date))
+}
+
 /** The month a date falls in. */
 export function monthOf(date: CalendarDate): Month {
   return { year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) }
@@ -114,6 +124,11 @@ export function mondayOf(date: CalendarDate): CalendarDate {
 /** The seven days of the week starting on `monday`. */
 export function weekDays(monday: CalendarDate): CalendarDate[] {
   return Array.from({ length: 7 }, (_, index) => addDays(monday, index))
+}
+
+/** The first day of a month. */
+export function firstOfMonth({ year, month }: Month): CalendarDate {
+  return dateOf(year, month, 1)
 }
 
 /** The weeks, Monday first, that hold the month's days: four to six of them. */
