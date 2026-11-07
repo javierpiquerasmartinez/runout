@@ -59,6 +59,8 @@ let statsRequests: string[]
 /** What the server answers a Stats read with, unless the test says otherwise. */
 let statsReply: () => Response | Promise<Response>
 /** Mark changes, as `PUT /api/library/hands/h1/mark`. */
+/** Every list of Hand ids asked for, to replay them. */
+let handIdsRequests: string[]
 let markRequests: string[]
 /** Tag changes, as `PUT /api/library/tags/t1/hands {"handIds":["h1"]}`. */
 let tagRequests: string[]
@@ -94,6 +96,7 @@ beforeEach(() => {
   }
   statsReply = () => Response.json(stats)
   markRequests = []
+  handIdsRequests = []
   tagRequests = []
   tagReply = () => Response.json({})
   removeRequests = []
@@ -143,6 +146,10 @@ beforeEach(() => {
           page.hands = page.hands.map((hand) => (hand.id === handId ? { ...hand, marked } : hand))
         }
         return Response.json({ handId, marked })
+      }
+      if (url.startsWith('/api/library/hand-ids')) {
+        handIdsRequests.push(url)
+        return Response.json({ ids: ['h1', 'h2', 'h3'] })
       }
       if (url.startsWith('/api/library/stats')) {
         statsRequests.push(url)
@@ -1254,5 +1261,30 @@ describe('LibraryPage', () => {
       expect(screen.queryByRole('button', { name: /to the room/ })).toBeNull()
       expect(screen.queryByRole('link', { name: /Back to/ })).toBeNull()
     })
+  })
+})
+
+describe('LibraryPage \u00b7 replaying several Hands', () => {
+  it('replays the selected Hands, in the order the Library shows them', async () => {
+    renderLibrary()
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, Hero' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play 2 hands' }))
+
+    expect(window.location.pathname + window.location.search).toBe('/library/hands/h1?replay=h1,h2')
+    expect(window.history.state).toEqual(expect.objectContaining({ openedFromLibrary: '/library?period=all' }))
+    expect(handIdsRequests).toEqual([])
+  })
+
+  it('replays every Hand the filter keeps, across its pages, with nothing selected', async () => {
+    renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars&page=2')
+    await screen.findByRole('checkbox', { name: 'Select CO vs SB, iMapleAA' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/library/hands/h1'))
+    expect(window.location.search).toBe('?replay=filter&period=all&site=pokerstars')
+    expect(new URL(handIdsRequests[0], 'http://localhost').searchParams.get('site')).toBe('pokerstars')
   })
 })

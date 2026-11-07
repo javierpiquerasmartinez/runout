@@ -26,12 +26,16 @@ let hasHistory: boolean
 /** Every call that changed a Note, as method, path and body. */
 let changes: [string, string, unknown][]
 let refusal: string | null
+/** The lists of Hands the page asked the server for. */
+let asked: string[]
 
 beforeEach(() => {
   notFound = false
   hasHistory = true
   refusal = null
   changes = []
+  asked = []
+  window.history.replaceState(null, '', '/library/hands/split-pot')
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit = {}) => {
@@ -53,6 +57,10 @@ beforeEach(() => {
         return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
       }
       if (url.endsWith('/notes')) return Response.json({ notes: [note], marked: false })
+      if (path === '/library/hand-ids') {
+        asked.push(url)
+        return Response.json({ ids: ['first', 'split-pot', 'last'] })
+      }
       return Response.json({ ...splitPot, hasHistory })
     }),
   )
@@ -220,5 +228,50 @@ describe('LibraryHandPage', () => {
     await userEvent.click(original)
 
     expect(writeText).not.toHaveBeenCalled()
+  })
+})
+
+describe('LibraryHandPage \u00b7 replaying a list of Hands', () => {
+  it('says where in the selected Hands this one is, and moves along them keeping the list', async () => {
+    window.history.replaceState({ openedFromLibrary: '/library?site=pokerstars' }, '', '/library/hands/split-pot?replay=first,split-pot,last')
+    renderHand()
+
+    expect(await screen.findByText('2 / 3')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Next hand' }))
+    expect(window.location.pathname + window.location.search).toBe('/library/hands/last?replay=first,split-pot,last')
+    // "Volver" still leads where the Library was left.
+    expect(window.history.state).toEqual({ openedFromLibrary: '/library?site=pokerstars' })
+  })
+
+  it('goes back along the list, and not past either end', async () => {
+    window.history.replaceState(null, '', '/library/hands/split-pot?replay=split-pot,last')
+    renderHand()
+
+    expect(await screen.findByText('1 / 2')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Previous hand/ }).getAttribute('aria-disabled')).toBe('true')
+    await userEvent.keyboard('k')
+    expect(window.location.pathname).toBe('/library/hands/last')
+  })
+
+  it('replays every Hand a filter keeps, as the server lists them', async () => {
+    window.history.replaceState(null, '', '/library/hands/split-pot?replay=filter&site=pokerstars&sort=result')
+    renderHand()
+
+    expect(await screen.findByText('2 / 3')).toBeTruthy()
+    expect(asked).toHaveLength(1)
+    const query = new URL(asked[0], 'http://localhost').searchParams
+    expect(query.get('site')).toBe('pokerstars')
+    expect(query.get('sort')).toBe('result')
+    await userEvent.click(screen.getByRole('button', { name: 'Previous hand' }))
+    expect(window.location.pathname + window.location.search).toBe(
+      '/library/hands/first?replay=filter&site=pokerstars&sort=result',
+    )
+  })
+
+  it('shows no list controls for a Hand opened on its own', async () => {
+    renderHand()
+
+    await screen.findByText('Action 0 of 17')
+    expect(screen.queryByRole('button', { name: 'Next hand' })).toBeNull()
   })
 })

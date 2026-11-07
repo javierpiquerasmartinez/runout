@@ -58,6 +58,28 @@ export class LibraryController {
   }
 
   /**
+   * Every Hand the Library filter and sort in the query keep, in that order
+   * and unpaged, for replaying them one after another.
+   */
+  @Get('hand-ids')
+  @Header('Cache-Control', 'private, no-cache')
+  async handIds(
+    @Headers('authorization') authorization: string | undefined,
+    @Query() query: Record<string, unknown>,
+  ): Promise<{ ids: string[] }> {
+    const account = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    return {
+      ids: await this.library.handIds(
+        account,
+        parseLibraryFilter(query),
+        parseLibrarySort(query),
+      ),
+    };
+  }
+
+  /**
    * The running Results over the Hands the Library filter in the query keeps
    * (the same filter as the list), downsampled to at most `points` points;
    * with `zoomFrom` and `zoomTo`, only that stretch of them (a Zoom).

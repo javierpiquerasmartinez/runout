@@ -55,9 +55,12 @@ export function navigate(path: string, state?: unknown) {
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
-/** Like `navigate`, but replaces the current entry: going back skips the path left. */
-export function redirect(path: string) {
-  window.history.replaceState(null, '', path)
+/**
+ * Like `navigate`, but replaces the current entry: going back skips the path
+ * left. With `keepState`, the entry keeps what it held (where it was opened from).
+ */
+export function redirect(path: string, { keepState = false }: { keepState?: boolean } = {}) {
+  window.history.replaceState(keepState ? window.history.state : null, '', path)
   shownUrl = currentUrl()
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }

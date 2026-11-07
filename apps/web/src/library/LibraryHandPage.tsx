@@ -14,11 +14,12 @@ import { useShortcuts } from '../room/shortcuts'
 import { StreetLog } from '../room/StreetLog'
 import { tableView } from '../room/tableView'
 import { useHand } from '../room/useHand'
-import { followLink, isPlainClick, useHistoryState } from '../routing'
+import { followLink, isPlainClick, redirect, useHistoryState, useSearch } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { libraryOpenedFrom, libraryPath } from './library'
+import { libraryHandPath, libraryOpenedFrom, libraryPath } from './library'
+import { replayFromSearch, replayServerQuery, type ReplayList } from './replay'
 import { LibraryFrame } from './LibraryPage'
 import '../room/RoomPage.css'
 import './LibraryHandPage.css'
@@ -61,6 +62,7 @@ export function LibraryHandPage({ handId }: { handId: string }) {
               <Icon name="chevron" size={14} className="library__back-icon" />
               {t('library.back')}
             </a>
+            <ReplayNav handId={handId} />
             {load.state === 'loaded' && <CopyHand handId={handId} hasHistory={load.hand.hasHistory} />}
           </div>
           {table ? (
@@ -248,4 +250,66 @@ function HandNotes({ handId }: { handId: string }) {
       )}
     </section>
   )
+}
+
+/**
+ * Where this Hand is in the list of Hands being replayed, and the way to the
+ * one before or after, keeping the list: J and K, as in a Room. Each Hand
+ * starts at its Initial State, and reaching its end never moves on by itself.
+ */
+function ReplayNav({ handId }: { handId: string }) {
+  const { t } = useI18n()
+  const search = useSearch()
+  const ids = useReplayList(replayFromSearch(search))
+  const at = ids ? ids.indexOf(handId) : -1
+  const go = (to: number) => () => ids && redirect(`${libraryHandPath(ids[to])}${search}`, { keepState: true })
+  // A Hand that has left the list since still lets the person carry on from its start.
+  const previous = ids && at > 0 ? go(at - 1) : undefined
+  const next = ids && at + 1 < ids.length ? go(at + 1) : undefined
+  useShortcuts(ids !== null, { 'previous-hand': previous, 'next-hand': next })
+  if (!ids) return null
+
+  return (
+    <div className="library-hand__replay" role="group" aria-label={t('library.replay.label')}>
+      <IconButton
+        icon="previous"
+        label={t('library.replay.previous')}
+        size="compact"
+        disabledReason={previous ? undefined : t('library.replay.atStart')}
+        onClick={previous}
+      />
+      <span className="library-hand__replay-at ro-mono">
+        {t('library.replay.at', { current: at >= 0 ? at + 1 : '–', total: ids.length })}
+      </span>
+      <IconButton
+        icon="next"
+        label={t('library.replay.next')}
+        size="compact"
+        disabledReason={next ? undefined : t('library.replay.atEnd')}
+        onClick={next}
+      />
+    </div>
+  )
+}
+
+/** The Hand ids of the list being replayed: null without one, or until the server has said which. */
+function useReplayList(list: ReplayList | null): string[] | null {
+  const { token } = useIdentity()
+  const selected = list?.kind === 'selected' ? list.ids.join(',') : null
+  const filter = list?.kind === 'filter' ? list.query : null
+  const [fetched, setFetched] = useState<{ query: string; ids: string[] } | null>(null)
+
+  useEffect(() => {
+    if (filter === null) return
+    let current = true
+    api<{ ids: string[] }>(`/library/hand-ids?${replayServerQuery(filter)}`, { token })
+      .then(({ ids }) => current && setFetched({ query: filter, ids }))
+      .catch(() => current && setFetched({ query: filter, ids: [] }))
+    return () => {
+      current = false
+    }
+  }, [filter, token])
+
+  if (selected !== null) return selected.split(',')
+  return filter !== null && fetched?.query === filter ? fetched.ids : null
 }

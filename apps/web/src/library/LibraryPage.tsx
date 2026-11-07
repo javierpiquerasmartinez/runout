@@ -59,6 +59,7 @@ import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import type { LibraryStats } from './stats'
 import { StatsView } from './StatsView'
+import { replayFilterSearch, replaySelectedSearch, replayServerQuery } from './replay'
 import './LibraryPage.css'
 
 /**
@@ -240,6 +241,18 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       // A refusal reads the Library too: a selected Hand may have left it elsewhere.
       .finally(() => setRevision((n) => n + 1))
 
+  // The selected Hands, in the order shown, or with none every Hand the filter keeps, one after another.
+  const playSelected = () => {
+    const ids = selectedHands.map((hand) => hand.id)
+    openHandAt(`${libraryHandPath(ids[0])}${replaySelectedSearch(ids)}`)
+  }
+  const playFiltered = () => {
+    const listed = replayFilterSearch(search)
+    api<{ ids: string[] }>(`/library/hand-ids?${replayServerQuery(search)}`, { token })
+      .then(({ ids }) => ids.length > 0 && openHandAt(`${libraryHandPath(ids[0])}${listed}`))
+      .catch((error: unknown) => setAddFailure(reasonOf(error)))
+  }
+
   // The same Hands go to the end of the Queue, as this person's; the Room shows them on the way back.
   const addToRoom = (code: string) => {
     setAdding(true)
@@ -322,6 +335,16 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
                 </span>
               )}
             </div>
+            {page && page.total > 0 && !room && (
+              <Button variant="secondary" onClick={selectedHands.length > 0 ? playSelected : playFiltered}>
+                <Icon name="next" size={16} />
+                {selectedHands.length > 0
+                  ? t(selectedHands.length === 1 ? 'library.replay.playSelected.one' : 'library.replay.playSelected.other', {
+                      count: selectedHands.length,
+                    })
+                  : t('library.replay.play')}
+              </Button>
+            )}
             {page && selectedHands.length > 0 && (
               <>
                 <TagSelection tags={page.options.tags} selected={selectedHands} onSet={setTag} />

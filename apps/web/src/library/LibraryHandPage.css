@@ -89,3 +89,18 @@
     border-top: 1px solid var(--color-panel-border);
   }
 }
+
+/* Where this Hand is in the Hands being replayed, between "Volver" and "Copiar mano". */
+.library-hand__replay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  margin-left: 12px;
+}
+.library-hand__replay-at {
+  min-width: 52px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--text-secondary);
+}
