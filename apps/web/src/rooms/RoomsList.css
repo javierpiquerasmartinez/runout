@@ -24,7 +24,6 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-left: auto;
 }
 .rooms-list__code {
   width: 150px;

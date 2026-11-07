@@ -190,7 +190,7 @@ describe('RoomsPage · your Rooms', () => {
     renderRooms()
     await screen.findByRole('region', { name: 'My rooms' })
 
-    await userEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'New room' }))
+    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
 
     expect(document.activeElement).toBe(screen.getByLabelText('Room name'))
   })

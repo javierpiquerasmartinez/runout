@@ -650,16 +650,18 @@ function RoomHeader({
 
       <span className="room-header__spacer" />
 
-      {isMaster && view.state === 'free-review' && (
+      {/* In Free Review the Master's way into Live stands where the state is said, so the header keeps its room. */}
+      {isMaster && view.state === 'free-review' && view.sync.state !== 'offline' ? (
         <Button variant="primary" size="compact" className="room-header__start-live" onClick={onStartLive}>
-          <Icon name="in-progress" size={14} />
+          <Icon name="live" size={14} />
           {t('room.live.start')}
         </Button>
+      ) : (
+        <span className="room-header__live" data-sync={view.sync.state} data-state={view.state}>
+          <span className="room-header__live-dot" />
+          {t(view.sync.state === 'offline' ? 'room.offline' : view.state === 'live' ? 'room.live' : 'room.freeReview')}
+        </span>
       )}
-      <span className="room-header__live" data-sync={view.sync.state} data-state={view.state}>
-        <span className="room-header__live-dot" />
-        {t(view.sync.state === 'offline' ? 'room.offline' : view.state === 'live' ? 'room.live' : 'room.freeReview')}
-      </span>
       {!isMaster && master && (
         <span className="room-header__master">
           <Avatar name={master.displayName} seed={master.identityId} size={20} />

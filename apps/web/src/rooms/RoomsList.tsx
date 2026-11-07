@@ -9,10 +9,8 @@ import type { RoomState, RoomSummary } from '../room/roomClient'
 import { roomLink, roomPath } from '../room/roomCode'
 import { Button } from '../ui/Button'
 import { copyText } from '../ui/clipboard'
-import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { TextField } from '../ui/TextField'
-import { requestNewRoom } from './rooms'
 import './RoomsList.css'
 
 /** Same limit the server enforces. */
@@ -56,11 +54,8 @@ export function RoomsList({
 
   return (
     <div className="rooms-list">
+      {/* "Nueva sala" is the header's, on every screen: it opens the form here. */}
       <div className="rooms-list__bar">
-        <Button variant="primary" onClick={requestNewRoom}>
-          <Icon name="add" size={15} />
-          {t('header.newRoom')}
-        </Button>
         <CompactJoin />
       </div>
       {creating}
@@ -159,7 +154,7 @@ function RoomRow({
         />
         {isMaster && (
           <IconButton
-            icon="note"
+            icon="edit"
             label={t('rooms.row.rename', { name: room.name })}
             size="compact"
             onClick={() => setRenaming(true)}

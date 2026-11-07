@@ -337,7 +337,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             </div>
             {page && page.total > 0 && !room && (
               <Button variant="secondary" onClick={selectedHands.length > 0 ? playSelected : playFiltered}>
-                <Icon name="next" size={16} />
+                <Icon name="play" size={16} />
                 {selectedHands.length > 0
                   ? t(selectedHands.length === 1 ? 'library.replay.playSelected.one' : 'library.replay.playSelected.other', {
                       count: selectedHands.length,
