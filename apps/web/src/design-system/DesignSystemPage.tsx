@@ -17,7 +17,7 @@ type Theme = 'dark' | 'light'
 type DisplayUnit = 'bb' | 'amount' | 'both'
 
 /**
- * The three design-system boards of Design.html rebuilt from the real tokens,
+ * The three "Sistema visual" boards of the design canvas, rebuilt from the real tokens,
  * components, icon sprite and message catalogue. Laid out for 1440×900.
  */
 /** Enough Screen Names for the dropdown of several to offer its search. */
