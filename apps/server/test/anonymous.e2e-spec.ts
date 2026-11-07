@@ -3,6 +3,7 @@ import request from 'supertest';
 import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount, personaIdToken } from './support/google.js';
 
@@ -357,6 +358,8 @@ describe('Anonymous identities last one Room (e2e)', () => {
 
     it('passes the role to an anonymous Participant when the Master drops', async () => {
       const room = await roomWithAnonymousGuest();
+      // The role only passes on by itself while the Room is Live (ADR 0009).
+      await goLive(room.masterSocket);
       await room.masterSocket.close();
       await room.guestSocket.next('room.participantLeft');
 

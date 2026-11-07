@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import {
@@ -107,12 +107,46 @@ export class PlaybackService {
     if (!(await this.end(roomId))) throw new Rejected('not-live');
   }
 
+  /** The open Rooms that are Live. */
+  async liveRooms(): Promise<string[]> {
+    const live = await this.db
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(and(eq(rooms.status, 'open'), eq(rooms.state, 'live')));
+    return live.map((room) => room.id);
+  }
+
+  /** The open Live Rooms whose Master was away when last heard of, and since when. */
+  async liveWithoutMaster(): Promise<{ roomId: string; since: Date }[]> {
+    const live = await this.db
+      .select({ roomId: rooms.id, since: rooms.masterAwaySince })
+      .from(rooms)
+      .where(
+        and(
+          eq(rooms.status, 'open'),
+          eq(rooms.state, 'live'),
+          isNotNull(rooms.masterAwaySince),
+        ),
+      );
+    return live.flatMap(({ roomId, since }) =>
+      since ? [{ roomId, since }] : [],
+    );
+  }
+
+  /** Records since when the Live Room has had no Master connected, or that it has one again. */
+  async masterAway(roomId: string, since: Date | null): Promise<void> {
+    await this.db
+      .update(rooms)
+      .set({ masterAwaySince: since })
+      .where(eq(rooms.id, roomId));
+  }
+
   /** Ends Live whoever asks, as the Room itself does. False when it wasn't Live. */
   async end(roomId: string): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const ended = await tx
         .update(rooms)
-        .set({ state: 'free-review' })
+        .set({ state: 'free-review', masterAwaySince: null })
         .where(and(eq(rooms.id, roomId), eq(rooms.state, 'live')))
         .returning({ id: rooms.id });
       if (ended.length === 0) return false;

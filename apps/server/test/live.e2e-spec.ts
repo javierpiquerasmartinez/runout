@@ -2,7 +2,9 @@ import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
+import { freshDatabase } from './support/fresh-database.js';
 import { newAccount } from './support/google.js';
+import { TestClock } from './support/test-clock.js';
 
 interface Playback {
   handId: string;
@@ -13,6 +15,7 @@ interface Playback {
 interface Snapshot {
   state: 'free-review' | 'live';
   playback: Playback | null;
+  participants: { identityId: string; role: 'master' | 'guest' }[];
   /** The Hand this Participant was last on in Free Review, while it is in the Queue. */
   yourHand: string | null;
   queue: { id: string; handId: string }[];
@@ -317,6 +320,116 @@ describe('Free Review and Live (e2e)', () => {
         command: 'review.open',
         reason: 'hand-not-in-queue',
       });
+    });
+  });
+
+  describe('the Master away', () => {
+    /** Advances past the Master's grace period, as master.e2e-spec reads it. */
+    const GRACE_MS = 120_000;
+    const LIVE_ENDS_MS = 30 * 60_000;
+
+    /** Waits for the server to have seen a connection go. */
+    async function untilGone(socket: RoomClient, watcher?: RoomClient) {
+      await socket.close();
+      if (watcher) await watcher.next('room.participantLeft');
+    }
+
+    it('keeps the role while away in Free Review, however long a Guest stays', async () => {
+      const { code, master, masterSocket, guestSocket } = await roomWithAHand();
+
+      await untilGone(masterSocket, guestSocket);
+      await running.clock.advance(GRACE_MS * 10);
+
+      const back = await join(master.token, code, 'Javier');
+      expect(back.snapshot.participants).toContainEqual(
+        expect.objectContaining({ identityId: master.id, role: 'master' }),
+      );
+      expect(guestSocket.all('room.masterChanged')).toEqual([]);
+    });
+
+    it('passes the role on while Live, as before', async () => {
+      const { guest, masterSocket, guestSocket } = await roomWithAHand();
+      masterSocket.send('live.start', {});
+      await guestSocket.next('live.started');
+
+      await untilGone(masterSocket, guestSocket);
+      await running.clock.advance(GRACE_MS);
+
+      expect(await guestSocket.next('room.masterChanged')).toMatchObject({
+        masterId: guest.id,
+        reason: 'failover',
+      });
+    });
+
+    it('ends Live once the Room has had no Master for 30 minutes', async () => {
+      const { code, guest, masterSocket, guestSocket } = await roomWithAHand();
+      masterSocket.send('live.start', {});
+      await guestSocket.next('live.started');
+
+      await untilGone(guestSocket, masterSocket);
+      await untilGone(masterSocket);
+      await running.clock.advance(LIVE_ENDS_MS);
+
+      const { snapshot } = await join(guest.token, code, 'Marta');
+      expect(snapshot.state).toBe('free-review');
+    });
+
+    it('stays Live when the Master comes back in time', async () => {
+      const { code, master, guest, masterSocket, guestSocket } =
+        await roomWithAHand();
+      masterSocket.send('live.start', {});
+      await guestSocket.next('live.started');
+
+      await untilGone(guestSocket, masterSocket);
+      await untilGone(masterSocket);
+      await running.clock.advance(LIVE_ENDS_MS - 60_000);
+      await join(master.token, code, 'Javier');
+      await running.clock.advance(LIVE_ENDS_MS);
+
+      const { snapshot } = await join(guest.token, code, 'Marta');
+      expect(snapshot.state).toBe('live');
+    });
+
+    it('still ends Live on time after the server restarts', async () => {
+      await running.close();
+      const database = await freshDatabase();
+      try {
+        running = await startApp({ databaseUrl: database.url });
+        const { code, guest, masterSocket, guestSocket } =
+          await roomWithAHand();
+        masterSocket.send('live.start', {});
+        await guestSocket.next('live.started');
+        await untilGone(guestSocket, masterSocket);
+        await untilGone(masterSocket);
+        await expect
+          .poll(async () => {
+            const res = await request(running.httpServer)
+              .get('/api/rooms')
+              .set('Authorization', `Bearer ${guest.token}`);
+            return (res.body as { code: string; connected: number }[]).find(
+              (open) => open.code === code,
+            )?.connected;
+          })
+          .toBe(0);
+        await running.clock.advance(LIVE_ENDS_MS / 2);
+        clients.splice(0);
+        // Shutting down waits for what it was still writing, as a restart would.
+        await running.close();
+
+        running = await startApp({
+          databaseUrl: database.url,
+          clock: new TestClock(new Date(Date.UTC(2026, 0, 1, 0, 15))),
+        });
+        await running.clock.advance(LIVE_ENDS_MS / 2);
+
+        const { snapshot } = await join(guest.token, code, 'Marta');
+        expect(snapshot.state).toBe('free-review');
+      } finally {
+        await Promise.all(clients.splice(0).map((client) => client.close()));
+        await running.close();
+        running = { ...running, close: () => Promise.resolve() };
+        await database.drop();
+      }
     });
   });
 });

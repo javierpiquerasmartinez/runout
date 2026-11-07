@@ -25,6 +25,8 @@ export interface RunningApp {
   wsUrl: string;
   /** The app's clock; advance it to trigger time-based rules. */
   clock: TestClock;
+  /** The database it runs on, for a second app to start on, as a restart would. */
+  databaseUrl: string;
   /** Every email the app has sent. */
   inbox: FakeInbox;
   close(): Promise<void>;
@@ -49,11 +51,12 @@ export async function startApp(
   options: StartAppOptions = {},
 ): Promise<RunningApp> {
   const own = options.ownDatabase ? await freshDatabase() : null;
+  const databaseUrl = own?.url ?? options.databaseUrl ?? inject('databaseUrl');
   const clock = options.clock ?? new TestClock();
   const inbox = new FakeInbox();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DATABASE_URL)
-    .useValue(own?.url ?? options.databaseUrl ?? inject('databaseUrl'))
+    .useValue(databaseUrl)
     .overrideProvider(CLOCK)
     .useValue(clock)
     .overrideProvider(GOOGLE_VERIFIER)
@@ -75,6 +78,7 @@ export async function startApp(
     httpServer,
     wsUrl: `ws://127.0.0.1:${port}/ws`,
     clock,
+    databaseUrl,
     inbox,
     close: async () => {
       await app.close();

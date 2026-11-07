@@ -254,6 +254,8 @@ export const rooms = pgTable('rooms', {
   state: text('state', { enum: ['free-review', 'live'] })
     .notNull()
     .default('free-review'),
+  /** While Live, since when no Master has been connected; Live ends 30 minutes on. */
+  masterAwaySince: timestamp('master_away_since', { withTimezone: true }),
   masterId: uuid('master_id')
     .notNull()
     .references(() => identities.id),

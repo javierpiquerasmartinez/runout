@@ -1,0 +1,1 @@
+ALTER TABLE "rooms" ADD COLUMN "master_away_since" timestamp with time zone;
