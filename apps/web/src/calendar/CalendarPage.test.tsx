@@ -710,21 +710,18 @@ describe('CalendarPage · dragging Milestones between days', () => {
     expect(within(day('Thursday, November 12')).getByText('Squeeze').closest('[data-milestone]')!.hasAttribute('data-dragged')).toBe(false)
   })
 
-  it('leaves a short press a click on the Milestone, which moves nothing', async () => {
-    planned('2026-11-10', 'Squeeze')
+  it('leaves a short press a click that opens the Milestone, and moves nothing', async () => {
+    const squeeze = planned('2026-11-10', 'Squeeze')
     renderAt('/calendar/month/2026-11')
     const title = await within(day('Tuesday, November 10')).findByText('Squeeze')
     under.set('12,11', day('Thursday, November 12'))
-    const clicked = vi.fn()
-    title.addEventListener('click', (event) => clicked(event.defaultPrevented))
 
     fireEvent.pointerDown(title, pointer(10, 10))
     fireEvent.pointerMove(window, pointer(12, 11))
     fireEvent.pointerUp(window, pointer(12, 11))
     fireEvent.click(title)
 
-    expect(clicked).toHaveBeenCalledWith(false)
-    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+    expect(window.location.pathname).toBe(`/calendar/milestones/${squeeze.id}`)
     expect(moves()).toEqual([])
     expect(dialog()).toBeNull()
   })
