@@ -14,11 +14,14 @@ export function MilestoneItem({
   milestone,
   today,
   onToggleDone,
+  dragged = false,
 }: {
   milestone: Milestone
   today: CalendarDate
   /** Marks the Milestone done or not done, at once. */
   onToggleDone: (milestone: Milestone, done: boolean) => void
+  /** Whether it is being dragged elsewhere, which leaves its slot dimmed. */
+  dragged?: boolean
 }) {
   const { t } = useI18n()
   const { done, title } = milestone
@@ -28,7 +31,7 @@ export function MilestoneItem({
     navigate(milestonePath(milestone.id), openedFromCalendar(window.location.pathname))
   }
   return (
-    <div className="calendar-milestone" data-milestone={milestone.id} data-done={done || undefined} data-pending={isPending(milestone, today) || undefined}>
+    <div className="calendar-milestone" data-milestone={milestone.id} data-done={done || undefined} data-pending={isPending(milestone, today) || undefined} data-dragged={dragged || undefined}>
       <button
         type="button"
         role="checkbox"

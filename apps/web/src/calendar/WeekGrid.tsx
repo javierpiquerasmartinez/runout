@@ -4,6 +4,7 @@ import { Icon } from '../ui/Icon'
 import { dayOfMonth, orderDay, weekDays, type CalendarDate, type Milestone } from './calendar'
 import { dayName, weekdayShort } from './calendarText'
 import { MilestoneItem } from './MilestoneItem'
+import type { CalendarDrag } from './useMilestoneDrag'
 
 /**
  * A week in seven columns, Monday to Sunday, each listing every Milestone of
@@ -16,6 +17,7 @@ export function WeekGrid({
   milestones,
   onCreate,
   onToggleDone,
+  drag = null,
 }: {
   monday: CalendarDate
   today: CalendarDate
@@ -23,6 +25,8 @@ export function WeekGrid({
   milestones: ReadonlyMap<CalendarDate, readonly Milestone[]>
   onCreate: (date: CalendarDate) => void
   onToggleDone: (milestone: Milestone, done: boolean) => void
+  /** The Milestone being dragged, if one is, and the day under the pointer. */
+  drag?: CalendarDrag | null
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -45,6 +49,7 @@ export function WeekGrid({
             className="calendar-week__day"
             data-date={date}
             data-today={isToday ? '' : undefined}
+            data-drop={drag?.over === date ? '' : undefined}
             onClick={(event) => create(event, date)}
           >
             <header className="calendar-week__head" aria-hidden="true">
@@ -53,7 +58,7 @@ export function WeekGrid({
             </header>
             <div className="calendar-week__list">
               {listed.map((milestone) => (
-                <MilestoneItem key={milestone.id} milestone={milestone} today={today} onToggleDone={onToggleDone} />
+                <MilestoneItem key={milestone.id} milestone={milestone} today={today} onToggleDone={onToggleDone} dragged={drag?.milestone.id === milestone.id} />
               ))}
               <button type="button" className="calendar-week__add" aria-label={t('calendar.day.add', { day: name })}>
                 <span className="calendar-week__add-hint" aria-hidden="true">

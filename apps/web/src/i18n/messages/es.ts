@@ -1298,6 +1298,7 @@ export const es = {
   'calendar.milestone.markDone': 'Marcar como hecho: {title}',
   'calendar.milestone.done': 'Hecho: {title}',
   'calendar.milestone.saveFailed': 'No se ha podido guardar «{title}». Inténtalo de nuevo.',
+  'calendar.milestone.moveFailed': 'No se ha podido mover «{title}». Inténtalo de nuevo.',
   'calendar.emptyHint': 'Pulsa un día para planear qué estudiar.',
   'calendar.loadFailed': 'No se han podido cargar tus hitos.',
   'calendar.create.title': 'Nuevo hito',
