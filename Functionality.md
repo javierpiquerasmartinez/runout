@@ -727,7 +727,7 @@ The Calendar is where a player plans what they are going to study, one day at a 
 
 **H11.2 — See a month.** As a player, I want the month at a glance, so I see what is planned and where there is room.
 
-- The month is laid out Monday first, in five or six weeks, with the neighbouring months' days set apart and today's number in a brass circle.
+- The month is laid out Monday first, in four to six weeks, with the neighbouring months' days set apart and today's number in a brass circle.
 - Each day shows up to three Milestones' titles, cut short with the whole title on hover, then **+N más**, which leads to that day's week.
 - A day lists its Milestones not done first, then the done ones, each in the order they were created.
 - Previous and next move a month, **Hoy** goes to the current month, and each move is a new address that back undoes.
