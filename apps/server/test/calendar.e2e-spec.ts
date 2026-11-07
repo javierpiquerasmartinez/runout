@@ -1,5 +1,11 @@
 import request from 'supertest';
 import { startApp, type RunningApp } from './support/app.js';
+import {
+  ADMINISTRATOR_EMAIL,
+  invitedAccount,
+  signInAdministrator,
+  uniqueEmail,
+} from './support/admin.js';
 import { newAccount } from './support/google.js';
 
 interface Milestone {
@@ -46,6 +52,18 @@ describe('Milestones in the Calendar (e2e)', () => {
       .patch(`/api/calendar/milestones/${id}`)
       .set('Authorization', `Bearer ${token}`)
       .send(body);
+  }
+
+  function reading(token: string, id: string) {
+    return request(running.httpServer)
+      .get(`/api/calendar/milestones/${id}`)
+      .set('Authorization', `Bearer ${token}`);
+  }
+
+  function deleting(token: string, id: string) {
+    return request(running.httpServer)
+      .delete(`/api/calendar/milestones/${id}`)
+      .set('Authorization', `Bearer ${token}`);
   }
 
   async function list(
@@ -359,6 +377,57 @@ describe('Milestones in the Calendar (e2e)', () => {
     });
   });
 
+  it('reads one Milestone', async () => {
+    const account = await newAccount(running.httpServer);
+    const planned = await plan(account.token, '2026-11-10', 'Squeeze');
+
+    const res = await reading(account.token, planned.id).expect(200);
+
+    expect(res.body).toEqual(planned);
+  });
+
+  it('deletes a Milestone, which is then not there', async () => {
+    const account = await newAccount(running.httpServer);
+    const doomed = await plan(account.token, '2026-11-10', 'Squeeze');
+    const kept = await plan(account.token, '2026-11-10', 'Float');
+
+    await deleting(account.token, doomed.id).expect(204);
+
+    for (const res of [
+      await reading(account.token, doomed.id),
+      await deleting(account.token, doomed.id),
+      await change(account.token, doomed.id, { done: true }),
+    ]) {
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ reason: 'milestone-not-found' });
+    }
+    expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
+      milestones: [kept],
+      hasAny: true,
+    });
+  });
+
+  it("neither reads nor deletes another Account's Milestone", async () => {
+    const owner = await newAccount(running.httpServer);
+    const stranger = await newAccount(running.httpServer);
+    const mine = await plan(owner.token, '2026-11-10', 'Mine');
+
+    for (const id of [
+      mine.id,
+      'not-a-uuid',
+      '5b0c6a2e-8f6d-4f43-9a52-3c1c4b3f8d11',
+    ]) {
+      for (const res of [
+        await reading(stranger.token, id),
+        await deleting(stranger.token, id),
+      ]) {
+        expect(res.status).toBe(404);
+        expect(res.body).toEqual({ reason: 'milestone-not-found' });
+      }
+    }
+    await reading(owner.token, mine.id).expect(200);
+  });
+
   it('refuses anyone without an Account', async () => {
     const master = await newAccount(running.httpServer);
     const room = await request(running.httpServer)
@@ -379,6 +448,8 @@ describe('Milestones in the Calendar (e2e)', () => {
       await listing(token, span),
       await create(token, body),
       await change(token, mine.id, { done: true }),
+      await reading(token, mine.id),
+      await deleting(token, mine.id),
     ]) {
       expect(res.status).toBe(403);
       expect(res.body).toEqual({ reason: 'account-required' });
@@ -393,9 +464,87 @@ describe('Milestones in the Calendar (e2e)', () => {
       await request(running.httpServer)
         .patch(`/api/calendar/milestones/${mine.id}`)
         .send({ done: true }),
+      await request(running.httpServer).get(
+        `/api/calendar/milestones/${mine.id}`,
+      ),
+      await request(running.httpServer).delete(
+        `/api/calendar/milestones/${mine.id}`,
+      ),
     ]) {
       expect(res.status).toBe(401);
       expect(res.body).toEqual({ reason: 'unauthenticated' });
     }
+  });
+});
+
+describe('Milestones during Impersonation (e2e)', () => {
+  let running: RunningApp;
+
+  beforeEach(async () => {
+    running = await startApp({ administratorEmails: [ADMINISTRATOR_EMAIL] });
+  });
+
+  afterEach(async () => {
+    await running.close();
+  });
+
+  it('lets an Administrator impersonating an Account read, change and delete its Milestones', async () => {
+    const administrator = await signInAdministrator(running);
+    const ana = await invitedAccount(
+      running,
+      administrator.token,
+      uniqueEmail('ana'),
+    );
+    const as = (token: string) => ({
+      get: (path: string) =>
+        request(running.httpServer)
+          .get(`/api${path}`)
+          .set('Authorization', `Bearer ${token}`),
+      post: (path: string) =>
+        request(running.httpServer)
+          .post(`/api${path}`)
+          .set('Authorization', `Bearer ${token}`),
+      patch: (path: string) =>
+        request(running.httpServer)
+          .patch(`/api${path}`)
+          .set('Authorization', `Bearer ${token}`),
+      delete: (path: string) =>
+        request(running.httpServer)
+          .delete(`/api${path}`)
+          .set('Authorization', `Bearer ${token}`),
+    });
+    const kept = await as(ana.token)
+      .post('/calendar/milestones')
+      .send({ title: 'Squeeze', date: '2026-11-10' })
+      .expect(201);
+    const doomed = await as(ana.token)
+      .post('/calendar/milestones')
+      .send({ title: 'Float', date: '2026-11-11' })
+      .expect(201);
+    const impersonation = await as(administrator.token)
+      .post(`/admin/accounts/${ana.id}/impersonations`)
+      .expect(201);
+    const token = impersonation.body.token as string;
+
+    const read = await as(token)
+      .get(`/calendar/milestones/${kept.body.id as string}`)
+      .expect(200);
+    expect(read.body).toEqual(kept.body);
+    await as(token)
+      .patch(`/calendar/milestones/${kept.body.id as string}`)
+      .send({ title: 'Squeeze vs BTN', done: true })
+      .expect(200);
+    await as(token)
+      .delete(`/calendar/milestones/${doomed.body.id as string}`)
+      .expect(204);
+
+    const list = await as(ana.token)
+      .get('/calendar/milestones')
+      .query({ from: '2026-11-01', to: '2026-11-30' })
+      .expect(200);
+    expect(list.body).toEqual({
+      milestones: [{ ...kept.body, title: 'Squeeze vs BTN', done: true }],
+      hasAny: true,
+    });
   });
 });

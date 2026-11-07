@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -54,6 +57,28 @@ export class MilestonesController {
   ): Promise<Milestone> {
     const account = await this.authenticate(authorization);
     return this.milestones.create(account, body);
+  }
+
+  /** One Milestone. Someone else's Milestone is `milestone-not-found`. */
+  @Get(':id')
+  @Header('Cache-Control', 'private, no-cache')
+  async get(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<Milestone> {
+    const account = await this.authenticate(authorization);
+    return this.milestones.get(account, id);
+  }
+
+  /** Deletes a Milestone, for good. Someone else's is `milestone-not-found`. */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<void> {
+    const account = await this.authenticate(authorization);
+    await this.milestones.delete(account, id);
   }
 
   /**

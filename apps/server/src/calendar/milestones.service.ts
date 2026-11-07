@@ -153,6 +153,24 @@ export class MilestonesService {
     return changed;
   }
 
+  /**
+   * Deletes one of the Account's Milestones, with no undo. Another Account's,
+   * or one already deleted, is `milestone-not-found`.
+   */
+  async delete(account: Identity, milestoneId: string): Promise<void> {
+    if (!isUuid(milestoneId)) throw new Rejected('milestone-not-found');
+    const deleted = await this.db
+      .delete(milestones)
+      .where(
+        and(
+          eq(milestones.id, milestoneId),
+          eq(milestones.identityId, account.id),
+        ),
+      )
+      .returning({ id: milestones.id });
+    if (deleted.length === 0) throw new Rejected('milestone-not-found');
+  }
+
   /** One of the Account's Milestones; `milestone-not-found` for anyone else's. */
   async get(account: Identity, milestoneId: string): Promise<Milestone> {
     if (!isUuid(milestoneId)) throw new Rejected('milestone-not-found');
