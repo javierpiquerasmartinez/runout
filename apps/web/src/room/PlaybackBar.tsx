@@ -10,7 +10,10 @@ import type { TableView } from './tableView'
 
 /** What the bar shows of a Room around the Playback: who drives it, and how in sync it is. */
 export interface PlaybackRoom {
+  /** Whether this person drives the table: the Master while Live, everyone in Free Review. */
   isMaster: boolean
+  /** Live shares one Playback, so whether everyone follows is worth showing; Free Review shares none. */
+  live: boolean
   sync: RoomSync
   guests: GuestsFollowing
   hideOpponentNames: boolean
@@ -28,7 +31,7 @@ export interface PlaybackRoom {
 export function PlaybackBar({ view, room, onGoTo }: { view: TableView; room?: PlaybackRoom; onGoTo: (actionIndex: number) => void }) {
   const { t } = useI18n()
   // Nothing is asked of a Room we cannot reach: the table stays where it froze.
-  const frozen = room?.sync.state === 'offline' ? t('room.playback.frozen') : undefined
+  const frozen = room?.live && room.sync.state === 'offline' ? t('room.playback.frozen') : undefined
   const masterOnly = frozen ?? (!room || room.isMaster ? undefined : t('room.playback.masterOnly'))
 
   return (
@@ -83,7 +86,7 @@ export function PlaybackBar({ view, room, onGoTo }: { view: TableView; room?: Pl
         </div>
 
         <div className="playback-bar__who">
-          {room && <SyncIndicator sync={room.sync} isMaster={room.isMaster} guests={room.guests} />}
+          {room?.live && <SyncIndicator sync={room.sync} isMaster={room.isMaster} guests={room.guests} />}
         </div>
       </div>
     </section>

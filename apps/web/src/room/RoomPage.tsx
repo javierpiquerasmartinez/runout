@@ -56,6 +56,7 @@ export function RoomPage({ code }: { code: string }) {
   if (view.phase === 'in-room') return <RoomScreen view={view} commands={commands} />
   if (view.phase === 'closed') return <Over room={view.room} what="closed" />
   if (view.phase === 'kicked') return <Over room={view.room} what="kicked" />
+  if (view.phase === 'left') return <Over room={view.room} what="left" />
   if (view.phase === 'rejected' && view.reason === 'invalid-display-name' && lookup.state === 'found') {
     return <ConfirmName room={lookup.room} rejected onConfirm={setDisplayName} />
   }
@@ -195,7 +196,7 @@ function ConfirmName({
  * A Room that has ended for this person: the Master closed it, or removed
  * them. Either way it never takes them back, so the only way on is home.
  */
-function Over({ room, what }: { room: RoomSummary; what: 'closed' | 'kicked' }) {
+function Over({ room, what }: { room: RoomSummary; what: 'closed' | 'kicked' | 'left' }) {
   const { t } = useI18n()
   return (
     <RoomGate>

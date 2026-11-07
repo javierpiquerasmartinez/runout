@@ -90,6 +90,8 @@ export interface AdminRoom {
   code: string
   name: string
   status: 'open' | 'closed'
+  /** Free Review or Live (ADR 0009). */
+  state: 'free-review' | 'live'
   master: Person
   participants: number
   queueLength: number

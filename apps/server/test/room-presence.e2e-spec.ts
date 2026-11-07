@@ -74,7 +74,9 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
         },
       ],
       queue: [],
+      state: 'free-review',
       playback: null,
+      yourHand: null,
       notes: [],
       marks: [],
       inLibrary: [],
@@ -129,7 +131,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
       },
     });
 
-    guestSocket.send('room.leave');
+    guestSocket.send('room.exit');
     expect(await masterSocket.next('room.participantLeft')).toEqual({
       identityId: guest.id,
     });
@@ -161,7 +163,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
     await masterSocket.next('room.participantJoined');
 
     await firstTab.close();
-    secondTab.send('room.leave');
+    secondTab.send('room.exit');
     await masterSocket.next('room.participantLeft');
 
     expect(masterSocket.all('room.participantJoined')).toEqual([]);
@@ -237,10 +239,10 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
     const guest = await newAccount(running.httpServer);
     const socket = await connect(guest.token);
 
-    socket.send('room.leave');
+    socket.send('room.exit');
 
     expect(await socket.next('rejected')).toEqual({
-      command: 'room.leave',
+      command: 'room.exit',
       reason: 'not-in-room',
     });
   });

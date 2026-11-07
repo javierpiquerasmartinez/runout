@@ -60,7 +60,7 @@ function renderBar(
     <I18nProvider initialLocale="en">
       <PlaybackBar
         view={view}
-        room={{ isMaster, sync, guests, hideOpponentNames, onHideOpponentNames }}
+        room={{ isMaster, live: true, sync, guests, hideOpponentNames, onHideOpponentNames }}
         onGoTo={onGoTo}
       />
     </I18nProvider>,

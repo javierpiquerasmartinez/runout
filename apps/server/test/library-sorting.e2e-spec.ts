@@ -161,6 +161,28 @@ describe('Sorting the Library (e2e)', () => {
     ]);
   });
 
+  it('lists every Hand the filter keeps, in the same order, unpaged, to replay them', async () => {
+    const query = 'sort=result&dir=asc&site=pokerstars';
+    const pages: string[] = [];
+    for (let page = 1; ; page++) {
+      const { body } = await request(running.httpServer)
+        .get(`/api/library/hands?${query}&pageSize=2&page=${page}`)
+        .set('Authorization', `Bearer ${account.token}`)
+        .expect(200);
+      const listed = (body as LibraryPage).hands.map((hand) => hand.id);
+      if (listed.length === 0) break;
+      pages.push(...listed);
+    }
+
+    const { body } = await request(running.httpServer)
+      .get(`/api/library/hand-ids?${query}`)
+      .set('Authorization', `Bearer ${account.token}`)
+      .expect(200);
+
+    expect(pages.length).toBeGreaterThan(2);
+    expect(body).toEqual({ ids: pages });
+  });
+
   it('refuses a sort it cannot read', async () => {
     for (const query of [
       'sort=hero',

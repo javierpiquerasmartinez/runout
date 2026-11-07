@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -69,6 +70,7 @@ describe('Master handover and failover (e2e)', () => {
     const albertoRoom = await join(alberto.token, code, 'Alberto');
     await masterRoom.socket.next('room.participantJoined');
     await masterRoom.socket.next('room.participantJoined');
+    await goLive(masterRoom.socket);
     return {
       code,
       master,

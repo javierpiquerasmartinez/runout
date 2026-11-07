@@ -75,6 +75,7 @@ describe('The Rooms tab (e2e)', () => {
       code,
       name: 'Martes NL50',
       status: 'open',
+      state: 'free-review',
       master: { id: ana.id, displayName: 'Ana', email: expect.any(String) },
       participants: 2,
       queueLength: 4,
@@ -127,6 +128,18 @@ describe('The Rooms tab (e2e)', () => {
     );
     expect(codes).toEqual([stale, fresh]);
     expect((await listed(closed)).status).toBe('closed');
+  });
+
+  it('says whether each Room is in Free Review or Live', async () => {
+    const ana = await newAccount(running.httpServer);
+    const code = await openRoom(ana.token);
+    expect((await listed(code)).state).toBe('free-review');
+
+    const anaSocket = await join(ana.token, code, 'Ana');
+    anaSocket.send('live.start', {});
+    await anaSocket.next('live.started');
+    expect((await listed(code)).state).toBe('live');
+    await anaSocket.close();
   });
 
   it('closes an open Room exactly as its Master would', async () => {

@@ -1,5 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, exists, inArray, ne, not, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  not,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
@@ -9,6 +21,7 @@ import {
 import {
   handStats,
   hands,
+  identities,
   libraryEntries,
   marks,
   notes,
@@ -38,9 +51,17 @@ export interface Room extends RoomSummary {
   masterId: string;
 }
 
-/** An open Room someone has been in, for the welcome screen's list. */
+/** An open Room someone is a Participant of, for their list of Rooms. */
 export interface OpenRoom extends RoomSummary {
   id: string;
+  state: 'free-review' | 'live';
+  masterId: string;
+  masterName: string;
+  /** Active Queue Entries. */
+  hands: number;
+  /** Its Participants, kicked ones apart, connected or not. */
+  participants: number;
+  lastActivityAt: Date;
   /** When they first arrived in it, kept across rejoins. */
   joinedAt: Date;
 }
@@ -82,6 +103,7 @@ export class RoomsService {
           creatorId: creator.id,
           createdAt: now,
           lastActivityAt: now,
+          lastEnteredAt: now,
         })
         .returning();
       await tx
@@ -193,7 +215,7 @@ export class RoomsService {
       })
       .returning();
     if (!membership) throw new Rejected('kicked-from-room');
-    await this.touch(room.id);
+    await this.entered(room.id);
     const { screenNames } = await this.identities.profile(named);
     return {
       room,
@@ -204,6 +226,60 @@ export class RoomsService {
         joinedAt: membership.joinedAt,
       },
     };
+  }
+
+  /**
+   * Remembers the Hand someone opened in Free Review, as its Queue Entry, to
+   * land them back on it whenever they return (ADR 0009).
+   */
+  async openHand(
+    roomId: string,
+    identityId: string,
+    handId: unknown,
+  ): Promise<{ handId: string }> {
+    await this.requireParticipant(roomId, identityId);
+    if (!isUuid(handId)) throw new Rejected('hand-not-in-queue');
+    const [entry] = await this.db
+      .select({ id: queueEntries.id })
+      .from(queueEntries)
+      .where(
+        and(
+          eq(queueEntries.roomId, roomId),
+          eq(queueEntries.handId, handId),
+          isNull(queueEntries.removedAt),
+        ),
+      )
+      .limit(1);
+    if (!entry) throw new Rejected('hand-not-in-queue');
+    await this.db
+      .update(roomMemberships)
+      .set({ currentEntryId: entry.id })
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, identityId),
+        ),
+      );
+    return { handId };
+  }
+
+  /** The Hand someone was last on in Free Review, while its Queue Entry is still there. */
+  async handOf(roomId: string, identityId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ handId: queueEntries.handId })
+      .from(roomMemberships)
+      .innerJoin(
+        queueEntries,
+        eq(queueEntries.id, roomMemberships.currentEntryId),
+      )
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, identityId),
+          isNull(queueEntries.removedAt),
+        ),
+      );
+    return row?.handId ?? null;
   }
 
   /** Whether they are a Participant of the Room, kicked ones apart. */
@@ -305,7 +381,12 @@ export class RoomsService {
       );
     const [placed] = await tx
       .insert(roomMemberships)
-      .values({ roomId, identityId: accountId, joinedAt: left.joinedAt })
+      .values({
+        roomId,
+        identityId: accountId,
+        joinedAt: left.joinedAt,
+        currentEntryId: left.currentEntryId,
+      })
       .onConflictDoUpdate({
         target: [roomMemberships.roomId, roomMemberships.identityId],
         set: {
@@ -420,42 +501,111 @@ export class RoomsService {
     }));
   }
 
-  /** Closes a Room nobody has been connected to for long enough. */
-  async closeAbandoned(roomId: string): Promise<boolean> {
-    return this.markClosed(roomId);
+  /** Records that someone joined or reconnected to the Room just now. */
+  private async entered(roomId: string): Promise<void> {
+    const now = this.clock.now();
+    await this.db
+      .update(rooms)
+      .set({ lastActivityAt: now, lastEnteredAt: now })
+      .where(eq(rooms.id, roomId));
+  }
+
+  /** The open Rooms nobody has entered since `cutoff`. */
+  async abandonedSince(cutoff: Date): Promise<string[]> {
+    const abandoned = await this.db
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(and(eq(rooms.status, 'open'), lte(rooms.lastEnteredAt, cutoff)));
+    return abandoned.map((room) => room.id);
+  }
+
+  /**
+   * Closes a Room nobody has entered since `cutoff`. Someone entering it
+   * while the sweep was deciding keeps it open.
+   */
+  async closeAbandoned(roomId: string, cutoff: Date): Promise<boolean> {
+    return this.markClosed(roomId, lte(rooms.lastEnteredAt, cutoff));
   }
 
   /** The open Rooms someone is a Participant of, the ones they were kicked from apart. */
   async openRoomsOf(identityId: string): Promise<OpenRoom[]> {
-    return this.db
-      .select({
-        id: rooms.id,
-        code: rooms.code,
-        name: rooms.name,
-        joinedAt: roomMemberships.joinedAt,
-      })
-      .from(roomMemberships)
-      .innerJoin(rooms, eq(rooms.id, roomMemberships.roomId))
+    return (
+      this.db
+        .select({
+          id: rooms.id,
+          code: rooms.code,
+          name: rooms.name,
+          state: rooms.state,
+          masterId: rooms.masterId,
+          masterName: sql<string>`coalesce(${identities.displayName}, '')`,
+          hands: sql<number>`(select count(*) from ${queueEntries} where ${queueEntries.roomId} = ${rooms.id} and ${queueEntries.removedAt} is null)::int`,
+          participants: sql<number>`(select count(*) from room_memberships as members where members.room_id = ${rooms.id} and not members.kicked)::int`,
+          lastActivityAt: rooms.lastActivityAt,
+          joinedAt: roomMemberships.joinedAt,
+        })
+        .from(roomMemberships)
+        .innerJoin(rooms, eq(rooms.id, roomMemberships.roomId))
+        .innerJoin(identities, eq(identities.id, rooms.masterId))
+        .where(
+          and(
+            eq(roomMemberships.identityId, identityId),
+            eq(roomMemberships.kicked, false),
+            eq(rooms.status, 'open'),
+          ),
+        )
+        // What is happening now first, then what happened last.
+        .orderBy(
+          sql`${rooms.state} = 'live' desc`,
+          desc(rooms.lastActivityAt),
+          rooms.id,
+        )
+    );
+  }
+
+  /** The Master gives the Room another name. */
+  async rename(
+    master: Identity,
+    code: string,
+    rawName: unknown,
+  ): Promise<Room> {
+    const room = await this.findOpen(code);
+    await this.requireMaster(room.id, master.id);
+    const name = validRoomName(rawName);
+    await this.db.update(rooms).set({ name }).where(eq(rooms.id, room.id));
+    return { ...room, name };
+  }
+
+  /**
+   * A Guest gives up being a Participant of the Room. Unlike a Kick, nothing
+   * keeps them out: joining again makes them a Participant anew. The Master
+   * is refused with `master-must-choose`: they close the Room or hand the
+   * role over first.
+   */
+  async leave(identity: Identity, code: string): Promise<Room> {
+    const room = await this.findOpen(code);
+    if (room.masterId === identity.id) throw new Rejected('master-must-choose');
+    await this.db
+      .delete(roomMemberships)
       .where(
         and(
-          eq(roomMemberships.identityId, identityId),
+          eq(roomMemberships.roomId, room.id),
+          eq(roomMemberships.identityId, identity.id),
           eq(roomMemberships.kicked, false),
-          eq(rooms.status, 'open'),
         ),
-      )
-      .orderBy(desc(roomMemberships.joinedAt));
+      );
+    return room;
   }
 
   /**
    * Closes the Room if it is still open, discarding its Room Hands and ending
    * its anonymous identities with it. False when it already was.
    */
-  private async markClosed(roomId: string): Promise<boolean> {
+  private async markClosed(roomId: string, still?: SQL): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const closed = await tx
         .update(rooms)
         .set({ status: 'closed', closedAt: this.clock.now() })
-        .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open')))
+        .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open'), still))
         .returning({ id: rooms.id });
       if (closed.length === 0) return false;
       await this.discardRoomHands(tx, roomId);

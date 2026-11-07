@@ -3,11 +3,13 @@ import request from 'supertest';
 import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
 /** This long with nobody connected and a Room closes on its own. */
-const ABANDONED_MS = 30 * 60_000;
+/** Long enough for a Room nobody enters to close (ADR 0009), sweep included. */
+const ABANDONED_MS = 14 * 24 * 60 * 60_000 + 60 * 60_000;
 
 describe('Room Hands are discarded on close (e2e)', () => {
   let running: RunningApp;
@@ -158,6 +160,7 @@ describe('Room Hands are discarded on close (e2e)', () => {
       await martaSocket.next('notes.written');
       martaSocket.send('hand.setMark', { handId, marked: true });
       await martaSocket.next('hand.markChanged');
+      await goLive(javierSocket);
       javierSocket.send('playback.load', { handId });
       await martaSocket.next('playback.changed');
 
@@ -227,6 +230,8 @@ describe('Room Hands are discarded on close (e2e)', () => {
     });
 
     it('discards them the same way when the Room closes abandoned', async () => {
+      await running.close();
+      running = await startApp({ ownDatabase: true });
       const { javier, code, javierSocket, martaSocket } = await roomOfTwo();
       const [handId] = await importIntoRoom(
         code,
@@ -263,11 +268,11 @@ describe('Room Hands are discarded on close (e2e)', () => {
         const res = await request(running.httpServer)
           .get('/api/rooms')
           .set('Authorization', `Bearer ${token}`);
-        return (res.body as { code: string; live: boolean }[]).find(
+        return (res.body as { code: string; connected: number }[]).find(
           (open) => open.code === code,
-        )?.live;
+        )?.connected;
       })
-      .toBe(false);
+      .toBe(0);
   }
 
   /** What is still stored about a Hand, read straight from the database. */

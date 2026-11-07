@@ -35,7 +35,7 @@ A person present in a Room: either with their Account, or anonymously, with an i
 _Avoid_: User, player, member, anonymous user
 
 **Master**:
-The one Participant who controls Playback in a Room. The Room's creator starts as Master; the role is handed over, never requested back as a right.
+The one Participant who controls Playback in a Room. The Room's creator starts as Master; the role is handed over, never requested back as a right. It only passes on by itself while the Room is Live and the Master is gone; in Free Review they keep it however long they are away.
 _Avoid_: Host, anfitrión, owner, admin, creator
 
 **Guest**:
@@ -83,7 +83,7 @@ The Participant who brought a Hand into Runout. Recorded for audit only; carries
 _Avoid_: Author
 
 **Note**:
-A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room any Participant writes one, but only the Master edits or deletes it; outside a Room, anyone who has the Hand in their Library can write, edit or delete.
+A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room any Participant writes one and edits or deletes their own, and the Master edits or deletes any, whether the Room is Live or in Free Review; outside a Room, anyone who has the Hand in their Library can write, edit or delete.
 _Avoid_: Comment, annotation
 
 **Tag**:
@@ -142,12 +142,16 @@ _Avoid_: HUD, metric, KPI
 ### Room and queue
 
 **Room**:
-The shared space for exactly one study session: Participants, a Queue and the Playback. Closes only when its Master closes it, or after 30 minutes with nobody connected; a closed Room never reopens.
+The shared space for studying one Queue of Hands together: Participants, the Queue and the Playback. Always either Live or in Free Review, starting in Free Review. Closes only when its Master closes it, or after 14 days without anyone entering it; a closed Room never reopens.
 _Avoid_: Session, study session, table, lobby, group
 
 **Kick**:
 Taking a Participant out of a Room for good. Only the Master does it: the person leaves at once, the Room Code stops working for them, and the Queue Entries they brought stay where they are.
 _Avoid_: Ban, expel, expulsar (UI only), remove
+
+**Leave**:
+A Guest stepping out of a Room of their own accord: they stop being its Participant and it leaves their list of Rooms, but they can join again while it is open. The Master doesn't Leave; they close the Room or hand the role over first.
+_Avoid_: Kick, delete, salir (UI only)
 
 **Room Code**:
 The short code that lets a person join a Room. Valid only while the Room is open.
@@ -160,8 +164,16 @@ _Avoid_: Playlist, cola (UI only)
 **Queue Entry**:
 A Hand placed in a Room's Queue, with its position and its Author in that Room. Removing it leaves the Hand intact.
 
+**Free Review**:
+A Room's state when each Participant replays its Queue on their own, at their own pace, whether or not anyone else is there, writing Notes as they go. Every Room starts in it and returns to it when Live ends. Runout remembers which Hand each Participant was on, and each one has their own Hide Opponent Names switch. The UI calls it "Revisión libre".
+_Avoid_: Offline, async mode, solo mode
+
+**Live**:
+A Room's state when the Master drives one Playback that every Participant sees. The Master starts it and ends it as often as they like; it also ends on its own once the Master has been away for 30 minutes. Each Participant jumps to the Master's Hand and Action when it starts, follows them with no way to step aside, and stays wherever it ended. The UI calls it "En directo".
+_Avoid_: Online, sync mode, session, playing
+
 **Playback**:
-The Room's shared replay state: which Hand is loaded, which Action it is on, and whether Hide Opponent Names is on. Only the Master changes it; there is no automatic play.
+The Room's shared replay state while it is Live: which Hand is loaded, which Action it is on, and whether Hide Opponent Names is on. Only the Master changes it; there is no automatic play.
 _Avoid_: Player state, reproduction, speed, autoplay
 
 **Revision**:
@@ -185,7 +197,7 @@ Whether what one Participant has on screen is the Room as it stands: synced, rec
 _Avoid_: Connected, online, up to date
 
 **Hide Opponent Names**:
-A Playback switch, off whenever a Hand is loaded, that shows seats by Position instead of Screen Name unless the Screen Name belongs to a Participant of the Room.
+A Playback switch (in Free Review, each Participant's own), off whenever a Hand is loaded, that shows seats by Position instead of Screen Name unless the Screen Name belongs to a Participant of the Room.
 _Avoid_: Anonymise, hide nicks
 
 **Action**:

@@ -45,13 +45,21 @@ const snapshot: RoomEvent = {
     you: 'id-marta',
     participants: [javier, marta],
     queue: [],
+    state: 'live',
     playback: null,
+    yourHand: null,
     notes: [],
     marks: [],
     inLibrary: [],
     revision: 4,
     presence: [],
   },
+}
+
+/** The same Room in Free Review, with two Hands in its Queue. */
+const freeReview: RoomEvent = {
+  type: 'snapshot',
+  snapshot: { ...snapshot.snapshot, state: 'free-review', queue: [firstHand, secondHand] },
 }
 
 const changeTypes = new Set<string>([
@@ -68,6 +76,9 @@ const changeTypes = new Set<string>([
   'entryRemoved',
   'entryRestored',
   'playbackChanged',
+  'liveStarted',
+  'liveEnded',
+  'roomRenamed',
   'noteWritten',
   'noteEdited',
   'noteRemoved',
@@ -105,7 +116,9 @@ describe('reduceRoom', () => {
       you: 'id-marta',
       participants: [javier, marta],
       queue: [],
+      state: 'live',
       playback: null,
+      own: null,
       notes: [],
       marks: [],
       inLibrary: [],
@@ -113,6 +126,7 @@ describe('reduceRoom', () => {
       presence: [],
       sync: { state: 'synced', latencyMs: null, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 4 },
       masterChange: null,
+      liveStarted: null,
     })
   })
 
@@ -324,6 +338,132 @@ describe('reduceRoom', () => {
     expect(closed).toEqual({ phase: 'closed', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
     const kicked = apply(snapshot, { type: 'participantKicked', identityId: 'id-marta' }, { type: 'disconnected' })
     expect(kicked).toEqual({ phase: 'kicked', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
+  })
+})
+
+describe('reduceRoom, Free Review and Live', () => {
+  it('lands someone in Free Review on the first Hand of the Queue, on their own', () => {
+    const view = inRoom(apply(freeReview))
+    expect(view?.state).toBe('free-review')
+    expect(view?.playback).toBeNull()
+    expect(view?.own).toEqual({ handId: 'hand-1', actionIndex: 0, hideOpponentNames: false })
+  })
+
+  it('lands someone back on the Hand they were last on', () => {
+    const view = inRoom(apply({ type: 'snapshot', snapshot: { ...freeReview.snapshot, yourHand: 'hand-2' } }))
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 0, hideOpponentNames: false })
+  })
+
+  it('lands on the first Hand when the one they were on has left the Queue', () => {
+    const view = inRoom(apply({ type: 'snapshot', snapshot: { ...freeReview.snapshot, yourHand: 'hand-9' } }))
+    expect(view?.own?.handId).toBe('hand-1')
+  })
+
+  it('lands on nothing in Free Review while the Queue is empty', () => {
+    const view = inRoom(apply({ type: 'snapshot', snapshot: { ...snapshot.snapshot, state: 'free-review' } }))
+    expect(view?.own).toBeNull()
+  })
+
+  it('moves through a Hand on its own in Free Review, with no revision', () => {
+    const view = inRoom(
+      apply(
+        freeReview,
+        { type: 'ownOpened', handId: 'hand-2' },
+        { type: 'ownWentTo', actionIndex: 3 },
+        { type: 'ownHidOpponentNames', hidden: true },
+      ),
+    )
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 3, hideOpponentNames: true })
+    expect(view?.revision).toBe(4)
+  })
+
+  it('turns Hide Opponent Names off whenever another Hand is opened', () => {
+    const view = inRoom(
+      apply(freeReview, { type: 'ownHidOpponentNames', hidden: true }, { type: 'ownOpened', handId: 'hand-2' }),
+    )
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 0, hideOpponentNames: false })
+  })
+
+  it('keeps its own place across a snapshot, while its Hand is still in the Queue', () => {
+    const view = inRoom(apply(freeReview, { type: 'ownOpened', handId: 'hand-2' }, { type: 'ownWentTo', actionIndex: 2 }, freeReview))
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 2, hideOpponentNames: false })
+  })
+
+  it('jumps to the Master’s Hand and Action when Live starts, and says so', () => {
+    const playback = { handId: 'hand-2', actionIndex: 5, hideOpponentNames: false }
+    const view = inRoom(apply(freeReview, { type: 'liveStarted', playback }))
+    expect(view?.state).toBe('live')
+    expect(view?.playback).toEqual(playback)
+    expect(view?.liveStarted).toBe(5)
+  })
+
+  it('stays where Live ended, on its own again', () => {
+    const view = inRoom(
+      apply(
+        freeReview,
+        { type: 'liveStarted', playback: { handId: 'hand-2', actionIndex: 0, hideOpponentNames: false } },
+        { type: 'playbackChanged', playback: { handId: 'hand-2', actionIndex: 4, hideOpponentNames: true } },
+        { type: 'liveEnded' },
+      ),
+    )
+    expect(view?.state).toBe('free-review')
+    expect(view?.playback).toBeNull()
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 4, hideOpponentNames: true })
+  })
+
+  it('lands on the Hand the Room remembers after missing the end of Live, not the one from before it', () => {
+    const view = inRoom(
+      apply(
+        freeReview,
+        { type: 'liveStarted', playback: { handId: 'hand-2', actionIndex: 3, hideOpponentNames: false } },
+        { type: 'snapshot', snapshot: { ...freeReview.snapshot, revision: 9, yourHand: 'hand-2' } },
+      ),
+    )
+    expect(view?.own?.handId).toBe('hand-2')
+  })
+
+  it('keeps its own place when Live ends with no Hand loaded', () => {
+    const view = inRoom(
+      apply(freeReview, { type: 'ownOpened', handId: 'hand-2' }, { type: 'liveStarted', playback: null }, { type: 'liveEnded' }),
+    )
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 0, hideOpponentNames: false })
+  })
+
+  it('reads the start and end of Live from the wire', () => {
+    const playback = { handId: 'hand-1', actionIndex: 2, hideOpponentNames: false }
+    expect(parseServerMessage(JSON.stringify({ event: 'live.started', data: { playback }, revision: 7 }))).toEqual({
+      type: 'liveStarted',
+      playback,
+      revision: 7,
+    })
+    expect(parseServerMessage(JSON.stringify({ event: 'live.started', data: { playback: null }, revision: 7 }))).toEqual({
+      type: 'liveStarted',
+      playback: null,
+      revision: 7,
+    })
+    expect(parseServerMessage(JSON.stringify({ event: 'live.ended', data: {}, revision: 8 }))).toEqual({
+      type: 'liveEnded',
+      revision: 8,
+    })
+  })
+})
+
+describe('reduceRoom, renaming and Leaving', () => {
+  it('shows the Room’s new name', () => {
+    expect(inRoom(apply(snapshot, { type: 'roomRenamed', name: 'Jueves NL100' }))?.room.name).toBe('Jueves NL100')
+  })
+
+  it('ends the Room for this tab once its person Leaves it from elsewhere', () => {
+    expect(apply(snapshot, { type: 'left' })).toEqual({ phase: 'left', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
+  })
+
+  it('reads both from the wire, the Leave without a revision', () => {
+    expect(parseServerMessage(JSON.stringify({ event: 'room.renamed', data: { name: 'Jueves' }, revision: 5 }))).toEqual({
+      type: 'roomRenamed',
+      name: 'Jueves',
+      revision: 5,
+    })
+    expect(parseServerMessage(JSON.stringify({ event: 'room.left', data: {} }))).toEqual({ type: 'left' })
   })
 })
 

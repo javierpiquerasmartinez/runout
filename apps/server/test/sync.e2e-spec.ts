@@ -6,6 +6,7 @@ import {
 } from '../src/rooms/room-presence.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -69,6 +70,7 @@ describe('Sync robustness and presence (e2e)', () => {
       entries: { handId: string }[];
     }>('queue.entriesAdded');
     await guestSocket.next('queue.entriesAdded');
+    await goLive(masterSocket);
     return {
       code,
       master,

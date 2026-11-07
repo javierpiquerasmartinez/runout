@@ -111,7 +111,7 @@ export class RoomConnection {
     this.generation += 1
     this.cancelBeat?.()
     this.cancelRetry?.()
-    if (this.open) this.send('room.leave')
+    if (this.open) this.send('room.exit')
     this.socket?.close()
     this.socket = null
     this.open = false

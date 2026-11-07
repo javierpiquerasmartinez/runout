@@ -119,6 +119,65 @@
   background: transparent;
   color: var(--text-muted);
 }
+/* Free Review shares nothing: the pill says so quietly, in the chip's tone. */
+.room-header__live[data-state='free-review']:not([data-sync='offline']) {
+  border-color: var(--color-border);
+  background: var(--color-chip);
+  color: var(--text-secondary);
+}
+
+.room-header__start-live {
+  flex-shrink: 0;
+}
+
+/* ---------- Live band ---------- */
+
+/* Under the header while the Room is Live: everyone follows one table. */
+.room-live-band {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--sync-soft-border);
+  background: var(--sync-hover-bg);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.room-live-band__dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--sync);
+}
+.room-live-band__title {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--sync-ink);
+}
+.room-live-band__who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-live-band__notice {
+  margin-left: auto;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.room-live-band__notice:empty {
+  display: none;
+}
+.room-live-band__end {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.room-live-band__notice:not(:empty) + .room-live-band__end {
+  margin-left: 0;
+}
 
 .room-header__master {
   display: inline-flex;
@@ -1639,6 +1698,7 @@
 }
 
 /* The Hand is in the viewer's Library: it outlives the Room. */
+.queue-entry__chip--notes,
 .queue-entry__chip--in-library {
   display: inline-flex;
   align-items: center;

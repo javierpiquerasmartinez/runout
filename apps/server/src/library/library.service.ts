@@ -229,6 +229,24 @@ export class LibraryService {
   }
 
   /**
+   * Every Hand the filter keeps, in the sort's order, unpaged: what the
+   * Library replays one after another. Ids only, so it stays light.
+   */
+  async handIds(
+    account: Identity,
+    filter: LibraryFilter,
+    sort: LibrarySort,
+  ): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: hands.id })
+      .from(libraryEntries)
+      .innerJoin(hands, eq(hands.id, libraryEntries.handId))
+      .where(libraryFilterWhere(account.id, filter))
+      .orderBy(...librarySortOrder(sort));
+    return rows.map((row) => row.id);
+  }
+
+  /**
    * The person Marks a Hand of their Library, or takes the Mark off. A Hand
    * outside it is `hand-not-found`, as if it didn't exist.
    */

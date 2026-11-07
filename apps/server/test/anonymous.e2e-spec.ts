@@ -3,6 +3,7 @@ import request from 'supertest';
 import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount, personaIdToken } from './support/google.js';
 
@@ -24,7 +25,8 @@ interface Note {
 }
 
 /** This long with nobody connected and a Room closes on its own. */
-const ABANDONED_MS = 30 * 60_000;
+/** Long enough for a Room nobody enters to close (ADR 0009), sweep included. */
+const ABANDONED_MS = 14 * 24 * 60 * 60_000 + 60 * 60_000;
 /** This long without its Master and a Room passes the role on. */
 const GRACE_MS = 120_000;
 
@@ -104,11 +106,11 @@ describe('Anonymous identities last one Room (e2e)', () => {
         const res = await request(running.httpServer)
           .get('/api/rooms')
           .set('Authorization', `Bearer ${token}`);
-        return (res.body as { code: string; live: boolean }[]).find(
+        return (res.body as { code: string; connected: number }[]).find(
           (open) => open.code === code,
-        )?.live;
+        )?.connected;
       })
-      .toBe(false);
+      .toBe(0);
   }
 
   /** What is still stored for an identity, read straight from the database. */
@@ -279,6 +281,8 @@ describe('Anonymous identities last one Room (e2e)', () => {
     });
 
     it('ends them too when the Room closes after being abandoned', async () => {
+      await running.close();
+      running = await startApp({ ownDatabase: true });
       const room = await roomWithAnonymousGuest();
       await room.guestSocket.close();
       await room.masterSocket.close();
@@ -354,6 +358,8 @@ describe('Anonymous identities last one Room (e2e)', () => {
 
     it('passes the role to an anonymous Participant when the Master drops', async () => {
       const room = await roomWithAnonymousGuest();
+      // The role only passes on by itself while the Room is Live (ADR 0009).
+      await goLive(room.masterSocket);
       await room.masterSocket.close();
       await room.guestSocket.next('room.participantLeft');
 

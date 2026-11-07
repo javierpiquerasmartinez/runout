@@ -15,6 +15,7 @@ import {
 import { MAILER } from '../../src/mail/mailer.js';
 import { FakeGoogleVerifier } from './google.js';
 import { FakeInbox } from './inbox.js';
+import { freshDatabase } from './fresh-database.js';
 import { TestClock } from './test-clock.js';
 
 export interface RunningApp {
@@ -24,6 +25,8 @@ export interface RunningApp {
   wsUrl: string;
   /** The app's clock; advance it to trigger time-based rules. */
   clock: TestClock;
+  /** The database it runs on, for a second app to start on, as a restart would. */
+  databaseUrl: string;
   /** Every email the app has sent. */
   inbox: FakeInbox;
   close(): Promise<void>;
@@ -33,6 +36,12 @@ export interface StartAppOptions {
   clock?: TestClock;
   /** Defaults to the Postgres started for this e2e run. */
   databaseUrl?: string;
+  /**
+   * A migrated database of its own, dropped on close. For a test that moves
+   * the clock 14 days or more: the Room sweep would close every other file's
+   * Rooms in the shared one.
+   */
+  ownDatabase?: boolean;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
   administratorEmails?: string[];
 }
@@ -41,11 +50,13 @@ export interface StartAppOptions {
 export async function startApp(
   options: StartAppOptions = {},
 ): Promise<RunningApp> {
+  const own = options.ownDatabase ? await freshDatabase() : null;
+  const databaseUrl = own?.url ?? options.databaseUrl ?? inject('databaseUrl');
   const clock = options.clock ?? new TestClock();
   const inbox = new FakeInbox();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DATABASE_URL)
-    .useValue(options.databaseUrl ?? inject('databaseUrl'))
+    .useValue(databaseUrl)
     .overrideProvider(CLOCK)
     .useValue(clock)
     .overrideProvider(GOOGLE_VERIFIER)
@@ -67,7 +78,11 @@ export async function startApp(
     httpServer,
     wsUrl: `ws://127.0.0.1:${port}/ws`,
     clock,
+    databaseUrl,
     inbox,
-    close: () => app.close(),
+    close: async () => {
+      await app.close();
+      await own?.drop();
+    },
   };
 }

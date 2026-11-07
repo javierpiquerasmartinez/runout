@@ -1,4 +1,9 @@
-import { Inject, Logger, type BeforeApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Logger,
+  type BeforeApplicationShutdown,
+  type OnApplicationBootstrap,
+} from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -22,9 +27,14 @@ import { MasterFailover } from './master-failover.js';
 import { MarksService } from './marks.service.js';
 import { MasterService, type MasterChanged } from './master.service.js';
 import { NotesService, type Note } from './notes.service.js';
-import { PlaybackService, type Playback } from './playback.service.js';
+import {
+  PlaybackService,
+  type Playback,
+  type RoomState,
+} from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
-import { RoomClosure } from './room-closure.js';
+import { LiveTimeout } from './live-timeout.js';
+import { RoomSweep } from './room-sweep.js';
 import {
   RoomPresence,
   presenceChanged,
@@ -45,8 +55,12 @@ export interface RoomSnapshot {
   you: string;
   participants: Participant[];
   queue: QueueEntry[];
-  /** Null while no Hand is loaded. */
+  /** Free Review, each Participant on their own, or Live, all following the Master. */
+  state: RoomState;
+  /** The shared Playback: null outside Live, or while no Hand is loaded. */
   playback: Playback | null;
+  /** The Hand this Participant was last on in Free Review, while it is in the Queue. */
+  yourHand: string | null;
   /** Every Note on the Hands in the Queue, oldest first. */
   notes: Note[];
   /** The Hands in the Queue this Participant has Marked. Nobody else is told. */
@@ -95,6 +109,12 @@ export interface HideOpponentNamesCommand {
 
 export interface LoadHandCommand {
   handId: string;
+}
+
+/** Where the Master is as they start Live; no Hand when they are on none. */
+export interface StartLiveCommand {
+  handId?: string;
+  actionIndex?: number;
 }
 
 export interface GoToActionCommand {
@@ -155,7 +175,11 @@ export interface RejectedEvent {
  */
 @WebSocketGateway({ path: '/ws' })
 export class RoomGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, BeforeApplicationShutdown
+  implements
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnApplicationBootstrap,
+    BeforeApplicationShutdown
 {
   private readonly logger = new Logger(RoomGateway.name);
   private readonly identityOf = new WeakMap<WebSocket, Promise<Identity>>();
@@ -164,8 +188,16 @@ export class RoomGateway
   private readonly playbackChanges = new Map<string, Promise<unknown>>();
   /** The Rooms waiting for a Master who dropped. */
   private readonly failover: MasterFailover;
-  /** The Rooms nobody is connected to, waiting to close themselves. */
-  private readonly closure: RoomClosure;
+  /** Closes the Rooms nobody has entered for long enough. */
+  private readonly sweep: RoomSweep;
+  /** Ends Live in the Rooms that have gone too long without a Master. */
+  private readonly liveTimeout: LiveTimeout;
+  /**
+   * The Rooms that are Live right now. The database says so too; this copy
+   * lets a dropped connection decide at once whether the Master's absence
+   * matters (only while Live: ADR 0009).
+   */
+  private readonly liveRooms = new Set<string>();
   /** Where each Room is in its own history, so clients can spot what they missed. */
   private readonly revisions = new RoomRevisions();
   /** The last presence each Room was told about, so only real changes travel. */
@@ -187,8 +219,13 @@ export class RoomGateway
     this.failover = new MasterFailover(clock, (roomId) =>
       this.passOnMaster(roomId),
     );
-    this.closure = new RoomClosure(clock, (roomId) =>
-      this.closeAbandoned(roomId),
+    this.liveTimeout = new LiveTimeout(clock, (roomId) =>
+      this.endAbandonedLive(roomId),
+    );
+    this.sweep = new RoomSweep(
+      clock,
+      (cutoff) => this.closeAbandoned(cutoff),
+      (error) => this.logger.error(error),
     );
     identities.onRenamed((identity) => this.renamed(identity));
     identities.onTakeOver((tx, anonymous, account) =>
@@ -199,14 +236,56 @@ export class RoomGateway
     );
   }
 
-  /** A Room has just been opened: its abandonment period starts at once. */
-  roomOpened(roomId: string): void {
-    this.closure.watch(roomId);
+  /** Starts looking for Rooms nobody has entered for long enough. */
+  async onApplicationBootstrap(): Promise<void> {
+    this.sweep.start();
+    try {
+      await this.loadLiveRooms();
+    } catch (error) {
+      // Runout still starts, and answers health, with the database away; a
+      // Room's own snapshot tells it whether it is Live once it is back.
+      this.logger.error(error);
+    }
   }
 
-  /** Whether anyone is connected to the Room right now. */
-  isLive(roomId: string): boolean {
-    return this.presence.isLive(roomId);
+  /** The Live Rooms as the database has them, and those whose Master was away. */
+  private async loadLiveRooms(): Promise<void> {
+    for (const roomId of await this.playback.liveRooms()) {
+      this.liveRooms.add(roomId);
+    }
+    // A Master away before a restart is still away: their period carries on.
+    for (const { roomId, since } of await this.playback.liveWithoutMaster()) {
+      this.liveTimeout.watch(roomId, since);
+    }
+  }
+
+  /** The Room has a new name: everyone in it sees it at once. */
+  roomRenamed(roomId: string, name: string): void {
+    this.publish(roomId, 'room.renamed', { name });
+  }
+
+  /** The Master closed the Room from outside it: everyone in it sees it close. */
+  closedByMaster(roomId: string): void {
+    this.roomClosed(roomId);
+  }
+
+  /**
+   * Someone Left the Room from their list of Rooms: any tab of theirs still
+   * in it is told and taken out, and everyone else sees them go.
+   */
+  participantLeft(roomId: string, identityId: string): void {
+    const wasMaster = this.presence.masterOf(roomId) === identityId;
+    const raw = JSON.stringify({ event: 'room.left', data: {} });
+    for (const socket of this.presence.evict(roomId, identityId)) {
+      if (socket.readyState === WebSocket.OPEN) socket.send(raw);
+    }
+    if (wasMaster) this.masterAway(roomId);
+    this.broadcast(roomId, identityId, 'room.participantLeft', { identityId });
+  }
+
+  /** How many Participants are connected to the Room right now. */
+  connectedCount(roomId: string): number {
+    return this.presence.connectedCount(roomId);
   }
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -246,11 +325,11 @@ export class RoomGateway
         socket,
         this.clock.now(),
       );
-      this.closure.stop(room.id);
       // A Room whose Master ran out of grace while empty gives the role to
       // whoever arrives first, before their own snapshot is drawn.
       if (identity.id === this.presence.masterOf(room.id)) {
         this.failover.stop(room.id);
+        this.masterBack(room.id);
       } else if (this.failover.expired(room.id)) {
         await this.passOnMaster(room.id, identity.id);
       }
@@ -318,13 +397,18 @@ export class RoomGateway
     room: Room,
   ): Promise<WsResponse<RoomSnapshot>> {
     const revision = this.revisions.current(room.id);
-    const [queue, playback, notes, marks, inLibrary] = await Promise.all([
-      this.queue.entries(room.id),
-      this.playback.current(room.id),
-      this.notes.inRoom(room.id),
-      this.marks.inRoom(identityId, room.id),
-      this.queue.inLibraryInRoom(identityId, room.id),
-    ]);
+    const [queue, { state, playback }, yourHand, notes, marks, inLibrary] =
+      await Promise.all([
+        this.queue.entries(room.id),
+        this.playback.current(room.id),
+        this.rooms.handOf(room.id, identityId),
+        this.notes.inRoom(room.id),
+        this.marks.inRoom(identityId, room.id),
+        this.queue.inLibraryInRoom(identityId, room.id),
+      ]);
+    // What the database says wins over what was loaded on starting.
+    if (state === 'live') this.liveRooms.add(room.id);
+    else this.liveRooms.delete(room.id);
     // A snapshot says as much as a heartbeat: they are at this revision now.
     this.presence.applied(socket, revision, this.clock.now());
     return {
@@ -334,7 +418,9 @@ export class RoomGateway
         you: identityId,
         participants: this.presence.participants(room.id),
         queue,
+        state,
         playback,
+        yourHand,
         notes,
         marks,
         inLibrary,
@@ -349,11 +435,11 @@ export class RoomGateway
    * `master-must-choose` until they have handed the role over or closed the
    * Room, so a Room is never left without anyone driving it.
    */
-  @SubscribeMessage('room.leave')
+  @SubscribeMessage('room.exit')
   leaveRoom(
     @ConnectedSocket() socket: WebSocket,
   ): Promise<WsResponse<RejectedEvent> | undefined> {
-    return this.rejecting('room.leave', async () => {
+    return this.rejecting('room.exit', async () => {
       const { identity, roomId } = await this.inRoom(socket);
       if (await this.rooms.isMaster(roomId, identity.id)) {
         throw new Rejected('master-must-choose');
@@ -384,7 +470,6 @@ export class RoomGateway
       this.publish(roomId, 'room.participantKicked', kicked);
       this.presence.evict(roomId, kicked.identityId);
       this.reportPresence(roomId);
-      this.watchIfEmpty(roomId);
       return undefined;
     });
   }
@@ -420,6 +505,65 @@ export class RoomGateway
       );
       this.masterChanged(roomId, changed);
       return undefined;
+    });
+  }
+
+  /**
+   * The Master starts Live from the Hand and Action they are on: every
+   * Participant jumps there and follows them from now on.
+   */
+  @SubscribeMessage('live.start')
+  startLive(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<StartLiveCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('live.start', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      await this.inOrder(roomId, async () => {
+        const playback = await this.playback.startLive(
+          identity,
+          roomId,
+          command?.handId,
+          command?.actionIndex,
+        );
+        this.liveRooms.add(roomId);
+        this.masterBack(roomId);
+        this.publish(roomId, 'live.started', { playback });
+      });
+      return undefined;
+    });
+  }
+
+  /** The Master ends Live: everyone stays where it ended, on their own again. */
+  @SubscribeMessage('live.end')
+  endLive(
+    @ConnectedSocket() socket: WebSocket,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('live.end', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      await this.inOrder(roomId, async () => {
+        await this.playback.endLive(identity, roomId);
+        this.liveEnded(roomId);
+      });
+      return undefined;
+    });
+  }
+
+  /**
+   * Someone opens a Hand on their own table in Free Review. Nobody else hears:
+   * it is only kept to land them back on it, and acknowledged to them alone.
+   */
+  @SubscribeMessage('review.open')
+  openHand(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<LoadHandCommand> | null,
+  ): Promise<WsResponse<{ handId: string } | RejectedEvent> | undefined> {
+    return this.rejecting('review.open', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      return {
+        event: 'review.opened',
+        data: await this.rooms.openHand(roomId, identity.id, command?.handId),
+      };
     });
   }
 
@@ -547,7 +691,7 @@ export class RoomGateway
     });
   }
 
-  /** The Master rewrites a Note. Guests are refused, whatever their screen offers. */
+  /** Its writer, or the Master, rewrites a Note. Anyone else is refused, whatever their screen offers. */
   @SubscribeMessage('notes.edit')
   editNote(
     @ConnectedSocket() socket: WebSocket,
@@ -566,7 +710,7 @@ export class RoomGateway
     });
   }
 
-  /** The Master deletes a Note; it can be brought back for 10 s. */
+  /** Its writer, or the Master, deletes a Note; it can be brought back for 10 s. */
   @SubscribeMessage('notes.remove')
   removeNote(
     @ConnectedSocket() socket: WebSocket,
@@ -583,7 +727,7 @@ export class RoomGateway
     });
   }
 
-  /** The Master undoes a deletion within its 10 s window. */
+  /** Its writer, or the Master, undoes a deletion within its 10 s window. */
   @SubscribeMessage('notes.undoRemoval')
   undoNoteRemoval(
     @ConnectedSocket() socket: WebSocket,
@@ -649,11 +793,10 @@ export class RoomGateway
       place.identityId === this.presence.masterOf(place.roomId);
     const left = this.presence.exit(socket);
     if (left) {
-      if (wasMaster) this.failover.watch(left.roomId);
+      if (wasMaster) this.masterAway(left.roomId);
       this.broadcast(left.roomId, left.identityId, 'room.participantLeft', {
         identityId: left.identityId,
       });
-      this.watchIfEmpty(left.roomId);
     }
   }
 
@@ -713,20 +856,19 @@ export class RoomGateway
       if (masterMoved) {
         this.masterChanged(roomId, { masterId: accountId, reason: 'sign-in' });
       }
-      this.watchIfEmpty(roomId);
     };
   }
 
-  /** A Room nobody is connected to any more starts its abandonment period. */
-  private watchIfEmpty(roomId: string): void {
-    if (!this.presence.isLive(roomId)) this.closure.watch(roomId);
-  }
-
-  /** Closes a Room that has sat empty for the whole abandonment period. */
-  private async closeAbandoned(roomId: string): Promise<void> {
-    // Someone arrived while the closure was on its way to running.
-    if (this.presence.isLive(roomId)) return;
-    if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
+  /**
+   * Closes every open Room nobody has entered since `cutoff`. One someone is
+   * still connected to stays: they entered it, only before the cutoff.
+   */
+  private async closeAbandoned(cutoff: Date): Promise<void> {
+    for (const roomId of await this.rooms.abandonedSince(cutoff)) {
+      if (this.presence.connectedCount(roomId) > 0) continue;
+      if (await this.rooms.closeAbandoned(roomId, cutoff))
+        this.roomClosed(roomId);
+    }
   }
 
   /**
@@ -749,9 +891,12 @@ export class RoomGateway
     for (const { roomId, wasMaster } of rooms) {
       this.publish(roomId, 'room.participantKicked', { identityId });
       this.presence.evict(roomId, identityId);
-      if (wasMaster) this.failover.watch(roomId);
+      // A suspended Master never comes back: the role passes on whatever the state.
+      if (wasMaster) {
+        this.failover.watch(roomId);
+        if (this.liveRooms.has(roomId)) this.noMaster(roomId);
+      }
       this.reportPresence(roomId);
-      this.watchIfEmpty(roomId);
     }
   }
 
@@ -759,6 +904,7 @@ export class RoomGateway
   async beforeApplicationShutdown(): Promise<void> {
     // Connections closing on the way out are no activity of anyone's.
     this.shuttingDown = true;
+    this.sweep.stop();
     await this.activitySettled();
   }
 
@@ -770,12 +916,63 @@ export class RoomGateway
   /** Writes the Room's last activity, after any write still on its way. */
   private touch(roomId: string): void {
     if (this.shuttingDown) return;
+    this.write(roomId, () => this.rooms.touch(roomId));
+  }
+
+  /**
+   * Writes something about the Room after any write still on its way to it,
+   * so they land in order, and before the app shuts down.
+   */
+  private write(roomId: string, work: () => Promise<void>): void {
     const next = (this.activity.get(roomId) ?? Promise.resolve())
-      .then(() => this.rooms.touch(roomId))
+      .then(work)
       .catch((error: unknown) => this.logger.error(error));
     this.activity.set(roomId, next);
     void next.then(() => {
       if (this.activity.get(roomId) === next) this.activity.delete(roomId);
+    });
+  }
+
+  /**
+   * The Master is not connected. While Live the role passes on after its
+   * grace period, and Live ends if nobody holds it for long enough; in Free
+   * Review nothing is shared, so they keep the role however long they're away.
+   */
+  private masterAway(roomId: string): void {
+    if (!this.liveRooms.has(roomId)) return;
+    this.failover.watch(roomId);
+    this.noMaster(roomId);
+  }
+
+  /** Live has no Master connected from now: its 30 minutes start, kept across a restart. */
+  private noMaster(roomId: string): void {
+    if (!this.liveTimeout.watch(roomId)) return;
+    this.recordMasterAway(roomId, this.clock.now());
+  }
+
+  /** A Master is connected to the Room again: Live goes on as long as it likes. */
+  private masterBack(roomId: string): void {
+    if (this.liveTimeout.stop(roomId)) this.recordMasterAway(roomId, null);
+  }
+
+  private recordMasterAway(roomId: string, since: Date | null): void {
+    // A Master dropping as the app goes down is still away when it comes back.
+    this.write(roomId, () => this.playback.masterAway(roomId, since));
+  }
+
+  /** The Room is back in Free Review: nothing about its Master's absence matters any more. */
+  private liveEnded(roomId: string): void {
+    this.liveRooms.delete(roomId);
+    this.liveTimeout.stop(roomId);
+    this.failover.stop(roomId);
+    this.publish(roomId, 'live.ended', {});
+  }
+
+  /** Ends Live in a Room that has gone too long without a Master connected. */
+  private async endAbandonedLive(roomId: string): Promise<void> {
+    await this.inOrder(roomId, async () => {
+      if (await this.playback.end(roomId)) this.liveEnded(roomId);
+      else this.liveRooms.delete(roomId);
     });
   }
 
@@ -784,7 +981,8 @@ export class RoomGateway
     this.publish(roomId, 'room.closed', {});
     this.presence.clear(roomId);
     this.failover.stop(roomId);
-    this.closure.stop(roomId);
+    this.liveTimeout.stop(roomId);
+    this.liveRooms.delete(roomId);
     this.revisions.forget(roomId);
     this.presenceTold.delete(roomId);
   }
@@ -830,8 +1028,10 @@ export class RoomGateway
   ): void {
     this.presence.setMaster(roomId, changed.masterId);
     this.failover.stop(roomId);
-    if (!this.presence.participant(roomId, changed.masterId)) {
-      this.failover.watch(roomId);
+    if (this.presence.participant(roomId, changed.masterId)) {
+      this.masterBack(roomId);
+    } else {
+      this.masterAway(roomId);
     }
     this.broadcast(roomId, exceptIdentityId, 'room.masterChanged', changed);
   }

@@ -1,14 +1,22 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react'
 import { initialRoomView, reduceRoom, type RoomView } from './roomClient'
 import { RESYNC_RETRY_MS, RoomConnection } from './roomConnection'
 
 /** What a Participant can ask of the Room. The server decides whether they may. */
 export interface RoomCommands {
+  /**
+   * Opens a Hand of the Queue: on this person's own table in Free Review, on
+   * everyone's while Live (the Master only).
+   */
   loadHand(handId: string): void
-  /** Takes Playback to an absolute Action index; 0 is the Initial State. */
+  /** Takes the table to an absolute Action index; 0 is the Initial State. Own or shared, as above. */
   goToAction(actionIndex: number): void
-  /** Shows seats that belong to no Participant by Position, on every table, or by name again. */
+  /** Shows seats that belong to no Participant by Position, or by name again. Own or shared, as above. */
   hideOpponentNames(hidden: boolean): void
+  /** The Master starts Live from the Hand and Action they are on. */
+  startLive(): void
+  /** The Master ends Live: everyone stays where it ended, on their own again. */
+  endLive(): void
   /** Hands the Master role to another Participant, by identity id. */
   handOverMaster(identityId: string): void
   /** Removes a Participant from the Room for good. Only the Master may. */
@@ -24,9 +32,9 @@ export interface RoomCommands {
   undoQueueRemoval(id: string): void
   /** Writes a Note on a Hand in the Queue. Any Participant may. */
   writeNote(handId: string, body: string): void
-  /** Rewrites a Note. Only the Master of a Room the Hand is in may. */
+  /** Rewrites a Note. Only its writer, or the Room's Master, may. */
   editNote(id: string, body: string): void
-  /** Removes a Note; undoable for 10 s. Only the Master may. */
+  /** Removes a Note; undoable for 10 s. Only its writer, or the Room's Master, may. */
   removeNote(id: string): void
   undoNoteRemoval(id: string): void
   /** Marks a Hand for this person alone, or takes the Mark off. */
@@ -76,15 +84,35 @@ export function useRoom(code: string, token: string | null, displayName: string 
     connectionRef.current?.report(revision)
   }, [revision])
 
+  // Read when a command runs, so the commands themselves never change.
+  const viewRef = useRef(view)
+  useLayoutEffect(() => {
+    viewRef.current = view
+  }, [view])
+  const live = () => viewRef.current.phase === 'in-room' && viewRef.current.state === 'live'
+
   const send = useCallback((event: string, data: unknown) => connectionRef.current?.send(event, data), [])
   const commands = useMemo<RoomCommands>(
     () => ({
       handOverMaster: (identityId) => send('room.handOver', { identityId }),
       kick: (identityId) => send('room.kick', { identityId }),
       closeRoom: () => send('room.close', {}),
-      loadHand: (handId) => send('playback.load', { handId }),
-      goToAction: (actionIndex) => send('playback.goTo', { actionIndex }),
-      hideOpponentNames: (hidden) => send('playback.hideOpponentNames', { hidden }),
+      loadHand: (handId) => {
+        if (live()) return send('playback.load', { handId })
+        dispatch({ type: 'ownOpened', handId })
+        // Kept by the Room, to land this person back on it next time.
+        send('review.open', { handId })
+      },
+      goToAction: (actionIndex) =>
+        live() ? send('playback.goTo', { actionIndex }) : dispatch({ type: 'ownWentTo', actionIndex }),
+      hideOpponentNames: (hidden) =>
+        live() ? send('playback.hideOpponentNames', { hidden }) : dispatch({ type: 'ownHidOpponentNames', hidden }),
+      startLive: () => {
+        const current = viewRef.current
+        const own = current.phase === 'in-room' ? current.own : null
+        send('live.start', own ? { handId: own.handId, actionIndex: own.actionIndex } : {})
+      },
+      endLive: () => send('live.end', {}),
       reassignAuthor: (handId, authorId) => send('queue.reassignAuthor', { handId, authorId }),
       reorderQueue: (order) => send('queue.reorder', { order }),
       removeQueueEntry: (id) => send('queue.remove', { id }),

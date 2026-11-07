@@ -71,7 +71,13 @@ export interface Note {
   editedAt: string | null
 }
 
-/** The Room's shared replay state. The Hand itself is fetched by id. */
+/** Free Review, each Participant on their own, or Live, all following the Master (ADR 0009). */
+export type RoomState = 'free-review' | 'live'
+
+/**
+ * A replay state: the Room's shared one while it is Live, or a Participant's
+ * own in Free Review. The Hand itself is fetched by id.
+ */
 export interface Playback {
   handId: string
   /** 0 is the Initial State; n is the table after Action n. */
@@ -108,8 +114,11 @@ export interface RoomSnapshot {
   you: string
   participants: Participant[]
   queue: QueueEntry[]
-  /** Null while no Hand is loaded. */
+  state: RoomState
+  /** The shared Playback: null outside Live, or while no Hand is loaded. */
   playback: Playback | null
+  /** The Hand this person was last on in Free Review, while it is in the Queue. */
+  yourHand: string | null
   /** Every Note on the Hands in the Queue, oldest first. */
   notes: Note[]
   /** The Hands in the Queue this person has Marked. Nobody else is told. */
@@ -167,6 +176,10 @@ export type RoomChange =
   /** A Queue Entry back in the Queue, with the Notes that left the Room with it. */
   | { type: 'entryRestored'; entry: QueueEntry; notes: Note[] }
   | { type: 'playbackChanged'; playback: Playback }
+  /** The Master started Live from where they were, or from no Hand. */
+  | { type: 'liveStarted'; playback: Playback | null }
+  | { type: 'liveEnded' }
+  | { type: 'roomRenamed'; name: string }
   | { type: 'noteWritten'; note: Note }
   | { type: 'noteEdited'; note: Note }
   | { type: 'noteRemoved'; id: string }
@@ -189,6 +202,12 @@ export type RoomEvent =
   | { type: 'disconnected' }
   | { type: 'reconnectFailed' }
   | { type: 'rejected'; command: string; reason: RejectionReason }
+  /** This person Left the Room from their list of Rooms, elsewhere: this tab is out of it too. */
+  | { type: 'left' }
+  /** This person moving through the Queue on their own in Free Review: nobody else is told. */
+  | { type: 'ownOpened'; handId: string }
+  | { type: 'ownWentTo'; actionIndex: number }
+  | { type: 'ownHidOpponentNames'; hidden: boolean }
   | (RoomChange & { revision: number })
 
 export type RoomView =
@@ -199,13 +218,19 @@ export type RoomView =
   | { phase: 'kicked'; room: RoomSummary }
   /** The session ended, for everyone. A closed Room never reopens. */
   | { phase: 'closed'; room: RoomSummary }
+  /** This person Left the Room; its link brings them back while it is open. */
+  | { phase: 'left'; room: RoomSummary }
   | {
       phase: 'in-room'
       room: RoomSummary
       you: string
       participants: Participant[]
       queue: QueueEntry[]
+      state: RoomState
+      /** The shared Playback: null outside Live, or while no Hand is loaded. */
       playback: Playback | null
+      /** Where this person is on their own in Free Review; kept while Live, for when it ends. */
+      own: Playback | null
       /** Every Note on the Hands in the Queue, oldest first. */
       notes: Note[]
       /** The Hands this person has Marked. Private: nobody else's are ever here. */
@@ -218,6 +243,8 @@ export type RoomView =
       sync: RoomSync
       /** The last move of the Master role, to announce. Null until one happens. */
       masterChange: MasterChange | null
+      /** The revision Live last started at, to announce. Null until it does. */
+      liveStarted: number | null
     }
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
@@ -228,7 +255,8 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
       // Whatever was held is dropped: this is the Room as it stands.
-      const { room, you, participants, queue, playback, notes, marks, inLibrary, revision, presence } = event.snapshot
+      const { room, you, participants, queue, state, playback, yourHand, notes, marks, inLibrary, revision, presence } =
+        event.snapshot
       const held = view.phase === 'in-room' ? view : null
       const seenRevision = Math.max(held?.sync.seenRevision ?? 0, revision)
       // Changes can go past while a snapshot is being drawn. One that lands
@@ -241,7 +269,10 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         you,
         participants,
         queue,
+        state,
         playback,
+        // What was on screen before a Live that ended unseen is stale: the Room knows where it ended.
+        own: ownAfterSnapshot(held?.state === 'free-review' ? held.own : null, yourHand, queue),
         notes,
         marks,
         inLibrary,
@@ -257,6 +288,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         },
         // A recovery is not news: an announcement being read stays on screen.
         masterChange: held?.masterChange ?? null,
+        liveStarted: held?.liveStarted ?? null,
       }
     }
     case 'presence':
@@ -298,6 +330,14 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     }
     case 'rejected':
       return event.command === 'room.join' ? { phase: 'rejected', reason: event.reason } : view
+    case 'left':
+      return view.phase === 'in-room' ? { phase: 'left', room: view.room } : view
+    case 'ownOpened':
+      return withOwn(view, () => ({ handId: event.handId, actionIndex: 0, hideOpponentNames: false }))
+    case 'ownWentTo':
+      return withOwn(view, (own) => own && { ...own, actionIndex: event.actionIndex })
+    case 'ownHidOpponentNames':
+      return withOwn(view, (own) => own && { ...own, hideOpponentNames: event.hidden })
     default:
       return applyChange(view, event)
   }
@@ -412,6 +452,13 @@ function applied(view: InRoom, change: RoomChange): RoomView {
     }
     case 'playbackChanged':
       return { ...view, playback: change.playback }
+    case 'liveStarted':
+      return { ...view, state: 'live', playback: change.playback, liveStarted: view.revision + 1 }
+    case 'roomRenamed':
+      return { ...view, room: { ...view.room, name: change.name } }
+    case 'liveEnded':
+      // Everyone stays where it ended, now on their own.
+      return { ...view, state: 'free-review', own: view.playback ?? view.own, playback: null }
     case 'noteWritten':
       return view.notes.some((note) => note.id === change.note.id)
         ? view
@@ -427,6 +474,24 @@ function applied(view: InRoom, change: RoomChange): RoomView {
       return { ...view, notes }
     }
   }
+}
+
+/** This person's own place changed, in Free Review only: while Live they follow the Master. */
+function withOwn(view: RoomView, change: (own: Playback | null) => Playback | null): RoomView {
+  if (view.phase !== 'in-room' || view.state !== 'free-review') return view
+  return { ...view, own: change(view.own) }
+}
+
+/**
+ * Where someone is on their own once a snapshot lands: where they were on
+ * screen, while that Hand is still in the Queue; else the Hand the Room
+ * remembers them on; else the Queue's first Hand.
+ */
+function ownAfterSnapshot(held: Playback | null, yourHand: string | null, queue: QueueEntry[]): Playback | null {
+  const queued = (handId: string | null | undefined) => queue.some((entry) => entry.handId === handId)
+  if (held && queued(held.handId)) return held
+  const handId = queued(yourHand) ? yourHand : queue[0]?.handId
+  return handId ? { handId, actionIndex: 0, hideOpponentNames: false } : null
 }
 
 /**
@@ -466,6 +531,8 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       }
     case 'rejected':
       return { type: 'rejected', command: String(data.command), reason: data.reason as RejectionReason }
+    case 'room.left':
+      return { type: 'left' }
     default: {
       const change = parseChange(event, data)
       // A change without its place in the run would be applied out of order.
@@ -506,14 +573,13 @@ function parseChange(event: unknown, data: any): RoomChange | null {
     case 'queue.entryRestored':
       return { type: 'entryRestored', entry: data.entry as QueueEntry, notes: (data.notes ?? []) as Note[] }
     case 'playback.changed':
-      return {
-        type: 'playbackChanged',
-        playback: {
-          handId: String(data.handId),
-          actionIndex: Number(data.actionIndex),
-          hideOpponentNames: data.hideOpponentNames === true,
-        },
-      }
+      return { type: 'playbackChanged', playback: parsePlayback(data) }
+    case 'live.started':
+      return { type: 'liveStarted', playback: data.playback ? parsePlayback(data.playback) : null }
+    case 'live.ended':
+      return { type: 'liveEnded' }
+    case 'room.renamed':
+      return { type: 'roomRenamed', name: String(data.name) }
     case 'notes.written':
       return { type: 'noteWritten', note: data.note as Note }
     case 'notes.edited':
@@ -524,5 +590,13 @@ function parseChange(event: unknown, data: any): RoomChange | null {
       return { type: 'noteRestored', note: data.note as Note }
     default:
       return null
+  }
+}
+
+function parsePlayback(data: any): Playback {
+  return {
+    handId: String(data.handId),
+    actionIndex: Number(data.actionIndex),
+    hideOpponentNames: data.hideOpponentNames === true,
   }
 }

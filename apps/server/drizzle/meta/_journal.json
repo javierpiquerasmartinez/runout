@@ -197,6 +197,34 @@
       "when": 1793964585949,
       "tag": "0027_hand_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794057874371,
+      "tag": "0028_rooms_last_entered",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794058246010,
+      "tag": "0029_room_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794058757030,
+      "tag": "0030_membership_current_entry",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794059013904,
+      "tag": "0031_room_master_away",
+      "breakpoints": true
     }
   ]
 }

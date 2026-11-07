@@ -250,6 +250,12 @@ export const rooms = pgTable('rooms', {
   status: text('status', { enum: ['open', 'closed'] })
     .notNull()
     .default('open'),
+  /** Free Review, each Participant on their own, or Live, all following the Master (ADR 0009). */
+  state: text('state', { enum: ['free-review', 'live'] })
+    .notNull()
+    .default('free-review'),
+  /** While Live, since when no Master has been connected; Live ends 30 minutes on. */
+  masterAwaySince: timestamp('master_away_since', { withTimezone: true }),
   masterId: uuid('master_id')
     .notNull()
     .references(() => identities.id),
@@ -259,8 +265,12 @@ export const rooms = pgTable('rooms', {
     .references(() => identities.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
-  /** Its last Revision or join, so stale Rooms can be found. */
+  /** Its last Revision or join, for the Administrator's statistics. */
   lastActivityAt: timestamp('last_activity_at', {
+    withTimezone: true,
+  }).notNull(),
+  /** When anyone last joined or reconnected: 14 days on, it closes (ADR 0009). */
+  lastEnteredAt: timestamp('last_entered_at', {
     withTimezone: true,
   }).notNull(),
 });
@@ -276,6 +286,11 @@ export const roomMemberships = pgTable(
       .references(() => identities.id),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull(),
     kicked: boolean('kicked').notNull().default(false),
+    /** The Queue Entry they were last on in Free Review, to land them back on it (ADR 0009). */
+    currentEntryId: uuid('current_entry_id').references(
+      (): AnyPgColumn => queueEntries.id,
+      { onDelete: 'set null' },
+    ),
   },
   (table) => [primaryKey({ columns: [table.roomId, table.identityId] })],
 );
