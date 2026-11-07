@@ -3,6 +3,7 @@ import request from 'supertest';
 import { inject } from 'vitest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -159,6 +160,7 @@ describe('Room Hands are discarded on close (e2e)', () => {
       await martaSocket.next('notes.written');
       martaSocket.send('hand.setMark', { handId, marked: true });
       await martaSocket.next('hand.markChanged');
+      await goLive(javierSocket);
       javierSocket.send('playback.load', { handId });
       await martaSocket.next('playback.changed');
 

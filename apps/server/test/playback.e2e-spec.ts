@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -59,6 +60,7 @@ describe('Playback (e2e)', () => {
     const { entries } = await masterSocket.next<{
       entries: { handId: string }[];
     }>('queue.entriesAdded');
+    await goLive(masterSocket);
     return {
       code,
       master,

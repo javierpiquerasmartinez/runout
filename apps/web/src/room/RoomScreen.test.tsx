@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
 import { HeldRoomContext } from './heldRoomContext'
+import { forgetHands } from './hand'
 import { RoomScreen } from './RoomScreen'
 import type { Note, Participant, QueueEntry, RoomView } from './roomClient'
 import type { RoomCommands } from './useRoom'
@@ -54,7 +55,10 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
     you: 'id-javier',
     participants: [javier, marta],
     queue: [],
+    // Live, as every Room was before Free Review: most of these tests are about the shared Playback.
+    state: 'live',
     playback: null,
+    own: null,
     notes: [],
     marks: [],
     inLibrary: [],
@@ -62,6 +66,7 @@ function roomView(view: Partial<InRoom> = {}): InRoom {
     presence: [],
     sync: { state: 'synced', latencyMs: 42, failedAttempts: 0, awaitingSnapshot: false, seenRevision: 1 },
     masterChange: null,
+    liveStarted: null,
     ...view,
   }
 }
@@ -97,6 +102,8 @@ function renderRoom(view: InRoom, identity: Partial<Identity> = {}) {
     undoNoteRemoval: vi.fn(),
     setMark: vi.fn(),
     rejoinAs: vi.fn(),
+    startLive: vi.fn(),
+    endLive: vi.fn(),
   } satisfies RoomCommands
   showAgain = render(screenOf(view, commands, identity)).rerender
   return commands
@@ -315,6 +322,93 @@ describe('RoomScreen · staying in sync', () => {
     )
 
     expect(screen.getByText('OFFLINE')).toBeTruthy()
+  })
+})
+
+describe('RoomScreen \u00b7 Free Review', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(splitPot)),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    forgetHands()
+  })
+
+  /** A Room in Free Review, with Marta on the first Hand of two. */
+  function freeReview(view: Partial<InRoom> = {}): InRoom {
+    return roomView({
+      state: 'free-review',
+      you: 'id-marta',
+      queue: [firstHand, secondHand],
+      own: { handId: 'hand-1', actionIndex: 0, hideOpponentNames: false },
+      ...view,
+    })
+  }
+
+  it('lets a Guest open any Hand of the Queue on their own', async () => {
+    const commands = renderRoom(freeReview())
+
+    const queue = screen.getByRole('complementary', { name: 'Hand queue' })
+    await userEvent.click(within(queue).getAllByRole('button', { name: /BTN/ })[1])
+
+    expect(commands.loadHand).toHaveBeenCalledWith('hand-2')
+  })
+
+  it('shows a Guest their own table, with controls that are theirs to use', async () => {
+    const commands = renderRoom(freeReview())
+
+    const next = await screen.findByRole('button', { name: 'Next action' })
+    expect(next.getAttribute('aria-disabled')).toBeNull()
+    await userEvent.click(next)
+    expect(commands.goToAction).toHaveBeenCalledWith(1)
+    expect(screen.getByRole('switch', { name: 'Hide opponent names' }).getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('shows no Sync indicator, since nothing is shared', async () => {
+    renderRoom(freeReview())
+
+    await screen.findByRole('button', { name: 'Next action' })
+    expect(screen.queryByText(/following|in sync/i)).toBeNull()
+    expect(screen.getByText('FREE REVIEW')).toBeTruthy()
+  })
+
+  it('offers the Master, and only the Master, to start Live', async () => {
+    const commands = renderRoom(freeReview({ you: 'id-javier' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start live' }))
+    expect(commands.startLive).toHaveBeenCalled()
+  })
+
+  it('offers a Guest no way to start Live', () => {
+    renderRoom(freeReview())
+
+    expect(screen.queryByRole('button', { name: 'Start live' })).toBeNull()
+  })
+})
+
+describe('RoomScreen \u00b7 Live', () => {
+  it('shows everyone that the Room is Live, and who leads it', () => {
+    renderRoom(roomView({ you: 'id-marta' }))
+
+    expect(screen.getByRole('region', { name: 'Live' }).textContent).toContain('Javier')
+    expect(screen.queryByRole('button', { name: 'End live' })).toBeNull()
+  })
+
+  it('lets the Master end Live', async () => {
+    const commands = renderRoom(roomView())
+
+    await userEvent.click(screen.getByRole('button', { name: 'End live' }))
+    expect(commands.endLive).toHaveBeenCalled()
+  })
+
+  it('says when the Master has just started Live', () => {
+    renderRoom(roomView({ you: 'id-marta', liveStarted: 2 }))
+
+    expect(screen.getByText('Javier started live: you are following them.')).toBeTruthy()
   })
 })
 

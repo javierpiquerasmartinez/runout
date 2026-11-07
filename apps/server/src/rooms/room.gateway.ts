@@ -27,7 +27,11 @@ import { MasterFailover } from './master-failover.js';
 import { MarksService } from './marks.service.js';
 import { MasterService, type MasterChanged } from './master.service.js';
 import { NotesService, type Note } from './notes.service.js';
-import { PlaybackService, type Playback } from './playback.service.js';
+import {
+  PlaybackService,
+  type Playback,
+  type RoomState,
+} from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
 import { RoomSweep } from './room-sweep.js';
 import {
@@ -50,7 +54,9 @@ export interface RoomSnapshot {
   you: string;
   participants: Participant[];
   queue: QueueEntry[];
-  /** Null while no Hand is loaded. */
+  /** Free Review, each Participant on their own, or Live, all following the Master. */
+  state: RoomState;
+  /** The shared Playback: null outside Live, or while no Hand is loaded. */
   playback: Playback | null;
   /** Every Note on the Hands in the Queue, oldest first. */
   notes: Note[];
@@ -100,6 +106,12 @@ export interface HideOpponentNamesCommand {
 
 export interface LoadHandCommand {
   handId: string;
+}
+
+/** Where the Master is as they start Live; no Hand when they are on none. */
+export interface StartLiveCommand {
+  handId?: string;
+  actionIndex?: number;
 }
 
 export interface GoToActionCommand {
@@ -328,13 +340,14 @@ export class RoomGateway
     room: Room,
   ): Promise<WsResponse<RoomSnapshot>> {
     const revision = this.revisions.current(room.id);
-    const [queue, playback, notes, marks, inLibrary] = await Promise.all([
-      this.queue.entries(room.id),
-      this.playback.current(room.id),
-      this.notes.inRoom(room.id),
-      this.marks.inRoom(identityId, room.id),
-      this.queue.inLibraryInRoom(identityId, room.id),
-    ]);
+    const [queue, { state, playback }, notes, marks, inLibrary] =
+      await Promise.all([
+        this.queue.entries(room.id),
+        this.playback.current(room.id),
+        this.notes.inRoom(room.id),
+        this.marks.inRoom(identityId, room.id),
+        this.queue.inLibraryInRoom(identityId, room.id),
+      ]);
     // A snapshot says as much as a heartbeat: they are at this revision now.
     this.presence.applied(socket, revision, this.clock.now());
     return {
@@ -344,6 +357,7 @@ export class RoomGateway
         you: identityId,
         participants: this.presence.participants(room.id),
         queue,
+        state,
         playback,
         notes,
         marks,
@@ -428,6 +442,45 @@ export class RoomGateway
         command?.identityId,
       );
       this.masterChanged(roomId, changed);
+      return undefined;
+    });
+  }
+
+  /**
+   * The Master starts Live from the Hand and Action they are on: every
+   * Participant jumps there and follows them from now on.
+   */
+  @SubscribeMessage('live.start')
+  startLive(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<StartLiveCommand> | null,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('live.start', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      await this.inOrder(roomId, async () => {
+        const playback = await this.playback.startLive(
+          identity,
+          roomId,
+          command?.handId,
+          command?.actionIndex,
+        );
+        this.publish(roomId, 'live.started', { playback });
+      });
+      return undefined;
+    });
+  }
+
+  /** The Master ends Live: everyone stays where it ended, on their own again. */
+  @SubscribeMessage('live.end')
+  endLive(
+    @ConnectedSocket() socket: WebSocket,
+  ): Promise<WsResponse<RejectedEvent> | undefined> {
+    return this.rejecting('live.end', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      await this.inOrder(roomId, async () => {
+        await this.playback.endLive(identity, roomId);
+        this.publish(roomId, 'live.ended', {});
+      });
       return undefined;
     });
   }

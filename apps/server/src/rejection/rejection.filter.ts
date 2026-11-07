@@ -30,6 +30,8 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'no-history': HttpStatus.NOT_FOUND,
   'hand-not-in-queue': HttpStatus.NOT_FOUND,
   'no-hand-loaded': HttpStatus.CONFLICT,
+  'not-live': HttpStatus.CONFLICT,
+  'already-live': HttpStatus.CONFLICT,
   'invalid-action-index': HttpStatus.BAD_REQUEST,
   'invalid-hide-opponent-names': HttpStatus.BAD_REQUEST,
   'file-too-large': HttpStatus.PAYLOAD_TOO_LARGE,

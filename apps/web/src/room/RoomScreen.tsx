@@ -84,7 +84,14 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const { t } = i18n
   const me = view.participants.find((p) => p.identityId === view.you)
   const isMaster = me?.role === 'master'
+  const live = view.state === 'live'
+  // While Live everyone sees the Master's table; in Free Review each person has their own.
+  const shown = live ? view.playback : view.own
+  const drives = live ? isMaster : true
+  // In Free Review nothing is asked of the server to move through a Hand: it works offline too.
+  const canDrive = drives && (!live || view.sync.state !== 'offline')
   const masterNotice = useMasterNotice(view)
+  const liveNotice = useLiveNotice(view)
   const [decision, setDecision] = useState<RoomDecision | null>(null)
   // Who the Master is handing the Room to on their way out, until the role moves.
   const [leavingTo, setLeavingTo] = useState<string | null>(null)
@@ -94,32 +101,32 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   usePasteToImport(view.room.code, !importing, reportImport)
   const { token } = useIdentity()
   const preferences = usePreferences()
-  const load = useHand(view.playback?.handId ?? null, token)
+  const load = useHand(shown?.handId ?? null, token)
   const table =
-    view.playback && load.state === 'loaded'
+    shown && load.state === 'loaded'
       ? tableView(
           load.hand,
-          view.playback.actionIndex,
+          shown.actionIndex,
           i18n,
           {
-            hideOpponentNames: view.playback.hideOpponentNames,
+            hideOpponentNames: shown.hideOpponentNames,
             participantScreenNames: view.participants.flatMap((p) => p.screenNames),
           },
           preferences,
         )
       : null
   // With no Hand loaded (or the loaded one gone from the Queue), K loads the first.
-  const loadedIndex = view.queue.findIndex((entry) => entry.handId === view.playback?.handId)
+  const loadedIndex = view.queue.findIndex((entry) => entry.handId === shown?.handId)
   const loadedEntry = view.queue[loadedIndex]
   // The Master may remove the loaded Hand's own Queue Entry; Playback (and this panel)
   // keeps showing it from the last Queue Entry seen for it, per "leaves Playback untouched".
   const [lastLoadedEntry, setLastLoadedEntry] = useState<QueueEntry | undefined>(undefined)
   if (loadedEntry && loadedEntry.id !== lastLoadedEntry?.id) setLastLoadedEntry(loadedEntry)
   const detailsEntry =
-    loadedEntry ?? (lastLoadedEntry?.handId === view.playback?.handId ? lastLoadedEntry : undefined)
+    loadedEntry ?? (lastLoadedEntry?.handId === shown?.handId ? lastLoadedEntry : undefined)
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
   const next = view.queue[loadedIndex + 1]
-  useShortcuts(isMaster && view.sync.state !== 'offline', {
+  useShortcuts(canDrive, {
     'previous-hand': previous && (() => commands.loadHand(previous.handId)),
     'next-hand': next && (() => commands.loadHand(next.handId)),
   })
@@ -134,13 +141,17 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
       <RoomHeader
         view={view}
         isMaster={isMaster}
+        onStartLive={commands.startLive}
         onLeave={() => (isMaster ? setDecision({ kind: 'leave' }) : navigate('/'))}
       />
+      {live && <LiveBand view={view} isMaster={isMaster} notice={liveNotice} onEnd={commands.endLive} />}
 
       <div className="room__body">
         <QueuePanel
           view={view}
           isMaster={isMaster}
+          drives={drives}
+          shownHandId={shown?.handId ?? null}
           commands={commands}
           i18n={i18n}
           onImport={() => setImporting(true)}
@@ -148,34 +159,38 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
         />
 
         <main className="room-stage" data-sync={view.sync.state}>
-          {view.playback ? (
+          {shown ? (
             <LoadedHand
               view={view}
-              handId={view.playback.handId}
+              handId={shown.handId}
               load={load}
               table={table}
-              isMaster={isMaster}
-              marked={view.marks.includes(view.playback.handId)}
+              drives={drives}
+              canDrive={canDrive}
+              hideOpponentNames={shown.hideOpponentNames}
+              marked={view.marks.includes(shown.handId)}
               onGoTo={commands.goToAction}
               onHideOpponentNames={commands.hideOpponentNames}
-              onSetMark={(marked) => commands.setMark(view.playback!.handId, marked)}
+              onSetMark={(marked) => commands.setMark(shown.handId, marked)}
             />
           ) : (
             <>
               <div className="room-stage__felt">
                 <div className="room-stage__table">
-                  <p>{t(isMaster ? 'room.table.waitingMaster' : 'room.table.waitingGuest')}</p>
+                  <p>{t(drives ? 'room.table.waitingMaster' : 'room.table.waitingGuest')}</p>
                 </div>
               </div>
               {/* No Hand, no transport bar — but whether the Room is still
-                  there is worth knowing before one is loaded too. */}
-              <div className="room-stage__standby">
-                <SyncIndicator
-                  sync={view.sync}
-                  isMaster={isMaster}
-                  guests={guestsFollowing(view.participants, view.presence)}
-                />
-              </div>
+                  there is worth knowing before one is loaded too, while Live. */}
+              {live && (
+                <div className="room-stage__standby">
+                  <SyncIndicator
+                    sync={view.sync}
+                    isMaster={isMaster}
+                    guests={guestsFollowing(view.participants, view.presence)}
+                  />
+                </div>
+              )}
             </>
           )}
         </main>
@@ -380,6 +395,8 @@ const NOTE_FIELD_ID = 'room-note-field'
 function QueuePanel({
   view,
   isMaster,
+  drives,
+  shownHandId,
   commands,
   i18n,
   onImport,
@@ -387,6 +404,10 @@ function QueuePanel({
 }: {
   view: InRoom
   isMaster: boolean
+  /** Whether this person opens Hands: the Master while Live, everyone in Free Review. */
+  drives: boolean
+  /** The Hand on this person's table. */
+  shownHandId: string | null
   commands: RoomCommands
   i18n: Translator
   onImport: () => void
@@ -562,8 +583,8 @@ function QueuePanel({
                     inLibrary={view.inLibrary.includes(entry.handId)}
                     noteCount={view.notes.filter((note) => note.handId === entry.handId).length}
                     i18n={i18n}
-                    loaded={entry.handId === view.playback?.handId}
-                    onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
+                    loaded={entry.handId === shownHandId}
+                    onLoad={drives ? () => commands.loadHand(entry.handId) : undefined}
                     onMoveUp={isMaster && fullIndex > 0 ? () => move(entry, -1) : undefined}
                     onMoveDown={isMaster && fullIndex < view.queue.length - 1 ? () => move(entry, 1) : undefined}
                     onRemove={isMaster ? () => removal.remove(entry.id, commands.removeQueueEntry) : undefined}
@@ -581,10 +602,12 @@ function QueuePanel({
 function RoomHeader({
   view,
   isMaster,
+  onStartLive,
   onLeave,
 }: {
   view: InRoom
   isMaster: boolean
+  onStartLive: () => void
   /** A Guest walks out; the Master is asked to hand the role over or close first. */
   onLeave: () => void
 }) {
@@ -627,9 +650,15 @@ function RoomHeader({
 
       <span className="room-header__spacer" />
 
-      <span className="room-header__live" data-sync={view.sync.state}>
+      {isMaster && view.state === 'free-review' && (
+        <Button variant="primary" size="compact" className="room-header__start-live" onClick={onStartLive}>
+          <Icon name="in-progress" size={14} />
+          {t('room.live.start')}
+        </Button>
+      )}
+      <span className="room-header__live" data-sync={view.sync.state} data-state={view.state}>
         <span className="room-header__live-dot" />
-        {t(view.sync.state === 'offline' ? 'room.offline' : 'room.live')}
+        {t(view.sync.state === 'offline' ? 'room.offline' : view.state === 'live' ? 'room.live' : 'room.freeReview')}
       </span>
       {!isMaster && master && (
         <span className="room-header__master">
@@ -663,16 +692,19 @@ function RoomHeader({
 }
 
 /**
- * The loaded Hand: which one it is, the table at the current Action and the
- * transport bar. The Hand's content is fetched once by id. The Master steps
- * Actions with the arrow keys and jumps Streets with Shift + arrow.
+ * The Hand on this person's table: which one it is, the table at the current
+ * Action and the transport bar. The Hand's content is fetched once by id.
+ * Whoever drives steps Actions with the arrow keys and jumps Streets with
+ * Shift + arrow.
  */
 function LoadedHand({
   view,
   handId,
   load,
   table,
-  isMaster,
+  drives,
+  canDrive,
+  hideOpponentNames,
   marked,
   onGoTo,
   onHideOpponentNames,
@@ -683,7 +715,11 @@ function LoadedHand({
   load: HandLoad
   /** The table at the current Action, once the Hand is loaded. */
   table: TableView | null
-  isMaster: boolean
+  /** Whether this person drives the table: the Master while Live, everyone in Free Review. */
+  drives: boolean
+  /** Whether they can right now: a Live Room out of reach asks nothing of anyone. */
+  canDrive: boolean
+  hideOpponentNames: boolean
   /** Whether this person has Marked the loaded Hand. Nobody else ever sees it. */
   marked: boolean
   onGoTo: (actionIndex: number) => void
@@ -695,7 +731,7 @@ function LoadedHand({
   const index = view.queue.findIndex((entry) => entry.handId === handId)
   const entry = view.queue[index]
   const goTo = (actionIndex: number | null) => (actionIndex === null ? undefined : () => onGoTo(actionIndex))
-  useShortcuts(isMaster && table !== null && view.sync.state !== 'offline', {
+  useShortcuts(canDrive && table !== null, {
     'previous-action': goTo(table?.canGoBack ? table.actionIndex - 1 : null),
     'next-action': goTo(table?.canGoForward ? table.actionIndex + 1 : null),
     'previous-street': goTo(table?.streets.previousStreet ?? null),
@@ -751,10 +787,11 @@ function LoadedHand({
           <PlaybackBar
             view={table}
             room={{
-              isMaster,
+              isMaster: drives,
+              live: view.state === 'live',
               sync: view.sync,
               guests: guestsFollowing(view.participants, view.presence),
-              hideOpponentNames: view.playback?.hideOpponentNames ?? false,
+              hideOpponentNames,
               onHideOpponentNames,
             }}
             onGoTo={onGoTo}
@@ -1059,7 +1096,7 @@ function QueueRow({
   noteCount: number
   i18n: Translator
   loaded: boolean
-  /** Only the Master loads Hands; for Guests a row is information, not a control. */
+  /** Whoever drives the table opens Hands; for anyone else a row is information, not a control. */
   onLoad?: () => void
   /** Undefined for a Guest, or at the Queue's ends (disabled, not hidden). */
   onMoveUp?: () => void
@@ -1347,6 +1384,63 @@ function useMasterNotice(view: InRoom): string | null {
 }
 
 const MASTER_NOTICE_FOR_MS = 6000
+
+/**
+ * The band every Participant sees while the Room is Live: who leads it, the
+ * notice that it has just started, and, for the Master, the way to end it.
+ */
+function LiveBand({
+  view,
+  isMaster,
+  notice,
+  onEnd,
+}: {
+  view: InRoom
+  isMaster: boolean
+  notice: string | null
+  onEnd: () => void
+}) {
+  const { t } = useI18n()
+  const master = view.participants.find((p) => p.role === 'master')
+  return (
+    <section className="room-live-band" aria-label={t('room.live.band')}>
+      <span className="room-live-band__dot" aria-hidden="true" />
+      <strong className="room-live-band__title">{t('room.live.band')}</strong>
+      <span className="room-live-band__who">
+        {isMaster ? t('room.live.leading.you') : master && t('room.live.leading', { name: master.displayName })}
+      </span>
+      <span className="room-live-band__notice" role="status">
+        {notice}
+      </span>
+      {isMaster && (
+        <Button variant="secondary" size="compact" className="room-live-band__end" onClick={onEnd}>
+          {t('room.live.end')}
+        </Button>
+      )}
+    </section>
+  )
+}
+
+/** What to say for a few seconds once the Master starts Live: everyone has just jumped to their table. */
+function useLiveNotice(view: InRoom): string | null {
+  const { t } = useI18n()
+  const [announced, setAnnounced] = useState<number | null>(null)
+  const [shown, setShown] = useState<number | null>(null)
+  if (view.liveStarted !== announced) {
+    setAnnounced(view.liveStarted)
+    setShown(view.liveStarted)
+  }
+  useEffect(() => {
+    if (shown === null) return
+    const timer = setTimeout(() => setShown(null), MASTER_NOTICE_FOR_MS)
+    return () => clearTimeout(timer)
+  }, [shown])
+
+  if (shown === null || view.state !== 'live') return null
+  const master = view.participants.find((p) => p.role === 'master')
+  if (!master) return null
+  return master.identityId === view.you ? t('room.live.started.you') : t('room.live.started', { name: master.displayName })
+}
 
 const COPIED_FOR_MS = 2000
 

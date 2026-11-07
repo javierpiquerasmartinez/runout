@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -157,6 +158,7 @@ describe('Removing Hands from the Library (e2e)', () => {
 
     await remove(master.token, [handId]).expect(200);
 
+    await goLive(socket);
     socket.send('playback.load', { handId });
     expect(await socket.next('playback.changed')).toEqual({
       handId,

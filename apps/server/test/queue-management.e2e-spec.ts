@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -66,6 +67,7 @@ describe('Queue management (e2e)', () => {
       entries: QueueEntry[];
     }>('queue.entriesAdded');
     await guestRoom.socket.next('queue.entriesAdded');
+    await goLive(masterRoom.socket);
     return {
       master,
       guest,

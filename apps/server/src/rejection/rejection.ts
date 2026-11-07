@@ -25,6 +25,8 @@ export type RejectionReason =
   | 'no-history'
   | 'hand-not-in-queue'
   | 'no-hand-loaded'
+  | 'not-live'
+  | 'already-live'
   | 'invalid-action-index'
   | 'invalid-hide-opponent-names'
   | 'file-too-large'

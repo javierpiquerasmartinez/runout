@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import { hands, playbacks, queueEntries } from '../database/schema.js';
+import { hands, playbacks, queueEntries, rooms } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { timeline } from '../hands/replay/timeline.js';
@@ -28,7 +28,13 @@ const playbackColumns = {
   hideOpponentNames: playbacks.hideOpponentNames,
 };
 
-/** Loading a Hand and moving through it. Only the Master may change Playback. */
+/** A Room's state: everyone on their own, or all following the Master (ADR 0009). */
+export type RoomState = 'free-review' | 'live';
+
+/**
+ * Starting and ending Live, loading a Hand and moving through it. Only the
+ * Master may change Playback, and only while the Room is Live.
+ */
 @Injectable()
 export class PlaybackService {
   constructor(
@@ -37,13 +43,76 @@ export class PlaybackService {
     private readonly rooms: RoomsService,
   ) {}
 
-  /** The Room's Playback, or null while no Hand has been loaded. */
-  async current(roomId: string): Promise<Playback | null> {
+  /** The Room's state, and its Playback: null outside Live or with no Hand loaded. */
+  async current(
+    roomId: string,
+  ): Promise<{ state: RoomState; playback: Playback | null }> {
+    const state = await this.stateOf(roomId);
+    if (state !== 'live') return { state, playback: null };
     const [row] = await this.db
       .select(playbackColumns)
       .from(playbacks)
       .where(eq(playbacks.roomId, roomId));
-    return row ?? null;
+    return { state, playback: row ?? null };
+  }
+
+  /**
+   * The Master starts Live from where they are: a Hand of the Queue at one of
+   * its Actions, with every name shown, or no Hand at all.
+   */
+  async startLive(
+    master: Identity,
+    roomId: string,
+    handId: unknown,
+    actionIndex: unknown,
+  ): Promise<Playback | null> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if ((await this.stateOf(roomId)) === 'live') {
+      throw new Rejected('already-live');
+    }
+    let playback: Playback | null = null;
+    if (handId !== undefined && handId !== null) {
+      const content = await this.queuedContent(roomId, handId);
+      playback = {
+        handId: handId as string,
+        actionIndex: validActionIndex(content, actionIndex ?? 0),
+        hideOpponentNames: false,
+      };
+    }
+    const updatedAt = this.clock.now();
+    await this.db.transaction(async (tx) => {
+      await tx.update(rooms).set({ state: 'live' }).where(eq(rooms.id, roomId));
+      if (playback) {
+        await tx
+          .insert(playbacks)
+          .values({ roomId, ...playback, updatedAt })
+          .onConflictDoUpdate({
+            target: playbacks.roomId,
+            set: { ...playback, updatedAt },
+          });
+      }
+    });
+    return playback;
+  }
+
+  /** The Master ends Live: the Room is back in Free Review, its Playback gone. */
+  async endLive(master: Identity, roomId: string): Promise<void> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if (!(await this.end(roomId))) throw new Rejected('not-live');
+  }
+
+  /** Ends Live whoever asks, as the Room itself does. False when it wasn't Live. */
+  async end(roomId: string): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const ended = await tx
+        .update(rooms)
+        .set({ state: 'free-review' })
+        .where(and(eq(rooms.id, roomId), eq(rooms.state, 'live')))
+        .returning({ id: rooms.id });
+      if (ended.length === 0) return false;
+      await tx.delete(playbacks).where(eq(playbacks.roomId, roomId));
+      return true;
+    });
   }
 
   /** Loads a Hand from the Room's Queue at its Initial State, with every name shown. */
@@ -52,22 +121,13 @@ export class PlaybackService {
     roomId: string,
     handId: unknown,
   ): Promise<Playback> {
-    await this.rooms.requireMaster(roomId, master.id);
-    if (!isUuid(handId)) throw new Rejected('hand-not-in-queue');
-    const [queued] = await this.db
-      .select({ id: queueEntries.id })
-      .from(queueEntries)
-      .where(
-        and(
-          eq(queueEntries.roomId, roomId),
-          eq(queueEntries.handId, handId),
-          isNull(queueEntries.removedAt),
-        ),
-      )
-      .limit(1);
-    if (!queued) throw new Rejected('hand-not-in-queue');
-
-    const playback = { handId, actionIndex: 0, hideOpponentNames: false };
+    await this.requireLiveMaster(master, roomId);
+    await this.queuedContent(roomId, handId);
+    const playback = {
+      handId: handId as string,
+      actionIndex: 0,
+      hideOpponentNames: false,
+    };
     const updatedAt = this.clock.now();
     await this.db
       .insert(playbacks)
@@ -89,7 +149,7 @@ export class PlaybackService {
     roomId: string,
     actionIndex: unknown,
   ): Promise<Playback> {
-    await this.rooms.requireMaster(roomId, master.id);
+    await this.requireLiveMaster(master, roomId);
     const [loaded] = await this.db
       .select({
         handId: playbacks.handId,
@@ -100,22 +160,15 @@ export class PlaybackService {
       .innerJoin(hands, eq(hands.id, playbacks.handId))
       .where(eq(playbacks.roomId, roomId));
     if (!loaded) throw new Rejected('no-hand-loaded');
-    if (
-      typeof actionIndex !== 'number' ||
-      !Number.isInteger(actionIndex) ||
-      actionIndex < 0 ||
-      actionIndex >= timeline(loaded.content).states.length
-    ) {
-      throw new Rejected('invalid-action-index');
-    }
+    const step = validActionIndex(loaded.content, actionIndex);
 
     await this.db
       .update(playbacks)
-      .set({ actionIndex, updatedAt: this.clock.now() })
+      .set({ actionIndex: step, updatedAt: this.clock.now() })
       .where(eq(playbacks.roomId, roomId));
     return {
       handId: loaded.handId,
-      actionIndex,
+      actionIndex: step,
       hideOpponentNames: loaded.hideOpponentNames,
     };
   }
@@ -126,7 +179,7 @@ export class PlaybackService {
     roomId: string,
     hidden: unknown,
   ): Promise<Playback> {
-    await this.rooms.requireMaster(roomId, master.id);
+    await this.requireLiveMaster(master, roomId);
     if (typeof hidden !== 'boolean') {
       throw new Rejected('invalid-hide-opponent-names');
     }
@@ -138,4 +191,59 @@ export class PlaybackService {
     if (!playback) throw new Rejected('no-hand-loaded');
     return playback;
   }
+
+  /** Refuses anyone but the Master, and anything while the Room isn't Live. */
+  private async requireLiveMaster(
+    master: Identity,
+    roomId: string,
+  ): Promise<void> {
+    await this.rooms.requireMaster(roomId, master.id);
+    if ((await this.stateOf(roomId)) !== 'live') throw new Rejected('not-live');
+  }
+
+  private async stateOf(roomId: string): Promise<RoomState> {
+    const [room] = await this.db
+      .select({ state: rooms.state })
+      .from(rooms)
+      .where(eq(rooms.id, roomId));
+    return room?.state ?? 'free-review';
+  }
+
+  /** The content of a Hand in the Room's Queue, or `hand-not-in-queue`. */
+  private async queuedContent(
+    roomId: string,
+    handId: unknown,
+  ): Promise<typeof hands.$inferSelect.content> {
+    if (!isUuid(handId)) throw new Rejected('hand-not-in-queue');
+    const [queued] = await this.db
+      .select({ content: hands.content })
+      .from(queueEntries)
+      .innerJoin(hands, eq(hands.id, queueEntries.handId))
+      .where(
+        and(
+          eq(queueEntries.roomId, roomId),
+          eq(queueEntries.handId, handId),
+          isNull(queueEntries.removedAt),
+        ),
+      )
+      .limit(1);
+    if (!queued) throw new Rejected('hand-not-in-queue');
+    return queued.content;
+  }
+}
+
+/** A step of the Hand's Timeline, or `invalid-action-index`. */
+function validActionIndex(
+  content: typeof hands.$inferSelect.content,
+  actionIndex: unknown,
+): number {
+  if (
+    typeof actionIndex !== 'number' ||
+    !Number.isInteger(actionIndex) ||
+    actionIndex < 0 ||
+    actionIndex >= timeline(content).states.length
+  ) {
+    throw new Rejected('invalid-action-index');
+  }
+  return actionIndex;
 }

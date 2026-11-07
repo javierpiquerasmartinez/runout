@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
+import { goLive } from './support/live.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -204,6 +205,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       );
       expect(snapshot.queue.map((entry) => entry.handId)).toContain(handId);
       // The Master can still drive it, Author gone or not.
+      await goLive(masterSocket);
       masterSocket.send('playback.load', { handId });
       expect(await masterSocket.next('playback.changed')).toEqual({
         handId,

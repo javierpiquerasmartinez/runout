@@ -250,6 +250,10 @@ export const rooms = pgTable('rooms', {
   status: text('status', { enum: ['open', 'closed'] })
     .notNull()
     .default('open'),
+  /** Free Review, each Participant on their own, or Live, all following the Master (ADR 0009). */
+  state: text('state', { enum: ['free-review', 'live'] })
+    .notNull()
+    .default('free-review'),
   masterId: uuid('master_id')
     .notNull()
     .references(() => identities.id),

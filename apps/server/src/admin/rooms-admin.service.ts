@@ -18,6 +18,8 @@ export interface AdminRoomView {
   code: string;
   name: string;
   status: 'open' | 'closed';
+  /** Free Review or Live (ADR 0009). */
+  state: 'free-review' | 'live';
   master: PersonView;
   participants: number;
   queueLength: number;
@@ -96,6 +98,7 @@ export class RoomsAdminService {
         code: room.code,
         name: room.name,
         status: room.status,
+        state: room.state,
         master: person(master),
         participants: counts.participants,
         queueLength: counts.queueLength,
