@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
+import { isUuid } from '../database/uuid.js';
 import { milestones } from '../database/schema.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -30,6 +31,11 @@ export interface MilestoneBody {
   title?: unknown;
   description?: unknown;
   date?: unknown;
+}
+
+/** What changing a Milestone sends: whichever of its fields change. */
+export interface MilestoneChange extends MilestoneBody {
+  done?: unknown;
 }
 
 /** How long a Milestone's title may be, in characters, once trimmed. */
@@ -110,6 +116,64 @@ export class MilestonesService {
       .returning(selection);
     return created;
   }
+
+  /**
+   * Changes whichever of a Milestone's title, description, date and done are
+   * sent, with the rules of creating; the rest stay as they were. Another
+   * Account's Milestone is `milestone-not-found`, before the body is read.
+   */
+  async change(
+    account: Identity,
+    milestoneId: string,
+    body: MilestoneChange,
+  ): Promise<Milestone> {
+    await this.get(account, milestoneId);
+    const changes: Partial<
+      Pick<Milestone, 'title' | 'description' | 'date' | 'done'>
+    > = {};
+    if (body.title !== undefined) changes.title = titleOf(body.title);
+    if (body.description !== undefined) {
+      changes.description = descriptionOf(body.description);
+    }
+    if (body.date !== undefined) {
+      changes.date = calendarDate(body.date, 'invalid-milestone-date');
+    }
+    if (body.done !== undefined) changes.done = doneOf(body.done);
+    const [changed] = await this.db
+      .update(milestones)
+      .set({ ...changes, updatedAt: this.clock.now() })
+      .where(
+        and(
+          eq(milestones.id, milestoneId),
+          eq(milestones.identityId, account.id),
+        ),
+      )
+      .returning(selection);
+    if (!changed) throw new Rejected('milestone-not-found');
+    return changed;
+  }
+
+  /** One of the Account's Milestones; `milestone-not-found` for anyone else's. */
+  async get(account: Identity, milestoneId: string): Promise<Milestone> {
+    if (!isUuid(milestoneId)) throw new Rejected('milestone-not-found');
+    const [row] = await this.db
+      .select(selection)
+      .from(milestones)
+      .where(
+        and(
+          eq(milestones.id, milestoneId),
+          eq(milestones.identityId, account.id),
+        ),
+      );
+    if (!row) throw new Rejected('milestone-not-found');
+    return row;
+  }
+}
+
+/** Whether a Milestone is done; `invalid-milestone-done` when not a boolean. */
+function doneOf(raw: unknown): boolean {
+  if (typeof raw !== 'boolean') throw new Rejected('invalid-milestone-done');
+  return raw;
 }
 
 /** A Milestone's title, trimmed; `invalid-milestone-title` when empty or too long. */

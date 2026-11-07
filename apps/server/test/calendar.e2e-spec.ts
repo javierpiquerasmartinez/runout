@@ -41,6 +41,13 @@ describe('Milestones in the Calendar (e2e)', () => {
       .set('Authorization', `Bearer ${token}`);
   }
 
+  function change(token: string, id: string, body: object) {
+    return request(running.httpServer)
+      .patch(`/api/calendar/milestones/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  }
+
   async function list(
     token: string,
     from: string,
@@ -229,6 +236,129 @@ describe('Milestones in the Calendar (e2e)', () => {
     });
   });
 
+  it('marks a Milestone done and not done', async () => {
+    const account = await newAccount(running.httpServer);
+    const squeeze = await plan(account.token, '2026-11-10', 'Squeeze');
+
+    const done = await change(account.token, squeeze.id, { done: true }).expect(
+      200,
+    );
+    expect(done.body).toEqual({ ...squeeze, done: true });
+    expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
+      milestones: [{ ...squeeze, done: true }],
+      hasAny: true,
+    });
+
+    const undone = await change(account.token, squeeze.id, {
+      done: false,
+    }).expect(200);
+    expect(undone.body).toEqual(squeeze);
+  });
+
+  it('changes the title, description and date, keeping what is left out', async () => {
+    const account = await newAccount(running.httpServer);
+    const squeeze = await plan(account.token, '2026-11-10', 'Squeeze');
+
+    const changed = await change(account.token, squeeze.id, {
+      title: '  Squeeze vs BTN ',
+      description: ' Desde la BB. ',
+      date: '2026-11-12',
+    }).expect(200);
+
+    expect(changed.body).toEqual({
+      ...squeeze,
+      title: 'Squeeze vs BTN',
+      description: 'Desde la BB.',
+      date: '2026-11-12',
+    });
+    const { milestones } = await list(
+      account.token,
+      '2026-11-10',
+      '2026-11-12',
+    );
+    expect(milestones).toEqual([changed.body]);
+
+    const cleared = await change(account.token, squeeze.id, {
+      description: '',
+    }).expect(200);
+    expect(cleared.body).toEqual({ ...changed.body, description: '' });
+  });
+
+  it('lists the pending Milestones of a day before the done ones, each by creation', async () => {
+    const account = await newAccount(running.httpServer);
+    const first = await plan(account.token, '2026-11-10', 'First');
+    await plan(account.token, '2026-11-10', 'Second');
+    const third = await plan(account.token, '2026-11-10', 'Third');
+    await plan(account.token, '2026-11-10', 'Fourth');
+    await plan(account.token, '2026-11-11', 'Next day');
+    await change(account.token, third.id, { done: true }).expect(200);
+    await change(account.token, first.id, { done: true }).expect(200);
+
+    const { milestones } = await list(
+      account.token,
+      '2026-11-10',
+      '2026-11-11',
+    );
+
+    expect(milestones.map(({ title, done }) => [title, done])).toEqual([
+      ['Second', false],
+      ['Fourth', false],
+      ['First', true],
+      ['Third', true],
+      ['Next day', false],
+    ]);
+  });
+
+  it('refuses a change with the same rules as creating', async () => {
+    const account = await newAccount(running.httpServer);
+    const squeeze = await plan(account.token, '2026-11-10', 'Squeeze');
+
+    for (const [body, reason] of [
+      [{ title: '' }, 'invalid-milestone-title'],
+      [{ title: '   ' }, 'invalid-milestone-title'],
+      [{ title: null }, 'invalid-milestone-title'],
+      [{ title: 'x'.repeat(81) }, 'invalid-milestone-title'],
+      [{ description: 'x'.repeat(501) }, 'invalid-milestone-description'],
+      [{ description: null }, 'invalid-milestone-description'],
+      [{ date: '2026-02-30' }, 'invalid-milestone-date'],
+      [{ date: null }, 'invalid-milestone-date'],
+      [{ done: 'yes' }, 'invalid-milestone-done'],
+      [{ done: null }, 'invalid-milestone-done'],
+      [{ done: 1 }, 'invalid-milestone-done'],
+      [{ done: true, title: '' }, 'invalid-milestone-title'],
+    ] as const) {
+      const res = await change(account.token, squeeze.id, body);
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ reason });
+    }
+    expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
+      milestones: [squeeze],
+      hasAny: true,
+    });
+  });
+
+  it("tells another Account a Milestone of someone else's is not there", async () => {
+    const owner = await newAccount(running.httpServer);
+    const stranger = await newAccount(running.httpServer);
+    const mine = await plan(owner.token, '2026-11-10', 'Mine');
+
+    for (const [id, body] of [
+      [mine.id, { done: true }],
+      // Not being there wins over a refused body.
+      [mine.id, { title: '' }],
+      ['not-a-uuid', { done: true }],
+      ['5b0c6a2e-8f6d-4f43-9a52-3c1c4b3f8d11', { done: true }],
+    ] as const) {
+      const res = await change(stranger.token, id, body);
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ reason: 'milestone-not-found' });
+    }
+    expect(await list(owner.token, '2026-11-10', '2026-11-10')).toEqual({
+      milestones: [mine],
+      hasAny: true,
+    });
+  });
+
   it('refuses anyone without an Account', async () => {
     const master = await newAccount(running.httpServer);
     const room = await request(running.httpServer)
@@ -243,7 +373,13 @@ describe('Milestones in the Calendar (e2e)', () => {
     const span = { from: '2026-11-01', to: '2026-11-30' };
     const body = { title: 'Squeeze', date: '2026-11-10' };
 
-    for (const res of [await listing(token, span), await create(token, body)]) {
+    const mine = await plan(master.token, '2026-11-10', 'Mine');
+
+    for (const res of [
+      await listing(token, span),
+      await create(token, body),
+      await change(token, mine.id, { done: true }),
+    ]) {
       expect(res.status).toBe(403);
       expect(res.body).toEqual({ reason: 'account-required' });
     }
@@ -254,6 +390,9 @@ describe('Milestones in the Calendar (e2e)', () => {
       await request(running.httpServer)
         .post('/api/calendar/milestones')
         .send(body),
+      await request(running.httpServer)
+        .patch(`/api/calendar/milestones/${mine.id}`)
+        .send({ done: true }),
     ]) {
       expect(res.status).toBe(401);
       expect(res.body).toEqual({ reason: 'unauthenticated' });

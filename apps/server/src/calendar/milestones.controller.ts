@@ -4,6 +4,8 @@ import {
   Get,
   Header,
   Headers,
+  Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -14,6 +16,7 @@ import {
   MilestonesService,
   type Milestone,
   type MilestoneBody,
+  type MilestoneChange,
   type MilestoneList,
 } from './milestones.service.js';
 
@@ -51,6 +54,20 @@ export class MilestonesController {
   ): Promise<Milestone> {
     const account = await this.authenticate(authorization);
     return this.milestones.create(account, body);
+  }
+
+  /**
+   * Changes whichever of a Milestone's title, description, date and done are
+   * sent. Someone else's Milestone is `milestone-not-found`.
+   */
+  @Patch(':id')
+  async change(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+    @Body() body: MilestoneChange = {},
+  ): Promise<Milestone> {
+    const account = await this.authenticate(authorization);
+    return this.milestones.change(account, id, body);
   }
 
   private authenticate(authorization: string | undefined) {
