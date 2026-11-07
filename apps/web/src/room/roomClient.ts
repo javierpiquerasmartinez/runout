@@ -179,6 +179,7 @@ export type RoomChange =
   /** The Master started Live from where they were, or from no Hand. */
   | { type: 'liveStarted'; playback: Playback | null }
   | { type: 'liveEnded' }
+  | { type: 'roomRenamed'; name: string }
   | { type: 'noteWritten'; note: Note }
   | { type: 'noteEdited'; note: Note }
   | { type: 'noteRemoved'; id: string }
@@ -201,6 +202,8 @@ export type RoomEvent =
   | { type: 'disconnected' }
   | { type: 'reconnectFailed' }
   | { type: 'rejected'; command: string; reason: RejectionReason }
+  /** This person Left the Room from their list of Rooms, elsewhere: this tab is out of it too. */
+  | { type: 'left' }
   /** This person moving through the Queue on their own in Free Review: nobody else is told. */
   | { type: 'ownOpened'; handId: string }
   | { type: 'ownWentTo'; actionIndex: number }
@@ -215,6 +218,8 @@ export type RoomView =
   | { phase: 'kicked'; room: RoomSummary }
   /** The session ended, for everyone. A closed Room never reopens. */
   | { phase: 'closed'; room: RoomSummary }
+  /** This person Left the Room; its link brings them back while it is open. */
+  | { phase: 'left'; room: RoomSummary }
   | {
       phase: 'in-room'
       room: RoomSummary
@@ -324,6 +329,8 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
     }
     case 'rejected':
       return event.command === 'room.join' ? { phase: 'rejected', reason: event.reason } : view
+    case 'left':
+      return view.phase === 'in-room' ? { phase: 'left', room: view.room } : view
     case 'ownOpened':
       return withOwn(view, () => ({ handId: event.handId, actionIndex: 0, hideOpponentNames: false }))
     case 'ownWentTo':
@@ -446,6 +453,8 @@ function applied(view: InRoom, change: RoomChange): RoomView {
       return { ...view, playback: change.playback }
     case 'liveStarted':
       return { ...view, state: 'live', playback: change.playback, liveStarted: view.revision + 1 }
+    case 'roomRenamed':
+      return { ...view, room: { ...view.room, name: change.name } }
     case 'liveEnded':
       // Everyone stays where it ended, now on their own.
       return { ...view, state: 'free-review', own: view.playback ?? view.own, playback: null }
@@ -521,6 +530,8 @@ export function parseServerMessage(raw: string): RoomEvent | null {
       }
     case 'rejected':
       return { type: 'rejected', command: String(data.command), reason: data.reason as RejectionReason }
+    case 'room.left':
+      return { type: 'left' }
     default: {
       const change = parseChange(event, data)
       // A change without its place in the run would be applied out of order.
@@ -566,6 +577,8 @@ function parseChange(event: unknown, data: any): RoomChange | null {
       return { type: 'liveStarted', playback: data.playback ? parsePlayback(data.playback) : null }
     case 'live.ended':
       return { type: 'liveEnded' }
+    case 'room.renamed':
+      return { type: 'roomRenamed', name: String(data.name) }
     case 'notes.written':
       return { type: 'noteWritten', note: data.note as Note }
     case 'notes.edited':

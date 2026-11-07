@@ -376,7 +376,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
   });
 
   describe('the Rooms someone can go back to', () => {
-    it('lists only the open Rooms they have been in, newest first', async () => {
+    it('lists only the open Rooms they are a Participant of', async () => {
       const marta = await newAccount(running.httpServer);
       const first = await roomOfTwo();
       await join(marta.token, first.code, 'Marta');
@@ -392,12 +392,13 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
         .set('Authorization', `Bearer ${marta.token}`)
         .expect(200);
       expect(mine.body).toEqual([
-        {
+        expect.objectContaining({
           code: first.code,
           name: 'Martes NL50',
+          role: 'guest',
           connected: 3,
           joinedAt: expect.any(String),
-        },
+        }),
       ]);
     });
 

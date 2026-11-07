@@ -20,6 +20,7 @@ import {
 import {
   handStats,
   hands,
+  identities,
   libraryEntries,
   marks,
   notes,
@@ -49,9 +50,17 @@ export interface Room extends RoomSummary {
   masterId: string;
 }
 
-/** An open Room someone has been in, for the welcome screen's list. */
+/** An open Room someone is a Participant of, for their list of Rooms. */
 export interface OpenRoom extends RoomSummary {
   id: string;
+  state: 'free-review' | 'live';
+  masterId: string;
+  masterName: string;
+  /** Active Queue Entries. */
+  hands: number;
+  /** Its Participants, kicked ones apart, connected or not. */
+  participants: number;
+  lastActivityAt: Date;
   /** When they first arrived in it, kept across rejoins. */
   joinedAt: Date;
 }
@@ -516,23 +525,71 @@ export class RoomsService {
 
   /** The open Rooms someone is a Participant of, the ones they were kicked from apart. */
   async openRoomsOf(identityId: string): Promise<OpenRoom[]> {
-    return this.db
-      .select({
-        id: rooms.id,
-        code: rooms.code,
-        name: rooms.name,
-        joinedAt: roomMemberships.joinedAt,
-      })
-      .from(roomMemberships)
-      .innerJoin(rooms, eq(rooms.id, roomMemberships.roomId))
+    return (
+      this.db
+        .select({
+          id: rooms.id,
+          code: rooms.code,
+          name: rooms.name,
+          state: rooms.state,
+          masterId: rooms.masterId,
+          masterName: sql<string>`coalesce(${identities.displayName}, '')`,
+          hands: sql<number>`(select count(*) from ${queueEntries} where ${queueEntries.roomId} = ${rooms.id} and ${queueEntries.removedAt} is null)::int`,
+          participants: sql<number>`(select count(*) from room_memberships as members where members.room_id = ${rooms.id} and not members.kicked)::int`,
+          lastActivityAt: rooms.lastActivityAt,
+          joinedAt: roomMemberships.joinedAt,
+        })
+        .from(roomMemberships)
+        .innerJoin(rooms, eq(rooms.id, roomMemberships.roomId))
+        .innerJoin(identities, eq(identities.id, rooms.masterId))
+        .where(
+          and(
+            eq(roomMemberships.identityId, identityId),
+            eq(roomMemberships.kicked, false),
+            eq(rooms.status, 'open'),
+          ),
+        )
+        // What is happening now first, then what happened last.
+        .orderBy(
+          sql`${rooms.state} = 'live' desc`,
+          desc(rooms.lastActivityAt),
+          rooms.id,
+        )
+    );
+  }
+
+  /** The Master gives the Room another name. */
+  async rename(
+    master: Identity,
+    code: string,
+    rawName: unknown,
+  ): Promise<Room> {
+    const room = await this.findOpen(code);
+    await this.requireMaster(room.id, master.id);
+    const name = validRoomName(rawName);
+    await this.db.update(rooms).set({ name }).where(eq(rooms.id, room.id));
+    return { ...room, name };
+  }
+
+  /**
+   * A Guest gives up being a Participant of the Room. Unlike a Kick, nothing
+   * keeps them out: joining again makes them a Participant anew. The Master
+   * is refused with `master-must-choose`: they close the Room or hand the
+   * role over first.
+   */
+  async leave(identity: Identity, code: string): Promise<Room> {
+    const room = await this.findOpen(code);
+    if (room.masterId === identity.id) throw new Rejected('master-must-choose');
+    await this.db
+      .delete(roomMemberships)
       .where(
         and(
-          eq(roomMemberships.identityId, identityId),
+          eq(roomMemberships.roomId, room.id),
+          eq(roomMemberships.identityId, identity.id),
           eq(roomMemberships.kicked, false),
-          eq(rooms.status, 'open'),
         ),
-      )
-      .orderBy(desc(roomMemberships.joinedAt));
+      );
+    return room;
   }
 
   /**

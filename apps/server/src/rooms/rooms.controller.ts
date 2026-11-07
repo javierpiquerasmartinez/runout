@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import {
   IdentityService,
@@ -10,10 +20,21 @@ import { QueueService } from './queue.service.js';
 import { RoomGateway } from './room.gateway.js';
 import { RoomsService, type RoomSummary } from './rooms.service.js';
 
-/** An open Room someone has been in, as the welcome screen lists it. */
+/** An open Room someone is a Participant of, as their list of Rooms shows it. */
 interface OpenRoomView extends RoomSummary {
+  state: 'free-review' | 'live';
+  /** What they are in it. */
+  role: 'master' | 'guest';
+  /** Active Queue Entries. */
+  hands: number;
   /** How many Participants are connected to it right now. */
   connected: number;
+  /** Its Participants, connected or not. */
+  participants: number;
+  /** As an ISO instant. */
+  lastActivityAt: string;
+  /** The Master's Display Name. */
+  master: string;
   /** When they first arrived in it, kept across rejoins, as an ISO instant. */
   joinedAt: string;
 }
@@ -61,9 +82,62 @@ export class RoomsController {
     return open.map((room) => ({
       code: room.code,
       name: room.name,
+      state: room.state,
+      role: room.masterId === identity.id ? 'master' : 'guest',
+      hands: room.hands,
       connected: this.gateway.connectedCount(room.id),
+      participants: room.participants,
+      lastActivityAt: room.lastActivityAt.toISOString(),
+      master: room.masterName,
       joinedAt: room.joinedAt.toISOString(),
     }));
+  }
+
+  /** The Master renames the Room; everyone in it sees the new name at once. */
+  @Patch(':code')
+  async rename(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('code') code: string,
+    @Body() body: { name?: unknown } = {},
+  ): Promise<RoomSummary> {
+    const master = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    refuseImpersonation(master);
+    const room = await this.rooms.rename(master, code, body.name);
+    this.gateway.roomRenamed(room.id, room.name);
+    return { code: room.code, name: room.name };
+  }
+
+  /** The Master closes the Room from outside it, exactly as from inside. */
+  @Post(':code/close')
+  @HttpCode(204)
+  async close(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('code') code: string,
+  ): Promise<void> {
+    const master = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    refuseImpersonation(master);
+    const room = await this.rooms.findOpen(code);
+    await this.rooms.close(master, room.id);
+    this.gateway.closedByMaster(room.id);
+  }
+
+  /** A Guest Leaves the Room: it is off their list, and any tab of theirs in it is taken out. */
+  @Delete(':code/membership')
+  @HttpCode(204)
+  async leave(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('code') code: string,
+  ): Promise<void> {
+    const guest = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    refuseImpersonation(guest);
+    const room = await this.rooms.leave(guest, code);
+    this.gateway.participantLeft(room.id, guest.id);
   }
 
   /**

@@ -78,6 +78,7 @@ const changeTypes = new Set<string>([
   'playbackChanged',
   'liveStarted',
   'liveEnded',
+  'roomRenamed',
   'noteWritten',
   'noteEdited',
   'noteRemoved',
@@ -433,6 +434,25 @@ describe('reduceRoom, Free Review and Live', () => {
       type: 'liveEnded',
       revision: 8,
     })
+  })
+})
+
+describe('reduceRoom, renaming and Leaving', () => {
+  it('shows the Room’s new name', () => {
+    expect(inRoom(apply(snapshot, { type: 'roomRenamed', name: 'Jueves NL100' }))?.room.name).toBe('Jueves NL100')
+  })
+
+  it('ends the Room for this tab once its person Leaves it from elsewhere', () => {
+    expect(apply(snapshot, { type: 'left' })).toEqual({ phase: 'left', room: { code: 'RNT4K9PX', name: 'Martes NL50' } })
+  })
+
+  it('reads both from the wire, the Leave without a revision', () => {
+    expect(parseServerMessage(JSON.stringify({ event: 'room.renamed', data: { name: 'Jueves' }, revision: 5 }))).toEqual({
+      type: 'roomRenamed',
+      name: 'Jueves',
+      revision: 5,
+    })
+    expect(parseServerMessage(JSON.stringify({ event: 'room.left', data: {} }))).toEqual({ type: 'left' })
   })
 })
 

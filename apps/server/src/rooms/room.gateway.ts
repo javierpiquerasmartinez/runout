@@ -259,6 +259,30 @@ export class RoomGateway
     }
   }
 
+  /** The Room has a new name: everyone in it sees it at once. */
+  roomRenamed(roomId: string, name: string): void {
+    this.publish(roomId, 'room.renamed', { name });
+  }
+
+  /** The Master closed the Room from outside it: everyone in it sees it close. */
+  closedByMaster(roomId: string): void {
+    this.roomClosed(roomId);
+  }
+
+  /**
+   * Someone Left the Room from their list of Rooms: any tab of theirs still
+   * in it is told and taken out, and everyone else sees them go.
+   */
+  participantLeft(roomId: string, identityId: string): void {
+    const wasMaster = this.presence.masterOf(roomId) === identityId;
+    const raw = JSON.stringify({ event: 'room.left', data: {} });
+    for (const socket of this.presence.evict(roomId, identityId)) {
+      if (socket.readyState === WebSocket.OPEN) socket.send(raw);
+    }
+    if (wasMaster) this.masterAway(roomId);
+    this.broadcast(roomId, identityId, 'room.participantLeft', { identityId });
+  }
+
   /** How many Participants are connected to the Room right now. */
   connectedCount(roomId: string): number {
     return this.presence.connectedCount(roomId);
