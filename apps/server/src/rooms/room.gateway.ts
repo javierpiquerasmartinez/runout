@@ -866,7 +866,8 @@ export class RoomGateway
   private async closeAbandoned(cutoff: Date): Promise<void> {
     for (const roomId of await this.rooms.abandonedSince(cutoff)) {
       if (this.presence.connectedCount(roomId) > 0) continue;
-      if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
+      if (await this.rooms.closeAbandoned(roomId, cutoff))
+        this.roomClosed(roomId);
     }
   }
 

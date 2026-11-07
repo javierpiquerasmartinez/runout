@@ -268,6 +268,7 @@ describe('the Rooms tab', () => {
       code,
       name,
       status,
+      state: 'free-review',
       master: administrator,
       participants: 3,
       queueLength: 12,

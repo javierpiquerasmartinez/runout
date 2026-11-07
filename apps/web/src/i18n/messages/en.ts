@@ -1261,6 +1261,8 @@ export const en: Messages = {
   'admin.rooms.status': 'Status',
   'admin.rooms.status.open': 'Open',
   'admin.rooms.status.closed': 'Closed',
+  'admin.rooms.state.free-review': 'Free review',
+  'admin.rooms.state.live': 'Live',
   'admin.rooms.participants': 'Participants',
   'admin.rooms.queue': 'Queue',
   'admin.rooms.createdAt': 'Created',

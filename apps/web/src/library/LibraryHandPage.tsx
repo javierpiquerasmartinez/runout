@@ -292,18 +292,30 @@ function ReplayNav({ handId }: { handId: string }) {
   )
 }
 
+/**
+ * The last filtered list fetched. Each Hand is a page of its own, so moving
+ * along the list would ask for it again, and blink, without it.
+ */
+let lastFiltered: { query: string; ids: string[] } | null = null
+
 /** The Hand ids of the list being replayed: null without one, or until the server has said which. */
 function useReplayList(list: ReplayList | null): string[] | null {
   const { token } = useIdentity()
   const selected = list?.kind === 'selected' ? list.ids.join(',') : null
   const filter = list?.kind === 'filter' ? list.query : null
-  const [fetched, setFetched] = useState<{ query: string; ids: string[] } | null>(null)
+  const [fetched, setFetched] = useState<{ query: string; ids: string[] } | null>(() =>
+    lastFiltered?.query === filter ? lastFiltered : null,
+  )
 
   useEffect(() => {
-    if (filter === null) return
+    if (filter === null || lastFiltered?.query === filter) return
     let current = true
+    const keep = (ids: string[]) => {
+      lastFiltered = { query: filter, ids }
+      if (current) setFetched(lastFiltered)
+    }
     api<{ ids: string[] }>(`/library/hand-ids?${replayServerQuery(filter)}`, { token })
-      .then(({ ids }) => current && setFetched({ query: filter, ids }))
+      .then(({ ids }) => keep(ids))
       .catch(() => current && setFetched({ query: filter, ids: [] }))
     return () => {
       current = false

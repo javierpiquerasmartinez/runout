@@ -105,6 +105,9 @@ export function RoomsTab() {
                     <td>{nameOf(room.master)}</td>
                     <td>
                       <Badge tone={room.status === 'open' ? 'sync' : 'muted'}>{t(`admin.rooms.status.${room.status}`)}</Badge>
+                      {room.status === 'open' && (
+                        <span className="admin-table__state">{t(`admin.rooms.state.${room.state}`)}</span>
+                      )}
                     </td>
                     <td className="admin-table__number">{formatNumber(room.participants)}</td>
                     <td className="admin-table__number">{formatNumber(room.queueLength)}</td>

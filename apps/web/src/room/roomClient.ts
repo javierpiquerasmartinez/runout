@@ -271,7 +271,8 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         queue,
         state,
         playback,
-        own: ownAfterSnapshot(held?.own ?? null, yourHand, queue),
+        // What was on screen before a Live that ended unseen is stale: the Room knows where it ended.
+        own: ownAfterSnapshot(held?.state === 'free-review' ? held.own : null, yourHand, queue),
         notes,
         marks,
         inLibrary,

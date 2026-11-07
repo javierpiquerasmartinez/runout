@@ -651,6 +651,11 @@ export class QueueService {
       )
       .returning({ id: queueEntries.id });
     if (!removed) throw new Rejected('entry-not-in-queue');
+    // Nobody comes back to it any more, even if the removal is undone.
+    await this.db
+      .update(roomMemberships)
+      .set({ currentEntryId: null })
+      .where(eq(roomMemberships.currentEntryId, removed.id));
     return { id: removed.id };
   }
 

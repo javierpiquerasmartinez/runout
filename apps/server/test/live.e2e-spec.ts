@@ -310,6 +310,21 @@ describe('Free Review and Live (e2e)', () => {
       expect(snapshot.yourHand).toBeNull();
     });
 
+    it('keeps a removed Hand forgotten even when its removal is undone', async () => {
+      const { code, guest, masterSocket, guestSocket, second } =
+        await roomWithTwoHands();
+      guestSocket.send('review.open', { handId: second.handId });
+      await guestSocket.next('review.opened');
+
+      masterSocket.send('queue.remove', { id: second.id });
+      await guestSocket.next('queue.entryRemoved');
+      masterSocket.send('queue.undoRemoval', { id: second.id });
+      await guestSocket.next('queue.entryRestored');
+
+      const { snapshot } = await join(guest.token, code, 'Marta');
+      expect(snapshot.yourHand).toBeNull();
+    });
+
     it('refuses a Hand that is not in the Queue', async () => {
       const { guestSocket } = await roomWithAHand();
 

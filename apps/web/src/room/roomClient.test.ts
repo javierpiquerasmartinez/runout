@@ -411,6 +411,17 @@ describe('reduceRoom, Free Review and Live', () => {
     expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 4, hideOpponentNames: true })
   })
 
+  it('lands on the Hand the Room remembers after missing the end of Live, not the one from before it', () => {
+    const view = inRoom(
+      apply(
+        freeReview,
+        { type: 'liveStarted', playback: { handId: 'hand-2', actionIndex: 3, hideOpponentNames: false } },
+        { type: 'snapshot', snapshot: { ...freeReview.snapshot, revision: 9, yourHand: 'hand-2' } },
+      ),
+    )
+    expect(view?.own?.handId).toBe('hand-2')
+  })
+
   it('keeps its own place when Live ends with no Hand loaded', () => {
     const view = inRoom(
       apply(freeReview, { type: 'ownOpened', handId: 'hand-2' }, { type: 'liveStarted', playback: null }, { type: 'liveEnded' }),

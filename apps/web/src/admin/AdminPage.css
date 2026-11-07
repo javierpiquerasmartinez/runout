@@ -204,3 +204,10 @@
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+/* Free Review or Live, beside an open Room's status. */
+.admin-table__state {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}

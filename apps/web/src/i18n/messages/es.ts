@@ -1260,6 +1260,8 @@ export const es = {
   'admin.rooms.status': 'Estado',
   'admin.rooms.status.open': 'Abierta',
   'admin.rooms.status.closed': 'Cerrada',
+  'admin.rooms.state.free-review': 'Revisión libre',
+  'admin.rooms.state.live': 'En directo',
   'admin.rooms.participants': 'Participantes',
   'admin.rooms.queue': 'Cola',
   'admin.rooms.createdAt': 'Creada',

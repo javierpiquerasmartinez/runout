@@ -10,6 +10,7 @@ import {
   ne,
   not,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
@@ -518,9 +519,12 @@ export class RoomsService {
     return abandoned.map((room) => room.id);
   }
 
-  /** Closes a Room nobody has entered for long enough. */
-  async closeAbandoned(roomId: string): Promise<boolean> {
-    return this.markClosed(roomId);
+  /**
+   * Closes a Room nobody has entered since `cutoff`. Someone entering it
+   * while the sweep was deciding keeps it open.
+   */
+  async closeAbandoned(roomId: string, cutoff: Date): Promise<boolean> {
+    return this.markClosed(roomId, lte(rooms.lastEnteredAt, cutoff));
   }
 
   /** The open Rooms someone is a Participant of, the ones they were kicked from apart. */
@@ -596,12 +600,12 @@ export class RoomsService {
    * Closes the Room if it is still open, discarding its Room Hands and ending
    * its anonymous identities with it. False when it already was.
    */
-  private async markClosed(roomId: string): Promise<boolean> {
+  private async markClosed(roomId: string, still?: SQL): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const closed = await tx
         .update(rooms)
         .set({ status: 'closed', closedAt: this.clock.now() })
-        .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open')))
+        .where(and(eq(rooms.id, roomId), eq(rooms.status, 'open'), still))
         .returning({ id: rooms.id });
       if (closed.length === 0) return false;
       await this.discardRoomHands(tx, roomId);
