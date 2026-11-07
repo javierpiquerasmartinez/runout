@@ -7,26 +7,31 @@ import { navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
+import { SegmentedControl } from '../ui/SegmentedControl'
 import {
   nextPeriod,
   periodPath,
   periodSpan,
   previousPeriod,
+  switchView,
   todayOf,
   todayPeriod,
   type CalendarDate,
   type CalendarSpan,
+  type CalendarView,
   type Milestone,
   type Period,
 } from './calendar'
-import { monthHeading } from './calendarText'
+import { monthHeading, weekHeading } from './calendarText'
 import { CreateMilestoneDialog } from './CreateMilestoneDialog'
 import { MonthGrid } from './MonthGrid'
+import { WeekGrid } from './WeekGrid'
 import './CalendarPage.css'
 
 /**
- * The Calendar ("Calendario"): the Account's Milestones over a period, with
- * previous, next and "Hoy" to move between periods, each move a new address.
+ * The Calendar ("Calendario"): the Account's Milestones over a month or a
+ * week, with previous, next and "Hoy" to move between periods and Mes/Semana
+ * to switch views, each move a new address.
  * A day's empty space and "Nuevo hito" open the dialog that creates one.
  */
 export function CalendarPage({ period }: { period: Period }) {
@@ -43,7 +48,12 @@ export function CalendarPage({ period }: { period: Period }) {
     return days
   }, [milestones])
 
-  const heading = period.view === 'month' ? monthHeading(i18n, period.month) : ''
+  const heading = period.view === 'month' ? monthHeading(i18n, period.month) : weekHeading(i18n, period.monday)
+  const isWeek = period.view === 'week'
+  const views: { value: CalendarView; label: string }[] = [
+    { value: 'month', label: t('calendar.view.month') },
+    { value: 'week', label: t('calendar.view.week') },
+  ]
 
   return (
     <div className="calendar-page">
@@ -51,14 +61,20 @@ export function CalendarPage({ period }: { period: Period }) {
       <main className="calendar-page__main" aria-busy={loading || undefined}>
         <div className="calendar-page__toolbar">
           <div className="calendar-page__moves">
-            <IconButton icon="previous" size="compact" label={t('calendar.previousMonth')} onClick={() => navigate(periodPath(previousPeriod(period)))} />
-            <IconButton icon="next" size="compact" label={t('calendar.nextMonth')} onClick={() => navigate(periodPath(nextPeriod(period)))} />
+            <IconButton icon="previous" size="compact" label={t(isWeek ? 'calendar.previousWeek' : 'calendar.previousMonth')} onClick={() => navigate(periodPath(previousPeriod(period)))} />
+            <IconButton icon="next" size="compact" label={t(isWeek ? 'calendar.nextWeek' : 'calendar.nextMonth')} onClick={() => navigate(periodPath(nextPeriod(period)))} />
             <Button size="compact" onClick={() => navigate(periodPath(todayPeriod(period.view, today)))}>
               {t('calendar.today')}
             </Button>
           </div>
           <h1 className="calendar-page__heading ro-serif">{heading}</h1>
           <span className="calendar-page__spacer" />
+          <SegmentedControl
+            label={t('calendar.view')}
+            options={views}
+            value={period.view}
+            onChange={(view) => view !== period.view && navigate(periodPath(switchView(period, today)))}
+          />
           <Button size="compact" onClick={() => setCreatingOn(today)}>
             <Icon name="add" size={14} />
             {t('calendar.newMilestone')}
@@ -70,6 +86,7 @@ export function CalendarPage({ period }: { period: Period }) {
           </p>
         )}
         {period.view === 'month' && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} />}
+        {period.view === 'week' && <WeekGrid monday={period.monday} today={today} milestones={byDay} onCreate={setCreatingOn} />}
         {hasAny === false && (
           <div className="calendar-page__hint">
             <p>{t('calendar.emptyHint')}</p>

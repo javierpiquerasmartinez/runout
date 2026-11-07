@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider, type Locale } from '../i18n'
@@ -317,5 +317,196 @@ describe('CalendarPage · creating Milestones', () => {
 
     expect(await within(dialog()!).findByRole('alert')).toBeTruthy()
     expect(dialog()).toBeTruthy()
+  })
+})
+
+const column = (name: string) => screen.getByRole('region', { name })
+const view = (name: string) => within(screen.getByRole('radiogroup', { name: 'View' })).getByRole('radio', { name })
+
+describe('CalendarPage · switching views', () => {
+  it("goes from the current month to today's week and back, each a new entry", async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/month/2026-11')
+    await heading()
+    expect(view('Month').getAttribute('aria-checked')).toBe('true')
+
+    await user.click(view('Week'))
+    expect((await heading()).textContent).toBe('Nov 2 – 8, 2026')
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-02')
+    expect(view('Week').getAttribute('aria-checked')).toBe('true')
+
+    await user.click(view('Month'))
+    expect((await heading()).textContent).toBe('November 2026')
+    expect(window.location.pathname).toBe('/calendar/month/2026-11')
+
+    act(() => window.history.back())
+    await waitFor(() => expect(window.location.pathname).toBe('/calendar/week/2026-11-02'))
+  })
+
+  it('goes from another month to the week of its first day', async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/month/2027-01')
+    await heading()
+
+    await user.click(view('Week'))
+    expect(window.location.pathname).toBe('/calendar/week/2026-12-28')
+  })
+
+  it("goes from a week to its Monday's month", async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/week/2026-11-30')
+    await heading()
+
+    await user.click(view('Month'))
+    expect((await heading()).textContent).toBe('November 2026')
+    expect(window.location.pathname).toBe('/calendar/month/2026-11')
+  })
+
+  it('says Mes and Semana in Spanish', async () => {
+    renderAt('/calendar/month/2026-11', 'es')
+    await heading()
+
+    const views = screen.getByRole('radiogroup', { name: 'Vista' })
+    expect(within(views).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['Mes', 'Semana'])
+  })
+
+  it('takes "+N more" to the week holding that day', async () => {
+    const user = userEvent.setup()
+    for (const title of ['A', 'B', 'C', 'D', 'E']) planned('2026-11-19', title)
+    renderAt('/calendar/month/2026-11')
+
+    await user.click(await within(day('Thursday, November 19')).findByRole('link', { name: '+2 more' }))
+
+    expect(dialog()).toBeNull()
+    expect((await heading()).textContent).toBe('Nov 16 – 22, 2026')
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-16')
+    expect(await within(column('Thursday, November 19')).findByText('E')).toBeTruthy()
+  })
+})
+
+describe('CalendarPage · the week', () => {
+  it('shows the week from its Monday, named by its days, with today marked', async () => {
+    renderAt('/calendar/week/2026-11-02')
+
+    expect((await heading()).textContent).toBe('Nov 2 – 8, 2026')
+    expect(column('Monday, November 2')).toBeTruthy()
+    expect(column('Saturday, November 7, today')).toBeTruthy()
+    expect(column('Sunday, November 8')).toBeTruthy()
+    expect(screen.queryByRole('grid')).toBeNull()
+    expect(await waitFor(() => fetchedSpans())).toEqual(['?from=2026-11-02&to=2026-11-08'])
+  })
+
+  it('goes to the Monday of a week written on another day, in place of it', async () => {
+    window.history.replaceState(null, '', '/library')
+    window.history.pushState(null, '', '/calendar/week/2026-11-12')
+    const entries = window.history.length
+    renderAt('/calendar/week/2026-11-12')
+
+    expect((await heading()).textContent).toBe('Nov 9 – 15, 2026')
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-09')
+    expect(window.history.length).toBe(entries)
+  })
+
+  it('opens on the current month from an invalid week', async () => {
+    renderAt('/calendar/week/2026-02-30')
+
+    expect((await heading()).textContent).toBe('November 2026')
+    expect(window.location.pathname).toBe('/calendar/month/2026-11')
+  })
+
+  it('names a week across a month', async () => {
+    renderAt('/calendar/week/2026-11-30')
+    expect((await heading()).textContent).toBe('Nov 30 – Dec 6, 2026')
+  })
+
+  it('names a week across a year', async () => {
+    renderAt('/calendar/week/2026-12-28')
+    expect((await heading()).textContent).toBe('Dec 28, 2026 – Jan 3, 2027')
+  })
+
+  it('says the week and its days in Spanish', async () => {
+    renderAt('/calendar/week/2026-11-09', 'es')
+
+    expect((await heading()).textContent).toBe('9 – 15 nov 2026')
+    expect(column('lunes, 9 de noviembre')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Semana anterior' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Semana siguiente' })).toBeTruthy()
+  })
+
+  it('lists every Milestone of each day, pending first, with no "+N more"', async () => {
+    planned('2026-11-06', 'Done first', true)
+    for (const title of ['Squeeze', 'Flat BTN', 'Blockers', 'Overbets']) planned('2026-11-06', title)
+    planned('2026-11-02', 'Monday topic')
+    planned('2026-11-09', 'Next week')
+    renderAt('/calendar/week/2026-11-02')
+
+    const friday = column('Friday, November 6')
+    await within(friday).findByText('Squeeze')
+    const titles = within(friday)
+      .getAllByTitle(/./)
+      .map((title) => title.textContent)
+    expect(titles).toEqual(['Squeeze', 'Flat BTN', 'Blockers', 'Overbets', 'Done first'])
+    expect(within(column('Monday, November 2')).getByText('Monday topic')).toBeTruthy()
+    expect(screen.queryByText(/more$/)).toBeNull()
+    expect(screen.queryByText('Next week')).toBeNull()
+  })
+
+  it("creates on the day whose empty space is clicked, and shows it there at once", async () => {
+    const user = userEvent.setup()
+    planned('2026-11-04', 'Squeeze')
+    renderAt('/calendar/week/2026-11-02')
+    await within(column('Wednesday, November 4')).findByText('Squeeze')
+
+    await user.click(within(column('Wednesday, November 4')).getByText('Squeeze'))
+    expect(dialog()).toBeNull()
+
+    await user.click(column('Wednesday, November 4'))
+    expect(dateField().value).toBe('2026-11-04')
+    await user.type(titleField(), 'Thin value')
+    await user.click(within(dialog()!).getByRole('button', { name: 'Create milestone' }))
+
+    await waitFor(() => expect(dialog()).toBeNull())
+    expect(within(column('Wednesday, November 4')).getByText('Thin value')).toBeTruthy()
+  })
+
+  it('creates from the "+" of a day', async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/week/2026-11-02')
+    await heading()
+
+    await user.click(screen.getByRole('button', { name: 'New milestone on Thursday, November 5' }))
+
+    expect(dateField().value).toBe('2026-11-05')
+  })
+
+  it('goes back, on and to today by a week, each a new entry that back undoes', async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/week/2026-11-02')
+    await heading()
+
+    await user.click(screen.getByRole('button', { name: 'Previous week' }))
+    expect((await heading()).textContent).toBe('Oct 26 – Nov 1, 2026')
+    expect(window.location.pathname).toBe('/calendar/week/2026-10-26')
+
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-02')
+
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    expect((await heading()).textContent).toBe('Nov 16 – 22, 2026')
+    expect(window.location.pathname).toBe('/calendar/week/2026-11-16')
+    await waitFor(() => expect(fetchedSpans().at(-1)).toBe('?from=2026-11-16&to=2026-11-22'))
+
+    act(() => window.history.back())
+    await waitFor(() => expect(window.location.pathname).toBe('/calendar/week/2026-11-09'))
+    expect((await heading()).textContent).toBe('Nov 9 – 15, 2026')
+  })
+
+  it('says weeks across a month and a year in Spanish', async () => {
+    renderAt('/calendar/week/2026-11-30', 'es')
+    expect((await heading()).textContent).toBe('30 nov – 6 dic 2026')
+    cleanup()
+    renderAt('/calendar/week/2026-12-28', 'es')
+    expect((await heading()).textContent).toBe('28 dic 2026 – 3 ene 2027')
   })
 })

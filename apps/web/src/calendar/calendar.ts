@@ -162,6 +162,18 @@ export function todayPeriod(view: CalendarView, today: CalendarDate): Period {
   return view === 'month' ? { view, month: monthOf(today) } : { view, monday: mondayOf(today) }
 }
 
+/**
+ * The other view of what is on screen: a month becomes the week of its first
+ * day, or today's week when it is the current month; a week becomes the month
+ * of its Monday.
+ */
+export function switchView(period: Period, today: CalendarDate): Period {
+  if (period.view === 'week') return { view: 'month', month: monthOf(period.monday) }
+  const { year, month } = monthOf(today)
+  const current = period.month.year === year && period.month.month === month
+  return { view: 'week', monday: mondayOf(current ? today : firstOfMonth(period.month)) }
+}
+
 /** The Milestones to fetch for a period: a month's whole grid, neighbouring days included, or a week's seven days. */
 export function periodSpan(period: Period): CalendarSpan {
   if (period.view === 'week') return { from: period.monday, to: addDays(period.monday, 6) }

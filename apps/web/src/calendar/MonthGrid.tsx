@@ -1,14 +1,16 @@
 import type { MouseEvent } from 'react'
 import { useI18n } from '../i18n'
 import { Icon } from '../ui/Icon'
-import { cellMilestones, dayOfMonth, monthGrid, type CalendarDate, type Milestone, type Month } from './calendar'
+import { followLink } from '../routing'
+import { cellMilestones, dayOfMonth, mondayOf, monthGrid, periodPath, type CalendarDate, type Milestone, type Month } from './calendar'
 import { dayName, monthHeading, weekdayShort } from './calendarText'
 import { MilestoneItem } from './MilestoneItem'
 
 /**
  * A month, Monday first, each day with the titles of its Milestones. Days of
  * the neighbouring months are set apart and today is marked. A click on a
- * day's empty space, or on its "+", asks to create a Milestone on that day.
+ * day's empty space, or on its "+", asks to create a Milestone on that day;
+ * "+N más" on a full day leads to its week.
  */
 export function MonthGrid({
   month,
@@ -27,7 +29,7 @@ export function MonthGrid({
   const weeks = monthGrid(month)
 
   function create(event: MouseEvent<HTMLElement>, date: CalendarDate) {
-    if ((event.target as Element).closest('[data-milestone]')) return
+    if ((event.target as Element).closest('[data-milestone], a')) return
     onCreate(date)
   }
 
@@ -64,7 +66,11 @@ export function MonthGrid({
                   {shown.map((milestone) => (
                     <MilestoneItem key={milestone.id} milestone={milestone} />
                   ))}
-                  {more > 0 && <span className="calendar-month__more">{t('calendar.more', { count: more })}</span>}
+                  {more > 0 && (
+                    <a className="calendar-month__more" href={periodPath({ view: 'week', monday: mondayOf(date) })} onClick={followLink}>
+                      {t('calendar.more', { count: more })}
+                    </a>
+                  )}
                   <button type="button" className="calendar-month__add" aria-label={t('calendar.day.add', { day: name })}>
                     {shown.length === 0 && (
                       <span className="calendar-month__add-hint" aria-hidden="true">
