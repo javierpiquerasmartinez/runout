@@ -58,6 +58,8 @@ export interface RoomSnapshot {
   state: RoomState;
   /** The shared Playback: null outside Live, or while no Hand is loaded. */
   playback: Playback | null;
+  /** The Hand this Participant was last on in Free Review, while it is in the Queue. */
+  yourHand: string | null;
   /** Every Note on the Hands in the Queue, oldest first. */
   notes: Note[];
   /** The Hands in the Queue this Participant has Marked. Nobody else is told. */
@@ -340,10 +342,11 @@ export class RoomGateway
     room: Room,
   ): Promise<WsResponse<RoomSnapshot>> {
     const revision = this.revisions.current(room.id);
-    const [queue, { state, playback }, notes, marks, inLibrary] =
+    const [queue, { state, playback }, yourHand, notes, marks, inLibrary] =
       await Promise.all([
         this.queue.entries(room.id),
         this.playback.current(room.id),
+        this.rooms.handOf(room.id, identityId),
         this.notes.inRoom(room.id),
         this.marks.inRoom(identityId, room.id),
         this.queue.inLibraryInRoom(identityId, room.id),
@@ -359,6 +362,7 @@ export class RoomGateway
         queue,
         state,
         playback,
+        yourHand,
         notes,
         marks,
         inLibrary,
@@ -482,6 +486,24 @@ export class RoomGateway
         this.publish(roomId, 'live.ended', {});
       });
       return undefined;
+    });
+  }
+
+  /**
+   * Someone opens a Hand on their own table in Free Review. Nobody else hears:
+   * it is only kept to land them back on it, and acknowledged to them alone.
+   */
+  @SubscribeMessage('review.open')
+  openHand(
+    @ConnectedSocket() socket: WebSocket,
+    @MessageBody() command: Partial<LoadHandCommand> | null,
+  ): Promise<WsResponse<{ handId: string } | RejectedEvent> | undefined> {
+    return this.rejecting('review.open', async () => {
+      const { identity, roomId } = await this.inRoom(socket);
+      return {
+        event: 'review.opened',
+        data: await this.rooms.openHand(roomId, identity.id, command?.handId),
+      };
     });
   }
 

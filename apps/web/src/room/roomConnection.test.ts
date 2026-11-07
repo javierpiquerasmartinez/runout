@@ -15,6 +15,7 @@ const room: RoomSnapshot = {
   participants: [],
   queue: [],
   state: 'live',
+  yourHand: null,
   playback: null,
   notes: [],
   marks: [],

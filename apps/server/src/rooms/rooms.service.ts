@@ -1,5 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, exists, inArray, lte, ne, not, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  not,
+  sql,
+} from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
@@ -207,6 +218,60 @@ export class RoomsService {
     };
   }
 
+  /**
+   * Remembers the Hand someone opened in Free Review, as its Queue Entry, to
+   * land them back on it whenever they return (ADR 0009).
+   */
+  async openHand(
+    roomId: string,
+    identityId: string,
+    handId: unknown,
+  ): Promise<{ handId: string }> {
+    await this.requireParticipant(roomId, identityId);
+    if (!isUuid(handId)) throw new Rejected('hand-not-in-queue');
+    const [entry] = await this.db
+      .select({ id: queueEntries.id })
+      .from(queueEntries)
+      .where(
+        and(
+          eq(queueEntries.roomId, roomId),
+          eq(queueEntries.handId, handId),
+          isNull(queueEntries.removedAt),
+        ),
+      )
+      .limit(1);
+    if (!entry) throw new Rejected('hand-not-in-queue');
+    await this.db
+      .update(roomMemberships)
+      .set({ currentEntryId: entry.id })
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, identityId),
+        ),
+      );
+    return { handId };
+  }
+
+  /** The Hand someone was last on in Free Review, while its Queue Entry is still there. */
+  async handOf(roomId: string, identityId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ handId: queueEntries.handId })
+      .from(roomMemberships)
+      .innerJoin(
+        queueEntries,
+        eq(queueEntries.id, roomMemberships.currentEntryId),
+      )
+      .where(
+        and(
+          eq(roomMemberships.roomId, roomId),
+          eq(roomMemberships.identityId, identityId),
+          isNull(queueEntries.removedAt),
+        ),
+      );
+    return row?.handId ?? null;
+  }
+
   /** Whether they are a Participant of the Room, kicked ones apart. */
   async isParticipant(roomId: string, identityId: string): Promise<boolean> {
     const [membership] = await this.db
@@ -306,7 +371,12 @@ export class RoomsService {
       );
     const [placed] = await tx
       .insert(roomMemberships)
-      .values({ roomId, identityId: accountId, joinedAt: left.joinedAt })
+      .values({
+        roomId,
+        identityId: accountId,
+        joinedAt: left.joinedAt,
+        currentEntryId: left.currentEntryId,
+      })
       .onConflictDoUpdate({
         target: [roomMemberships.roomId, roomMemberships.identityId],
         set: {

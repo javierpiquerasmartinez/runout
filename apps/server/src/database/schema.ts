@@ -284,6 +284,11 @@ export const roomMemberships = pgTable(
       .references(() => identities.id),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull(),
     kicked: boolean('kicked').notNull().default(false),
+    /** The Queue Entry they were last on in Free Review, to land them back on it (ADR 0009). */
+    currentEntryId: uuid('current_entry_id').references(
+      (): AnyPgColumn => queueEntries.id,
+      { onDelete: 'set null' },
+    ),
   },
   (table) => [primaryKey({ columns: [table.roomId, table.identityId] })],
 );

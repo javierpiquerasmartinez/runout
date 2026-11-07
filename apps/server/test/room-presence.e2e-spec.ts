@@ -76,6 +76,7 @@ describe('Joining a Room over the WebSocket (e2e)', () => {
       queue: [],
       state: 'free-review',
       playback: null,
+      yourHand: null,
       notes: [],
       marks: [],
       inLibrary: [],

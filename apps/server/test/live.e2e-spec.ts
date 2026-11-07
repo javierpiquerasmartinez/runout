@@ -13,6 +13,9 @@ interface Playback {
 interface Snapshot {
   state: 'free-review' | 'live';
   playback: Playback | null;
+  /** The Hand this Participant was last on in Free Review, while it is in the Queue. */
+  yourHand: string | null;
+  queue: { id: string; handId: string }[];
   revision: number;
 }
 
@@ -230,6 +233,90 @@ describe('Free Review and Live (e2e)', () => {
     expect(await masterSocket.next('rejected')).toEqual({
       command: 'live.start',
       reason: 'already-live',
+    });
+  });
+
+  describe('the Hand each Participant was on', () => {
+    /** A Room in Free Review with two Hands in its Queue. */
+    async function roomWithTwoHands() {
+      const room = await roomWithAHand();
+      await request(running.httpServer)
+        .post(`/api/rooms/${room.code}/hands`)
+        .set('Authorization', `Bearer ${room.master.token}`)
+        .send({ text: freshHandHistory('pokerstars-session.txt') })
+        .expect(201);
+      const { entries } = await room.masterSocket.next<{
+        entries: { id: string; handId: string }[];
+      }>('queue.entriesAdded');
+      return { ...room, second: entries[0] };
+    }
+
+    it('knows none for someone who has never opened one', async () => {
+      const { snapshot } = await roomWithAHand();
+      expect(snapshot.yourHand).toBeNull();
+    });
+
+    it('lands someone back on the Hand they opened, from any browser', async () => {
+      const { code, guest, guestSocket, second } = await roomWithTwoHands();
+
+      guestSocket.send('review.open', { handId: second.handId });
+      await guestSocket.next('review.opened');
+
+      const elsewhere = await join(guest.token, code, 'Marta');
+      expect(elsewhere.snapshot.yourHand).toBe(second.handId);
+    });
+
+    it('keeps each Participant’s Hand their own', async () => {
+      const { code, master, guestSocket, second } = await roomWithTwoHands();
+
+      guestSocket.send('review.open', { handId: second.handId });
+      await guestSocket.next('review.opened');
+
+      const { snapshot } = await join(master.token, code, 'Javier');
+      expect(snapshot.yourHand).toBeNull();
+    });
+
+    it('lands everyone on the Hand Live ended on', async () => {
+      const { code, guest, masterSocket, guestSocket, handId, second } =
+        await roomWithTwoHands();
+      guestSocket.send('review.open', { handId });
+      await guestSocket.next('review.opened');
+
+      masterSocket.send('live.start', {
+        handId: second.handId,
+        actionIndex: 0,
+      });
+      await guestSocket.next('live.started');
+      masterSocket.send('live.end');
+      await guestSocket.next('live.ended');
+
+      const { snapshot } = await join(guest.token, code, 'Marta');
+      expect(snapshot.yourHand).toBe(second.handId);
+    });
+
+    it('forgets a Hand whose Queue Entry was removed', async () => {
+      const { code, guest, masterSocket, guestSocket, second } =
+        await roomWithTwoHands();
+      guestSocket.send('review.open', { handId: second.handId });
+      await guestSocket.next('review.opened');
+
+      masterSocket.send('queue.remove', { id: second.id });
+      await guestSocket.next('queue.entryRemoved');
+
+      const { snapshot } = await join(guest.token, code, 'Marta');
+      expect(snapshot.yourHand).toBeNull();
+    });
+
+    it('refuses a Hand that is not in the Queue', async () => {
+      const { guestSocket } = await roomWithAHand();
+
+      guestSocket.send('review.open', {
+        handId: '00000000-0000-4000-8000-000000000000',
+      });
+      expect(await guestSocket.next('rejected')).toEqual({
+        command: 'review.open',
+        reason: 'hand-not-in-queue',
+      });
     });
   });
 });

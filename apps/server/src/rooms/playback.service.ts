@@ -2,7 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import { hands, playbacks, queueEntries, rooms } from '../database/schema.js';
+import {
+  hands,
+  playbacks,
+  queueEntries,
+  roomMemberships,
+  rooms,
+} from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { timeline } from '../hands/replay/timeline.js';
@@ -110,6 +116,26 @@ export class PlaybackService {
         .where(and(eq(rooms.id, roomId), eq(rooms.state, 'live')))
         .returning({ id: rooms.id });
       if (ended.length === 0) return false;
+      // Everyone comes back to the Hand it ended on, as if they had opened it.
+      const [endedOn] = await tx
+        .select({ entryId: queueEntries.id })
+        .from(playbacks)
+        .innerJoin(
+          queueEntries,
+          and(
+            eq(queueEntries.roomId, playbacks.roomId),
+            eq(queueEntries.handId, playbacks.handId),
+            isNull(queueEntries.removedAt),
+          ),
+        )
+        .where(eq(playbacks.roomId, roomId))
+        .limit(1);
+      if (endedOn) {
+        await tx
+          .update(roomMemberships)
+          .set({ currentEntryId: endedOn.entryId })
+          .where(eq(roomMemberships.roomId, roomId));
+      }
       await tx.delete(playbacks).where(eq(playbacks.roomId, roomId));
       return true;
     });

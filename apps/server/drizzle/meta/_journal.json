@@ -211,6 +211,13 @@
       "when": 1794058246010,
       "tag": "0029_room_state",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794058757030,
+      "tag": "0030_membership_current_entry",
+      "breakpoints": true
     }
   ]
 }

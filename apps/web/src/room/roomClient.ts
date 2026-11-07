@@ -117,6 +117,8 @@ export interface RoomSnapshot {
   state: RoomState
   /** The shared Playback: null outside Live, or while no Hand is loaded. */
   playback: Playback | null
+  /** The Hand this person was last on in Free Review, while it is in the Queue. */
+  yourHand: string | null
   /** Every Note on the Hands in the Queue, oldest first. */
   notes: Note[]
   /** The Hands in the Queue this person has Marked. Nobody else is told. */
@@ -248,7 +250,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
   switch (event.type) {
     case 'snapshot': {
       // Whatever was held is dropped: this is the Room as it stands.
-      const { room, you, participants, queue, state, playback, notes, marks, inLibrary, revision, presence } =
+      const { room, you, participants, queue, state, playback, yourHand, notes, marks, inLibrary, revision, presence } =
         event.snapshot
       const held = view.phase === 'in-room' ? view : null
       const seenRevision = Math.max(held?.sync.seenRevision ?? 0, revision)
@@ -264,7 +266,7 @@ export function reduceRoom(view: RoomView, event: RoomEvent): RoomView {
         queue,
         state,
         playback,
-        own: ownAfterSnapshot(held?.own ?? null, queue),
+        own: ownAfterSnapshot(held?.own ?? null, yourHand, queue),
         notes,
         marks,
         inLibrary,
@@ -471,13 +473,15 @@ function withOwn(view: RoomView, change: (own: Playback | null) => Playback | nu
 }
 
 /**
- * Where someone is on their own once a snapshot lands: where they were, while
- * that Hand is still in the Queue, or else the Queue's first Hand.
+ * Where someone is on their own once a snapshot lands: where they were on
+ * screen, while that Hand is still in the Queue; else the Hand the Room
+ * remembers them on; else the Queue's first Hand.
  */
-function ownAfterSnapshot(held: Playback | null, queue: QueueEntry[]): Playback | null {
-  if (held && queue.some((entry) => entry.handId === held.handId)) return held
-  const first = queue[0]
-  return first ? { handId: first.handId, actionIndex: 0, hideOpponentNames: false } : null
+function ownAfterSnapshot(held: Playback | null, yourHand: string | null, queue: QueueEntry[]): Playback | null {
+  const queued = (handId: string | null | undefined) => queue.some((entry) => entry.handId === handId)
+  if (held && queued(held.handId)) return held
+  const handId = queued(yourHand) ? yourHand : queue[0]?.handId
+  return handId ? { handId, actionIndex: 0, hideOpponentNames: false } : null
 }
 
 /**

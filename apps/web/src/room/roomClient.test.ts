@@ -47,6 +47,7 @@ const snapshot: RoomEvent = {
     queue: [],
     state: 'live',
     playback: null,
+    yourHand: null,
     notes: [],
     marks: [],
     inLibrary: [],
@@ -345,6 +346,16 @@ describe('reduceRoom, Free Review and Live', () => {
     expect(view?.state).toBe('free-review')
     expect(view?.playback).toBeNull()
     expect(view?.own).toEqual({ handId: 'hand-1', actionIndex: 0, hideOpponentNames: false })
+  })
+
+  it('lands someone back on the Hand they were last on', () => {
+    const view = inRoom(apply({ type: 'snapshot', snapshot: { ...freeReview.snapshot, yourHand: 'hand-2' } }))
+    expect(view?.own).toEqual({ handId: 'hand-2', actionIndex: 0, hideOpponentNames: false })
+  })
+
+  it('lands on the first Hand when the one they were on has left the Queue', () => {
+    const view = inRoom(apply({ type: 'snapshot', snapshot: { ...freeReview.snapshot, yourHand: 'hand-9' } }))
+    expect(view?.own?.handId).toBe('hand-1')
   })
 
   it('lands on nothing in Free Review while the Queue is empty', () => {

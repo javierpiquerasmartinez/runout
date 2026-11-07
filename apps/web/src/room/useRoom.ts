@@ -97,7 +97,12 @@ export function useRoom(code: string, token: string | null, displayName: string 
       handOverMaster: (identityId) => send('room.handOver', { identityId }),
       kick: (identityId) => send('room.kick', { identityId }),
       closeRoom: () => send('room.close', {}),
-      loadHand: (handId) => (live() ? send('playback.load', { handId }) : dispatch({ type: 'ownOpened', handId })),
+      loadHand: (handId) => {
+        if (live()) return send('playback.load', { handId })
+        dispatch({ type: 'ownOpened', handId })
+        // Kept by the Room, to land this person back on it next time.
+        send('review.open', { handId })
+      },
       goToAction: (actionIndex) =>
         live() ? send('playback.goTo', { actionIndex }) : dispatch({ type: 'ownWentTo', actionIndex }),
       hideOpponentNames: (hidden) =>
