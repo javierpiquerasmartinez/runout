@@ -78,6 +78,7 @@ describe('The Administrator role (e2e)', () => {
         ['post', '/api/admin/accounts/x/impersonations'],
         ['get', '/api/admin/rooms'],
         ['post', '/api/admin/rooms/x/close'],
+        ['post', '/api/admin/rooms/x/end-live'],
       ] as const) {
         const req = request(running.httpServer)[method](path);
         if (token) req.set('Authorization', `Bearer ${token}`);

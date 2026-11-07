@@ -177,4 +177,68 @@ describe('The Rooms tab (e2e)', () => {
     await anaSocket.close();
     await martaSocket.close();
   });
+
+  describe('ending Live', () => {
+    const endLive = (code: string, token = administrator) =>
+      request(running.httpServer)
+        .post(`/api/admin/rooms/${code}/end-live`)
+        .set('Authorization', `Bearer ${token}`);
+
+    it('ends Live for everyone, with no Master involved, keeping the Room open', async () => {
+      const ana = await newAccount(running.httpServer);
+      const code = await openRoom(ana.token);
+      const guest = await request(running.httpServer)
+        .post(`/api/rooms/${code}/guests`)
+        .send({ displayName: 'Marta' })
+        .expect(201);
+      const anaSocket = await join(ana.token, code, 'Ana');
+      const martaSocket = await join(guest.body.token, code, 'Marta');
+      anaSocket.send('live.start', {});
+      await martaSocket.next('live.started');
+
+      await endLive(code).expect(204);
+
+      await anaSocket.next('live.ended');
+      await martaSocket.next('live.ended');
+      expect(await listed(code)).toMatchObject({
+        status: 'open',
+        state: 'free-review',
+      });
+      // Back in Free Review: the Master can go Live again.
+      anaSocket.send('live.start', {});
+      await martaSocket.next('live.started');
+      await anaSocket.close();
+      await martaSocket.close();
+    });
+
+    it('refuses anyone but an Administrator, the Room’s Master included', async () => {
+      const ana = await newAccount(running.httpServer);
+      const code = await openRoom(ana.token);
+      const anaSocket = await join(ana.token, code, 'Ana');
+      anaSocket.send('live.start', {});
+      await anaSocket.next('live.started');
+
+      const res = await endLive(code, ana.token).expect(404);
+      expect(res.body).toEqual({ reason: 'not-found' });
+      expect((await listed(code)).state).toBe('live');
+      await anaSocket.close();
+    });
+
+    it('answers not-live for a Room in Free Review, and room-not-found for one closed or unknown', async () => {
+      const ana = await newAccount(running.httpServer);
+      const code = await openRoom(ana.token);
+      expect((await endLive(code).expect(409)).body.reason).toBe('not-live');
+
+      await request(running.httpServer)
+        .post(`/api/admin/rooms/${code}/close`)
+        .set('Authorization', `Bearer ${administrator}`)
+        .expect(204);
+      expect((await endLive(code).expect(404)).body.reason).toBe(
+        'room-not-found',
+      );
+      expect((await endLive('ZZZZZZ').expect(404)).body.reason).toBe(
+        'room-not-found',
+      );
+    });
+  });
 });

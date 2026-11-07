@@ -13,4 +13,6 @@ We rejected a separate "shared Queue" object for asynchronous review, because it
 - In Free Review people write Notes alone, so the writer edits and deletes their own Notes, and the Master any, in both states.
 - An Account lists the open Rooms it is a Participant of. A Guest can Leave one; the Master closes it instead.
 - The Master's role passes on by failover only while the Room is Live; in Free Review the Master keeps it however long they are away, so a Guest opening the link days later never becomes Master.
+- Live ends on its own across restarts too: a Room Live when Runout comes back has no Master connected, so its 30 minutes and failover start then, or carry on from when its Master went away.
+- An Administrator can end Live with no Master involved, exactly as the 30 minutes would, as a way out of a stuck Live that keeps the Room, its Room Hands and its Notes.
 - Rooms open when this ships start in Free Review.

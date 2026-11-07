@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import {
@@ -107,30 +107,17 @@ export class PlaybackService {
     if (!(await this.end(roomId))) throw new Rejected('not-live');
   }
 
-  /** The open Rooms that are Live. */
-  async liveRooms(): Promise<string[]> {
-    const live = await this.db
-      .select({ id: rooms.id })
+  /**
+   * The open Rooms that are Live, each with since when its Master has been
+   * away: null when they were connected when last heard of.
+   */
+  async liveRooms(): Promise<
+    { roomId: string; masterAwaySince: Date | null }[]
+  > {
+    return this.db
+      .select({ roomId: rooms.id, masterAwaySince: rooms.masterAwaySince })
       .from(rooms)
       .where(and(eq(rooms.status, 'open'), eq(rooms.state, 'live')));
-    return live.map((room) => room.id);
-  }
-
-  /** The open Live Rooms whose Master was away when last heard of, and since when. */
-  async liveWithoutMaster(): Promise<{ roomId: string; since: Date }[]> {
-    const live = await this.db
-      .select({ roomId: rooms.id, since: rooms.masterAwaySince })
-      .from(rooms)
-      .where(
-        and(
-          eq(rooms.status, 'open'),
-          eq(rooms.state, 'live'),
-          isNotNull(rooms.masterAwaySince),
-        ),
-      );
-    return live.flatMap(({ roomId, since }) =>
-      since ? [{ roomId, since }] : [],
-    );
   }
 
   /** Records since when the Live Room has had no Master connected, or that it has one again. */

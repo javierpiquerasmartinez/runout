@@ -112,4 +112,10 @@ export class AdminController {
   async closeRoom(@Param('code') code: string): Promise<void> {
     await this.rooms.close(code);
   }
+
+  @Post('rooms/:code/end-live')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async endLive(@Param('code') code: string): Promise<void> {
+    await this.rooms.endLive(code);
+  }
 }

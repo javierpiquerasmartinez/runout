@@ -1,3 +1,4 @@
+import pg from 'pg';
 import request from 'supertest';
 import { freshHandHistory } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
@@ -405,16 +406,80 @@ describe('Free Review and Live (e2e)', () => {
       expect(snapshot.state).toBe('live');
     });
 
-    it('still ends Live on time after the server restarts', async () => {
+    /**
+     * Runs `test` on a database of its own: an app on the shared one leaves
+     * the Live Rooms it finds there to their own app (see startApp).
+     */
+    async function onItsOwnDatabase(
+      test: (
+        restart: (at: string, whileDown?: () => Promise<void>) => Promise<void>,
+      ) => Promise<void>,
+    ) {
       await running.close();
       const database = await freshDatabase();
       try {
         running = await startApp({ databaseUrl: database.url });
-        const { code, guest, masterSocket, guestSocket } =
-          await roomWithAHand();
-        masterSocket.send('live.start', {});
-        await guestSocket.next('live.started');
-        await untilGone(guestSocket, masterSocket);
+        await test(async (at, whileDown) => {
+          // Shutting down closes every connection still open.
+          clients.splice(0);
+          await running.close();
+          await whileDown?.();
+          running = await startApp({
+            databaseUrl: database.url,
+            clock: new TestClock(new Date(at)),
+          });
+        });
+      } finally {
+        await Promise.all(clients.splice(0).map((client) => client.close()));
+        await running.close();
+        running = { ...running, close: () => Promise.resolve() };
+        await database.drop();
+      }
+    }
+
+    /** Reads the Room's row as a restart would find it. */
+    async function roomRow(code: string) {
+      const db = new pg.Client(running.databaseUrl);
+      await db.connect();
+      try {
+        const { rows } = await db.query<{
+          state: string;
+          master_away_since: Date | null;
+        }>('select state, master_away_since from rooms where code = $1', [
+          code,
+        ]);
+        return rows[0];
+      } finally {
+        await db.end();
+      }
+    }
+
+    /** As a crash leaves the Room: its Master was connected, so no absence is recorded. */
+    async function crashedWithMasterConnected(code: string) {
+      const db = new pg.Client(running.databaseUrl);
+      await db.connect();
+      try {
+        await db.query(
+          'update rooms set master_away_since = null where code = $1',
+          [code],
+        );
+      } finally {
+        await db.end();
+      }
+    }
+
+    /** A Live Room whose Guest has left, its Master still connected. */
+    async function liveWithOnlyTheMaster() {
+      const room = await roomWithAHand();
+      room.masterSocket.send('live.start', {});
+      await room.guestSocket.next('live.started');
+      await untilGone(room.guestSocket, room.masterSocket);
+      return room;
+    }
+
+    it('still ends Live on time after the server restarts', async () => {
+      await onItsOwnDatabase(async (restart) => {
+        const { code, guest, masterSocket } = await liveWithOnlyTheMaster();
         await untilGone(masterSocket);
         await expect
           .poll(async () => {
@@ -427,24 +492,85 @@ describe('Free Review and Live (e2e)', () => {
           })
           .toBe(0);
         await running.clock.advance(LIVE_ENDS_MS / 2);
-        clients.splice(0);
-        // Shutting down waits for what it was still writing, as a restart would.
-        await running.close();
-
-        running = await startApp({
-          databaseUrl: database.url,
-          clock: new TestClock(new Date(Date.UTC(2026, 0, 1, 0, 15))),
-        });
+        await restart('2026-01-01T00:15:00Z');
         await running.clock.advance(LIVE_ENDS_MS / 2);
 
         const { snapshot } = await join(guest.token, code, 'Marta');
         expect(snapshot.state).toBe('free-review');
-      } finally {
-        await Promise.all(clients.splice(0).map((client) => client.close()));
-        await running.close();
-        running = { ...running, close: () => Promise.resolve() };
-        await database.drop();
-      }
+      });
+    });
+
+    it('counts from the shutdown when the server goes down with the Master connected', async () => {
+      await onItsOwnDatabase(async (restart) => {
+        const { code } = await liveWithOnlyTheMaster();
+        await running.clock.advance(20 * 60_000);
+        await restart('2026-01-01T00:30:00Z');
+
+        // Down at 00:20 for ten minutes, then twenty more: 30 since it went down.
+        await running.clock.advance(20 * 60_000 - 1);
+        expect((await roomRow(code)).state).toBe('live');
+        await running.clock.advance(1);
+        expect((await roomRow(code)).state).toBe('free-review');
+      });
+    });
+
+    it('ends Live 30 minutes after a restart that followed a crash with the Master connected', async () => {
+      await onItsOwnDatabase(async (restart) => {
+        const { code, guest } = await liveWithOnlyTheMaster();
+        await restart('2026-01-01T02:00:00Z', () =>
+          crashedWithMasterConnected(code),
+        );
+
+        // The period counts from the restart, and a second one carries it on.
+        expect((await roomRow(code)).master_away_since).toEqual(
+          new Date('2026-01-01T02:00:00Z'),
+        );
+        await running.clock.advance(LIVE_ENDS_MS - 1);
+        expect((await roomRow(code)).state).toBe('live');
+        await running.clock.advance(1);
+
+        const { snapshot } = await join(guest.token, code, 'Marta');
+        expect(snapshot.state).toBe('free-review');
+      });
+    });
+
+    it('passes the role on after such a restart, once the grace period runs out', async () => {
+      await onItsOwnDatabase(async (restart) => {
+        const { code, guest } = await liveWithOnlyTheMaster();
+        await restart('2026-01-01T02:00:00Z', () =>
+          crashedWithMasterConnected(code),
+        );
+        await running.clock.advance(GRACE_MS);
+
+        const { snapshot } = await join(guest.token, code, 'Marta');
+        expect(snapshot.state).toBe('live');
+        expect(snapshot.participants).toContainEqual(
+          expect.objectContaining({ identityId: guest.id, role: 'master' }),
+        );
+        // Someone holds the role again: Live goes on.
+        await running.clock.advance(LIVE_ENDS_MS);
+        expect((await roomRow(code)).state).toBe('live');
+      });
+    });
+
+    it('stays Live after such a restart when the Master comes back in time', async () => {
+      await onItsOwnDatabase(async (restart) => {
+        const { code, master } = await liveWithOnlyTheMaster();
+        await restart('2026-01-01T02:00:00Z', () =>
+          crashedWithMasterConnected(code),
+        );
+        await running.clock.advance(60_000);
+
+        const { snapshot } = await join(master.token, code, 'Javier');
+        expect(snapshot.participants).toContainEqual(
+          expect.objectContaining({ identityId: master.id, role: 'master' }),
+        );
+        await running.clock.advance(LIVE_ENDS_MS);
+        expect(await roomRow(code)).toEqual({
+          state: 'live',
+          master_away_since: null,
+        });
+      });
     });
   });
 });

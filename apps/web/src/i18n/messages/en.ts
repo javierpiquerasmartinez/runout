@@ -1270,4 +1270,7 @@ export const en: Messages = {
   'admin.rooms.close': 'Close room',
   'admin.rooms.confirm.title': 'Close the room?',
   'admin.rooms.confirm.body': '“{name}” will close for everyone, as if its Master closed it. Its room hands are discarded.',
+  'admin.rooms.endLive': 'End live',
+  'admin.rooms.endLive.title': 'End live?',
+  'admin.rooms.endLive.body': '“{name}” goes back to free review for everyone, each staying on the hand it ended on. The room stays open with its hands and notes.',
 }
