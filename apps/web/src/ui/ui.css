@@ -1,5 +1,5 @@
 /*
- * Components from Design.html, board "Botones, campos y controles".
+ * Components from the design canvas, board "Botones, campos y controles".
  *
  * Each interactive state has a real selector and a [data-state] twin, so the
  * design-system page can pin a control in hover, pressed or focus.

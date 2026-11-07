@@ -9,8 +9,8 @@ import './AdminPage.css'
 
 /**
  * The Administrator panel: Invitations, Accounts and Rooms, each tab a route.
- * Built from the design system's tables, buttons, badges and dialogs, as
- * Design.html draws no board for it.
+ * Built from the design system's tables, buttons, badges and dialogs; the
+ * design canvas's "Administración" boards are captures of this page.
  */
 export function AdminPage({ tab }: { tab: AdminTab }) {
   const { t } = useI18n()

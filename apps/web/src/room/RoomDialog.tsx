@@ -5,8 +5,8 @@ import './RoomDialog.css'
 
 /**
  * The irreversible decisions a Room asks for: leaving, kicking, closing.
- * Built from the import dialog's own shell (Design.html draws no board for
- * these), with the way out always to the left of the act.
+ * Built from the import dialog's own shell (the design canvas draws no board
+ * for these), with the way out always to the left of the act.
  */
 export function RoomDialog({
   title,
