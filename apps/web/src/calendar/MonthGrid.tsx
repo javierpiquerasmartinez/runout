@@ -5,6 +5,7 @@ import { followLink } from '../routing'
 import { cellMilestones, dayOfMonth, mondayOf, monthGrid, periodPath, type CalendarDate, type Milestone, type Month } from './calendar'
 import { dayName, monthHeading, weekdayShort } from './calendarText'
 import { MilestoneItem } from './MilestoneItem'
+import type { CalendarDrag } from './useMilestoneDrag'
 
 /**
  * A month, Monday first, each day with the titles of its Milestones. Days of
@@ -18,6 +19,7 @@ export function MonthGrid({
   milestones,
   onCreate,
   onToggleDone,
+  drag = null,
 }: {
   month: Month
   today: CalendarDate
@@ -25,6 +27,8 @@ export function MonthGrid({
   milestones: ReadonlyMap<CalendarDate, readonly Milestone[]>
   onCreate: (date: CalendarDate) => void
   onToggleDone: (milestone: Milestone, done: boolean) => void
+  /** The Milestone being dragged, if one is, and the day under the pointer. */
+  drag?: CalendarDrag | null
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -60,13 +64,14 @@ export function MonthGrid({
                   data-date={date}
                   data-outside={inMonth ? undefined : ''}
                   data-today={isToday ? '' : undefined}
+                  data-drop={drag?.over === date ? '' : undefined}
                   onClick={(event) => create(event, date)}
                 >
                   <span className="calendar-month__number" aria-hidden="true">
                     {dayOfMonth(date)}
                   </span>
                   {shown.map((milestone) => (
-                    <MilestoneItem key={milestone.id} milestone={milestone} today={today} onToggleDone={onToggleDone} />
+                    <MilestoneItem key={milestone.id} milestone={milestone} today={today} onToggleDone={onToggleDone} dragged={drag?.milestone.id === milestone.id} />
                   ))}
                   {more > 0 && (
                     <a className="calendar-month__more" href={periodPath({ view: 'week', monday: mondayOf(date) })} onClick={followLink}>

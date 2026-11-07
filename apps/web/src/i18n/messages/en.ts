@@ -1299,6 +1299,7 @@ export const en: Messages = {
   'calendar.milestone.markDone': 'Mark as done: {title}',
   'calendar.milestone.done': 'Done: {title}',
   'calendar.milestone.saveFailed': 'Couldn’t save “{title}”. Try again.',
+  'calendar.milestone.moveFailed': 'Couldn’t move “{title}”. Try again.',
   'calendar.emptyHint': 'Click a day to plan what to study.',
   'calendar.loadFailed': "Couldn't load your milestones.",
   'calendar.create.title': 'New milestone',

@@ -24,8 +24,10 @@ import {
 } from './calendar'
 import { monthHeading, weekHeading } from './calendarText'
 import { CreateMilestoneDialog } from './CreateMilestoneDialog'
+import { DraggedMilestone } from './DraggedMilestone'
 import { MonthGrid } from './MonthGrid'
 import { WeekGrid } from './WeekGrid'
+import { useMilestoneDrag } from './useMilestoneDrag'
 import './CalendarPage.css'
 
 /**
@@ -39,7 +41,8 @@ export function CalendarPage({ period }: { period: Period }) {
   const { t } = i18n
   const today = todayOf()
   const span = periodSpan(period)
-  const { milestones, loading, hasAny, failed, add, setDone, unsaved } = useMilestones(span)
+  const { milestones, loading, hasAny, failed, add, setDone, move, unsaved } = useMilestones(span)
+  const { dragged, onPointerDown, onDragStart } = useMilestoneDrag({ milestones, onMove: move })
   const [creatingOn, setCreatingOn] = useState<CalendarDate | null>(null)
 
   const byDay = useMemo(() => {
@@ -58,7 +61,7 @@ export function CalendarPage({ period }: { period: Period }) {
   return (
     <div className="calendar-page">
       <AppHeader current="calendar" />
-      <main className="calendar-page__main" aria-busy={loading || undefined}>
+      <main className="calendar-page__main" aria-busy={loading || undefined} data-dragging={dragged ? '' : undefined} onPointerDown={onPointerDown} onDragStart={onDragStart}>
         <div className="calendar-page__toolbar">
           <div className="calendar-page__moves">
             <IconButton icon="previous" size="compact" label={t(isWeek ? 'calendar.previousWeek' : 'calendar.previousMonth')} onClick={() => navigate(periodPath(previousPeriod(period)))} />
@@ -87,17 +90,18 @@ export function CalendarPage({ period }: { period: Period }) {
         )}
         {unsaved !== null && (
           <p role="alert" className="calendar-page__failure">
-            {t('calendar.milestone.saveFailed', { title: unsaved })}
+            {t(unsaved.message, { title: unsaved.title })}
           </p>
         )}
-        {period.view === 'month' && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} />}
-        {period.view === 'week' && <WeekGrid monday={period.monday} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} />}
+        {period.view === 'month' && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} />}
+        {period.view === 'week' && <WeekGrid monday={period.monday} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} />}
         {hasAny === false && (
           <div className="calendar-page__hint">
             <p>{t('calendar.emptyHint')}</p>
           </div>
         )}
       </main>
+      {dragged && <DraggedMilestone dragged={dragged} today={today} />}
       {creatingOn !== null && (
         <CreateMilestoneDialog
           date={creatingOn}
@@ -112,6 +116,12 @@ export function CalendarPage({ period }: { period: Period }) {
   )
 }
 
+/** A change to a Milestone that could not be saved and went back: what to say, and of which. */
+interface Unsaved {
+  message: 'calendar.milestone.saveFailed' | 'calendar.milestone.moveFailed'
+  title: string
+}
+
 /** What the Calendar knows of the Account's Milestones for a span. */
 interface Fetched {
   /** The span the Milestones are of. */
@@ -124,18 +134,19 @@ interface Fetched {
  * The Account's Milestones in the span, asked for again whenever it changes,
  * and whether it has any at all (unknown until the first answer). A Milestone
  * created here is added at once, without asking again. Marking one done or not
- * done shows at once; if saving it fails, it goes back and `unsaved` names it.
+ * done, or moving it to another day, shows at once; if saving it fails, it
+ * goes back and `unsaved` says so.
  */
 function useMilestones(span: CalendarSpan) {
   const { token } = useSession()
   const key = `from=${span.from}&to=${span.to}`
   const [fetched, setFetched] = useState<Fetched | null>(null)
   const [failedKey, setFailedKey] = useState<string | null>(null)
-  const [unsaved, setUnsaved] = useState<string | null>(null)
+  const [unsaved, setUnsaved] = useState<Unsaved | null>(null)
 
-  /** Sets one Milestone's done, wherever the Milestones held are of. */
-  function markDone(id: string, done: boolean) {
-    setFetched((before) => before && { ...before, milestones: before.milestones.map((m) => (m.id === id ? { ...m, done } : m)) })
+  /** Changes one Milestone held, wherever the Milestones held are of. */
+  function change(id: string, changed: Partial<Milestone>) {
+    setFetched((before) => before && { ...before, milestones: before.milestones.map((m) => (m.id === id ? { ...m, ...changed } : m)) })
   }
 
   useEffect(() => {
@@ -164,10 +175,18 @@ function useMilestones(span: CalendarSpan) {
     unsaved,
     setDone(milestone: Milestone, done: boolean) {
       setUnsaved(null)
-      markDone(milestone.id, done)
+      change(milestone.id, { done })
       api(`/calendar/milestones/${encodeURIComponent(milestone.id)}`, { token: token ?? undefined, method: 'PATCH', body: { done } }).catch(() => {
-        markDone(milestone.id, !done)
-        setUnsaved(milestone.title)
+        change(milestone.id, { done: !done })
+        setUnsaved({ message: 'calendar.milestone.saveFailed', title: milestone.title })
+      })
+    },
+    move(milestone: Milestone, date: CalendarDate) {
+      setUnsaved(null)
+      change(milestone.id, { date })
+      api(`/calendar/milestones/${encodeURIComponent(milestone.id)}`, { token: token ?? undefined, method: 'PATCH', body: { date } }).catch(() => {
+        change(milestone.id, { date: milestone.date })
+        setUnsaved({ message: 'calendar.milestone.moveFailed', title: milestone.title })
       })
     },
   }

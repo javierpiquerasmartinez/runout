@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider, type Locale } from '../i18n'
@@ -634,5 +634,216 @@ describe('CalendarPage · done and pending in the week', () => {
     ])
     expect(calls.filter(({ method }) => method === 'PATCH').map(({ path, body }) => [path, body])).toEqual([[`/calendar/milestones/${squeeze.id}`, { done: true }]])
     expect(within(column('Thursday, November 5')).getByText('Slipped').closest('[data-milestone]')!.hasAttribute('data-pending')).toBe(true)
+  })
+})
+
+describe('CalendarPage · dragging Milestones between days', () => {
+  /** What `document.elementFromPoint` finds at each point, by "x,y"; jsdom has no layout. */
+  let under: Map<string, Element>
+  const moves = () => calls.filter(({ method }) => method === 'PATCH').map(({ path, body }) => [path, body])
+
+  beforeEach(() => {
+    under = new Map()
+    document.elementFromPoint = (x: number, y: number) => under.get(`${x},${y}`) ?? null
+  })
+
+  afterEach(() => {
+    delete (document as Partial<Document>).elementFromPoint
+  })
+
+  const pointer = (x: number, y: number) => ({ clientX: x, clientY: y, button: 0, pointerType: 'mouse' })
+
+  /** Presses on `from`, moves the pointer over `over` (or over nothing), and releases there. */
+  function drag(from: Element, over: Element | null) {
+    if (over) under.set('120,80', over)
+    fireEvent.pointerDown(from, pointer(10, 10))
+    fireEvent.pointerMove(window, pointer(120, 80))
+    fireEvent.pointerUp(window, pointer(120, 80))
+  }
+
+  it('moves a Milestone to the day it is dropped on in the month, at once, and saves its date', async () => {
+    const squeeze = planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+    let answer: (response: Response) => void = () => {}
+    changeReply = () => new Promise((resolve) => (answer = resolve))
+
+    drag(within(day('Tuesday, November 10')).getByText('Squeeze'), day('Thursday, November 12'))
+
+    expect(within(day('Thursday, November 12')).getByText('Squeeze')).toBeTruthy()
+    expect(within(day('Tuesday, November 10')).queryByText('Squeeze')).toBeNull()
+    expect(moves()).toEqual([[`/calendar/milestones/${squeeze.id}`, { date: '2026-11-12' }]])
+    await act(async () => answer(Response.json({ ...squeeze, date: '2026-11-12' })))
+    expect(within(day('Thursday, November 12')).getByText('Squeeze')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(dialog()).toBeNull()
+  })
+
+  it('follows the pointer once it has moved a few pixels, with its slot dimmed and the day under it highlighted', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    const title = await within(day('Tuesday, November 10')).findByText('Squeeze')
+    const floating = () => document.querySelector<HTMLElement>('[data-dragged-milestone]')
+    under.set('12,11', day('Tuesday, November 10'))
+    under.set('120,80', day('Thursday, November 12'))
+
+    fireEvent.pointerDown(title, pointer(10, 10))
+    fireEvent.pointerMove(window, pointer(12, 11))
+    expect(floating()).toBeNull()
+    expect(day('Tuesday, November 10').hasAttribute('data-drop')).toBe(false)
+
+    fireEvent.pointerMove(window, pointer(120, 80))
+    expect(floating()!.textContent).toBe('Squeeze')
+    expect(floating()!.getAttribute('aria-hidden')).toBe('true')
+    expect([floating()!.style.left, floating()!.style.top]).toEqual(['110px', '70px'])
+    expect(title.closest('[data-milestone]')!.hasAttribute('data-dragged')).toBe(true)
+    expect(day('Thursday, November 12').hasAttribute('data-drop')).toBe(true)
+    expect(day('Tuesday, November 10').hasAttribute('data-drop')).toBe(false)
+
+    fireEvent.pointerUp(window, pointer(120, 80))
+    expect(floating()).toBeNull()
+    expect(day('Thursday, November 12').hasAttribute('data-drop')).toBe(false)
+    expect(within(day('Thursday, November 12')).getByText('Squeeze').closest('[data-milestone]')!.hasAttribute('data-dragged')).toBe(false)
+  })
+
+  it('leaves a short press a click on the Milestone, which moves nothing', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    const title = await within(day('Tuesday, November 10')).findByText('Squeeze')
+    under.set('12,11', day('Thursday, November 12'))
+    const clicked = vi.fn()
+    title.addEventListener('click', (event) => clicked(event.defaultPrevented))
+
+    fireEvent.pointerDown(title, pointer(10, 10))
+    fireEvent.pointerMove(window, pointer(12, 11))
+    fireEvent.pointerUp(window, pointer(12, 11))
+    fireEvent.click(title)
+
+    expect(clicked).toHaveBeenCalledWith(false)
+    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+    expect(moves()).toEqual([])
+    expect(dialog()).toBeNull()
+  })
+
+  it('only ticks the check when it is pressed, however the pointer moves', async () => {
+    const user = userEvent.setup()
+    const squeeze = planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+    const check = within(day('Tuesday, November 10')).getByRole('checkbox', { name: 'Mark as done: Squeeze' })
+
+    drag(check, day('Thursday, November 12'))
+    expect(document.querySelector('[data-dragged-milestone]')).toBeNull()
+    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+    expect(moves()).toEqual([])
+
+    await user.click(check)
+    expect(moves()).toEqual([[`/calendar/milestones/${squeeze.id}`, { done: true }]])
+    expect(within(day('Tuesday, November 10')).getByRole('checkbox', { name: 'Done: Squeeze' })).toBeTruthy()
+  })
+
+  it('changes nothing, and asks nothing, when dropped on its own day or outside any day', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+
+    drag(within(day('Tuesday, November 10')).getByText('Squeeze'), day('Tuesday, November 10'))
+    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+    drag(within(day('Tuesday, November 10')).getByText('Squeeze'), null)
+    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+
+    expect(moves()).toEqual([])
+    expect(document.querySelector('[data-dragged-milestone]')).toBeNull()
+  })
+
+  it('keeps the click that ends a drag from creating on the day it was dropped on', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+
+    drag(within(day('Tuesday, November 10')).getByText('Squeeze'), day('Tuesday, November 10'))
+    fireEvent.click(day('Tuesday, November 10'))
+
+    expect(dialog()).toBeNull()
+  })
+
+  it('ends the drag with Escape, changing nothing where it is then released', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    const title = await within(day('Tuesday, November 10')).findByText('Squeeze')
+    under.set('120,80', day('Thursday, November 12'))
+
+    fireEvent.pointerDown(title, pointer(10, 10))
+    fireEvent.pointerMove(window, pointer(120, 80))
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(document.querySelector('[data-dragged-milestone]')).toBeNull()
+    expect(day('Thursday, November 12').hasAttribute('data-drop')).toBe(false)
+    fireEvent.pointerMove(window, pointer(121, 80))
+    fireEvent.pointerUp(window, pointer(120, 80))
+
+    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+    expect(document.querySelector('[data-dragged-milestone]')).toBeNull()
+    expect(moves()).toEqual([])
+  })
+
+  it('puts it back on its old day, and says so, when the move cannot be saved', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+    changeReply = () => refusal(500, 'internal')
+
+    drag(within(day('Tuesday, November 10')).getByText('Squeeze'), day('Thursday, November 12'))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Couldn’t move “Squeeze”. Try again.')
+    expect(within(day('Tuesday, November 10')).getByText('Squeeze')).toBeTruthy()
+    expect(within(day('Thursday, November 12')).queryByText('Squeeze')).toBeNull()
+  })
+
+  it('says a move was not saved in Spanish', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11', 'es')
+    await within(grid()).findByText('Squeeze')
+    changeReply = () => refusal(500, 'internal')
+
+    drag(within(day('martes, 10 de noviembre')).getByText('Squeeze'), day('jueves, 12 de noviembre'))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('No se ha podido mover «Squeeze». Inténtalo de nuevo.')
+  })
+
+  it("moves a Milestone to another day of the week, in that day's order", async () => {
+    planned('2026-11-04', 'Flat BTN')
+    const squeeze = planned('2026-11-05', 'Squeeze')
+    planned('2026-11-04', 'Blockers')
+    planned('2026-11-04', 'Done first', true)
+    renderAt('/calendar/week/2026-11-02')
+    const thursday = column('Thursday, November 5')
+    const wednesday = column('Wednesday, November 4')
+    await within(thursday).findByText('Squeeze')
+
+    drag(within(thursday).getByText('Squeeze'), wednesday)
+
+    expect(within(thursday).queryByText('Squeeze')).toBeNull()
+    expect(within(wednesday).getAllByRole('checkbox').map((box) => box.getAttribute('aria-label'))).toEqual([
+      'Mark as done: Flat BTN',
+      'Mark as done: Squeeze',
+      'Mark as done: Blockers',
+      'Done: Done first',
+    ])
+    expect(moves()).toEqual([[`/calendar/milestones/${squeeze.id}`, { date: '2026-11-04' }]])
+  })
+
+  it('offers no dragging on a narrow screen', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 760px)', addEventListener() {}, removeEventListener() {} }))
+    planned('2026-11-02', 'Squeeze')
+    renderAt('/calendar/week/2026-11-02')
+    const monday = column('Monday, November 2')
+    await within(monday).findByText('Squeeze')
+
+    drag(within(monday).getByText('Squeeze'), column('Tuesday, November 3'))
+
+    expect(document.querySelector('[data-dragged-milestone]')).toBeNull()
+    expect(within(monday).getByText('Squeeze')).toBeTruthy()
+    expect(moves()).toEqual([])
   })
 })
