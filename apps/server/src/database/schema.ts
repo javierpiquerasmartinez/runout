@@ -259,8 +259,12 @@ export const rooms = pgTable('rooms', {
     .references(() => identities.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
-  /** Its last Revision or join, so stale Rooms can be found. */
+  /** Its last Revision or join, for the Administrator's statistics. */
   lastActivityAt: timestamp('last_activity_at', {
+    withTimezone: true,
+  }).notNull(),
+  /** When anyone last joined or reconnected: 14 days on, it closes (ADR 0009). */
+  lastEnteredAt: timestamp('last_entered_at', {
     withTimezone: true,
   }).notNull(),
 });

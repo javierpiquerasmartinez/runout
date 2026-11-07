@@ -19,7 +19,10 @@ interface Snapshot {
 }
 
 /** This long with nobody connected and a Room closes on its own. */
-const ABANDONED_MS = 30 * 60_000;
+/** How long a Room nobody enters stays open (ADR 0009). */
+const ABANDONED_MS = 14 * 24 * 60 * 60_000;
+/** How often open Rooms are checked; a Room due closes within one of these. */
+const SWEEP_MS = 60 * 60_000;
 
 describe('Room lifecycle: leave, kick and close (e2e)', () => {
   let running: RunningApp;
@@ -305,34 +308,51 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
   });
 
   describe('a Room nobody is connected to', () => {
-    it('closes itself once the whole period has passed', async () => {
+    beforeEach(async () => {
+      await running.close();
+      running = await startApp({ ownDatabase: true });
+    });
+
+    it('stays open long after everyone has left', async () => {
       const { code, master, masterSocket, martaSocket } = await roomOfTwo();
 
       await Promise.all([masterSocket.close(), martaSocket.close()]);
       await untilEmpty(master.token, code);
-      await running.clock.advance(ABANDONED_MS - 1_000);
+      await running.clock.advance(3 * 24 * 60 * 60_000);
+
+      const back = await join(master.token, code, 'Javier');
+      expect(back.snapshot.room.code).toBe(code);
+    });
+
+    it('closes itself once nobody has entered it for 14 days', async () => {
+      const { code, master, masterSocket, martaSocket } = await roomOfTwo();
+
+      await Promise.all([masterSocket.close(), martaSocket.close()]);
+      await untilEmpty(master.token, code);
+      await running.clock.advance(ABANDONED_MS - SWEEP_MS);
       await request(running.httpServer)
         .get(`/api/rooms/${code}`)
         .set('Authorization', `Bearer ${master.token}`)
         .expect(200);
 
-      await running.clock.advance(1_000);
+      await running.clock.advance(2 * SWEEP_MS);
       await request(running.httpServer)
         .get(`/api/rooms/${code}`)
         .set('Authorization', `Bearer ${master.token}`)
         .expect(404, { reason: 'room-not-found' });
     });
 
-    it('stays open when someone comes back in time', async () => {
+    it('counts the 14 days again from whoever entered last', async () => {
       const { code, master, masterSocket, martaSocket } = await roomOfTwo();
 
       await Promise.all([masterSocket.close(), martaSocket.close()]);
       await untilEmpty(master.token, code);
-      await running.clock.advance(ABANDONED_MS - 1_000);
+      await running.clock.advance(ABANDONED_MS - SWEEP_MS);
       const back = await join(master.token, code, 'Javier');
-      await running.clock.advance(ABANDONED_MS * 2);
+      await back.socket.close();
+      await untilEmpty(master.token, code);
+      await running.clock.advance(ABANDONED_MS - SWEEP_MS);
 
-      expect(back.snapshot.room.code).toBe(code);
       expect(back.socket.all('room.closed')).toEqual([]);
       await request(running.httpServer)
         .get(`/api/rooms/${code}`)
@@ -344,7 +364,7 @@ describe('Room lifecycle: leave, kick and close (e2e)', () => {
       const master = await newAccount(running.httpServer);
       const code = await createRoom(master.token);
 
-      await running.clock.advance(ABANDONED_MS);
+      await running.clock.advance(ABANDONED_MS + SWEEP_MS);
 
       await request(running.httpServer)
         .get(`/api/rooms/${code}`)

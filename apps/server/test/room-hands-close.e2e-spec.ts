@@ -7,7 +7,8 @@ import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
 /** This long with nobody connected and a Room closes on its own. */
-const ABANDONED_MS = 30 * 60_000;
+/** Long enough for a Room nobody enters to close (ADR 0009), sweep included. */
+const ABANDONED_MS = 14 * 24 * 60 * 60_000 + 60 * 60_000;
 
 describe('Room Hands are discarded on close (e2e)', () => {
   let running: RunningApp;
@@ -227,6 +228,8 @@ describe('Room Hands are discarded on close (e2e)', () => {
     });
 
     it('discards them the same way when the Room closes abandoned', async () => {
+      await running.close();
+      running = await startApp({ ownDatabase: true });
       const { javier, code, javierSocket, martaSocket } = await roomOfTwo();
       const [handId] = await importIntoRoom(
         code,

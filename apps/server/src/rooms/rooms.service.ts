@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, exists, inArray, ne, not, sql } from 'drizzle-orm';
+import { and, desc, eq, exists, inArray, lte, ne, not, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
@@ -82,6 +82,7 @@ export class RoomsService {
           creatorId: creator.id,
           createdAt: now,
           lastActivityAt: now,
+          lastEnteredAt: now,
         })
         .returning();
       await tx
@@ -193,7 +194,7 @@ export class RoomsService {
       })
       .returning();
     if (!membership) throw new Rejected('kicked-from-room');
-    await this.touch(room.id);
+    await this.entered(room.id);
     const { screenNames } = await this.identities.profile(named);
     return {
       room,
@@ -420,7 +421,25 @@ export class RoomsService {
     }));
   }
 
-  /** Closes a Room nobody has been connected to for long enough. */
+  /** Records that someone joined or reconnected to the Room just now. */
+  private async entered(roomId: string): Promise<void> {
+    const now = this.clock.now();
+    await this.db
+      .update(rooms)
+      .set({ lastActivityAt: now, lastEnteredAt: now })
+      .where(eq(rooms.id, roomId));
+  }
+
+  /** The open Rooms nobody has entered since `cutoff`. */
+  async abandonedSince(cutoff: Date): Promise<string[]> {
+    const abandoned = await this.db
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(and(eq(rooms.status, 'open'), lte(rooms.lastEnteredAt, cutoff)));
+    return abandoned.map((room) => room.id);
+  }
+
+  /** Closes a Room nobody has entered for long enough. */
   async closeAbandoned(roomId: string): Promise<boolean> {
     return this.markClosed(roomId);
   }

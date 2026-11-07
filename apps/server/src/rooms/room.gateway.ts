@@ -1,4 +1,9 @@
-import { Inject, Logger, type BeforeApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Logger,
+  type BeforeApplicationShutdown,
+  type OnApplicationBootstrap,
+} from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -24,7 +29,7 @@ import { MasterService, type MasterChanged } from './master.service.js';
 import { NotesService, type Note } from './notes.service.js';
 import { PlaybackService, type Playback } from './playback.service.js';
 import { QueueService, type QueueEntry } from './queue.service.js';
-import { RoomClosure } from './room-closure.js';
+import { RoomSweep } from './room-sweep.js';
 import {
   RoomPresence,
   presenceChanged,
@@ -155,7 +160,11 @@ export interface RejectedEvent {
  */
 @WebSocketGateway({ path: '/ws' })
 export class RoomGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, BeforeApplicationShutdown
+  implements
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnApplicationBootstrap,
+    BeforeApplicationShutdown
 {
   private readonly logger = new Logger(RoomGateway.name);
   private readonly identityOf = new WeakMap<WebSocket, Promise<Identity>>();
@@ -164,8 +173,8 @@ export class RoomGateway
   private readonly playbackChanges = new Map<string, Promise<unknown>>();
   /** The Rooms waiting for a Master who dropped. */
   private readonly failover: MasterFailover;
-  /** The Rooms nobody is connected to, waiting to close themselves. */
-  private readonly closure: RoomClosure;
+  /** Closes the Rooms nobody has entered for long enough. */
+  private readonly sweep: RoomSweep;
   /** Where each Room is in its own history, so clients can spot what they missed. */
   private readonly revisions = new RoomRevisions();
   /** The last presence each Room was told about, so only real changes travel. */
@@ -187,8 +196,10 @@ export class RoomGateway
     this.failover = new MasterFailover(clock, (roomId) =>
       this.passOnMaster(roomId),
     );
-    this.closure = new RoomClosure(clock, (roomId) =>
-      this.closeAbandoned(roomId),
+    this.sweep = new RoomSweep(
+      clock,
+      (cutoff) => this.closeAbandoned(cutoff),
+      (error) => this.logger.error(error),
     );
     identities.onRenamed((identity) => this.renamed(identity));
     identities.onTakeOver((tx, anonymous, account) =>
@@ -199,9 +210,9 @@ export class RoomGateway
     );
   }
 
-  /** A Room has just been opened: its abandonment period starts at once. */
-  roomOpened(roomId: string): void {
-    this.closure.watch(roomId);
+  /** Starts looking for Rooms nobody has entered for long enough. */
+  onApplicationBootstrap(): void {
+    this.sweep.start();
   }
 
   /** How many Participants are connected to the Room right now. */
@@ -246,7 +257,6 @@ export class RoomGateway
         socket,
         this.clock.now(),
       );
-      this.closure.stop(room.id);
       // A Room whose Master ran out of grace while empty gives the role to
       // whoever arrives first, before their own snapshot is drawn.
       if (identity.id === this.presence.masterOf(room.id)) {
@@ -384,7 +394,6 @@ export class RoomGateway
       this.publish(roomId, 'room.participantKicked', kicked);
       this.presence.evict(roomId, kicked.identityId);
       this.reportPresence(roomId);
-      this.watchIfEmpty(roomId);
       return undefined;
     });
   }
@@ -653,7 +662,6 @@ export class RoomGateway
       this.broadcast(left.roomId, left.identityId, 'room.participantLeft', {
         identityId: left.identityId,
       });
-      this.watchIfEmpty(left.roomId);
     }
   }
 
@@ -713,20 +721,18 @@ export class RoomGateway
       if (masterMoved) {
         this.masterChanged(roomId, { masterId: accountId, reason: 'sign-in' });
       }
-      this.watchIfEmpty(roomId);
     };
   }
 
-  /** A Room nobody is connected to any more starts its abandonment period. */
-  private watchIfEmpty(roomId: string): void {
-    if (this.presence.connectedCount(roomId) === 0) this.closure.watch(roomId);
-  }
-
-  /** Closes a Room that has sat empty for the whole abandonment period. */
-  private async closeAbandoned(roomId: string): Promise<void> {
-    // Someone arrived while the closure was on its way to running.
-    if (this.presence.connectedCount(roomId) > 0) return;
-    if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
+  /**
+   * Closes every open Room nobody has entered since `cutoff`. One someone is
+   * still connected to stays: they entered it, only before the cutoff.
+   */
+  private async closeAbandoned(cutoff: Date): Promise<void> {
+    for (const roomId of await this.rooms.abandonedSince(cutoff)) {
+      if (this.presence.connectedCount(roomId) > 0) continue;
+      if (await this.rooms.closeAbandoned(roomId)) this.roomClosed(roomId);
+    }
   }
 
   /**
@@ -751,7 +757,6 @@ export class RoomGateway
       this.presence.evict(roomId, identityId);
       if (wasMaster) this.failover.watch(roomId);
       this.reportPresence(roomId);
-      this.watchIfEmpty(roomId);
     }
   }
 
@@ -759,6 +764,7 @@ export class RoomGateway
   async beforeApplicationShutdown(): Promise<void> {
     // Connections closing on the way out are no activity of anyone's.
     this.shuttingDown = true;
+    this.sweep.stop();
     await this.activitySettled();
   }
 
@@ -784,7 +790,6 @@ export class RoomGateway
     this.publish(roomId, 'room.closed', {});
     this.presence.clear(roomId);
     this.failover.stop(roomId);
-    this.closure.stop(roomId);
     this.revisions.forget(roomId);
     this.presenceTold.delete(roomId);
   }

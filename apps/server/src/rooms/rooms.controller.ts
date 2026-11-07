@@ -42,8 +42,6 @@ export class RoomsController {
       name: body.name,
       displayName: body.displayName,
     });
-    // Its abandonment period starts now: a Room nobody ever joins still closes.
-    this.gateway.roomOpened(room.id);
     return { code: room.code, name: room.name };
   }
 

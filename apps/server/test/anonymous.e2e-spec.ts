@@ -24,7 +24,8 @@ interface Note {
 }
 
 /** This long with nobody connected and a Room closes on its own. */
-const ABANDONED_MS = 30 * 60_000;
+/** Long enough for a Room nobody enters to close (ADR 0009), sweep included. */
+const ABANDONED_MS = 14 * 24 * 60 * 60_000 + 60 * 60_000;
 /** This long without its Master and a Room passes the role on. */
 const GRACE_MS = 120_000;
 
@@ -279,6 +280,8 @@ describe('Anonymous identities last one Room (e2e)', () => {
     });
 
     it('ends them too when the Room closes after being abandoned', async () => {
+      await running.close();
+      running = await startApp({ ownDatabase: true });
       const room = await roomWithAnonymousGuest();
       await room.guestSocket.close();
       await room.masterSocket.close();
