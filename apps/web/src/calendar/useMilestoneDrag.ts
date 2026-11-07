@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type PointerEvent } from 'react'
 import type { CalendarDate, Milestone } from './calendar'
 import { isDragging, milestoneDrop } from './milestoneDrag'
-
-/** Under this width the Calendar offers no dragging: a Milestone's date is changed on its page. */
-export const NARROW_SCREEN = '(max-width: 760px)'
+import { useNarrowScreen } from './narrowScreen'
 
 /** What the days show of a drag: the Milestone whose slot is dimmed, and the day highlighted. */
 export interface CalendarDrag {
@@ -141,16 +139,4 @@ function swallowNextClick() {
   }
   window.addEventListener('click', swallow, { capture: true, once: true })
   setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0)
-}
-
-/** Whether the screen is under the narrow breakpoint, following it as it changes. */
-export function useNarrowScreen(): boolean {
-  return useSyncExternalStore(
-    (changed) => {
-      const query = window.matchMedia?.(NARROW_SCREEN)
-      query?.addEventListener('change', changed)
-      return () => query?.removeEventListener('change', changed)
-    },
-    () => window.matchMedia?.(NARROW_SCREEN).matches ?? false,
-  )
 }

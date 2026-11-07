@@ -1,15 +1,19 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { api, reasonOf } from '../backend/api'
-import { useI18n, type MessageKey } from '../i18n'
+import { reasonOf } from '../backend/api'
+import { useI18n } from '../i18n'
 import { useSession } from '../identity/context'
 import { Button } from '../ui/Button'
 import { TextField } from '../ui/TextField'
-import { MAX_MILESTONE_DESCRIPTION_LENGTH, MAX_MILESTONE_TITLE_LENGTH, parseDate, type CalendarDate, type Milestone } from './calendar'
+import { MAX_MILESTONE_TITLE_LENGTH, type CalendarDate, type Milestone } from './calendar'
+import { DescriptionField, LengthCount } from './MilestoneFields'
+import { draftRefusal, serverRefusal, type MilestoneField, type Refusal } from './milestoneForm'
+import { createMilestone } from './milestonesApi'
 
 /**
  * Creating a Milestone: its title, an optional description and its date,
  * filled in with the day it was asked for and still open to change. An empty
- * title is refused in place, before anything is sent.
+ * title is refused in place, before anything is sent; the server's refusal of
+ * a field shows beside it too.
  */
 export function CreateMilestoneDialog({
   date: initialDate,
@@ -24,11 +28,10 @@ export function CreateMilestoneDialog({
   const { token } = useSession()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
-  const descriptionId = useId()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(initialDate)
-  const [error, setError] = useState<{ field: 'title' | 'date' | 'form'; message: MessageKey } | null>(null)
+  const [error, setError] = useState<Refusal | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -41,17 +44,22 @@ export function CreateMilestoneDialog({
   async function create(event: FormEvent) {
     event.preventDefault()
     if (busy) return
-    if (title.trim() === '') return setError({ field: 'title', message: 'calendar.create.titleRequired' })
-    if (parseDate(date) === null) return setError({ field: 'date', message: 'calendar.create.dateRequired' })
+    const refused = draftRefusal({ title, date })
+    if (refused) return setError(refused)
     setBusy(true)
     setError(null)
     try {
-      const created = await api<Milestone>('/calendar/milestones', { token: token ?? undefined, method: 'POST', body: { title, description, date } })
-      onCreated(created)
+      onCreated(await createMilestone(token, { title, description, date }))
     } catch (caught) {
-      setError({ field: 'form', message: `reason.${reasonOf(caught)}` })
+      setError(serverRefusal(reasonOf(caught)))
       setBusy(false)
     }
+  }
+
+  const errorOf = (field: MilestoneField) => (error?.field === field ? t(error.message) : undefined)
+  const edit = (field: MilestoneField, set: (value: string) => void) => (value: string) => {
+    set(value)
+    if (error?.field === field) setError(null)
   }
 
   return (
@@ -75,40 +83,26 @@ export function CreateMilestoneDialog({
             placeholder={t('calendar.create.titlePlaceholder')}
             maxLength={MAX_MILESTONE_TITLE_LENGTH}
             value={title}
-            error={error?.field === 'title' ? t(error.message) : undefined}
+            error={errorOf('title')}
             autoFocus
-            onChange={(event) => {
-              setTitle(event.target.value)
-              if (error?.field === 'title') setError(null)
-            }}
+            onChange={(event) => edit('title', setTitle)(event.target.value)}
           />
-          <span className="calendar-create__count ro-mono" data-beside-error={error?.field === 'title' || undefined}>
-            {`${title.length} / ${MAX_MILESTONE_TITLE_LENGTH}`}
-          </span>
+          <LengthCount length={title.length} max={MAX_MILESTONE_TITLE_LENGTH} className="calendar-create__count" besideError={error?.field === 'title'} />
         </div>
-        <div className="ro-field">
-          <label htmlFor={descriptionId} className="ro-field__label">
-            {t('calendar.create.description')} <span className="calendar-create__optional">· {t('calendar.create.optional')}</span>
-          </label>
-          <textarea
-            id={descriptionId}
-            className="ro-field__input calendar-create__description"
-            placeholder={t('calendar.create.descriptionPlaceholder')}
-            maxLength={MAX_MILESTONE_DESCRIPTION_LENGTH}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </div>
+        <DescriptionField
+          className="calendar-create__description"
+          placeholder={t('calendar.create.descriptionPlaceholder')}
+          value={description}
+          error={errorOf('description')}
+          onChange={edit('description', setDescription)}
+        />
         <TextField
           type="date"
           className="calendar-create__date"
           label={t('calendar.create.date')}
           value={date}
-          error={error?.field === 'date' ? t(error.message) : undefined}
-          onChange={(event) => {
-            setDate(event.target.value)
-            if (error?.field === 'date') setError(null)
-          }}
+          error={errorOf('date')}
+          onChange={(event) => edit('date', setDate)(event.target.value)}
         />
         {error?.field === 'form' && (
           <p role="alert" className="calendar-create__failure">

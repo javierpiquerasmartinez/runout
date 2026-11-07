@@ -88,8 +88,8 @@ export function useHistoryState<T extends string | number | null>(read: (state: 
   return useSyncExternalStore(subscribe, () => read(window.history.state))
 }
 
-/** Whether a click on a link opens it here, rather than in another tab or window. */
-export function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+/** Whether a click on a link, or on what stands for one, opens it here rather than in another tab or window. */
+export function isPlainClick(event: MouseEvent<Element>): boolean {
   return !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0
 }
 

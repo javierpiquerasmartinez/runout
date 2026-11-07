@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
-import { api, reasonOf } from '../backend/api'
+import { reasonOf } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
-import { useI18n, type MessageKey } from '../i18n'
+import { useI18n } from '../i18n'
 import { useSession } from '../identity/context'
 import { RoomDialog } from '../room/RoomDialog'
 import { followLink, isPlainClick, redirect, setLeaveGuard, useHistoryState } from '../routing'
@@ -13,10 +13,8 @@ import {
   calendarOpenedFrom,
   calendarPath,
   isPending,
-  MAX_MILESTONE_DESCRIPTION_LENGTH,
   MAX_MILESTONE_TITLE_LENGTH,
   monthOf,
-  parseDate,
   periodFromPath,
   periodPath,
   todayOf,
@@ -25,29 +23,13 @@ import {
   type Period,
 } from './calendar'
 import { dayName, monthHeading, weekHeading } from './calendarText'
+import { DescriptionField } from './MilestoneFields'
+import { draftRefusal, serverRefusal, type MilestoneField, type Refusal } from './milestoneForm'
+import { changeMilestone, deleteMilestone, getMilestone, type NewMilestone } from './milestonesApi'
 import './MilestonePage.css'
 
 /** What the page edits and keeps with "Guardar". */
-interface Draft {
-  title: string
-  description: string
-  date: string
-}
-
-type Field = 'title' | 'description' | 'date'
-
-/** A refused value, shown in place beside its field, or for the whole form. */
-interface Refusal {
-  field: Field | 'form'
-  message: MessageKey
-}
-
-/** The field each of the server's refusals is about. */
-const refusedField: Partial<Record<string, Field>> = {
-  'invalid-milestone-title': 'title',
-  'invalid-milestone-description': 'description',
-  'invalid-milestone-date': 'date',
-}
+type Draft = NewMilestone
 
 const draftOf = ({ title, description, date }: Milestone): Draft => ({ title, description, date })
 
@@ -62,7 +44,6 @@ export function MilestonePage({ id }: { id: string }) {
   const i18n = useI18n()
   const { t } = i18n
   const { token } = useSession()
-  const auth = token ?? undefined
   const openedFrom = useHistoryState(calendarOpenedFrom)
   const [load, setLoad] = useState<'loading' | 'missing' | 'failed' | 'loaded'>('loading')
   const [saved, setSaved] = useState<Milestone | null>(null)
@@ -73,7 +54,6 @@ export function MilestonePage({ id }: { id: string }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
   const [pendingLeave, setPendingLeave] = useState<{ go: () => void } | null>(null)
-  const descriptionId = useId()
   const refusalId = useId()
 
   const dirty = saved !== null && (draft.title !== saved.title || draft.description !== saved.description || draft.date !== saved.date)
@@ -84,7 +64,7 @@ export function MilestonePage({ id }: { id: string }) {
 
   useEffect(() => {
     let current = true
-    api<Milestone>(`/calendar/milestones/${encodeURIComponent(id)}`, { token: auth })
+    getMilestone(token, id)
       .then((milestone) => {
         if (!current) return
         setSaved(milestone)
@@ -95,7 +75,7 @@ export function MilestonePage({ id }: { id: string }) {
     return () => {
       current = false
     }
-  }, [id, auth])
+  }, [id, token])
 
   // Leaving within the app asks through the dialog below.
   useEffect(() => {
@@ -142,7 +122,7 @@ export function MilestonePage({ id }: { id: string }) {
     },
   ]
 
-  function edit(field: Field, value: string) {
+  function edit(field: MilestoneField, value: string) {
     setDraft((before) => ({ ...before, [field]: value }))
     if (refusal?.field === field || refusal?.field === 'form') setRefusal(null)
   }
@@ -150,18 +130,18 @@ export function MilestonePage({ id }: { id: string }) {
   async function keep(event: FormEvent) {
     event.preventDefault()
     if (saving || !saved) return
-    if (draft.title.trim() === '') return setRefusal({ field: 'title', message: 'calendar.create.titleRequired' })
-    if (parseDate(draft.date) === null) return setRefusal({ field: 'date', message: 'calendar.create.dateRequired' })
+    const refused = draftRefusal(draft)
+    if (refused) return setRefusal(refused)
     setSaving(true)
     setRefusal(null)
     try {
-      const changed = await api<Milestone>(`/calendar/milestones/${encodeURIComponent(id)}`, { token: auth, method: 'PATCH', body: draft })
+      const changed = await changeMilestone(token, id, draft)
       setSaved(changed)
       setDraft(draftOf(changed))
     } catch (error) {
       const reason = reasonOf(error)
       if (reason === 'milestone-not-found') setLoad('missing')
-      else setRefusal({ field: refusedField[reason] ?? 'form', message: `reason.${reason}` })
+      else setRefusal(serverRefusal(reason))
     } finally {
       setSaving(false)
     }
@@ -171,7 +151,7 @@ export function MilestonePage({ id }: { id: string }) {
     if (!saved) return
     setDoneFailed(false)
     setSaved({ ...saved, done })
-    api(`/calendar/milestones/${encodeURIComponent(id)}`, { token: auth, method: 'PATCH', body: { done } }).catch(() => {
+    changeMilestone(token, id, { done }).catch(() => {
       setSaved((before) => before && { ...before, done: !done })
       setDoneFailed(true)
     })
@@ -181,7 +161,7 @@ export function MilestonePage({ id }: { id: string }) {
     if (!saved) return
     setDeleteFailed(false)
     try {
-      await api(`/calendar/milestones/${encodeURIComponent(id)}`, { token: auth, method: 'DELETE' }).catch((error: unknown) => {
+      await deleteMilestone(token, id).catch((error: unknown) => {
         if (reasonOf(error) !== 'milestone-not-found') throw error
       })
     } catch {
@@ -196,7 +176,7 @@ export function MilestonePage({ id }: { id: string }) {
     else redirect(periodAddress)
   }
 
-  const errorOf = (field: Field) => (refusal?.field === field ? t(refusal.message) : undefined)
+  const errorOf = (field: MilestoneField) => (refusal?.field === field ? t(refusal.message) : undefined)
 
   return (
     <div className="milestone-page">
@@ -263,11 +243,7 @@ export function MilestonePage({ id }: { id: string }) {
                       data-pending={isPending(saved, todayOf()) || undefined}
                       onClick={() => toggleDone(!saved.done)}
                     >
-                      {saved.done && (
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="m7 12.4 3.2 3.2L17 8.8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
+                      {saved.done && <Icon name="check" size={15} />}
                     </button>
                     {t('calendar.milestone.doneLabel')}
                   </label>
@@ -288,21 +264,13 @@ export function MilestonePage({ id }: { id: string }) {
                   error={errorOf('date')}
                   onChange={(event) => edit('date', event.target.value)}
                 />
-                <div className="ro-field" data-invalid={refusal?.field === 'description' ? '' : undefined}>
-                  <label htmlFor={descriptionId} className="ro-field__label">
-                    {t('calendar.create.description')} <span className="milestone-page__optional">· {t('calendar.create.optional')}</span>
-                  </label>
-                  <textarea
-                    id={descriptionId}
-                    className="ro-field__input milestone-page__description"
-                    maxLength={MAX_MILESTONE_DESCRIPTION_LENGTH}
-                    aria-invalid={refusal?.field === 'description' || undefined}
-                    value={draft.description}
-                    onChange={(event) => edit('description', event.target.value)}
-                  />
-                  {refusal?.field === 'description' && <span className="ro-field__error">{t(refusal.message)}</span>}
-                  <span className="milestone-page__count ro-mono">{`${draft.description.length} / ${MAX_MILESTONE_DESCRIPTION_LENGTH}`}</span>
-                </div>
+                <DescriptionField
+                  className="milestone-page__description"
+                  value={draft.description}
+                  error={errorOf('description')}
+                  counted
+                  onChange={(value) => edit('description', value)}
+                />
                 {refusal?.field === 'form' && (
                   <p role="alert" className="milestone-page__failure">
                     {t(refusal.message)}

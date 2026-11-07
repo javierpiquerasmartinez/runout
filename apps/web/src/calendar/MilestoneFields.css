@@ -1,0 +1,17 @@
+/* The fields a Milestone is written with, in the create dialog and on its page. */
+
+/* "12 / 80": under its field, at the end. */
+.milestone-count {
+  align-self: flex-end;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.milestone-field__optional {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.milestone-field__description {
+  resize: none;
+  font-family: inherit;
+}

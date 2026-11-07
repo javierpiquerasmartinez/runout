@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api } from '../backend/api'
+import { useMemo, useState } from 'react'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
-import { useSession } from '../identity/context'
 import { navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -17,7 +15,6 @@ import {
   todayOf,
   todayPeriod,
   type CalendarDate,
-  type CalendarSpan,
   type CalendarView,
   type Milestone,
   type Period,
@@ -28,7 +25,9 @@ import { DraggedMilestone } from './DraggedMilestone'
 import { MonthGrid } from './MonthGrid'
 import { WeekGrid } from './WeekGrid'
 import { MonthCounts } from './MonthCounts'
-import { useMilestoneDrag, useNarrowScreen } from './useMilestoneDrag'
+import { useNarrowScreen } from './narrowScreen'
+import { useMilestoneDrag } from './useMilestoneDrag'
+import { useMilestones } from './useMilestones'
 import './CalendarPage.css'
 
 /**
@@ -121,80 +120,4 @@ export function CalendarPage({ period }: { period: Period }) {
       )}
     </div>
   )
-}
-
-/** A change to a Milestone that could not be saved and went back: what to say, and of which. */
-interface Unsaved {
-  message: 'calendar.milestone.saveFailed' | 'calendar.milestone.moveFailed'
-  title: string
-}
-
-/** What the Calendar knows of the Account's Milestones for a span. */
-interface Fetched {
-  /** The span the Milestones are of. */
-  key: string
-  milestones: Milestone[]
-  hasAny: boolean
-}
-
-/**
- * The Account's Milestones in the span, asked for again whenever it changes,
- * and whether it has any at all (unknown until the first answer). A Milestone
- * created here is added at once, without asking again. Marking one done or not
- * done, or moving it to another day, shows at once; if saving it fails, it
- * goes back and `unsaved` says so.
- */
-function useMilestones(span: CalendarSpan) {
-  const { token } = useSession()
-  const key = `from=${span.from}&to=${span.to}`
-  const [fetched, setFetched] = useState<Fetched | null>(null)
-  const [failedKey, setFailedKey] = useState<string | null>(null)
-  const [unsaved, setUnsaved] = useState<Unsaved | null>(null)
-
-  /** Changes one Milestone held, wherever the Milestones held are of. */
-  function change(id: string, changed: Partial<Milestone>) {
-    setFetched((before) => before && { ...before, milestones: before.milestones.map((m) => (m.id === id ? { ...m, ...changed } : m)) })
-  }
-
-  useEffect(() => {
-    let current = true
-    api<{ milestones: Milestone[]; hasAny: boolean }>(`/calendar/milestones?${key}`, { token: token ?? undefined })
-      .then((answer) => current && setFetched({ key, ...answer }))
-      .catch(() => current && setFailedKey(key))
-    return () => {
-      current = false
-    }
-  }, [key, token])
-
-  const fresh = fetched?.key === key
-  return {
-    milestones: fresh ? fetched.milestones : [],
-    loading: !fresh && failedKey !== key,
-    hasAny: fetched?.hasAny,
-    failed: failedKey === key,
-    add(milestone: Milestone) {
-      setFetched((before) => {
-        const within = milestone.date >= span.from && milestone.date <= span.to
-        if (!before || before.key !== key) return before && { ...before, hasAny: true }
-        return { ...before, hasAny: true, milestones: within ? [...before.milestones, milestone] : before.milestones }
-      })
-    },
-    unsaved,
-    setDone(milestone: Milestone, done: boolean) {
-      setUnsaved(null)
-      change(milestone.id, { done })
-      api(`/calendar/milestones/${encodeURIComponent(milestone.id)}`, { token: token ?? undefined, method: 'PATCH', body: { done } }).catch(() => {
-        change(milestone.id, { done: !done })
-        setUnsaved({ message: 'calendar.milestone.saveFailed', title: milestone.title })
-      })
-    },
-    move(milestone: Milestone, date: CalendarDate) {
-      setUnsaved(null)
-      change(milestone.id, { date })
-      api(`/calendar/milestones/${encodeURIComponent(milestone.id)}`, { token: token ?? undefined, method: 'PATCH', body: { date } }).catch(() => {
-        change(milestone.id, { date: milestone.date })
-        setUnsaved({ message: 'calendar.milestone.moveFailed', title: milestone.title })
-      })
-    },
-  }
 }

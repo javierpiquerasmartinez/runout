@@ -356,7 +356,8 @@
   padding: 0 6px 0 4px;
   border-radius: 4px;
   background: var(--color-control);
-  cursor: default;
+  /* A click anywhere on it, but on its check, opens its page. */
+  cursor: pointer;
 }
 .calendar-milestone[data-done] {
   background: transparent;
@@ -375,7 +376,7 @@
   text-decoration: none;
   cursor: pointer;
 }
-.calendar-milestone__title:hover {
+.calendar-milestone:hover .calendar-milestone__title {
   text-decoration: underline;
 }
 .calendar-milestone__title:focus-visible {
@@ -496,25 +497,16 @@
 }
 /* "0 / 80", on the error's line when there is one. */
 .calendar-create__count {
-  align-self: flex-end;
   margin-top: 6px;
-  color: var(--text-muted);
-  font-size: 10.5px;
   line-height: 17px;
 }
 .calendar-create__count[data-beside-error] {
   margin-top: -17px;
 }
 
-.calendar-create__optional {
-  color: var(--text-muted);
-  font-weight: 400;
-}
 .calendar-create__description {
   height: 88px;
   padding: 10px 12px;
-  resize: none;
-  font-family: inherit;
   line-height: 1.5;
 }
 .calendar-create__date .ro-field__input {
@@ -605,7 +597,7 @@
   color: var(--on-brass);
   font-weight: 600;
 }
-/* The count: plain, brass when one slipped, muted when all are done. */
+/* The count: plain, brass when one is pending, muted when all are done. */
 .calendar-counts__count {
   display: flex;
   align-items: center;

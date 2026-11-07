@@ -182,7 +182,7 @@ describe('CalendarPage · Milestones in the cells', () => {
     expect(screen.queryByText('Christmas, outside the grid')).toBeNull()
   })
 
-  it('shows three of a busy day, pending first, and how many more', async () => {
+  it('shows three of a busy day, not done first, and how many more', async () => {
     planned('2026-11-06', 'Done first', true)
     planned('2026-11-06', 'Squeeze')
     planned('2026-11-06', 'Flat BTN')
@@ -240,7 +240,7 @@ describe('CalendarPage · done and pending', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('puts a ticked Milestone after the pending ones of its day, out of a full cell', async () => {
+  it('puts a ticked Milestone after the ones not done of its day, out of a full cell', async () => {
     const user = userEvent.setup()
     for (const title of ['Squeeze', 'Flat BTN', 'Blockers', 'Overbets']) planned('2026-11-10', title)
     renderAt('/calendar/month/2026-11')
@@ -412,7 +412,7 @@ describe('CalendarPage · creating Milestones', () => {
 
   it('says why, and stays open, when the server refuses', async () => {
     const user = userEvent.setup()
-    createReply = () => refusal(400, 'invalid-milestone-title')
+    createReply = () => refusal(403, 'account-required')
     renderAt('/calendar/month/2026-11')
     await heading()
 
@@ -422,6 +422,46 @@ describe('CalendarPage · creating Milestones', () => {
 
     expect(await within(dialog()!).findByRole('alert')).toBeTruthy()
     expect(dialog()).toBeTruthy()
+  })
+
+  it('says beside the title, not for the whole form, when the server refuses the title', async () => {
+    const user = userEvent.setup()
+    createReply = () => refusal(400, 'invalid-milestone-title')
+    renderAt('/calendar/month/2026-11')
+    await heading()
+
+    await user.click(screen.getByRole('button', { name: 'New milestone' }))
+    await user.type(titleField(), 'Squeeze')
+    await user.click(within(dialog()!).getByRole('button', { name: 'Create milestone' }))
+
+    expect(await within(dialog()!).findByText('Write a title of 1 to 80 characters.')).toBeTruthy()
+    expect(titleField().getAttribute('aria-invalid')).toBe('true')
+    expect(within(dialog()!).queryByRole('alert')).toBeNull()
+  })
+
+  it('shows a Milestone created while the period it lands in is still loading', async () => {
+    const user = userEvent.setup()
+    renderAt('/calendar/month/2026-11')
+    await heading()
+    const list = answers['GET /calendar/milestones']
+    let land: () => void = () => {}
+    answers['GET /calendar/milestones'] = (call) => {
+      // Answered as the server had it when asked, but only later.
+      const answer = list(call)
+      return new Promise((resolve) => (land = () => resolve(answer)))
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+    expect((await heading()).textContent).toBe('December 2026')
+    await user.click(screen.getByRole('button', { name: 'New milestone' }))
+    await user.clear(dateField())
+    await user.type(dateField(), '2026-12-10')
+    await user.type(titleField(), 'Thin value')
+    await user.click(within(dialog()!).getByRole('button', { name: 'Create milestone' }))
+    await waitFor(() => expect(dialog()).toBeNull())
+    await act(async () => land())
+
+    expect(await within(day('Thursday, December 10')).findByText('Thin value')).toBeTruthy()
   })
 })
 
@@ -538,7 +578,7 @@ describe('CalendarPage · the week', () => {
     expect(screen.getByRole('button', { name: 'Semana siguiente' })).toBeTruthy()
   })
 
-  it('lists every Milestone of each day, pending first, with no "+N more"', async () => {
+  it('lists every Milestone of each day, not done first, with no "+N more"', async () => {
     planned('2026-11-06', 'Done first', true)
     for (const title of ['Squeeze', 'Flat BTN', 'Blockers', 'Overbets']) planned('2026-11-06', title)
     planned('2026-11-02', 'Monday topic')
@@ -621,7 +661,7 @@ describe('CalendarPage · the week', () => {
 })
 
 describe('CalendarPage · done and pending in the week', () => {
-  it('ticks a Milestone done at once, after the pending ones of its day, and marks what slipped', async () => {
+  it('ticks a Milestone done at once, after the ones not done of its day, and marks what is pending', async () => {
     const user = userEvent.setup()
     planned('2026-11-05', 'Slipped')
     const squeeze = planned('2026-11-07', 'Squeeze')
@@ -757,6 +797,43 @@ describe('CalendarPage · dragging Milestones between days', () => {
     expect(document.querySelector('[data-dragged-milestone]')).toBeNull()
   })
 
+  it('opens a Milestone from a click anywhere on its row in the month, but not from its check', async () => {
+    const user = userEvent.setup()
+    const squeeze = planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    const row = (await within(day('Tuesday, November 10')).findByText('Squeeze')).closest('[data-milestone]')!
+    expect(within(day('Tuesday, November 10')).getByRole('link', { name: 'Squeeze' })).toBeTruthy()
+
+    await user.click(within(day('Tuesday, November 10')).getByRole('checkbox', { name: 'Mark as done: Squeeze' }))
+    expect(window.location.pathname).toBe('/calendar/month/2026-11')
+
+    fireEvent.click(row)
+    expect(window.location.pathname).toBe(`/calendar/milestones/${squeeze.id}`)
+    expect(dialog()).toBeNull()
+  })
+
+  it('opens a Milestone from a click anywhere on its card in the week', async () => {
+    const squeeze = planned('2026-11-04', 'Squeeze')
+    renderAt('/calendar/week/2026-11-02')
+    const row = (await within(column('Wednesday, November 4')).findByText('Squeeze')).closest('[data-milestone]')!
+
+    fireEvent.click(row)
+
+    expect(window.location.pathname).toBe(`/calendar/milestones/${squeeze.id}`)
+    expect(dialog()).toBeNull()
+  })
+
+  it('keeps the click that ends a drag from opening the Milestone', async () => {
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    const row = (await within(day('Tuesday, November 10')).findByText('Squeeze')).closest('[data-milestone]')!
+
+    drag(row, day('Tuesday, November 10'))
+    fireEvent.click(row)
+
+    expect(window.location.pathname).toBe('/calendar/month/2026-11')
+  })
+
   it('keeps the click that ends a drag from creating on the day it was dropped on', async () => {
     planned('2026-11-10', 'Squeeze')
     renderAt('/calendar/month/2026-11')
@@ -858,7 +935,7 @@ describe('CalendarPage · on a narrow screen', () => {
   const dayLink = (name: string) => screen.getByRole('link', { name })
   const count = (link: HTMLElement) => link.querySelector('[data-count]')?.textContent ?? null
 
-  it('shows how many Milestones each day of the month has, and which have slipped, instead of their titles', async () => {
+  it('shows how many Milestones each day of the month has, and which have pending ones, instead of their titles', async () => {
     planned('2026-11-03', 'Slipped')
     planned('2026-11-03', 'Reviewed', true)
     planned('2026-11-07', 'Squeeze')

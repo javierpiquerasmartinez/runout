@@ -116,23 +116,12 @@
   font-size: 12.5px;
 }
 
-.milestone-page__optional {
-  color: var(--text-muted);
-  font-weight: 400;
-}
 .milestone-page__description {
   height: 200px;
   padding: 12px 14px;
-  resize: none;
-  font-family: inherit;
   font-size: 13.5px;
   line-height: 1.6;
   white-space: pre-wrap;
-}
-.milestone-page__count {
-  align-self: flex-end;
-  color: var(--text-muted);
-  font-size: 10.5px;
 }
 
 .milestone-page__failure {

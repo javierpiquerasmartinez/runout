@@ -1,14 +1,16 @@
 import type { MouseEvent } from 'react'
 import { useI18n } from '../i18n'
 import { isPlainClick, navigate } from '../routing'
+import { Icon } from '../ui/Icon'
 import { isPending, milestonePath, openedFromCalendar, type CalendarDate, type Milestone } from './calendar'
 
 /**
  * A Milestone as a day lists it: its done check, then its title on one line,
  * cut short with the whole title on hover. A done Milestone is dimmed, never
  * struck through; a pending one (not done, on a day before today) draws its
- * check in brass. A click on it is the Milestone's, never the day's: its
- * title opens its page, which keeps the view it was opened from.
+ * check in brass. A click on it is the Milestone's, never the day's: anywhere
+ * but on its check it opens the Milestone's page, which keeps the view it was
+ * opened from. Its title is the link that says so.
  */
 export function MilestoneItem({
   milestone,
@@ -25,13 +27,15 @@ export function MilestoneItem({
 }) {
   const { t } = useI18n()
   const { done, title } = milestone
-  const open = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!isPlainClick(event)) return
+  const open = (event: MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented || !isPlainClick(event)) return
+    if ((event.target as Element).closest('[role="checkbox"]')) return
     event.preventDefault()
     navigate(milestonePath(milestone.id), openedFromCalendar(window.location.pathname))
   }
   return (
-    <div className="calendar-milestone" data-milestone={milestone.id} data-done={done || undefined} data-pending={isPending(milestone, today) || undefined} data-dragged={dragged || undefined}>
+    // The row's click is the title link's, made bigger: keyboards and screen readers reach it through the link.
+    <div className="calendar-milestone" data-milestone={milestone.id} data-done={done || undefined} data-pending={isPending(milestone, today) || undefined} data-dragged={dragged || undefined} onClick={open}>
       <button
         type="button"
         role="checkbox"
@@ -40,13 +44,9 @@ export function MilestoneItem({
         className="calendar-milestone__check"
         onClick={() => onToggleDone(milestone, !done)}
       >
-        {done && (
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="m7 12.4 3.2 3.2L17 8.8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
+        {done && <Icon name="check" size={11} />}
       </button>
-      <a className="calendar-milestone__title" href={milestonePath(milestone.id)} title={title} onClick={open}>
+      <a className="calendar-milestone__title" href={milestonePath(milestone.id)} title={title}>
         {title}
       </a>
     </div>
