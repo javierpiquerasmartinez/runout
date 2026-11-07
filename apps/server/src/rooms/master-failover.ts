@@ -20,12 +20,17 @@ export class MasterFailover {
     private readonly passOn: (roomId: string) => unknown,
   ) {}
 
-  /** Starts the grace period of a Room whose Master has just dropped. */
-  watch(roomId: string): void {
+  /**
+   * Starts the grace period of a Room whose Master has just dropped, or
+   * carries on one that began `since` (as read back after a restart).
+   */
+  watch(roomId: string, since: Date = this.clock.now()): void {
     if (this.watching.has(roomId)) return;
+    const left =
+      MASTER_GRACE_MS - (this.clock.now().getTime() - since.getTime());
     this.watching.set(roomId, {
-      since: this.clock.now().getTime(),
-      cancel: this.clock.schedule(MASTER_GRACE_MS, () => this.passOn(roomId)),
+      since: since.getTime(),
+      cancel: this.clock.schedule(Math.max(0, left), () => this.passOn(roomId)),
     });
   }
 

@@ -248,14 +248,18 @@ export class RoomGateway
     }
   }
 
-  /** The Live Rooms as the database has them, and those whose Master was away. */
+  /**
+   * The Live Rooms as the database has them. Nobody is connected yet, so no
+   * Master is either: each one's 30 minutes and failover carry on from when
+   * their Master went away, or start now when Runout went down with them
+   * still connected (a crash records no absence).
+   */
   private async loadLiveRooms(): Promise<void> {
-    for (const roomId of await this.playback.liveRooms()) {
+    for (const { roomId, masterAwaySince } of await this.playback.liveRooms()) {
       this.liveRooms.add(roomId);
-    }
-    // A Master away before a restart is still away: their period carries on.
-    for (const { roomId, since } of await this.playback.liveWithoutMaster()) {
-      this.liveTimeout.watch(roomId, since);
+      this.failover.watch(roomId, masterAwaySince ?? undefined);
+      if (masterAwaySince) this.liveTimeout.watch(roomId, masterAwaySince);
+      else this.noMaster(roomId);
     }
   }
 
@@ -902,9 +906,17 @@ export class RoomGateway
 
   /** The last activities still being written land before the database goes. */
   async beforeApplicationShutdown(): Promise<void> {
+    this.sweep.stop();
+    // The Masters still connected drop as Runout goes down: their absence is
+    // recorded now, while the database is still there, so their 30 minutes
+    // carry on after the restart. Their connections close only later.
+    for (const roomId of this.liveRooms) {
+      if (this.masterConnected(roomId)) {
+        this.recordMasterAway(roomId, this.clock.now());
+      }
+    }
     // Connections closing on the way out are no activity of anyone's.
     this.shuttingDown = true;
-    this.sweep.stop();
     await this.activitySettled();
   }
 
@@ -939,7 +951,8 @@ export class RoomGateway
    * Review nothing is shared, so they keep the role however long they're away.
    */
   private masterAway(roomId: string): void {
-    if (!this.liveRooms.has(roomId)) return;
+    // Going down: the absence is recorded already, and nothing is left to time.
+    if (this.shuttingDown || !this.liveRooms.has(roomId)) return;
     this.failover.watch(roomId);
     this.noMaster(roomId);
   }
@@ -956,8 +969,15 @@ export class RoomGateway
   }
 
   private recordMasterAway(roomId: string, since: Date | null): void {
-    // A Master dropping as the app goes down is still away when it comes back.
     this.write(roomId, () => this.playback.masterAway(roomId, since));
+  }
+
+  /** Whether the Room's Master is connected to it right now. */
+  private masterConnected(roomId: string): boolean {
+    const masterId = this.presence.masterOf(roomId);
+    return (
+      masterId !== null && this.presence.participant(roomId, masterId) !== null
+    );
   }
 
   /** The Room is back in Free Review: nothing about its Master's absence matters any more. */

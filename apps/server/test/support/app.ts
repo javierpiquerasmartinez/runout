@@ -13,6 +13,7 @@ import {
   AdministratorEmails,
 } from '../../src/identity/administrators.js';
 import { MAILER } from '../../src/mail/mailer.js';
+import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
 import { FakeInbox } from './inbox.js';
 import { freshDatabase } from './fresh-database.js';
@@ -34,19 +35,38 @@ export interface RunningApp {
 
 export interface StartAppOptions {
   clock?: TestClock;
-  /** Defaults to the Postgres started for this e2e run. */
+  /**
+   * Defaults to the Postgres started for this e2e run. Another one is taken
+   * as Runout restarting on it: its Live Rooms are taken on at boot.
+   */
   databaseUrl?: string;
   /**
    * A migrated database of its own, dropped on close. For a test that moves
    * the clock 14 days or more: the Room sweep would close every other file's
-   * Rooms in the shared one.
+   * Rooms in the shared one. It also takes on the Live Rooms it finds there
+   * on boot, as a restart does.
    */
   ownDatabase?: boolean;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
   administratorEmails?: string[];
 }
 
-/** Boots the real app on a random port, wired exactly like production. */
+/**
+ * An app on the shared database finds every other file's Live Rooms there,
+ * their Masters connected to apps of their own. Taking them on as a restart
+ * does would end their Live once its clock moves 30 minutes, under the test
+ * still using them: it leaves them to their own app instead.
+ */
+class SharedDatabasePlayback extends PlaybackService {
+  override liveRooms(): ReturnType<PlaybackService['liveRooms']> {
+    return Promise.resolve([]);
+  }
+}
+
+/**
+ * Boots the real app on a random port, wired exactly like production, but
+ * for the Live Rooms it finds on boot when on the shared database.
+ */
 export async function startApp(
   options: StartAppOptions = {},
 ): Promise<RunningApp> {
@@ -54,7 +74,7 @@ export async function startApp(
   const databaseUrl = own?.url ?? options.databaseUrl ?? inject('databaseUrl');
   const clock = options.clock ?? new TestClock();
   const inbox = new FakeInbox();
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DATABASE_URL)
     .useValue(databaseUrl)
     .overrideProvider(CLOCK)
@@ -64,8 +84,11 @@ export async function startApp(
     .overrideProvider(MAILER)
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)
-    .useValue(new AdministratorEmails(options.administratorEmails ?? []))
-    .compile();
+    .useValue(new AdministratorEmails(options.administratorEmails ?? []));
+  if (databaseUrl === inject('databaseUrl')) {
+    builder.overrideProvider(PlaybackService).useClass(SharedDatabasePlayback);
+  }
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication();
   configureApp(app);

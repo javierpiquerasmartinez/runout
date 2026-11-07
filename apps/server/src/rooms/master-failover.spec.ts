@@ -32,6 +32,22 @@ describe('MasterFailover', () => {
     expect(passedOn).toEqual(['room-1']);
   });
 
+  it('carries on a grace period that began before a restart', async () => {
+    const { clock, passedOn, failover } = watching();
+    failover.watch(
+      'room-1',
+      new Date(clock.now().getTime() - MASTER_GRACE_MS / 2),
+    );
+
+    await clock.advance(MASTER_GRACE_MS / 2 - 1);
+    expect(passedOn).toEqual([]);
+    expect(failover.expired('room-1')).toBe(false);
+
+    await clock.advance(1);
+    expect(passedOn).toEqual(['room-1']);
+    expect(failover.expired('room-1')).toBe(true);
+  });
+
   it('passes nothing on once the Master is back', async () => {
     const { clock, passedOn, failover } = watching();
     failover.watch('room-1');
