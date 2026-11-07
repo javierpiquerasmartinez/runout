@@ -236,7 +236,7 @@ export function calendarOpenedFrom(state: unknown): string | null {
   return typeof address === 'string' ? address : null
 }
 
-/** A day's Milestones in the order a day shows them: pending before done, then by creation. */
+/** A day's Milestones in the order a day shows them: not done before done, then by creation. */
 export function orderDay(milestones: readonly Milestone[]): Milestone[] {
   return [...milestones].sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt.localeCompare(b.createdAt))
 }
@@ -247,18 +247,19 @@ export function cellMilestones(milestones: readonly Milestone[]): { shown: Miles
   return { shown: ordered.slice(0, MILESTONES_PER_CELL), more: Math.max(0, ordered.length - MILESTONES_PER_CELL) }
 }
 
-/** Whether a Milestone slipped: not done, on a day before today. */
+/** Whether a Milestone is pending: not done, on a day before today. */
 export function isPending(milestone: Milestone, today: CalendarDate): boolean {
   return !milestone.done && milestone.date < today
 }
 
 /**
  * How a day of the month sums up its Milestones on a narrow screen: how many,
- * how many slipped, and the count's tone (brass when any slipped, muted when
- * all are done, plain otherwise; none when there are no Milestones).
+ * how many are pending, and the count's tone (brass when any is pending,
+ * muted when all are done, plain otherwise; none when there are no Milestones).
  */
 export interface DayTally {
   count: number
+  /** How many are pending: not done, on a day before today. */
   pending: number
   tone: 'empty' | 'open' | 'pending' | 'done'
 }

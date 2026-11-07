@@ -5,7 +5,7 @@ import { dayWithTally, monthHeading, weekdayNarrow } from './calendarText'
 
 /**
  * A month on a narrow screen: each day with how many Milestones it has instead
- * of their titles, the count in brass when one slipped and muted when all are
+ * of their titles, the count in brass when one is pending and muted when all are
  * done. Tapping a day opens the week holding it.
  */
 export function MonthCounts({

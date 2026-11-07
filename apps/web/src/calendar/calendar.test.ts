@@ -295,10 +295,10 @@ function milestone(title: string, minute: number, done = false): Milestone {
 }
 
 describe("a day's Milestones", () => {
-  it('come pending first, then done, each by creation', () => {
-    const day = [milestone('Done early', 1, true), milestone('Pending late', 9), milestone('Pending early', 2), milestone('Done late', 8, true)]
+  it('come not done first, then done, each by creation', () => {
+    const day = [milestone('Done early', 1, true), milestone('Open late', 9), milestone('Open early', 2), milestone('Done late', 8, true)]
 
-    expect(orderDay(day).map(({ title }) => title)).toEqual(['Pending early', 'Pending late', 'Done early', 'Done late'])
+    expect(orderDay(day).map(({ title }) => title)).toEqual(['Open early', 'Open late', 'Done early', 'Done late'])
   })
 
   it('all fit in a cell up to three', () => {
@@ -308,7 +308,7 @@ describe("a day's Milestones", () => {
     expect(cellMilestones([])).toEqual({ shown: [], more: 0 })
   })
 
-  it('show the first three pending ones and how many more there are', () => {
+  it('show the first three not done and how many more there are', () => {
     const day = [milestone('Done', 1, true), milestone('A', 2), milestone('B', 3), milestone('C', 4), milestone('D', 5)]
 
     const { shown, more } = cellMilestones(day)
@@ -326,10 +326,10 @@ describe("a day's Milestones", () => {
 })
 
 describe("a day's tally on a narrow screen", () => {
-  it('counts its Milestones, and tones it by what slipped and what is done', () => {
+  it('counts its Milestones, and tones it by what is pending and what is done', () => {
     expect(dayTally([], '2026-11-11')).toEqual({ count: 0, pending: 0, tone: 'empty' })
     expect(dayTally([milestone('Open', 1), milestone('Done', 2, true)], '2026-11-10')).toEqual({ count: 2, pending: 0, tone: 'open' })
-    expect(dayTally([milestone('Slipped', 1), milestone('Done', 2, true)], '2026-11-11')).toEqual({ count: 2, pending: 1, tone: 'pending' })
+    expect(dayTally([milestone('Pending', 1), milestone('Done', 2, true)], '2026-11-11')).toEqual({ count: 2, pending: 1, tone: 'pending' })
     expect(dayTally([milestone('Done', 1, true), milestone('Also', 2, true)], '2026-11-11')).toEqual({ count: 2, pending: 0, tone: 'done' })
   })
 })

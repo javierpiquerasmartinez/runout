@@ -1,7 +1,11 @@
 import type { I18n } from '../i18n/context'
 import { addDays, dayOfMonth, firstOfMonth, intlDate, monthOf, type CalendarDate, type DayTally, type Month } from './calendar'
 
+/** What says a date the locale's way. */
 type Formatter = Pick<I18n, 'formatDate' | 'locale'>
+
+/** What says a date the locale's way, and the catalogue's phrases around it. */
+type Phrasing = Formatter & Pick<I18n, 't'>
 
 /** "Noviembre 2026", "November 2026": a month as the Calendar's heading says it. */
 export function monthHeading({ formatDate, locale }: Formatter, month: Month): string {
@@ -19,7 +23,7 @@ export function dayName({ formatDate }: Formatter, date: CalendarDate): string {
  * as the Calendar's heading says it, naming a month or year only where the
  * week crosses into another.
  */
-export function weekHeading({ formatDate, t }: Formatter & Pick<I18n, 't'>, monday: CalendarDate): string {
+export function weekHeading({ formatDate, t }: Phrasing, monday: CalendarDate): string {
   const sunday = addDays(monday, 6)
   const monthName = (date: CalendarDate) => formatDate(intlDate(date), { month: 'short', timeZone: 'UTC' })
   const from = monthOf(monday)
@@ -54,9 +58,9 @@ export function weekdayLong({ formatDate }: Formatter, date: CalendarDate): stri
 
 /**
  * "martes, 3 de noviembre, 2 hitos, 1 pendiente": a day of a narrow screen's
- * month named with how many Milestones it has and how many slipped.
+ * month named with how many Milestones it has and how many are pending.
  */
-export function dayWithTally(i18n: Formatter & Pick<I18n, 't'>, date: CalendarDate, today: CalendarDate, { count, pending }: DayTally): string {
+export function dayWithTally(i18n: Phrasing, date: CalendarDate, today: CalendarDate, { count, pending }: DayTally): string {
   const { t } = i18n
   const name = dayName(i18n, date)
   const day = date === today ? t('calendar.day.today', { day: name }) : name
