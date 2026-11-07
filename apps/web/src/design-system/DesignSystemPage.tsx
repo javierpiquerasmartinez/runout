@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useI18n, type Locale, type MessageKey } from '../i18n'
+import { Breadcrumb } from '../ui/Breadcrumb'
 import { Button, type ButtonVariant } from '../ui/Button'
 import { Chip } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
@@ -463,6 +464,30 @@ function ControlsBoard() {
               </div>
             </div>
             <p className="ds-note">{t('design.controls.sizesNote')}</p>
+            <hr className="ds-divider" />
+            <h3 className="ds-panel__title">{t('design.controls.breadcrumb')}</h3>
+            <div className="ds-breadcrumb">
+              <span className="ds-overline">{t('design.controls.breadcrumb.fromMonth')}</span>
+              <Breadcrumb
+                label={t('calendar.breadcrumb')}
+                trail={[
+                  { label: t('header.nav.calendar'), href: '/calendar' },
+                  { label: t('design.controls.breadcrumb.month'), href: '/calendar/month/2026-11' },
+                ]}
+                current={t('design.controls.breadcrumb.milestone')}
+              />
+            </div>
+            <div className="ds-breadcrumb">
+              <span className="ds-overline">{t('design.controls.breadcrumb.fromWeek')}</span>
+              <Breadcrumb
+                label={t('calendar.breadcrumb')}
+                trail={[
+                  { label: t('header.nav.calendar'), href: '/calendar' },
+                  { label: t('design.controls.breadcrumb.week'), href: '/calendar/week/2026-11-02' },
+                ]}
+                current={t('design.controls.breadcrumb.longMilestone')}
+              />
+            </div>
           </Panel>
         </div>
 

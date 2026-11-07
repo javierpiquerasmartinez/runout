@@ -6,6 +6,10 @@ import {
   calendarPath,
   cellMilestones,
   isCalendarPath,
+  calendarOpenedFrom,
+  milestoneIdFromPath,
+  milestonePath,
+  openedFromCalendar,
   isPending,
   mondayOf,
   monthGrid,
@@ -247,6 +251,28 @@ describe('addresses', () => {
     ]) {
       expect(periodFromPath(path)).toBeNull()
     }
+  })
+})
+
+describe("a Milestone's address", () => {
+  it('is written and read back', () => {
+    expect(milestonePath('5b0c6a2e')).toBe('/calendar/milestones/5b0c6a2e')
+    expect(milestonePath('a/b')).toBe('/calendar/milestones/a%2Fb')
+    expect(milestoneIdFromPath('/calendar/milestones/5b0c6a2e')).toBe('5b0c6a2e')
+    expect(milestoneIdFromPath(milestonePath('a/b'))).toBe('a/b')
+  })
+
+  it('is not any other path', () => {
+    for (const path of ['/calendar/milestones', '/calendar/milestones/', '/calendar/milestones/a/b', '/calendar/month/2026-11', '/lab/ranges/a']) {
+      expect(milestoneIdFromPath(path)).toBeNull()
+    }
+  })
+
+  it('keeps the view it was opened from in its history entry', () => {
+    expect(calendarOpenedFrom(openedFromCalendar('/calendar/week/2026-11-09'))).toBe('/calendar/week/2026-11-09')
+    expect(calendarOpenedFrom(null)).toBeNull()
+    expect(calendarOpenedFrom({ openedFromLibrary: '/library' })).toBeNull()
+    expect(calendarOpenedFrom({ openedFromCalendar: 3 })).toBeNull()
   })
 })
 

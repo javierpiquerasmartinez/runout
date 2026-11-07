@@ -562,8 +562,12 @@ describe('CalendarPage · the week', () => {
     renderAt('/calendar/week/2026-11-02')
     await within(column('Wednesday, November 4')).findByText('Squeeze')
 
+    // A click on a Milestone opens it, never creates on its day.
     await user.click(within(column('Wednesday, November 4')).getByText('Squeeze'))
     expect(dialog()).toBeNull()
+    expect(window.location.pathname).toBe('/calendar/milestones/m1')
+    window.history.back()
+    await within(await screen.findByRole('region', { name: 'Wednesday, November 4' })).findByText('Squeeze')
 
     await user.click(column('Wednesday, November 4'))
     expect(dateField().value).toBe('2026-11-04')

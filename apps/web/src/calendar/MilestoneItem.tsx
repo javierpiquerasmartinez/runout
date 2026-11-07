@@ -1,11 +1,14 @@
+import type { MouseEvent } from 'react'
 import { useI18n } from '../i18n'
-import { isPending, type CalendarDate, type Milestone } from './calendar'
+import { isPlainClick, navigate } from '../routing'
+import { isPending, milestonePath, openedFromCalendar, type CalendarDate, type Milestone } from './calendar'
 
 /**
  * A Milestone as a day lists it: its done check, then its title on one line,
  * cut short with the whole title on hover. A done Milestone is dimmed, never
  * struck through; a pending one (not done, on a day before today) draws its
- * check in brass. A click on it is the Milestone's, never the day's.
+ * check in brass. A click on it is the Milestone's, never the day's: its
+ * title opens its page, which keeps the view it was opened from.
  */
 export function MilestoneItem({
   milestone,
@@ -19,6 +22,11 @@ export function MilestoneItem({
 }) {
   const { t } = useI18n()
   const { done, title } = milestone
+  const open = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!isPlainClick(event)) return
+    event.preventDefault()
+    navigate(milestonePath(milestone.id), openedFromCalendar(window.location.pathname))
+  }
   return (
     <div className="calendar-milestone" data-milestone={milestone.id} data-done={done || undefined} data-pending={isPending(milestone, today) || undefined}>
       <button
@@ -35,9 +43,9 @@ export function MilestoneItem({
           </svg>
         )}
       </button>
-      <span className="calendar-milestone__title" title={title}>
+      <a className="calendar-milestone__title" href={milestonePath(milestone.id)} title={title} onClick={open}>
         {title}
-      </span>
+      </a>
     </div>
   )
 }

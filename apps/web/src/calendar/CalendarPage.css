@@ -371,6 +371,18 @@
   font-size: 12px;
   line-height: 20px;
 }
+.calendar-milestone__title {
+  text-decoration: none;
+  cursor: pointer;
+}
+.calendar-milestone__title:hover {
+  text-decoration: underline;
+}
+.calendar-milestone__title:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
 .calendar-milestone[data-done] .calendar-milestone__title {
   color: var(--text-muted);
 }

@@ -1,7 +1,8 @@
 import { adminTabFromPath } from '../admin/admin'
 import { AdminPage } from '../admin/AdminPage'
-import { isCalendarPath, periodFromPath, periodPath, todayOf, todayPeriod } from '../calendar/calendar'
+import { isCalendarPath, milestoneIdFromPath, periodFromPath, periodPath, todayOf, todayPeriod } from '../calendar/calendar'
 import { CalendarPage } from '../calendar/CalendarPage'
+import { MilestonePage } from '../calendar/MilestonePage'
 import { invitationTokenFromPath, resetPasswordPath, resetTokenFromPath } from '../identity/accessPaths'
 import { useSession } from '../identity/context'
 import { InvitationPage } from '../identity/InvitationPage'
@@ -66,6 +67,8 @@ export function Routes() {
   if (path === labRangesPath || labRangeIdFromPath(path)) return <LabRangesPage />
   // The Calendar opens on the current month, and so does any period it can't show.
   if (isCalendarPath(path)) {
+    const milestoneId = milestoneIdFromPath(path)
+    if (milestoneId) return <MilestonePage key={milestoneId} id={milestoneId} />
     const period = periodFromPath(path)
     if (!period) return <Redirect to={periodPath(todayPeriod('month', todayOf()))} />
     // A week written on another day than its Monday is shown at its Monday's address.

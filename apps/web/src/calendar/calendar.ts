@@ -207,6 +207,35 @@ export function periodFromPath(path: string): Period | null {
   return date ? { view: 'week', monday: mondayOf(date) } : null
 }
 
+/** A Milestone's own page. */
+export function milestonePath(id: string): string {
+  return `${calendarPath}/milestones/${encodeURIComponent(id)}`
+}
+
+/** The Milestone whose page this path is, or null when it is no Milestone's. */
+export function milestoneIdFromPath(path: string): string | null {
+  const match = /^\/calendar\/milestones\/([^/]+)$/.exec(path)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+/*
+ * A Milestone opened from the Calendar keeps, in its history entry, the
+ * address of the view it was opened from, so its breadcrumb and the browser's
+ * Back return there.
+ */
+const OPENED_FROM = 'openedFromCalendar'
+
+/** The history state for a Milestone opened from the Calendar's view at this address. */
+export function openedFromCalendar(address: string): Record<string, unknown> {
+  return { [OPENED_FROM]: address }
+}
+
+/** The address of the Calendar's view a Milestone's history entry was opened from, or null when it wasn't. */
+export function calendarOpenedFrom(state: unknown): string | null {
+  const address = typeof state === 'object' && state !== null ? (state as Record<string, unknown>)[OPENED_FROM] : undefined
+  return typeof address === 'string' ? address : null
+}
+
 /** A day's Milestones in the order a day shows them: pending before done, then by creation. */
 export function orderDay(milestones: readonly Milestone[]): Milestone[] {
   return [...milestones].sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt.localeCompare(b.createdAt))
