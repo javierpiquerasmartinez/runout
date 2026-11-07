@@ -13,6 +13,7 @@ export type RejectionReason =
   | 'room-not-found'
   | 'not-in-room'
   | 'not-master'
+  | 'not-your-note'
   | 'not-a-participant'
   | 'already-master'
   | 'master-must-choose'

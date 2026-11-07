@@ -1639,6 +1639,7 @@
 }
 
 /* The Hand is in the viewer's Library: it outlives the Room. */
+.queue-entry__chip--notes,
 .queue-entry__chip--in-library {
   display: inline-flex;
   align-items: center;

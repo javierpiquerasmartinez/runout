@@ -108,14 +108,14 @@ export class NotesService {
     return this.byId(written.id);
   }
 
-  /** The Master rewrites any Note on a Hand in their Room's Queue. */
+  /** Its writer, or the Master, rewrites a Note on a Hand in the Room's Queue. */
   async edit(
-    master: Identity,
+    editor: Identity,
     roomId: string,
     noteId: unknown,
     body: unknown,
   ): Promise<Note> {
-    const id = await this.editable(master, roomId, noteId);
+    const id = await this.editable(editor, roomId, noteId);
     await this.db
       .update(notes)
       .set({ body: validBody(body), editedAt: this.clock.now() })
@@ -124,15 +124,15 @@ export class NotesService {
   }
 
   /**
-   * The Master removes a Note, soft: it is gone for everyone at once, and
+   * Its writer, or the Master, removes a Note, soft: it is gone for everyone at once, and
    * undoing within the window brings it back as it was (see `undoRemoval`).
    */
   async remove(
-    master: Identity,
+    editor: Identity,
     roomId: string,
     noteId: unknown,
   ): Promise<{ id: string }> {
-    const id = await this.editable(master, roomId, noteId);
+    const id = await this.editable(editor, roomId, noteId);
     await this.db
       .update(notes)
       .set({ removedAt: this.clock.now() })
@@ -140,19 +140,24 @@ export class NotesService {
     return { id };
   }
 
-  /** The Master undoes a removal within its window. */
+  /** Its writer, or the Master, undoes a removal within its window. */
   async undoRemoval(
-    master: Identity,
+    editor: Identity,
     roomId: string,
     noteId: unknown,
   ): Promise<Note> {
-    await this.rooms.requireMaster(roomId, master.id);
+    await this.rooms.requireParticipant(roomId, editor.id);
     if (!isUuid(noteId)) throw new Rejected('nothing-to-undo');
     const [row] = await this.db
-      .select({ handId: notes.handId, removedAt: notes.removedAt })
+      .select({
+        handId: notes.handId,
+        writerId: notes.writerId,
+        removedAt: notes.removedAt,
+      })
       .from(notes)
       .where(eq(notes.id, noteId));
     if (!row) throw new Rejected('nothing-to-undo');
+    await this.requireWriterOrMaster(editor, roomId, row.writerId);
     await requireQueued(this.db, roomId, row.handId);
     requireUndoable(this.clock, row.removedAt);
     await this.db
@@ -257,23 +262,36 @@ export class NotesService {
   }
 
   /**
-   * The id of a Note a Master may rewrite or remove: one on a Hand that is in
-   * the Queue of the Room they hold, and that is still there.
+   * The id of a Note someone may rewrite or remove in a Room: one on a Hand in
+   * its Queue, still there, that they wrote or that is in the Room they hold.
    */
   private async editable(
-    master: Identity,
+    editor: Identity,
     roomId: string,
     noteId: unknown,
   ): Promise<string> {
-    await this.rooms.requireMaster(roomId, master.id);
+    await this.rooms.requireParticipant(roomId, editor.id);
     if (!isUuid(noteId)) throw new Rejected('note-not-found');
     const [row] = await this.db
-      .select({ id: notes.id, handId: notes.handId })
+      .select({ id: notes.id, handId: notes.handId, writerId: notes.writerId })
       .from(notes)
       .where(and(eq(notes.id, noteId), isNull(notes.removedAt)));
     if (!row) throw new Rejected('note-not-found');
+    await this.requireWriterOrMaster(editor, roomId, row.writerId);
     await requireQueued(this.db, roomId, row.handId);
     return row.id;
+  }
+
+  /** Refuses with `not-your-note` anyone but the Note's writer and the Master. */
+  private async requireWriterOrMaster(
+    editor: Identity,
+    roomId: string,
+    writerId: string,
+  ): Promise<void> {
+    if (writerId === editor.id) return;
+    if (!(await this.rooms.isMaster(roomId, editor.id))) {
+      throw new Rejected('not-your-note');
+    }
   }
 
   private async byId(id: string): Promise<Note> {

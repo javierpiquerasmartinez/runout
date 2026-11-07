@@ -205,26 +205,57 @@ describe('Notes and Marks (e2e)', () => {
       }
     });
 
-    it('refuses a Guest who tries to rewrite or delete a Note, and changes nothing', async () => {
+    it('lets a Guest rewrite and delete their own Note, for everyone', async () => {
       const { masterSocket, guestSocket, note } = await roomWithANote();
 
-      guestSocket.send('notes.edit', {
-        id: note.id,
-        body: 'Mia, la reescribo.',
-      });
-      expect(await guestSocket.next('rejected')).toEqual({
-        command: 'notes.edit',
-        reason: 'not-master',
-      });
+      guestSocket.send('notes.edit', { id: note.id, body: 'Jam forzado.' });
+      for (const socket of [masterSocket, guestSocket]) {
+        const edited = await socket.next<{ note: Note }>('notes.edited');
+        expect(edited.note).toMatchObject({
+          id: note.id,
+          body: 'Jam forzado.',
+        });
+      }
 
       guestSocket.send('notes.remove', { id: note.id });
-      expect(await guestSocket.next('rejected')).toEqual({
-        command: 'notes.remove',
-        reason: 'not-master',
+      for (const socket of [masterSocket, guestSocket]) {
+        expect(await socket.next('notes.removed')).toEqual({ id: note.id });
+      }
+
+      guestSocket.send('notes.undoRemoval', { id: note.id });
+      for (const socket of [masterSocket, guestSocket]) {
+        const restored = await socket.next<{ note: Note }>('notes.restored');
+        expect(restored.note.id).toBe(note.id);
+      }
+    });
+
+    it('refuses anyone else who tries to rewrite, delete or restore a Note, and changes nothing', async () => {
+      const { code, masterSocket, guestSocket, note } = await roomWithANote();
+      const other = await newAccount(running.httpServer);
+      const { socket: otherSocket } = await join(other.token, code, 'Pablo');
+
+      otherSocket.send('notes.edit', { id: note.id, body: 'La reescribo.' });
+      expect(await otherSocket.next('rejected')).toEqual({
+        command: 'notes.edit',
+        reason: 'not-your-note',
       });
 
-      expect(masterSocket.all('notes.edited')).toEqual([]);
-      expect(masterSocket.all('notes.removed')).toEqual([]);
+      otherSocket.send('notes.remove', { id: note.id });
+      expect(await otherSocket.next('rejected')).toEqual({
+        command: 'notes.remove',
+        reason: 'not-your-note',
+      });
+
+      masterSocket.send('notes.remove', { id: note.id });
+      await otherSocket.next('notes.removed');
+      otherSocket.send('notes.undoRemoval', { id: note.id });
+      expect(await otherSocket.next('rejected')).toEqual({
+        command: 'notes.undoRemoval',
+        reason: 'not-your-note',
+      });
+
+      expect(guestSocket.all('notes.edited')).toEqual([]);
+      expect(guestSocket.all('notes.restored')).toEqual([]);
     });
 
     it('takes a deleted Note from everyone, and brings it back when the Master undoes in time', async () => {

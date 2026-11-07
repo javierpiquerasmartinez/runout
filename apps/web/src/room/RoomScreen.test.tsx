@@ -357,13 +357,30 @@ describe('RoomScreen \u00b7 Notes', () => {
     expect(commands.loadHand).not.toHaveBeenCalled()
   })
 
-  it('shows a Guest the edit and delete controls locked, with the reason', () => {
-    renderRoom(roomWithLoadedHand({ you: 'id-marta', notes: [martasNote] }))
+  it("shows a Guest the edit and delete controls of someone else's Note locked, with the reason", () => {
+    const pablo: Participant = { identityId: 'id-pablo', displayName: 'Pablo', role: 'guest', screenNames: [] }
+    renderRoom(roomWithLoadedHand({ you: 'id-pablo', participants: [javier, marta, pablo], notes: [martasNote] }))
 
     const edit = screen.getByRole('button', { name: /^Edit Marta\u2019s note/ })
     expect(edit.getAttribute('aria-disabled')).toBe('true')
-    expect(edit.getAttribute('title')).toBe('Only the Master can edit or delete a note.')
+    expect(edit.getAttribute('title')).toBe('Only whoever wrote a note, or the Master, can edit or delete it.')
     expect(screen.getByRole('button', { name: /^Delete Marta\u2019s note/ }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('lets a Guest rewrite, delete and restore their own Note', async () => {
+    const commands = renderRoom(roomWithLoadedHand({ you: 'id-marta', notes: [martasNote] }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Marta\u2019s note' }))
+    const field = screen.getByLabelText('Edit Marta\u2019s note')
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Forced jam.')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(commands.editNote).toHaveBeenCalledWith('note-1', 'Forced jam.')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Marta\u2019s note' }))
+    expect(commands.removeNote).toHaveBeenCalledWith('note-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(commands.undoNoteRemoval).toHaveBeenCalledWith('note-1')
   })
 
   it('lets the Master rewrite a Note', async () => {
@@ -576,6 +593,17 @@ describe('RoomScreen · copying the Hand', () => {
     expect(await screen.findByRole('button', { name: 'Couldn’t copy the hand' })).toBeTruthy()
     expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('Couldn’t copy the hand')
     expect(writeText).not.toHaveBeenCalled()
+  })
+})
+
+describe('RoomScreen \u00b7 Note counts in the Queue', () => {
+  it('shows how many Notes each Queue Entry has, and nothing on one with none', () => {
+    const another: Note = { ...martasNote, id: 'note-2', seq: 2, body: 'Fold the river.' }
+    renderRoom(roomView({ queue: [firstHand, secondHand], notes: [martasNote, another] }))
+
+    const [first, second] = within(screen.getByRole('complementary', { name: 'Hand queue' })).getAllByRole('listitem')
+    expect(within(first).getByText('2 notes')).toBeTruthy()
+    expect(within(second).queryByText(/note/)).toBeNull()
   })
 })
 

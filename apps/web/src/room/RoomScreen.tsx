@@ -231,6 +231,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
             <HandNotes
               handId={detailsEntry.handId}
               notes={view.notes}
+              you={view.you}
               isMaster={isMaster}
               commands={commands}
             />
@@ -559,6 +560,7 @@ function QueuePanel({
                     entry={entry}
                     sameHand={sameHandLabel(entry, view.queue, i18n)}
                     inLibrary={view.inLibrary.includes(entry.handId)}
+                    noteCount={view.notes.filter((note) => note.handId === entry.handId).length}
                     i18n={i18n}
                     loaded={entry.handId === view.playback?.handId}
                     onLoad={isMaster ? () => commands.loadHand(entry.handId) : undefined}
@@ -889,19 +891,22 @@ function CurrentHand({
 
 /**
  * The "Notas de la mano" panel of the "Sala" boards: what the group concluded
- * about the loaded Hand. Any Participant writes one; only the Master rewrites
- * or deletes one, and a deletion can be undone for ten seconds. Guests see
- * those controls locked with the reason, never hidden.
+ * about the loaded Hand. Any Participant writes one; its writer or the Master
+ * rewrites or deletes it, and a deletion can be undone for ten seconds.
+ * Anyone else sees those controls locked with the reason, never hidden.
  */
 function HandNotes({
   handId,
   notes,
+  you,
   isMaster,
   commands,
 }: {
   handId: string
   /** Every Note in the Room; this panel reads the loaded Hand's own. */
   notes: Note[]
+  /** Who is looking: their own Notes are theirs to change. */
+  you: string
   isMaster: boolean
   commands: RoomCommands
 }) {
@@ -921,7 +926,8 @@ function HandNotes({
   }
 
   const onHand = notes.filter((note) => note.handId === handId)
-  const lockedReason = isMaster ? undefined : t('room.notes.locked')
+  const lockedReason = (note: Note) =>
+    isMaster || note.writer.identityId === you ? undefined : t('room.notes.locked')
 
   function write() {
     if (draft.trim() === '') return
@@ -965,14 +971,14 @@ function HandNotes({
                     icon="note"
                     label={t('room.notes.edit', { name: note.writer.displayName })}
                     size="compact"
-                    disabledReason={lockedReason}
+                    disabledReason={lockedReason(note)}
                     onClick={() => setEditing(note.id)}
                   />
                   <IconButton
                     icon="delete"
                     label={t('room.notes.delete', { name: note.writer.displayName })}
                     size="compact"
-                    disabledReason={lockedReason}
+                    disabledReason={lockedReason(note)}
                     onClick={() => removal.remove(note.id, commands.removeNote)}
                   />
                 </div>
@@ -981,7 +987,7 @@ function HandNotes({
           )}
         </ul>
       )}
-      {isMaster && removal.pendingId && (
+      {removal.pendingId && (
         <div className="room-notes__undo" role="status">
           <span>{t('room.notes.removed')}</span>
           <Button variant="secondary" size="compact" onClick={removal.undo}>
@@ -1036,6 +1042,7 @@ function QueueRow({
   entry,
   sameHand,
   inLibrary,
+  noteCount,
   i18n,
   loaded,
   onLoad,
@@ -1048,6 +1055,8 @@ function QueueRow({
   sameHand: string | null
   /** Whether the Hand is in the viewer's Library: theirs to keep once the Room closes. */
   inLibrary: boolean
+  /** How many Notes the Hand has: where the discussion is. */
+  noteCount: number
   i18n: Translator
   loaded: boolean
   /** Only the Master loads Hands; for Guests a row is information, not a control. */
@@ -1109,6 +1118,12 @@ function QueueRow({
           <span className="queue-entry__chip queue-entry__chip--same-hand">
             <Icon name="link" size={11} />
             {sameHand}
+          </span>
+        )}
+        {noteCount > 0 && (
+          <span className="queue-entry__chip queue-entry__chip--notes">
+            <Icon name="note" size={11} />
+            {t(noteCount === 1 ? 'room.queue.notes.one' : 'room.queue.notes.other', { count: noteCount })}
           </span>
         )}
         {inLibrary && (

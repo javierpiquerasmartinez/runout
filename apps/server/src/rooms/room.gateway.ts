@@ -556,7 +556,7 @@ export class RoomGateway
     });
   }
 
-  /** The Master rewrites a Note. Guests are refused, whatever their screen offers. */
+  /** Its writer, or the Master, rewrites a Note. Anyone else is refused, whatever their screen offers. */
   @SubscribeMessage('notes.edit')
   editNote(
     @ConnectedSocket() socket: WebSocket,
@@ -575,7 +575,7 @@ export class RoomGateway
     });
   }
 
-  /** The Master deletes a Note; it can be brought back for 10 s. */
+  /** Its writer, or the Master, deletes a Note; it can be brought back for 10 s. */
   @SubscribeMessage('notes.remove')
   removeNote(
     @ConnectedSocket() socket: WebSocket,
@@ -592,7 +592,7 @@ export class RoomGateway
     });
   }
 
-  /** The Master undoes a deletion within its 10 s window. */
+  /** Its writer, or the Master, undoes a deletion within its 10 s window. */
   @SubscribeMessage('notes.undoRemoval')
   undoNoteRemoval(
     @ConnectedSocket() socket: WebSocket,

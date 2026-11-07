@@ -251,19 +251,15 @@ describe('Notes from the Library (e2e)', () => {
       });
     });
 
-    it('still lets only the Master rewrite or delete inside the Room', async () => {
-      const { note, martaSocket } = await roomReviewingTheHand();
+    it('inside the Room, lets the writer of a Note from the Library rewrite and delete it', async () => {
+      const { note, javierSocket, martaSocket } = await roomReviewingTheHand();
 
       martaSocket.send('notes.edit', { id: note.id, body: 'Mia.' });
-      expect(await martaSocket.next('rejected')).toEqual({
-        command: 'notes.edit',
-        reason: 'not-master',
+      expect(await javierSocket.next('notes.edited')).toEqual({
+        note: expect.objectContaining({ id: note.id, body: 'Mia.' }),
       });
       martaSocket.send('notes.remove', { id: note.id });
-      expect(await martaSocket.next('rejected')).toEqual({
-        command: 'notes.remove',
-        reason: 'not-master',
-      });
+      expect(await javierSocket.next('notes.removed')).toEqual({ id: note.id });
     });
   });
 });
