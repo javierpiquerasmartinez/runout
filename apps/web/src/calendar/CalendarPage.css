@@ -226,6 +226,41 @@
   color: var(--text-muted);
 }
 
+/* The done check: muted when open, brass on a past day, filled muted with a canvas tick when done. */
+.calendar-milestone__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-canvas);
+  cursor: pointer;
+}
+.calendar-milestone__check svg {
+  display: block;
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+.calendar-milestone__check:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+.calendar-milestone[data-pending] .calendar-milestone__check {
+  border-color: var(--brass);
+  background: var(--brass-soft-bg);
+}
+.calendar-milestone[data-done] .calendar-milestone__check {
+  border-color: var(--text-muted);
+  background: var(--text-muted);
+}
+
 /* ---------- The create dialog: the Room dialog's shell ---------- */
 
 .calendar-create {

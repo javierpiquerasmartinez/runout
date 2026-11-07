@@ -15,12 +15,14 @@ export function MonthGrid({
   today,
   milestones,
   onCreate,
+  onToggleDone,
 }: {
   month: Month
   today: CalendarDate
   /** The Milestones of the grid's days, by date. */
   milestones: ReadonlyMap<CalendarDate, readonly Milestone[]>
   onCreate: (date: CalendarDate) => void
+  onToggleDone: (milestone: Milestone, done: boolean) => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -62,7 +64,7 @@ export function MonthGrid({
                     {dayOfMonth(date)}
                   </span>
                   {shown.map((milestone) => (
-                    <MilestoneItem key={milestone.id} milestone={milestone} />
+                    <MilestoneItem key={milestone.id} milestone={milestone} today={today} onToggleDone={onToggleDone} />
                   ))}
                   {more > 0 && <span className="calendar-month__more">{t('calendar.more', { count: more })}</span>}
                   <button type="button" className="calendar-month__add" aria-label={t('calendar.day.add', { day: name })}>

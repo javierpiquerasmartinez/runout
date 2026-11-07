@@ -13,12 +13,21 @@ let stored: Milestone[]
 let calls: ApiCall[]
 /** What the next create answers instead of creating, when set. */
 let createReply: (() => Response) | null
+/** What the next change answers instead of changing, when set. */
+let changeReply: (() => Response | Promise<Response>) | null
+/** The faked server's answers; each planned Milestone adds its own PATCH. */
+let answers: Parameters<typeof fakeApi>[0]
 
 /** A Milestone on `date`, created in the order the test lists them. */
 function planned(date: string, title: string, done = false): Milestone {
   const createdAt = new Date(Date.UTC(2026, 9, 1, 9, stored.length)).toISOString()
   const milestone = { id: `m${stored.length + 1}`, title, description: '', date, done, createdAt }
   stored.push(milestone)
+  answers[`PATCH /calendar/milestones/${milestone.id}`] = ({ body }) => {
+    if (changeReply) return changeReply()
+    Object.assign(milestone, body)
+    return Response.json(milestone)
+  }
   return milestone
 }
 
@@ -28,7 +37,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 10, 7, 12, 0))
   stored = []
   createReply = null
-  calls = fakeApi({
+  changeReply = null
+  calls = fakeApi((answers = {
     'GET /calendar/milestones': ({ search }) => {
       const query = new URLSearchParams(search)
       const from = query.get('from')!
@@ -43,7 +53,7 @@ beforeEach(() => {
       milestone.description = description.trim()
       return Response.json(milestone, { status: 201 })
     },
-  })
+  }))
 })
 
 afterEach(() => {
@@ -194,6 +204,101 @@ describe('CalendarPage · Milestones in the cells', () => {
     renderAt('/calendar/month/2026-11', 'es')
 
     expect(await within(day('viernes, 6 de noviembre')).findByText('+1 más')).toBeTruthy()
+  })
+})
+
+describe('CalendarPage · done and pending', () => {
+  const check = (name: string | RegExp) => within(grid()).getByRole('checkbox', { name })
+  const milestoneOf = (title: string) => within(grid()).getByText(title).closest('[data-milestone]')!
+  const changes = () => calls.filter(({ method }) => method === 'PATCH').map(({ path, body }) => [path, body])
+
+  it('ticks a Milestone done at once, and unticks it', async () => {
+    const user = userEvent.setup()
+    const squeeze = planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+
+    let answer: (response: Response) => void = () => {}
+    changeReply = () => new Promise((resolve) => (answer = resolve))
+    await user.click(check('Mark as done: Squeeze'))
+
+    expect(check('Done: Squeeze').getAttribute('aria-checked')).toBe('true')
+    expect(milestoneOf('Squeeze').hasAttribute('data-done')).toBe(true)
+    expect(changes()).toEqual([[`/calendar/milestones/${squeeze.id}`, { done: true }]])
+    expect(dialog()).toBeNull()
+    await act(async () => answer(Response.json({ ...squeeze, done: true })))
+
+    changeReply = null
+    await user.click(check('Done: Squeeze'))
+
+    expect(check('Mark as done: Squeeze').getAttribute('aria-checked')).toBe('false')
+    expect(milestoneOf('Squeeze').hasAttribute('data-done')).toBe(false)
+    expect(changes()).toEqual([
+      [`/calendar/milestones/${squeeze.id}`, { done: true }],
+      [`/calendar/milestones/${squeeze.id}`, { done: false }],
+    ])
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('puts a ticked Milestone after the pending ones of its day, out of a full cell', async () => {
+    const user = userEvent.setup()
+    for (const title of ['Squeeze', 'Flat BTN', 'Blockers', 'Overbets']) planned('2026-11-10', title)
+    renderAt('/calendar/month/2026-11')
+    const busy = day('Tuesday, November 10')
+    await within(busy).findByText('Squeeze')
+    expect(within(busy).queryByText('Overbets')).toBeNull()
+
+    await user.click(check('Mark as done: Squeeze'))
+
+    expect(within(busy).queryByText('Squeeze')).toBeNull()
+    expect(within(busy).getAllByRole('checkbox').map((box) => box.getAttribute('aria-label'))).toEqual([
+      'Mark as done: Flat BTN',
+      'Mark as done: Blockers',
+      'Mark as done: Overbets',
+    ])
+    expect(within(busy).getByText('+1 more')).toBeTruthy()
+  })
+
+  it('goes back, and says so, when saving the check fails', async () => {
+    const user = userEvent.setup()
+    planned('2026-11-10', 'Squeeze')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Squeeze')
+    changeReply = () => refusal(500, 'internal')
+
+    await user.click(check('Mark as done: Squeeze'))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Couldn’t save “Squeeze”. Try again.')
+    expect(check('Mark as done: Squeeze').getAttribute('aria-checked')).toBe('false')
+    expect(milestoneOf('Squeeze').hasAttribute('data-done')).toBe(false)
+  })
+
+  it('marks as pending only what is not done on a day before today', async () => {
+    planned('2026-11-06', 'Slipped')
+    planned('2026-11-06', 'Done yesterday', true)
+    planned('2026-11-07', 'Today')
+    planned('2026-11-09', 'Ahead')
+    renderAt('/calendar/month/2026-11')
+    await within(grid()).findByText('Slipped')
+
+    expect(milestoneOf('Slipped').hasAttribute('data-pending')).toBe(true)
+    for (const title of ['Done yesterday', 'Today', 'Ahead']) {
+      expect(milestoneOf(title).hasAttribute('data-pending')).toBe(false)
+    }
+  })
+
+  it('names the check, and the failure, in Spanish', async () => {
+    const user = userEvent.setup()
+    planned('2026-11-10', 'Squeeze')
+    planned('2026-11-11', 'Flat BTN', true)
+    renderAt('/calendar/month/2026-11', 'es')
+    await within(grid()).findByText('Squeeze')
+    expect(check('Hecho: Flat BTN')).toBeTruthy()
+    changeReply = () => refusal(500, 'internal')
+
+    await user.click(check('Marcar como hecho: Squeeze'))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('No se ha podido guardar «Squeeze». Inténtalo de nuevo.')
   })
 })
 

@@ -34,7 +34,7 @@ export function CalendarPage({ period }: { period: Period }) {
   const { t } = i18n
   const today = todayOf()
   const span = periodSpan(period)
-  const { milestones, loading, hasAny, failed, add } = useMilestones(span)
+  const { milestones, loading, hasAny, failed, add, setDone, unsaved } = useMilestones(span)
   const [creatingOn, setCreatingOn] = useState<CalendarDate | null>(null)
 
   const byDay = useMemo(() => {
@@ -69,7 +69,12 @@ export function CalendarPage({ period }: { period: Period }) {
             {t('calendar.loadFailed')}
           </p>
         )}
-        {period.view === 'month' && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} />}
+        {unsaved !== null && (
+          <p role="alert" className="calendar-page__failure">
+            {t('calendar.milestone.saveFailed', { title: unsaved })}
+          </p>
+        )}
+        {period.view === 'month' && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} />}
         {hasAny === false && (
           <div className="calendar-page__hint">
             <p>{t('calendar.emptyHint')}</p>
@@ -101,13 +106,20 @@ interface Fetched {
 /**
  * The Account's Milestones in the span, asked for again whenever it changes,
  * and whether it has any at all (unknown until the first answer). A Milestone
- * created here is added at once, without asking again.
+ * created here is added at once, without asking again. Marking one done or not
+ * done shows at once; if saving it fails, it goes back and `unsaved` names it.
  */
 function useMilestones(span: CalendarSpan) {
   const { token } = useSession()
   const key = `from=${span.from}&to=${span.to}`
   const [fetched, setFetched] = useState<Fetched | null>(null)
   const [failedKey, setFailedKey] = useState<string | null>(null)
+  const [unsaved, setUnsaved] = useState<string | null>(null)
+
+  /** Sets one Milestone's done, wherever the Milestones held are of. */
+  function markDone(id: string, done: boolean) {
+    setFetched((before) => before && { ...before, milestones: before.milestones.map((m) => (m.id === id ? { ...m, done } : m)) })
+  }
 
   useEffect(() => {
     let current = true
@@ -130,6 +142,15 @@ function useMilestones(span: CalendarSpan) {
         const within = milestone.date >= span.from && milestone.date <= span.to
         if (!before || before.key !== key) return before && { ...before, hasAny: true }
         return { ...before, hasAny: true, milestones: within ? [...before.milestones, milestone] : before.milestones }
+      })
+    },
+    unsaved,
+    setDone(milestone: Milestone, done: boolean) {
+      setUnsaved(null)
+      markDone(milestone.id, done)
+      api(`/calendar/milestones/${encodeURIComponent(milestone.id)}`, { token: token ?? undefined, method: 'PATCH', body: { done } }).catch(() => {
+        markDone(milestone.id, !done)
+        setUnsaved(milestone.title)
       })
     },
   }
