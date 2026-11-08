@@ -1609,9 +1609,10 @@
     position: relative;
     row-gap: 10px;
   }
-  /* The avatars can sit anywhere on a wrapped header, so what they open spans the screen. */
+  /* What the avatars open spans the screen from the header's foot, so they take its last row, right above it. */
   .room-header__people {
     position: static;
+    order: 1;
   }
   .room-people {
     top: calc(100% - 2px);
@@ -1620,6 +1621,15 @@
   }
   .room-people__panel {
     width: 100%;
+  }
+  /* From the avatars, past the rest of their row and the header's padding. */
+  .room-people__panel::before {
+    top: -18px;
+    height: 18px;
+  }
+  /* The page scrolls here, so nothing else would stop the list growing and pushing the field below every Note. */
+  .room-side__panel .room-notes__list {
+    max-height: min(50vh, 420px);
   }
   .room-people__notice {
     white-space: normal;

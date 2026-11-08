@@ -13,6 +13,9 @@ export const VIEWPORTS = [
   { name: '1000x900', width: 1000, height: 900 },
 ] as const
 
+/** Rooms for the tests where a second Participant comes in, and may be handed the Master role. */
+export const ROOMS_FOR_TWO = ['keyboard-kick', 'keyboard-hand-over'] as const
+
 /** What `seed.ts` left for the tests: Tester A's Library Hands, and a Room per viewport. */
 export interface Seed {
   handIds: string[]

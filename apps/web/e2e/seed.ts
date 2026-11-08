@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { SERVER_URL, VIEWPORTS, type Seed } from './seeded'
+import { ROOMS_FOR_TWO, SERVER_URL, VIEWPORTS, type Seed } from './seeded'
 
 /*
  * Gives Tester A, on the throwaway server, the Hands the tests replay: a few
@@ -29,14 +29,20 @@ export default async function seed() {
   const { hands } = await call<{ hands: { id: string }[] }>('GET', '/library/hands?pageSize=100', token)
   const handIds = hands.map((hand) => hand.id)
 
+  // Tester B has an Account with a name ready, for the tests with two Participants.
+  const testerB = await call<{ token: string }>('POST', '/sessions/google', undefined, {
+    idToken: 'dev-sign-in|tester-b',
+  })
+  await call('PUT', '/identities/me/display-name', testerB.token, { displayName: 'Tester B' })
+
   const rooms: Record<string, string> = {}
-  for (const viewport of VIEWPORTS) {
+  for (const name of [...VIEWPORTS.map((viewport) => viewport.name), ...ROOMS_FOR_TWO]) {
     const { code } = await call<{ code: string }>('POST', '/rooms', token, {
-      name: `Layout ${viewport.name}`,
+      name: `Layout ${name}`,
       displayName: 'Tester A',
     })
     await call('POST', `/rooms/${code}/library-hands`, token, { handIds })
-    rooms[viewport.name] = code
+    rooms[name] = code
   }
 
   const seeded: Seed = { handIds, rooms }

@@ -160,7 +160,7 @@ describe('RoomScreen · the Master role', () => {
     expect(screen.getByRole('button', { name: 'Hand the Master role to Javier' })).toBeTruthy()
   })
 
-  it('says the Master dropped when the role passes on its own', async () => {
+  it('says the Master dropped when the role passes on its own', () => {
     renderRoom(
       roomView({
         you: 'id-javier',
@@ -280,6 +280,39 @@ describe('RoomScreen · who is in the Room', () => {
     await user.tab()
 
     expect(document.activeElement).not.toBe(peopleTrigger())
+    expect(peoplePanel()).toBeNull()
+  })
+
+  it('keeps Escape working when the Master hands over the role from the keyboard and their buttons vanish', async () => {
+    const user = userEvent.setup()
+    const commands = renderRoom(roomView())
+    act(() => peopleTrigger().focus())
+    act(() => screen.getByRole('button', { name: 'Hand the Master role to Marta' }).focus())
+
+    rerenderRoom(
+      roomView({ participants: [{ ...javier, role: 'guest', screenNames: [] }, { ...marta, role: 'master' }] }),
+      commands,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Hand the Master role to Marta' })).toBeNull()
+    expect(document.activeElement).toBe(peopleTrigger())
+    expect(peoplePanel()).not.toBeNull()
+
+    await user.keyboard('{Escape}')
+    expect(peoplePanel()).toBeNull()
+    expect(document.activeElement).toBe(peopleTrigger())
+  })
+
+  it('keeps Escape working when the Participant on the focused row leaves', async () => {
+    const user = userEvent.setup()
+    const commands = renderRoom(roomView())
+    act(() => peopleTrigger().focus())
+    act(() => screen.getByRole('button', { name: 'Remove Marta' }).focus())
+
+    rerenderRoom(roomView({ participants: [javier] }), commands)
+
+    expect(document.activeElement).toBe(peopleTrigger())
+    await user.keyboard('{Escape}')
     expect(peoplePanel()).toBeNull()
   })
 

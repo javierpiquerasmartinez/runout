@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
@@ -1326,7 +1326,14 @@ function RoomPeople({
   const pointerInside = useRef(false)
   const pressedWith = useRef('')
   const returningFocus = useRef(false)
+  const focusWasInside = useRef(false)
   useEffect(() => () => clearTimeout(closing.current), [])
+
+  // React fires no blur when the focused element unmounts, as a Master's buttons
+  // do on handing over the role: focus would fall to the page, out of Esc's reach.
+  useLayoutEffect(() => {
+    if (focusWasInside.current && document.activeElement === document.body) returnFocus()
+  })
 
   // Guests see the Master named apart, so the stack shows everyone else.
   const stacked = isMaster ? view.participants : view.participants.filter((p) => p.role !== 'master')
@@ -1358,7 +1365,11 @@ function RoomPeople({
       }}
       // A press never takes focus here, or focus would hold the panel open after the mouse has left.
       onMouseDown={(event) => event.preventDefault()}
+      onFocus={() => {
+        focusWasInside.current = true
+      }}
       onBlur={(event) => {
+        focusWasInside.current = false
         if (!pointerInside.current && !event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
       onKeyDown={(event) => {

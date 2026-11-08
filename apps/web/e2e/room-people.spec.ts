@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from '@playwright/test'
 import { seeded, VIEWPORTS } from './seeded'
 
 /*
@@ -54,6 +54,91 @@ test.describe('on a phone', () => {
     await expect(panel(page)).toBeHidden()
   })
 })
+
+/* Below 760 px the header wraps, and the avatars can land on any of its rows. */
+for (const width of [700, 390]) {
+  test.describe(`at ${width} px wide with a mouse`, () => {
+    test.use({ viewport: { width, height: 800 } })
+
+    test('the way from the avatars to the panel never leaves them', async ({ page }) => {
+      await openRoom(page, '1000x900')
+      const from = centreOf(await box(trigger(page)))
+
+      await page.mouse.move(from.x, from.y)
+      await expect(panel(page)).toBeVisible()
+
+      // Slower than the panel's grace at every step: only a continuous way keeps it open.
+      const end = (await box(panel(page))).y + 20
+      for (let y = from.y; y < end; y += 4) {
+        await page.mouse.move(from.x, y)
+        await page.waitForTimeout(200)
+        await expect(panel(page), `with the pointer at y=${y}`).toBeVisible()
+      }
+    })
+  })
+}
+
+test.describe('with a keyboard', () => {
+  test.use({ viewport: { width: 1440, height: 760 } })
+
+  test('cancelling a Kick leaves focus on the avatars and the panel closed', async ({ page, browser }) => {
+    await openRoom(page, 'keyboard-kick')
+    await joinAsTesterB(browser, 'keyboard-kick')
+
+    await trigger(page).focus()
+    await page.getByRole('button', { name: 'Expulsar a Tester B' }).focus()
+    await page.keyboard.press('Enter')
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect(panel(page)).toBeHidden()
+
+    await dialog.getByRole('button', { name: 'Cancelar' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(dialog).toBeHidden()
+
+    await expect(trigger(page)).toBeFocused()
+    await page.waitForTimeout(300)
+    await expect(panel(page)).toBeHidden()
+
+    // The dialog hands focus back as React commits, when it listens to no events, so
+    // that return opens nothing; this test is what holds it if React ever changes.
+    // Arriving at the avatars later still opens the panel.
+    await page.keyboard.press('Tab')
+    await expect(trigger(page)).not.toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(trigger(page)).toBeFocused()
+    await expect(panel(page)).toBeVisible()
+  })
+
+  test('handing over the role leaves focus somewhere Esc can close the panel from', async ({ page, browser }) => {
+    await openRoom(page, 'keyboard-hand-over')
+    await joinAsTesterB(browser, 'keyboard-hand-over')
+
+    await trigger(page).focus()
+    const handOver = page.getByRole('button', { name: 'Pasar el mando a Tester B' })
+    await handOver.focus()
+    await page.keyboard.press('Enter')
+    await expect(handOver).toBeHidden()
+
+    await expect(trigger(page)).toBeFocused()
+    await expect(panel(page)).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(panel(page)).toBeHidden()
+    await expect(trigger(page)).toBeFocused()
+  })
+})
+
+/** Tester B, in a browser of their own, comes into the Room and stays. */
+async function joinAsTesterB(browser: Browser, roomName: string) {
+  const page = await (await browser.newContext()).newPage()
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Tester B' }).click()
+  await expect(page).not.toHaveURL(/\/login/)
+  await page.goto(`/room/${seeded().rooms[roomName]}`)
+  await page.getByRole('button', { name: /en la sala/ }).waitFor()
+}
 
 function trigger(page: Page) {
   return page.getByRole('button', { name: /en la sala/ })

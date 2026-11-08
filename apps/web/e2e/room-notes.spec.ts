@@ -51,6 +51,26 @@ for (const viewport of VIEWPORTS) {
   })
 }
 
+test.describe('below 760 px wide, where the page scrolls', () => {
+  test.use({ viewport: { width: 600, height: 800 } })
+
+  test('the Notes scroll by themselves, and the field is one screen away from them at most', async ({ page }) => {
+    await openHandInRoom(page, '1000x900')
+    await page.getByRole('tab', { name: /^Notas/ }).click()
+
+    for (let written = 0; written < 12; written++) {
+      await writeNote(page, `Note ${written} of a long discussion on a narrow screen`)
+    }
+
+    const list = page.locator('.room-notes__list')
+    expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+
+    const listBox = await list.boundingBox()
+    const fieldBox = await page.locator('.room-notes__save').boundingBox()
+    expect(fieldBox!.y + fieldBox!.height - listBox!.y).toBeLessThanOrEqual(800)
+  })
+})
+
 async function openHandInRoom(page: Page, viewportName: string) {
   await page.goto('/login')
   await page.getByRole('button', { name: 'Tester A' }).click()
