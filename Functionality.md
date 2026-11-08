@@ -731,7 +731,7 @@ The Calendar is where a player plans what they are going to study, one day at a 
 - Each day shows up to three Milestones' titles, cut short with the whole title on hover, then **+N más**, which leads to that day's week.
 - A day lists its Milestones not done first, then the done ones, each in the order they were created.
 - Previous and next move a month, **Hoy** goes to the current month, and each move is a new address that back undoes.
-- While I have no Milestone at all, a hint over the grid says "Pulsa un día para planear qué estudiar." If they can't be loaded, the Calendar says so.
+- If my Milestones can't be loaded, the Calendar says so.
 
 **H11.3 — See a week.** As a player, I want a week in detail, so I see every Milestone of each day.
 

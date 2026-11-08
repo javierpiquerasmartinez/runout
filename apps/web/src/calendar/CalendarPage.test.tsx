@@ -44,7 +44,7 @@ beforeEach(() => {
       const from = query.get('from')!
       const to = query.get('to')!
       const milestones = stored.filter(({ date }) => date >= from && date <= to).sort((a, b) => a.date.localeCompare(b.date))
-      return Response.json({ milestones, hasAny: stored.length > 0 })
+      return Response.json({ milestones })
     },
     'POST /calendar/milestones': ({ body }) => {
       if (createReply) return createReply()
@@ -302,29 +302,11 @@ describe('CalendarPage · done and pending', () => {
   })
 })
 
-describe('CalendarPage · the empty hint', () => {
-  it('shows over the grid while the Account has no Milestone at all', async () => {
-    renderAt('/calendar/month/2026-11')
-
-    expect(await screen.findByText('Click a day to plan what to study.')).toBeTruthy()
-    expect(within(grid()).getAllByRole('gridcell')).toHaveLength(42)
-  })
-
-  it('stays away when there is a Milestone anywhere, even outside the month', async () => {
-    planned('2027-05-04', 'Far away')
-    renderAt('/calendar/month/2026-11')
-    await waitFor(() => expect(fetchedSpans()).toHaveLength(1))
-    await heading()
-
-    expect(screen.queryByText('Click a day to plan what to study.')).toBeNull()
-  })
-})
-
 describe('CalendarPage · creating Milestones', () => {
   it("opens on the day clicked, and the new Milestone shows on it at once", async () => {
     const user = userEvent.setup()
     renderAt('/calendar/month/2026-11')
-    await screen.findByText('Click a day to plan what to study.')
+    await heading()
 
     await user.click(day('Wednesday, November 11'))
 
@@ -341,7 +323,6 @@ describe('CalendarPage · creating Milestones', () => {
       description: 'Botes 3-bet',
       date: '2026-11-11',
     })
-    expect(screen.queryByText('Click a day to plan what to study.')).toBeNull()
   })
 
   it('creates on another day when the date is changed', async () => {

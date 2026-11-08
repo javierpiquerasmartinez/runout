@@ -43,7 +43,7 @@ export function CalendarPage({ period }: { period: Period }) {
   const { t } = i18n
   const today = todayOf()
   const span = periodSpan(period)
-  const { milestones, loading, hasAny, failed, add, setDone, move, unsaved } = useMilestones(span)
+  const { milestones, loading, failed, add, setDone, move, unsaved } = useMilestones(span)
   const { dragged, onPointerDown, onDragStart } = useMilestoneDrag({ milestones, onMove: move })
   const narrow = useNarrowScreen()
   const [creatingOn, setCreatingOn] = useState<CalendarDate | null>(null)
@@ -101,11 +101,6 @@ export function CalendarPage({ period }: { period: Period }) {
         {period.view === 'month' && narrow && <MonthCounts month={period.month} today={today} milestones={byDay} />}
         {period.view === 'month' && !narrow && <MonthGrid month={period.month} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} />}
         {period.view === 'week' && <WeekGrid monday={period.monday} today={today} milestones={byDay} onCreate={setCreatingOn} onToggleDone={setDone} drag={dragged} narrow={narrow} />}
-        {hasAny === false && !(narrow && period.view === 'month') && (
-          <div className="calendar-page__hint">
-            <p>{t('calendar.emptyHint')}</p>
-          </div>
-        )}
       </main>
       {dragged && <DraggedMilestone dragged={dragged} today={today} />}
       {creatingOn !== null && (

@@ -51,25 +51,6 @@
   font-size: 13px;
 }
 
-/* The empty-Calendar hint: a pill on the elevated surface over the grid. */
-.calendar-page__hint {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 45%;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-.calendar-page__hint p {
-  margin: 0;
-  padding: 9px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-elevated);
-  color: var(--text-secondary);
-  font-size: 13px;
-}
 
 /* ---------- The month grid ---------- */
 
@@ -683,10 +664,6 @@
 
   .calendar-page__failure {
     margin: 0 16px 10px;
-  }
-  .calendar-page__hint {
-    position: static;
-    margin: 0 16px 12px;
   }
 
   /* The week: its days one under another, each with its "+" by its name. */
