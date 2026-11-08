@@ -245,14 +245,71 @@
   width: 320px;
   border-right: 1px solid var(--color-panel-border);
 }
-/* Taller than a 13" laptop's viewport once a Hand ends: it scrolls itself, never the page. */
 .room-side {
-  /* Positioned, like the Queue's list, so visually hidden text far down it is
-     placed inside its scroll box; placed against the page, it scrolled the page. */
-  position: relative;
   width: 300px;
-  overflow-y: auto;
+  min-height: 0;
   border-left: 1px solid var(--color-panel-border);
+}
+
+/* The tabs of the import dialog, in the band where a panel has its title. */
+.room-side__tabs {
+  height: 50px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 22px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.room-side__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.room-side__tab:hover {
+  color: var(--text-secondary);
+}
+.room-side__tab[aria-selected='true'] {
+  font-weight: 600;
+  color: var(--brass-ink);
+  border-bottom-color: var(--brass);
+}
+.room-side__count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* Each tab scrolls itself, never the page. Positioned, like the Queue's list, so
+   visually hidden text far down it is placed inside its scroll box. */
+.room-side__panel {
+  position: relative;
+  flex-grow: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.room-side__panel[hidden] {
+  display: none;
+}
+
+.room-side__empty {
+  margin: 0;
+  padding: 16px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .room-panel__header {
@@ -604,13 +661,16 @@
 
 /* ---------- The loaded Hand: header, table, transport bar ---------- */
 
+/* Wraps on a narrow stage: spilling over the side panel, its buttons covered the tabs. */
 .room-stage__header {
-  height: 54px;
+  min-height: 54px;
+  box-sizing: border-box;
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 0 20px;
+  gap: 6px 12px;
+  padding: 8px 20px;
   border-bottom: 1px solid var(--color-divider);
 }
 
@@ -635,6 +695,8 @@
 }
 
 .room-stage__by {
+  /* From nothing, so a long name gives up its room before the row wraps. */
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   font-size: 12.5px;
@@ -1636,13 +1698,14 @@
 .room-facts {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 7px;
   margin: 0;
 }
 .room-facts__row {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 28px;
 }
 .room-facts__row dt {
   width: 92px;
@@ -1730,9 +1793,9 @@
 }
 
 /*
- * The "Notas de la mano" panel of the "Sala" boards: the Notes already on the
- * loaded Hand, then the field to write one. It takes what is left of the side
- * panel, as the board draws it, and scrolls when the Notes outgrow it.
+ * A Hand's Notes, then the field to write one: the Room's Notas tab and the
+ * Library's Hand page. It takes what is left of its panel and scrolls when the
+ * Notes outgrow it.
  */
 .room-notes {
   flex-grow: 1;
@@ -1746,6 +1809,22 @@
   gap: 8px;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* In the Notas tab, the Notes take all the height there is and the field stays in view below them. */
+.room-side__panel .room-notes {
+  padding: 14px;
+}
+.room-side__panel .room-notes__list {
+  flex-grow: 1;
+}
+.room-side__panel .room-notes__note {
+  flex-shrink: 0;
+}
+.room-side__panel .room-notes__field {
+  flex: none;
+  height: 96px;
+  min-height: 0;
 }
 
 .room-notes__note {

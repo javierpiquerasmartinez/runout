@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
@@ -96,6 +97,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   // Who the Master is handing the Room to on their way out, until the role moves.
   const [leavingTo, setLeavingTo] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [sideTab, setSideTab] = useState<SideTab>('notes')
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
   usePasteToImport(view.room.code, !importing, reportImport)
@@ -124,6 +126,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   if (loadedEntry && loadedEntry.id !== lastLoadedEntry?.id) setLastLoadedEntry(loadedEntry)
   const detailsEntry =
     loadedEntry ?? (lastLoadedEntry?.handId === shown?.handId ? lastLoadedEntry : undefined)
+  const noteCount = view.notes.filter((note) => note.handId === detailsEntry?.handId).length
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
   const next = view.queue[loadedIndex + 1]
   useShortcuts(canDrive, {
@@ -172,6 +175,11 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               onGoTo={commands.goToAction}
               onHideOpponentNames={commands.hideOpponentNames}
               onSetMark={(marked) => commands.setMark(shown.handId, marked)}
+              onJumpToNote={() => {
+                // A hidden field cannot take focus, so Notas has to be showing first.
+                flushSync(() => setSideTab('notes'))
+                document.getElementById(NOTE_FIELD_ID)?.focus()
+              }}
             />
           ) : (
             <>
@@ -195,62 +203,95 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           )}
         </main>
 
-        <aside className="room-side" aria-labelledby="room-side-title">
-          <div className="room-panel__header">
-            <h2 id="room-side-title" className="room-panel__title">
-              {t('room.details.title')}
-            </h2>
-          </div>
+        <aside className="room-side" aria-label={t('room.details.title')}>
           <AnonymousNotice />
-          {detailsEntry && (
-            <CurrentHand
-              entry={detailsEntry}
-              tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
-              participants={view.participants}
-              isMaster={isMaster && loadedEntry !== undefined}
-              onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
-            />
-          )}
-          {table?.payout && <Payout payout={table.payout} />}
-          <section className="room-side__section" aria-labelledby="room-participants-title">
-            <h3 id="room-participants-title" className="room-side__title">
-              {t('room.participants.title')}
-            </h3>
-            {/* Always mounted, so screen readers announce a change of Master when it happens. */}
-            <p className="room-participants__status" role="status">
-              {masterNotice}
-            </p>
-            <ul className="room-participants" aria-live="polite">
-              {view.participants.map((participant) => (
-                <ParticipantRow
-                  key={participant.identityId}
-                  participant={participant}
-                  presence={presenceOf(view.presence, participant.identityId)}
-                  isYou={participant.identityId === view.you}
-                  authored={authoredCount(view.queue, participant.identityId)}
-                  onHandOver={
-                    isMaster && participant.identityId !== view.you
-                      ? () => commands.handOverMaster(participant.identityId)
-                      : undefined
-                  }
-                  onKick={
-                    isMaster && participant.identityId !== view.you
-                      ? () => setDecision({ kind: 'kick', participant })
-                      : undefined
-                  }
-                />
-              ))}
-            </ul>
-          </section>
-          {detailsEntry && (
-            <HandNotes
-              handId={detailsEntry.handId}
-              notes={view.notes}
-              you={view.you}
-              isMaster={isMaster}
-              commands={commands}
-            />
-          )}
+          <div className="room-side__tabs" role="tablist">
+            {SIDE_TABS.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={`room-tab-${name}`}
+                aria-controls={`room-tabpanel-${name}`}
+                aria-selected={sideTab === name}
+                className="room-side__tab"
+                onClick={() => setSideTab(name)}
+              >
+                {t(`room.side.tab.${name}`)}{' '}
+                {name === 'notes' && noteCount > 0 && <span className="room-side__count ro-mono">{noteCount}</span>}
+              </button>
+            ))}
+          </div>
+          {/* Both stay mounted: a half-written Note, an edit and an undo outlive a look at the other tab. */}
+          <div
+            id="room-tabpanel-details"
+            role="tabpanel"
+            aria-labelledby="room-tab-details"
+            className="room-side__panel"
+            hidden={sideTab !== 'details'}
+          >
+            {detailsEntry ? (
+              <CurrentHand
+                entry={detailsEntry}
+                tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
+                participants={view.participants}
+                isMaster={isMaster && loadedEntry !== undefined}
+                onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
+              />
+            ) : (
+              <NoHandLoaded />
+            )}
+            {table?.payout && <Payout payout={table.payout} />}
+            <section className="room-side__section" aria-labelledby="room-participants-title">
+              <h3 id="room-participants-title" className="room-side__title">
+                {t('room.participants.title')}
+              </h3>
+              {/* Always mounted, so screen readers announce a change of Master when it happens. */}
+              <p className="room-participants__status" role="status">
+                {masterNotice}
+              </p>
+              <ul className="room-participants" aria-live="polite">
+                {view.participants.map((participant) => (
+                  <ParticipantRow
+                    key={participant.identityId}
+                    participant={participant}
+                    presence={presenceOf(view.presence, participant.identityId)}
+                    isYou={participant.identityId === view.you}
+                    authored={authoredCount(view.queue, participant.identityId)}
+                    onHandOver={
+                      isMaster && participant.identityId !== view.you
+                        ? () => commands.handOverMaster(participant.identityId)
+                        : undefined
+                    }
+                    onKick={
+                      isMaster && participant.identityId !== view.you
+                        ? () => setDecision({ kind: 'kick', participant })
+                        : undefined
+                    }
+                  />
+                ))}
+              </ul>
+            </section>
+          </div>
+          <div
+            id="room-tabpanel-notes"
+            role="tabpanel"
+            aria-labelledby="room-tab-notes"
+            className="room-side__panel"
+            hidden={sideTab !== 'notes'}
+          >
+            {detailsEntry ? (
+              <HandNotes
+                handId={detailsEntry.handId}
+                notes={view.notes}
+                you={view.you}
+                isMaster={isMaster}
+                commands={commands}
+              />
+            ) : (
+              <NoHandLoaded />
+            )}
+          </div>
         </aside>
       </div>
       {importing && (
@@ -385,6 +426,9 @@ function RoomDecisionDialog({
 
 /** The Note field the loaded Hand's "Nota" button takes you to. */
 const NOTE_FIELD_ID = 'room-note-field'
+
+const SIDE_TABS = ['details', 'notes'] as const
+type SideTab = (typeof SIDE_TABS)[number]
 
 /**
  * The Queue panel, from the "Sala" boards: Author, date, Positions, Stake,
@@ -711,6 +755,7 @@ function LoadedHand({
   onGoTo,
   onHideOpponentNames,
   onSetMark,
+  onJumpToNote,
 }: {
   view: InRoom
   handId: string
@@ -727,6 +772,7 @@ function LoadedHand({
   onGoTo: (actionIndex: number) => void
   onHideOpponentNames: (hidden: boolean) => void
   onSetMark: (marked: boolean) => void
+  onJumpToNote: () => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -772,7 +818,7 @@ function LoadedHand({
               variant="ghost"
               size="compact"
               className="room-stage__note"
-              onClick={() => document.getElementById(NOTE_FIELD_ID)?.focus()}
+              onClick={onJumpToNote}
             >
               <Icon name="note" size={14} />
               {t('room.notes.jump')}
@@ -928,8 +974,14 @@ function CurrentHand({
   )
 }
 
+/** What either tab of the side panel says while no Hand is loaded. */
+function NoHandLoaded() {
+  const { t } = useI18n()
+  return <p className="room-side__empty">{t('room.side.empty')}</p>
+}
+
 /**
- * The "Notas de la mano" panel of the "Sala" boards: what the group concluded
+ * The Notas tab of the "Sala" boards: what the group concluded
  * about the loaded Hand. Any Participant writes one; its writer or the Master
  * rewrites or deletes it, and a deletion can be undone for ten seconds.
  * Anyone else sees those controls locked with the reason, never hidden.
@@ -975,57 +1027,52 @@ function HandNotes({
   }
 
   return (
-    <section className="room-side__section room-notes" aria-labelledby="room-notes-title">
-      <h3 id="room-notes-title" className="room-side__title">
-        {t('room.notes.title')}
-      </h3>
-      {onHand.length > 0 && (
-        <ul className="room-notes__list">
-          {onHand.map((note) =>
-            editing === note.id ? (
-              <li key={note.id} className="room-notes__note">
-                <NoteEditor
-                  note={note}
-                  onSave={(body) => {
-                    commands.editNote(note.id, body)
-                    setEditing(null)
-                  }}
-                  onCancel={() => setEditing(null)}
+    <div className="room-side__section room-notes">
+      <ul className="room-notes__list">
+        {onHand.map((note) =>
+          editing === note.id ? (
+            <li key={note.id} className="room-notes__note">
+              <NoteEditor
+                note={note}
+                onSave={(body) => {
+                  commands.editNote(note.id, body)
+                  setEditing(null)
+                }}
+                onCancel={() => setEditing(null)}
+              />
+            </li>
+          ) : (
+            <li key={note.id} className="room-notes__note">
+              <div className="room-notes__by">
+                <Avatar name={note.writer.displayName} seed={note.writer.identityId} size={18} />
+                <span className="room-notes__writer">{note.writer.displayName}</span>
+                {/* Dated by when it was written; a rewrite is said apart, never in its place. */}
+                <span className="room-notes__when ro-mono" title={dateTimeLabel(note.writtenAt, i18n)}>
+                  {i18n.formatRelative(new Date(note.writtenAt))}
+                  {note.editedAt && ` · ${t('room.notes.edited')}`}
+                </span>
+              </div>
+              <p className="room-notes__body">{note.body}</p>
+              <div className="room-notes__controls">
+                <IconButton
+                  icon="edit"
+                  label={t('room.notes.edit', { name: note.writer.displayName })}
+                  size="compact"
+                  disabledReason={lockedReason(note)}
+                  onClick={() => setEditing(note.id)}
                 />
-              </li>
-            ) : (
-              <li key={note.id} className="room-notes__note">
-                <div className="room-notes__by">
-                  <Avatar name={note.writer.displayName} seed={note.writer.identityId} size={18} />
-                  <span className="room-notes__writer">{note.writer.displayName}</span>
-                  {/* Dated by when it was written; a rewrite is said apart, never in its place. */}
-                  <span className="room-notes__when ro-mono" title={dateTimeLabel(note.writtenAt, i18n)}>
-                    {i18n.formatRelative(new Date(note.writtenAt))}
-                    {note.editedAt && ` · ${t('room.notes.edited')}`}
-                  </span>
-                </div>
-                <p className="room-notes__body">{note.body}</p>
-                <div className="room-notes__controls">
-                  <IconButton
-                    icon="edit"
-                    label={t('room.notes.edit', { name: note.writer.displayName })}
-                    size="compact"
-                    disabledReason={lockedReason(note)}
-                    onClick={() => setEditing(note.id)}
-                  />
-                  <IconButton
-                    icon="delete"
-                    label={t('room.notes.delete', { name: note.writer.displayName })}
-                    size="compact"
-                    disabledReason={lockedReason(note)}
-                    onClick={() => removal.remove(note.id, commands.removeNote)}
-                  />
-                </div>
-              </li>
-            ),
-          )}
-        </ul>
-      )}
+                <IconButton
+                  icon="delete"
+                  label={t('room.notes.delete', { name: note.writer.displayName })}
+                  size="compact"
+                  disabledReason={lockedReason(note)}
+                  onClick={() => removal.remove(note.id, commands.removeNote)}
+                />
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
       {removal.pendingId && (
         <div className="room-notes__undo" role="status">
           <span>{t('room.notes.removed')}</span>
@@ -1045,7 +1092,7 @@ function HandNotes({
       <Button variant="secondary" className="room-notes__save" onClick={write}>
         {t(isMaster ? 'room.notes.save' : 'room.notes.post')}
       </Button>
-    </section>
+    </div>
   )
 }
 

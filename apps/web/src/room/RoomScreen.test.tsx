@@ -114,9 +114,15 @@ function rerenderRoom(view: InRoom, commands: RoomCommands) {
   showAgain?.(screenOf(view, commands))
 }
 
+/** The Details tab of the side panel, where the Participants are for now. */
+async function showDetails() {
+  await userEvent.click(screen.getByRole('tab', { name: 'Details' }))
+}
+
 describe('RoomScreen · the Master role', () => {
   it('lets the Master hand the role to another Participant, never to themselves', async () => {
     const commands = renderRoom(roomView())
+    await showDetails()
 
     expect(screen.queryByRole('button', { name: 'Hand the Master role to Javier' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Hand the Master role to Marta' }))
@@ -124,14 +130,15 @@ describe('RoomScreen · the Master role', () => {
     expect(commands.handOverMaster).toHaveBeenCalledWith('id-marta')
   })
 
-  it('offers a Guest no way to take the role', () => {
+  it('offers a Guest no way to take the role', async () => {
     renderRoom(roomView({ you: 'id-marta' }))
+    await showDetails()
 
     expect(screen.queryByRole('button', { name: /Hand the Master role/ })).toBeNull()
     expect(screen.getByText('Waiting for the Master to load a hand.')).toBeTruthy()
   })
 
-  it('announces a handover to the Room, and who controls it now', () => {
+  it('announces a handover to the Room, and who controls it now', async () => {
     renderRoom(
       roomView({
         you: 'id-marta',
@@ -139,12 +146,13 @@ describe('RoomScreen · the Master role', () => {
         masterChange: { masterId: 'id-marta', reason: 'handover' },
       }),
     )
+    await showDetails()
 
     expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('You control the Room now')
     expect(screen.getByRole('button', { name: 'Hand the Master role to Javier' })).toBeTruthy()
   })
 
-  it('says the Master dropped when the role passes on its own', () => {
+  it('says the Master dropped when the role passes on its own', async () => {
     renderRoom(
       roomView({
         you: 'id-javier',
@@ -152,6 +160,7 @@ describe('RoomScreen · the Master role', () => {
         masterChange: { masterId: 'id-marta', reason: 'failover' },
       }),
     )
+    await showDetails()
 
     expect(
       screen.getAllByRole('status').map((region) => region.textContent),
@@ -172,6 +181,7 @@ describe('RoomScreen · the end of a Room', () => {
 
   it('asks the Master to confirm before removing someone, and never offers it on their own row', async () => {
     const commands = renderRoom(roomView())
+    await showDetails()
 
     expect(screen.queryByRole('button', { name: 'Remove Javier' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
@@ -184,6 +194,7 @@ describe('RoomScreen · the end of a Room', () => {
 
   it('leaves the Room untouched when the Master cancels the removal', async () => {
     const commands = renderRoom(roomView())
+    await showDetails()
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -436,7 +447,7 @@ describe('RoomScreen \u00b7 Notes', () => {
     const elsewhere: Note = { ...martasNote, id: 'note-2', seq: 2, handId: 'hand-2', body: 'Another hand.' }
     renderRoom(roomWithLoadedHand({ notes: [martasNote, elsewhere] }))
 
-    const notes = screen.getByRole('region', { name: 'Hand notes' })
+    const notes = screen.getByRole('tabpanel', { name: /^Notes/ })
     expect(within(notes).getByText('The turn jam is forced.')).toBeTruthy()
     expect(within(notes).getByText('Marta')).toBeTruthy()
     expect(within(notes).queryByText('Another hand.')).toBeNull()
@@ -515,9 +526,184 @@ describe('RoomScreen \u00b7 Notes', () => {
     const edited: Note = { ...martasNote, editedAt: '2026-09-18T13:30:00.000Z' }
     renderRoom(roomWithLoadedHand({ notes: [edited] }))
 
-    const when = screen.getByRole('region', { name: 'Hand notes' }).querySelector('.room-notes__when')
+    const when = screen.getByRole('tabpanel', { name: /^Notes/ }).querySelector('.room-notes__when')
     expect(when?.textContent).toContain('edited')
     expect(when?.getAttribute('title')).toContain('18')
+  })
+})
+
+describe('RoomScreen · the side panel', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(splitPot)),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+    forgetHands()
+  })
+
+  function tab(name: string | RegExp) {
+    return screen.getByRole('tab', { name })
+  }
+  function isSelected(name: string | RegExp) {
+    return tab(name).getAttribute('aria-selected') === 'true'
+  }
+  function shownPanel() {
+    return within(screen.getByRole('tabpanel'))
+  }
+  function onHand(handId: string, actionIndex = 0) {
+    return { handId, actionIndex, hideOpponentNames: false }
+  }
+
+  it('opens on Notes, with the Details one click away', async () => {
+    renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
+
+    expect(isSelected(/^Notes/)).toBe(true)
+    expect(isSelected('Details')).toBe(false)
+    expect(shownPanel().getByText('The turn jam is forced.')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Current hand' })).toBeNull()
+
+    await userEvent.click(tab('Details'))
+
+    expect(isSelected('Details')).toBe(true)
+    expect(shownPanel().getByRole('heading', { name: 'Current hand' })).toBeTruthy()
+    expect(shownPanel().queryByText('The turn jam is forced.')).toBeNull()
+  })
+
+  it('gives the Notes no title of their own', () => {
+    renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
+
+    expect(shownPanel().queryByRole('heading')).toBeNull()
+  })
+
+  it('keeps the chosen tab when the Hand changes', async () => {
+    const view = roomWithLoadedHand({ queue: [firstHand, secondHand] })
+    const commands = renderRoom(view)
+    await userEvent.click(tab('Details'))
+
+    rerenderRoom({ ...view, playback: onHand('hand-2') }, commands)
+
+    expect(isSelected('Details')).toBe(true)
+  })
+
+  it('counts the Notes on the Hand, and goes up while the Details are showing', async () => {
+    const elsewhere: Note = { ...martasNote, id: 'note-2', seq: 2, handId: 'hand-2' }
+    const view = roomWithLoadedHand({ notes: [martasNote, elsewhere] })
+    const commands = renderRoom(view)
+    expect(isSelected('Notes 1')).toBe(true)
+
+    await userEvent.click(tab('Details'))
+    rerenderRoom({ ...view, notes: [martasNote, elsewhere, { ...martasNote, id: 'note-3', seq: 3 }] }, commands)
+
+    expect(tab('Notes 2')).toBeTruthy()
+  })
+
+  it('shows no count on a Hand with no Notes', () => {
+    renderRoom(roomWithLoadedHand())
+
+    expect(tab('Notes')).toBeTruthy()
+  })
+
+  it('takes the Participant to the field to write from either tab with the Note button', async () => {
+    renderRoom(roomWithLoadedHand())
+    const button = await screen.findByRole('button', { name: 'Note' })
+    await userEvent.click(tab('Details'))
+
+    await userEvent.click(button)
+
+    expect(isSelected('Notes')).toBe(true)
+    expect(document.activeElement).toBe(screen.getByLabelText('Save a note about this hand'))
+
+    await userEvent.click(tab('Details'))
+    await userEvent.click(tab('Notes'))
+    await userEvent.click(button)
+
+    expect(document.activeElement).toBe(screen.getByLabelText('Save a note about this hand'))
+  })
+
+  it('keeps a half-written Note across a change of tab', async () => {
+    renderRoom(roomWithLoadedHand())
+    await userEvent.type(screen.getByLabelText('Save a note about this hand'), 'BB can call')
+
+    await userEvent.click(tab('Details'))
+    await userEvent.click(tab('Notes'))
+
+    expect((screen.getByLabelText('Save a note about this hand') as HTMLTextAreaElement).value).toBe('BB can call')
+  })
+
+  it('keeps a Note being edited across a change of tab', async () => {
+    renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Marta’s note' }))
+    await userEvent.type(screen.getByLabelText('Edit Marta’s note'), ' Always.')
+
+    await userEvent.click(tab('Details'))
+    await userEvent.click(tab(/^Notes/))
+
+    expect((screen.getByLabelText('Edit Marta’s note') as HTMLTextAreaElement).value).toBe(
+      'The turn jam is forced. Always.',
+    )
+  })
+
+  it('keeps the undo of a deleted Note across a change of tab', async () => {
+    const commands = renderRoom(roomWithLoadedHand({ notes: [martasNote] }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Marta’s note' }))
+
+    await userEvent.click(tab('Details'))
+    await userEvent.click(tab(/^Notes/))
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(commands.undoNoteRemoval).toHaveBeenCalledWith('note-1')
+  })
+
+  it('shows the Payout in the Details at the end of the Hand, without changing the tab', async () => {
+    const view = roomWithLoadedHand()
+    const commands = renderRoom(view)
+    await screen.findByRole('button', { name: 'Note' })
+
+    rerenderRoom({ ...view, playback: onHand('hand-1', splitPot.timeline.states.length - 1) }, commands)
+
+    expect(await screen.findByRole('heading', { name: 'Pot distribution', hidden: true })).toBeTruthy()
+    expect(isSelected('Notes')).toBe(true)
+
+    await userEvent.click(tab('Details'))
+
+    expect(shownPanel().getByRole('heading', { name: 'Pot distribution' })).toBeTruthy()
+  })
+
+  it('says so on both tabs when no Hand is loaded, with no field to write', async () => {
+    renderRoom(roomView({ you: 'id-marta' }))
+
+    expect(shownPanel().getByText('No hand has been loaded yet.')).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull()
+
+    await userEvent.click(tab('Details'))
+
+    expect(shownPanel().getByText('No hand has been loaded yet.')).toBeTruthy()
+    expect(shownPanel().getByRole('heading', { name: 'In the room' })).toBeTruthy()
+  })
+
+  it('keeps the notice to someone without an Account above the tabs', () => {
+    fakeGoogleIdentity()
+    renderRoom(roomView({ you: 'id-marta' }), { account: null, room: { code: 'RNT4K9PX' } })
+
+    const notice = screen.getByRole('region', { name: 'Without an account' })
+    expect(notice.compareDocumentPosition(screen.getByRole('tablist'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
+  it('works from the keyboard', async () => {
+    renderRoom(roomWithLoadedHand())
+
+    tab('Details').focus()
+    await userEvent.keyboard('{Enter}')
+    expect(isSelected('Details')).toBe(true)
+
+    tab('Notes').focus()
+    await userEvent.keyboard(' ')
+    expect(isSelected('Notes')).toBe(true)
   })
 })
 
