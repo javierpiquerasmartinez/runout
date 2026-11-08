@@ -302,6 +302,7 @@ export const en: Messages = {
   'room.side.tab.notes': 'Notes',
   'room.side.empty': 'No hand has been loaded yet.',
   'room.participants.title': 'In the room',
+  'room.people.trigger': '{count} in the room, see who',
   'room.joining': 'Joining the room…',
   'room.disconnected': 'The connection to the room was lost. Reload the page to rejoin.',
   'room.reload': 'Reload',

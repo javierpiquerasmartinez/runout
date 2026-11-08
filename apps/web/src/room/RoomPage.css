@@ -197,10 +197,23 @@
 }
 
 .room-header__people {
-  display: flex;
+  position: relative;
   flex-shrink: 0;
+}
+.room-header__people-trigger {
+  display: flex;
   align-items: center;
   gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  cursor: default;
+}
+.room-header__people-trigger:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
 }
 .room-header__count {
   font-size: 12px;
@@ -1456,15 +1469,57 @@
   color: var(--alert-ink);
 }
 
-.room-participants__status {
-  margin: 0 0 10px;
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--text-muted);
+/* Boards "Sala · Quién está en la sala" and "Sala · Cambio de Master". */
+.room-people {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  /* Only the panel answers the pointer: a notice alone must not open it. */
+  pointer-events: none;
 }
 
-.room-participants__status:empty {
-  display: none;
+.room-people__panel {
+  position: relative;
+  box-sizing: border-box;
+  width: 301px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+  pointer-events: auto;
+}
+/* Bridges the gap below the avatars, so a slow pointer on its way here does not leave them. */
+.room-people__panel::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  right: 0;
+  left: 0;
+  height: 9px;
+}
+.room-people__panel .room-participants {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+
+.room-people__notice {
+  display: block;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 
 /* ---------- Before the Room: confirm the name, or say why not ---------- */
@@ -1551,7 +1606,23 @@
     flex-wrap: wrap;
     height: auto;
     padding: 10px 16px;
+    position: relative;
     row-gap: 10px;
+  }
+  /* The avatars can sit anywhere on a wrapped header, so what they open spans the screen. */
+  .room-header__people {
+    position: static;
+  }
+  .room-people {
+    top: calc(100% - 2px);
+    right: 16px;
+    left: 16px;
+  }
+  .room-people__panel {
+    width: 100%;
+  }
+  .room-people__notice {
+    white-space: normal;
   }
   .room__body {
     flex-direction: column;

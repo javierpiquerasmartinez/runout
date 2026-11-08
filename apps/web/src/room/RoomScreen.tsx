@@ -144,6 +144,9 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
       <RoomHeader
         view={view}
         isMaster={isMaster}
+        masterNotice={masterNotice}
+        onHandOver={commands.handOverMaster}
+        onKick={(participant) => setDecision({ kind: 'kick', participant })}
         onStartLive={commands.startLive}
         onLeave={() => (isMaster ? setDecision({ kind: 'leave' }) : navigate('/'))}
       />
@@ -242,36 +245,6 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               <NoHandLoaded />
             )}
             {table?.payout && <Payout payout={table.payout} />}
-            <section className="room-side__section" aria-labelledby="room-participants-title">
-              <h3 id="room-participants-title" className="room-side__title">
-                {t('room.participants.title')}
-              </h3>
-              {/* Always mounted, so screen readers announce a change of Master when it happens. */}
-              <p className="room-participants__status" role="status">
-                {masterNotice}
-              </p>
-              <ul className="room-participants" aria-live="polite">
-                {view.participants.map((participant) => (
-                  <ParticipantRow
-                    key={participant.identityId}
-                    participant={participant}
-                    presence={presenceOf(view.presence, participant.identityId)}
-                    isYou={participant.identityId === view.you}
-                    authored={authoredCount(view.queue, participant.identityId)}
-                    onHandOver={
-                      isMaster && participant.identityId !== view.you
-                        ? () => commands.handOverMaster(participant.identityId)
-                        : undefined
-                    }
-                    onKick={
-                      isMaster && participant.identityId !== view.you
-                        ? () => setDecision({ kind: 'kick', participant })
-                        : undefined
-                    }
-                  />
-                ))}
-              </ul>
-            </section>
           </div>
           <div
             id="room-tabpanel-notes"
@@ -646,19 +619,23 @@ function QueuePanel({
 function RoomHeader({
   view,
   isMaster,
+  masterNotice,
+  onHandOver,
+  onKick,
   onStartLive,
   onLeave,
 }: {
   view: InRoom
   isMaster: boolean
+  masterNotice: string | null
+  onHandOver: (identityId: string) => void
+  onKick: (participant: Participant) => void
   onStartLive: () => void
   /** A Guest walks out; the Master is asked to hand the role over or close first. */
   onLeave: () => void
 }) {
   const { t } = useI18n()
   const master = view.participants.find((p) => p.role === 'master')
-  // Guests see the Master named apart, so the stack shows everyone else.
-  const stacked = isMaster ? view.participants : view.participants.filter((p) => p.role !== 'master')
   const [copied, copy] = useCopied()
 
   return (
@@ -714,14 +691,7 @@ function RoomHeader({
           </span>
         </span>
       )}
-      <span className="room-header__people">
-        <span className="ro-avatar-stack">
-          {stacked.map((p) => (
-            <Avatar key={p.identityId} name={p.displayName} seed={p.identityId} />
-          ))}
-        </span>
-        <span className="room-header__count">{t('room.inRoom', { count: view.participants.length })}</span>
-      </span>
+      <RoomPeople view={view} isMaster={isMaster} notice={masterNotice} onHandOver={onHandOver} onKick={onKick} />
       <span className="room-header__role" data-role={isMaster ? 'master' : 'guest'}>
         <Icon name={isMaster ? 'master' : 'profile'} size={14} />
         {t(isMaster ? 'room.master' : 'room.guest')}
@@ -1328,6 +1298,137 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
     return () => document.removeEventListener('paste', onPaste)
   }, [code, token, enabled, report])
 }
+
+/**
+ * The avatars in the header and who they stand for: a panel with every
+ * Participant and, for the Master, the actions on each. A mouse governs it by
+ * hovering alone; a tap toggles it; keyboard focus opens it and Esc closes it.
+ * Below it, for a few seconds, the notice of a change of Master.
+ */
+function RoomPeople({
+  view,
+  isMaster,
+  notice,
+  onHandOver,
+  onKick,
+}: {
+  view: InRoom
+  isMaster: boolean
+  notice: string | null
+  onHandOver: (identityId: string) => void
+  onKick: (participant: Participant) => void
+}) {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const closing = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const pointerInside = useRef(false)
+  const pressedWith = useRef('')
+  const returningFocus = useRef(false)
+  useEffect(() => () => clearTimeout(closing.current), [])
+
+  // Guests see the Master named apart, so the stack shows everyone else.
+  const stacked = isMaster ? view.participants : view.participants.filter((p) => p.role !== 'master')
+  const focusInside = () => root.current?.contains(document.activeElement) ?? false
+
+  function returnFocus() {
+    // Focus coming back to the trigger is not someone arriving at it.
+    returningFocus.current = true
+    trigger.current?.focus()
+    returningFocus.current = false
+  }
+
+  return (
+    <div
+      ref={root}
+      className="room-header__people"
+      onPointerEnter={(event) => {
+        if (event.pointerType !== 'mouse') return
+        pointerInside.current = true
+        clearTimeout(closing.current)
+        setOpen(true)
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== 'mouse') return
+        pointerInside.current = false
+        closing.current = setTimeout(() => {
+          if (!focusInside()) setOpen(false)
+        }, PEOPLE_CLOSE_AFTER_MS)
+      }}
+      // A press never takes focus here, or focus would hold the panel open after the mouse has left.
+      onMouseDown={(event) => event.preventDefault()}
+      onBlur={(event) => {
+        if (!pointerInside.current && !event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !open) return
+        setOpen(false)
+        returnFocus()
+      }}
+    >
+      <button
+        ref={trigger}
+        type="button"
+        className="room-header__people-trigger"
+        aria-label={t('room.people.trigger', { count: view.participants.length })}
+        aria-expanded={open}
+        onPointerDown={(event) => {
+          pressedWith.current = event.pointerType
+        }}
+        onFocus={() => {
+          if (!returningFocus.current) setOpen(true)
+        }}
+        onClick={(event) => {
+          // Enter and Space click with no detail; a mouse has already opened it by hovering.
+          if (event.detail > 0 && pressedWith.current === 'mouse') return
+          setOpen((wasOpen) => !wasOpen)
+        }}
+      >
+        <span className="ro-avatar-stack">
+          {stacked.map((p) => (
+            <Avatar key={p.identityId} name={p.displayName} seed={p.identityId} />
+          ))}
+        </span>
+        <span className="room-header__count">{t('room.inRoom', { count: view.participants.length })}</span>
+      </button>
+      <div className="room-people">
+        {open && (
+          <div className="room-people__panel" role="group" aria-label={t('room.participants.title')}>
+            <ul className="room-participants" aria-live="polite">
+              {view.participants.map((participant) => {
+                const canAct = isMaster && participant.identityId !== view.you
+                return (
+                  <ParticipantRow
+                    key={participant.identityId}
+                    participant={participant}
+                    presence={presenceOf(view.presence, participant.identityId)}
+                    isYou={participant.identityId === view.you}
+                    authored={authoredCount(view.queue, participant.identityId)}
+                    onHandOver={canAct ? () => onHandOver(participant.identityId) : undefined}
+                    onKick={
+                      canAct
+                        ? () => {
+                            setOpen(false)
+                            if (focusInside()) returnFocus()
+                            onKick(participant)
+                          }
+                        : undefined
+                    }
+                  />
+                )
+              })}
+            </ul>
+          </div>
+        )}
+        {/* Always mounted, so screen readers announce a change of Master with the panel closed. */}
+        <span role="status">{notice && <span className="room-people__notice">{notice}</span>}</span>
+      </div>
+    </div>
+  )
+}
+
+const PEOPLE_CLOSE_AFTER_MS = 150
 
 function ParticipantRow({
   participant,

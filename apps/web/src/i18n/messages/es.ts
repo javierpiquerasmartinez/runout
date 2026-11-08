@@ -301,6 +301,7 @@ export const es = {
   'room.side.tab.notes': 'Notas',
   'room.side.empty': 'Todavía no hay una mano cargada.',
   'room.participants.title': 'En la sala',
+  'room.people.trigger': '{count} en la sala, ver quién está',
   'room.joining': 'Entrando en la sala…',
   'room.disconnected': 'Se ha perdido la conexión con la sala. Recarga la página para volver a entrar.',
   'room.reload': 'Recargar',
