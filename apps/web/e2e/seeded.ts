@@ -1,3 +1,5 @@
+import { expect, type Page } from '@playwright/test'
+
 /** Where Playwright runs the throwaway server and the Vite in front of it (see playwright.config.ts). */
 export const SERVER_PORT = 3183
 export const WEB_PORT = 5183
@@ -26,4 +28,16 @@ export function seeded(): Seed {
   const json = process.env.RUNOUT_E2E_SEED
   if (!json) throw new Error('No seed: run the tests through playwright.config.ts')
   return JSON.parse(json) as Seed
+}
+
+export async function signInAs(page: Page, persona: 'Tester A' | 'Tester B') {
+  await page.goto('/login')
+  await page.getByRole('button', { name: persona }).click()
+  await expect(page).not.toHaveURL(/\/login/)
+}
+
+/** Signs in as Tester A and goes to one of the seeded Rooms. */
+export async function goToSeededRoom(page: Page, roomName: string) {
+  await signInAs(page, 'Tester A')
+  await page.goto(`/room/${seeded().rooms[roomName]}`)
 }

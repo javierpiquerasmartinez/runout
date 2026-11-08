@@ -1470,7 +1470,7 @@
 }
 
 /* Boards "Sala · Quién está en la sala" and "Sala · Cambio de Master". */
-.room-people {
+.room-header-participants {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -1483,7 +1483,7 @@
   pointer-events: none;
 }
 
-.room-people__panel {
+.room-header-participants__panel {
   position: relative;
   box-sizing: border-box;
   width: 301px;
@@ -1495,7 +1495,7 @@
   pointer-events: auto;
 }
 /* Bridges the gap below the avatars, so a slow pointer on its way here does not leave them. */
-.room-people__panel::before {
+.room-header-participants__panel::before {
   content: '';
   position: absolute;
   top: -9px;
@@ -1503,12 +1503,12 @@
   left: 0;
   height: 9px;
 }
-.room-people__panel .room-participants {
+.room-header-participants__panel .room-participants {
   max-height: min(60vh, 420px);
   overflow-y: auto;
 }
 
-.room-people__notice {
+.room-header-participants__notice {
   display: block;
   box-sizing: border-box;
   padding: 8px 12px;
@@ -1614,16 +1614,16 @@
     position: static;
     order: 1;
   }
-  .room-people {
+  .room-header-participants {
     top: calc(100% - 2px);
     right: 16px;
     left: 16px;
   }
-  .room-people__panel {
+  .room-header-participants__panel {
     width: 100%;
   }
   /* From the avatars, past the rest of their row and the header's padding. */
-  .room-people__panel::before {
+  .room-header-participants__panel::before {
     top: -18px;
     height: 18px;
   }
@@ -1631,7 +1631,7 @@
   .room-side__panel .room-notes__list {
     max-height: min(50vh, 420px);
   }
-  .room-people__notice {
+  .room-header-participants__notice {
     white-space: normal;
   }
   .room__body {

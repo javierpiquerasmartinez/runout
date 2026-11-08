@@ -114,23 +114,23 @@ function rerenderRoom(view: InRoom, commands: RoomCommands) {
   showAgain?.(screenOf(view, commands))
 }
 
-function peopleTrigger() {
+function participantsTrigger() {
   return screen.getByRole('button', { name: /in the room/ })
 }
 
-function peoplePanel() {
+function participantsPanel() {
   return screen.queryByRole('group', { name: 'In the room' })
 }
 
 /** Who is in the Room, as a mouse reveals it from the header. */
-async function showPeople() {
-  await userEvent.hover(peopleTrigger())
+async function showParticipants() {
+  await userEvent.hover(participantsTrigger())
 }
 
 describe('RoomScreen · the Master role', () => {
   it('lets the Master hand the role to another Participant, never to themselves', async () => {
     const commands = renderRoom(roomView())
-    await showPeople()
+    await showParticipants()
 
     expect(screen.queryByRole('button', { name: 'Hand the Master role to Javier' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Hand the Master role to Marta' }))
@@ -140,7 +140,7 @@ describe('RoomScreen · the Master role', () => {
 
   it('offers a Guest no way to take the role', async () => {
     renderRoom(roomView({ you: 'id-marta' }))
-    await showPeople()
+    await showParticipants()
 
     expect(screen.queryByRole('button', { name: /Hand the Master role/ })).toBeNull()
     expect(screen.getByText('Waiting for the Master to load a hand.')).toBeTruthy()
@@ -154,7 +154,7 @@ describe('RoomScreen · the Master role', () => {
         masterChange: { masterId: 'id-marta', reason: 'handover' },
       }),
     )
-    await showPeople()
+    await showParticipants()
 
     expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('You control the Room now')
     expect(screen.getByRole('button', { name: 'Hand the Master role to Javier' })).toBeTruthy()
@@ -192,101 +192,101 @@ describe('RoomScreen · who is in the Room', () => {
     renderRoom(roomView())
 
     expect(screen.queryByRole('heading', { name: 'In the room' })).toBeNull()
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
     expect(screen.queryByText('Master · 0 hands')).toBeNull()
   })
 
   it('shows every Participant when the pointer rests on the avatars', async () => {
     renderRoom(roomView({ presence: [{ identityId: 'id-marta', presence: 'away', latencyMs: 400, inSync: false }] }))
 
-    await showPeople()
+    await showParticipants()
 
-    const panel = within(peoplePanel()!)
+    const panel = within(participantsPanel()!)
     expect(panel.getByText('Javier')).toBeTruthy()
     expect(panel.getByText('Master · 0 hands')).toBeTruthy()
     expect(panel.getByText('Marta')).toBeTruthy()
     expect(panel.getByText('Guest · 0 hands')).toBeTruthy()
     expect(panel.getByTitle('No signal for over 30 s')).toBeTruthy()
-    expect(peopleTrigger().getAttribute('aria-expanded')).toBe('true')
+    expect(participantsTrigger().getAttribute('aria-expanded')).toBe('true')
   })
 
   it('takes no notice of a mouse click on the avatars', async () => {
     const user = userEvent.setup()
     renderRoom(roomView())
 
-    await user.hover(peopleTrigger())
-    await user.click(peopleTrigger())
-    expect(peoplePanel()).not.toBeNull()
+    await user.hover(participantsTrigger())
+    await user.click(participantsTrigger())
+    expect(participantsPanel()).not.toBeNull()
 
-    await user.click(peopleTrigger())
-    expect(peoplePanel()).not.toBeNull()
+    await user.click(participantsTrigger())
+    expect(participantsPanel()).not.toBeNull()
   })
 
   it('closes 150 ms after the pointer leaves, unless it comes back', async () => {
     const user = userOnAFakeClock()
     renderRoom(roomView())
 
-    await user.hover(peopleTrigger())
-    await user.unhover(peopleTrigger())
+    await user.hover(participantsTrigger())
+    await user.unhover(participantsTrigger())
     act(() => vi.advanceTimersByTime(100))
-    await user.hover(peoplePanel()!)
+    await user.hover(participantsPanel()!)
     act(() => vi.advanceTimersByTime(1000))
-    expect(peoplePanel()).not.toBeNull()
+    expect(participantsPanel()).not.toBeNull()
 
-    await user.unhover(peoplePanel()!)
+    await user.unhover(participantsPanel()!)
     act(() => vi.advanceTimersByTime(140))
-    expect(peoplePanel()).not.toBeNull()
+    expect(participantsPanel()).not.toBeNull()
     act(() => vi.advanceTimersByTime(20))
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
   })
 
   it('still closes when the pointer leaves after the Master used a button in it', async () => {
     const user = userOnAFakeClock()
     renderRoom(roomView())
 
-    await user.hover(peopleTrigger())
+    await user.hover(participantsTrigger())
     const handOver = screen.getByRole('button', { name: 'Hand the Master role to Marta' })
     await user.click(handOver)
     await user.unhover(handOver)
     act(() => vi.advanceTimersByTime(200))
 
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
   })
 
   it('opens from the keyboard, stays open while focus is inside and closes on Escape', async () => {
     const user = userEvent.setup()
     renderRoom(roomView())
 
-    act(() => peopleTrigger().focus())
-    expect(peoplePanel()).not.toBeNull()
+    act(() => participantsTrigger().focus())
+    expect(participantsPanel()).not.toBeNull()
 
     await user.tab()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Hand the Master role to Marta' }))
-    expect(peoplePanel()).not.toBeNull()
+    expect(participantsPanel()).not.toBeNull()
 
     await user.keyboard('{Escape}')
-    expect(peoplePanel()).toBeNull()
-    expect(document.activeElement).toBe(peopleTrigger())
+    expect(participantsPanel()).toBeNull()
+    expect(document.activeElement).toBe(participantsTrigger())
 
     await user.keyboard('{Enter}')
-    expect(peoplePanel()).not.toBeNull()
+    expect(participantsPanel()).not.toBeNull()
   })
 
   it('closes when keyboard focus moves on past it', async () => {
     const user = userEvent.setup()
     renderRoom(roomView({ participants: [javier] }))
 
-    act(() => peopleTrigger().focus())
+    act(() => participantsTrigger().focus())
     await user.tab()
 
-    expect(document.activeElement).not.toBe(peopleTrigger())
-    expect(peoplePanel()).toBeNull()
+    expect(document.activeElement).not.toBe(participantsTrigger())
+    expect(participantsPanel()).toBeNull()
   })
 
   it('keeps Escape working when the Master hands over the role from the keyboard and their buttons vanish', async () => {
     const user = userEvent.setup()
     const commands = renderRoom(roomView())
-    act(() => peopleTrigger().focus())
+    act(() => participantsTrigger().focus())
     act(() => screen.getByRole('button', { name: 'Hand the Master role to Marta' }).focus())
 
     rerenderRoom(
@@ -295,47 +295,47 @@ describe('RoomScreen · who is in the Room', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'Hand the Master role to Marta' })).toBeNull()
-    expect(document.activeElement).toBe(peopleTrigger())
-    expect(peoplePanel()).not.toBeNull()
+    expect(document.activeElement).toBe(participantsTrigger())
+    expect(participantsPanel()).not.toBeNull()
 
     await user.keyboard('{Escape}')
-    expect(peoplePanel()).toBeNull()
-    expect(document.activeElement).toBe(peopleTrigger())
+    expect(participantsPanel()).toBeNull()
+    expect(document.activeElement).toBe(participantsTrigger())
   })
 
   it('keeps Escape working when the Participant on the focused row leaves', async () => {
     const user = userEvent.setup()
     const commands = renderRoom(roomView())
-    act(() => peopleTrigger().focus())
+    act(() => participantsTrigger().focus())
     act(() => screen.getByRole('button', { name: 'Remove Marta' }).focus())
 
     rerenderRoom(roomView({ participants: [javier] }), commands)
 
-    expect(document.activeElement).toBe(peopleTrigger())
+    expect(document.activeElement).toBe(participantsTrigger())
     await user.keyboard('{Escape}')
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
   })
 
   it('opens and closes with a tap on a touch screen', async () => {
     const user = userEvent.setup()
     renderRoom(roomView())
-    const tap = () => user.pointer([{ keys: '[TouchA]', target: peopleTrigger() }])
+    const tap = () => user.pointer([{ keys: '[TouchA]', target: participantsTrigger() }])
 
     await tap()
-    expect(peoplePanel()).not.toBeNull()
+    expect(participantsPanel()).not.toBeNull()
 
     await tap()
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
   })
 
   it('gets out of the way before asking to confirm a removal', async () => {
     renderRoom(roomView())
-    await showPeople()
+    await showParticipants()
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
 
     expect(screen.getByRole('heading', { name: 'Remove Marta?' })).toBeTruthy()
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
   })
 
   it('shows a change of Master for six seconds with the panel closed, in a region that stays', () => {
@@ -348,7 +348,7 @@ describe('RoomScreen · who is in the Room', () => {
       }),
     )
     const region = screen.getAllByRole('status').find((status) => status.textContent === 'Marta is now the Master')!
-    expect(peoplePanel()).toBeNull()
+    expect(participantsPanel()).toBeNull()
 
     act(() => vi.advanceTimersByTime(5900))
     expect(region.textContent).toBe('Marta is now the Master')
@@ -367,9 +367,9 @@ describe('RoomScreen · who is in the Room', () => {
       }),
     )
 
-    await showPeople()
+    await showParticipants()
 
-    expect(peoplePanel()).not.toBeNull()
+    expect(participantsPanel()).not.toBeNull()
     expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('You control the Room now')
   })
 })
@@ -387,7 +387,7 @@ describe('RoomScreen · the end of a Room', () => {
 
   it('asks the Master to confirm before removing someone, and never offers it on their own row', async () => {
     const commands = renderRoom(roomView())
-    await showPeople()
+    await showParticipants()
 
     expect(screen.queryByRole('button', { name: 'Remove Javier' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
@@ -400,7 +400,7 @@ describe('RoomScreen · the end of a Room', () => {
 
   it('leaves the Room untouched when the Master cancels the removal', async () => {
     const commands = renderRoom(roomView())
-    await showPeople()
+    await showParticipants()
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Marta' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -411,7 +411,7 @@ describe('RoomScreen · the end of a Room', () => {
 
   it('offers a Guest no way to remove anyone', async () => {
     renderRoom(roomView({ you: 'id-marta' }))
-    await showPeople()
+    await showParticipants()
 
     expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull()
   })
@@ -513,7 +513,7 @@ describe('RoomScreen · staying in sync', () => {
         ],
       }),
     )
-    await showPeople()
+    await showParticipants()
 
     expect(screen.getByTitle('Connected')).toBeTruthy()
     expect(screen.getByTitle('No signal for over 30 s')).toBeTruthy()
@@ -525,7 +525,7 @@ describe('RoomScreen · staying in sync', () => {
         presence: [{ identityId: 'id-marta', presence: 'unstable', latencyMs: 900, inSync: false }],
       }),
     )
-    await showPeople()
+    await showParticipants()
 
     expect(screen.getByTitle('Unstable connection · Has not received the latest Action yet')).toBeTruthy()
   })
@@ -767,6 +767,12 @@ describe('RoomScreen · the side panel', () => {
   function onHand(handId: string, actionIndex = 0) {
     return { handId, actionIndex, hideOpponentNames: false }
   }
+
+  it('names the panel for the Hand, true of both its tabs', () => {
+    renderRoom(roomWithLoadedHand())
+
+    expect(screen.getByRole('complementary', { name: 'Hand panel' })).toBeTruthy()
+  })
 
   it('opens on Notes, with the Details one click away', async () => {
     renderRoom(roomWithLoadedHand({ notes: [martasNote] }))

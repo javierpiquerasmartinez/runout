@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent,
+} from 'react'
 import { flushSync } from 'react-dom'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
@@ -206,7 +217,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           )}
         </main>
 
-        <aside className="room-side" aria-label={t('room.details.title')}>
+        <aside className="room-side" aria-label={t('room.side.label')}>
           <AnonymousNotice />
           <div className="room-side__tabs" role="tablist">
             {SIDE_TABS.map((name) => (
@@ -691,7 +702,7 @@ function RoomHeader({
           </span>
         </span>
       )}
-      <RoomPeople view={view} isMaster={isMaster} notice={masterNotice} onHandOver={onHandOver} onKick={onKick} />
+      <RoomParticipants view={view} isMaster={isMaster} notice={masterNotice} onHandOver={onHandOver} onKick={onKick} />
       <span className="room-header__role" data-role={isMaster ? 'master' : 'guest'}>
         <Icon name={isMaster ? 'master' : 'profile'} size={14} />
         {t(isMaster ? 'room.master' : 'room.guest')}
@@ -1301,11 +1312,10 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
 
 /**
  * The avatars in the header and who they stand for: a panel with every
- * Participant and, for the Master, the actions on each. A mouse governs it by
- * hovering alone; a tap toggles it; keyboard focus opens it and Esc closes it.
- * Below it, for a few seconds, the notice of a change of Master.
+ * Participant and, for the Master, the actions on each. Below it, for a few
+ * seconds, the notice of a change of Master.
  */
-function RoomPeople({
+function RoomParticipants({
   view,
   isMaster,
   notice,
@@ -1319,82 +1329,19 @@ function RoomPeople({
   onKick: (participant: Participant) => void
 }) {
   const { t } = useI18n()
-  const [open, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const trigger = useRef<HTMLButtonElement>(null)
-  const closing = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const pointerInside = useRef(false)
-  const pressedWith = useRef('')
-  const returningFocus = useRef(false)
-  const focusWasInside = useRef(false)
-  useEffect(() => () => clearTimeout(closing.current), [])
-
-  // React fires no blur when the focused element unmounts, as a Master's buttons
-  // do on handing over the role: focus would fall to the page, out of Esc's reach.
-  useLayoutEffect(() => {
-    if (focusWasInside.current && document.activeElement === document.body) returnFocus()
-  })
+  const { open, rootProps, triggerProps, closeBeforeConfirming } = useParticipantsPanel()
 
   // Guests see the Master named apart, so the stack shows everyone else.
   const stacked = isMaster ? view.participants : view.participants.filter((p) => p.role !== 'master')
-  const focusInside = () => root.current?.contains(document.activeElement) ?? false
-
-  function returnFocus() {
-    // Focus coming back to the trigger is not someone arriving at it.
-    returningFocus.current = true
-    trigger.current?.focus()
-    returningFocus.current = false
-  }
 
   return (
-    <div
-      ref={root}
-      className="room-header__people"
-      onPointerEnter={(event) => {
-        if (event.pointerType !== 'mouse') return
-        pointerInside.current = true
-        clearTimeout(closing.current)
-        setOpen(true)
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType !== 'mouse') return
-        pointerInside.current = false
-        closing.current = setTimeout(() => {
-          if (!focusInside()) setOpen(false)
-        }, PEOPLE_CLOSE_AFTER_MS)
-      }}
-      // A press never takes focus here, or focus would hold the panel open after the mouse has left.
-      onMouseDown={(event) => event.preventDefault()}
-      onFocus={() => {
-        focusWasInside.current = true
-      }}
-      onBlur={(event) => {
-        focusWasInside.current = false
-        if (!pointerInside.current && !event.currentTarget.contains(event.relatedTarget)) setOpen(false)
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape' || !open) return
-        setOpen(false)
-        returnFocus()
-      }}
-    >
+    <div {...rootProps} className="room-header__people">
       <button
-        ref={trigger}
+        {...triggerProps}
         type="button"
         className="room-header__people-trigger"
-        aria-label={t('room.people.trigger', { count: view.participants.length })}
+        aria-label={t('room.participants.trigger', { count: view.participants.length })}
         aria-expanded={open}
-        onPointerDown={(event) => {
-          pressedWith.current = event.pointerType
-        }}
-        onFocus={() => {
-          if (!returningFocus.current) setOpen(true)
-        }}
-        onClick={(event) => {
-          // Enter and Space click with no detail; a mouse has already opened it by hovering.
-          if (event.detail > 0 && pressedWith.current === 'mouse') return
-          setOpen((wasOpen) => !wasOpen)
-        }}
       >
         <span className="ro-avatar-stack">
           {stacked.map((p) => (
@@ -1403,9 +1350,9 @@ function RoomPeople({
         </span>
         <span className="room-header__count">{t('room.inRoom', { count: view.participants.length })}</span>
       </button>
-      <div className="room-people">
+      <div className="room-header-participants">
         {open && (
-          <div className="room-people__panel" role="group" aria-label={t('room.participants.title')}>
+          <div className="room-header-participants__panel" role="group" aria-label={t('room.participants.title')}>
             <ul className="room-participants" aria-live="polite">
               {view.participants.map((participant) => {
                 const canAct = isMaster && participant.identityId !== view.you
@@ -1420,8 +1367,7 @@ function RoomPeople({
                     onKick={
                       canAct
                         ? () => {
-                            setOpen(false)
-                            if (focusInside()) returnFocus()
+                            closeBeforeConfirming()
                             onKick(participant)
                           }
                         : undefined
@@ -1433,13 +1379,99 @@ function RoomPeople({
           </div>
         )}
         {/* Always mounted, so screen readers announce a change of Master with the panel closed. */}
-        <span role="status">{notice && <span className="room-people__notice">{notice}</span>}</span>
+        <span role="status">{notice && <span className="room-header-participants__notice">{notice}</span>}</span>
       </div>
     </div>
   )
 }
 
-const PEOPLE_CLOSE_AFTER_MS = 150
+const PARTICIPANTS_PANEL_CLOSE_AFTER_MS = 150
+
+/**
+ * When the panel of who is in the Room shows. A mouse governs it by hovering
+ * alone; a tap toggles it; keyboard focus opens it and Esc closes it, returning
+ * focus to the trigger. Spread the props on the element that holds trigger and
+ * panel, and on the trigger.
+ */
+function useParticipantsPanel() {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const pointerInside = useRef(false)
+  const pressedWith = useRef('')
+  const returningFocus = useRef(false)
+  const focusWasInside = useRef(false)
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
+
+  const focusInside = () => root.current?.contains(document.activeElement) ?? false
+
+  function returnFocus() {
+    // Focus coming back to the trigger is not someone arriving at it.
+    returningFocus.current = true
+    trigger.current?.focus()
+    returningFocus.current = false
+  }
+
+  // React fires no blur when the focused element unmounts, as a Master's buttons
+  // do on handing over the role: focus would fall to the page, out of Esc's reach.
+  useLayoutEffect(() => {
+    if (focusWasInside.current && document.activeElement === document.body) returnFocus()
+  })
+
+  const rootProps = {
+    ref: root,
+    onPointerEnter: (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return
+      pointerInside.current = true
+      clearTimeout(closeTimer.current)
+      setOpen(true)
+    },
+    onPointerLeave: (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return
+      pointerInside.current = false
+      closeTimer.current = setTimeout(() => {
+        if (!focusInside()) setOpen(false)
+      }, PARTICIPANTS_PANEL_CLOSE_AFTER_MS)
+    },
+    // A press never takes focus here, or focus would hold the panel open after the mouse has left.
+    onMouseDown: (event: ReactMouseEvent) => event.preventDefault(),
+    onFocus: () => {
+      focusWasInside.current = true
+    },
+    onBlur: (event: FocusEvent<HTMLDivElement>) => {
+      focusWasInside.current = false
+      if (!pointerInside.current && !event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+    },
+    onKeyDown: (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !open) return
+      setOpen(false)
+      returnFocus()
+    },
+  }
+
+  const triggerProps = {
+    ref: trigger,
+    onPointerDown: (event: PointerEvent) => {
+      pressedWith.current = event.pointerType
+    },
+    onFocus: () => {
+      if (!returningFocus.current) setOpen(true)
+    },
+    onClick: (event: ReactMouseEvent) => {
+      // Enter and Space click with no detail; a mouse has already opened it by hovering.
+      if (event.detail > 0 && pressedWith.current === 'mouse') return
+      setOpen((wasOpen) => !wasOpen)
+    },
+  }
+
+  function closeBeforeConfirming() {
+    setOpen(false)
+    if (focusInside()) returnFocus()
+  }
+
+  return { open, rootProps, triggerProps, closeBeforeConfirming }
+}
 
 function ParticipantRow({
   participant,

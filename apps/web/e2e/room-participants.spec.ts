@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
-import { seeded, VIEWPORTS } from './seeded'
+import { goToSeededRoom, seeded, signInAs, VIEWPORTS } from './seeded'
 
 /*
  * Who is in the Room opens from the header on hover. Whether the pointer can
@@ -133,9 +133,7 @@ test.describe('with a keyboard', () => {
 /** Tester B, in a browser of their own, comes into the Room and stays. */
 async function joinAsTesterB(browser: Browser, roomName: string) {
   const page = await (await browser.newContext()).newPage()
-  await page.goto('/login')
-  await page.getByRole('button', { name: 'Tester B' }).click()
-  await expect(page).not.toHaveURL(/\/login/)
+  await signInAs(page, 'Tester B')
   await page.goto(`/room/${seeded().rooms[roomName]}`)
   await page.getByRole('button', { name: /en la sala/ }).waitFor()
 }
@@ -159,10 +157,6 @@ function centreOf(area: { x: number; y: number; width: number; height: number })
 }
 
 async function openRoom(page: Page, viewportName: string) {
-  await page.goto('/login')
-  await page.getByRole('button', { name: 'Tester A' }).click()
-  await expect(page).not.toHaveURL(/\/login/)
-
-  await page.goto(`/room/${seeded().rooms[viewportName]}`)
+  await goToSeededRoom(page, viewportName)
   await trigger(page).waitFor()
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seeded, VIEWPORTS } from './seeded'
+import { goToSeededRoom, VIEWPORTS } from './seeded'
 
 /*
  * A Hand's Notes stay readable to its end, however little height the screen
@@ -72,11 +72,7 @@ test.describe('below 760 px wide, where the page scrolls', () => {
 })
 
 async function openHandInRoom(page: Page, viewportName: string) {
-  await page.goto('/login')
-  await page.getByRole('button', { name: 'Tester A' }).click()
-  await expect(page).not.toHaveURL(/\/login/)
-
-  await page.goto(`/room/${seeded().rooms[viewportName]}`)
+  await goToSeededRoom(page, viewportName)
   await page.locator('.queue-entry__load').first().click()
   await page.locator('.poker-table').waitFor()
 }

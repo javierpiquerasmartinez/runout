@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seeded, VIEWPORTS } from './seeded'
+import { seeded, signInAs, VIEWPORTS } from './seeded'
 
 /*
  * The replayer fits a laptop screen as one picture: the page never scrolls,
@@ -35,7 +35,7 @@ for (const viewport of VIEWPORTS) {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
 
     test.beforeEach(async ({ page }) => {
-      await signInAsTesterA(page)
+      await signInAs(page, 'Tester A')
     })
 
     test('a Library Hand fits without overlaps at every Action', async ({ page }) => {
@@ -59,12 +59,6 @@ for (const viewport of VIEWPORTS) {
       }
     })
   })
-}
-
-async function signInAsTesterA(page: Page) {
-  await page.goto('/login')
-  await page.getByRole('button', { name: 'Tester A' }).click()
-  await expect(page).not.toHaveURL(/\/login/)
 }
 
 /**
