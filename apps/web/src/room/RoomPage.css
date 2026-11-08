@@ -197,10 +197,23 @@
 }
 
 .room-header__people {
-  display: flex;
+  position: relative;
   flex-shrink: 0;
+}
+.room-header__people-trigger {
+  display: flex;
   align-items: center;
   gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  cursor: default;
+}
+.room-header__people-trigger:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
 }
 .room-header__count {
   font-size: 12px;
@@ -245,14 +258,71 @@
   width: 320px;
   border-right: 1px solid var(--color-panel-border);
 }
-/* Taller than a 13" laptop's viewport once a Hand ends: it scrolls itself, never the page. */
 .room-side {
-  /* Positioned, like the Queue's list, so visually hidden text far down it is
-     placed inside its scroll box; placed against the page, it scrolled the page. */
-  position: relative;
   width: 300px;
-  overflow-y: auto;
+  min-height: 0;
   border-left: 1px solid var(--color-panel-border);
+}
+
+/* The tabs of the import dialog, in the band where a panel has its title. */
+.room-side__tabs {
+  height: 50px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 22px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.room-side__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.room-side__tab:hover {
+  color: var(--text-secondary);
+}
+.room-side__tab[aria-selected='true'] {
+  font-weight: 600;
+  color: var(--brass-ink);
+  border-bottom-color: var(--brass);
+}
+.room-side__count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* Each tab scrolls itself, never the page. Positioned, like the Queue's list, so
+   visually hidden text far down it is placed inside its scroll box. */
+.room-side__panel {
+  position: relative;
+  flex-grow: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.room-side__panel[hidden] {
+  display: none;
+}
+
+.room-side__empty {
+  margin: 0;
+  padding: 16px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .room-panel__header {
@@ -604,13 +674,16 @@
 
 /* ---------- The loaded Hand: header, table, transport bar ---------- */
 
+/* Wraps on a narrow stage: spilling over the side panel, its buttons covered the tabs. */
 .room-stage__header {
-  height: 54px;
+  min-height: 54px;
+  box-sizing: border-box;
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 0 20px;
+  gap: 6px 12px;
+  padding: 8px 20px;
   border-bottom: 1px solid var(--color-divider);
 }
 
@@ -635,6 +708,8 @@
 }
 
 .room-stage__by {
+  /* From nothing, so a long name gives up its room before the row wraps. */
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   font-size: 12.5px;
@@ -1394,15 +1469,57 @@
   color: var(--alert-ink);
 }
 
-.room-participants__status {
-  margin: 0 0 10px;
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--text-muted);
+/* Boards "Sala · Quién está en la sala" and "Sala · Cambio de Master". */
+.room-header-participants {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  /* Only the panel answers the pointer: a notice alone must not open it. */
+  pointer-events: none;
 }
 
-.room-participants__status:empty {
-  display: none;
+.room-header-participants__panel {
+  position: relative;
+  box-sizing: border-box;
+  width: 301px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+  pointer-events: auto;
+}
+/* Bridges the gap below the avatars, so a slow pointer on its way here does not leave them. */
+.room-header-participants__panel::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  right: 0;
+  left: 0;
+  height: 9px;
+}
+.room-header-participants__panel .room-participants {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+
+.room-header-participants__notice {
+  display: block;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-preview);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 
 /* ---------- Before the Room: confirm the name, or say why not ---------- */
@@ -1489,7 +1606,33 @@
     flex-wrap: wrap;
     height: auto;
     padding: 10px 16px;
+    position: relative;
     row-gap: 10px;
+  }
+  /* What the avatars open spans the screen from the header's foot, so they take its last row, right above it. */
+  .room-header__people {
+    position: static;
+    order: 1;
+  }
+  .room-header-participants {
+    top: calc(100% - 2px);
+    right: 16px;
+    left: 16px;
+  }
+  .room-header-participants__panel {
+    width: 100%;
+  }
+  /* From the avatars, past the rest of their row and the header's padding. */
+  .room-header-participants__panel::before {
+    top: -18px;
+    height: 18px;
+  }
+  /* The page scrolls here, so nothing else would stop the list growing and pushing the field below every Note. */
+  .room-side__panel .room-notes__list {
+    max-height: min(50vh, 420px);
+  }
+  .room-header-participants__notice {
+    white-space: normal;
   }
   .room__body {
     flex-direction: column;
@@ -1636,13 +1779,14 @@
 .room-facts {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 7px;
   margin: 0;
 }
 .room-facts__row {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 28px;
 }
 .room-facts__row dt {
   width: 92px;
@@ -1730,9 +1874,9 @@
 }
 
 /*
- * The "Notas de la mano" panel of the "Sala" boards: the Notes already on the
- * loaded Hand, then the field to write one. It takes what is left of the side
- * panel, as the board draws it, and scrolls when the Notes outgrow it.
+ * A Hand's Notes, then the field to write one: the Room's Notas tab and the
+ * Library's Hand page. It takes what is left of its panel and scrolls when the
+ * Notes outgrow it.
  */
 .room-notes {
   flex-grow: 1;
@@ -1746,6 +1890,22 @@
   gap: 8px;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* In the Notas tab, the Notes take all the height there is and the field stays in view below them. */
+.room-side__panel .room-notes {
+  padding: 14px;
+}
+.room-side__panel .room-notes__list {
+  flex-grow: 1;
+}
+.room-side__panel .room-notes__note {
+  flex-shrink: 0;
+}
+.room-side__panel .room-notes__field {
+  flex: none;
+  height: 96px;
+  min-height: 0;
 }
 
 .room-notes__note {

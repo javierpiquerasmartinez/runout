@@ -1,4 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent,
+} from 'react'
+import { flushSync } from 'react-dom'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
@@ -96,6 +108,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   // Who the Master is handing the Room to on their way out, until the role moves.
   const [leavingTo, setLeavingTo] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [sideTab, setSideTab] = useState<SideTab>('notes')
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
   usePasteToImport(view.room.code, !importing, reportImport)
@@ -124,6 +137,7 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   if (loadedEntry && loadedEntry.id !== lastLoadedEntry?.id) setLastLoadedEntry(loadedEntry)
   const detailsEntry =
     loadedEntry ?? (lastLoadedEntry?.handId === shown?.handId ? lastLoadedEntry : undefined)
+  const noteCount = view.notes.filter((note) => note.handId === detailsEntry?.handId).length
   const previous = loadedIndex > 0 ? view.queue[loadedIndex - 1] : undefined
   const next = view.queue[loadedIndex + 1]
   useShortcuts(canDrive, {
@@ -141,6 +155,9 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
       <RoomHeader
         view={view}
         isMaster={isMaster}
+        masterNotice={masterNotice}
+        onHandOver={commands.handOverMaster}
+        onKick={(participant) => setDecision({ kind: 'kick', participant })}
         onStartLive={commands.startLive}
         onLeave={() => (isMaster ? setDecision({ kind: 'leave' }) : navigate('/'))}
       />
@@ -172,6 +189,11 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               onGoTo={commands.goToAction}
               onHideOpponentNames={commands.hideOpponentNames}
               onSetMark={(marked) => commands.setMark(shown.handId, marked)}
+              onJumpToNote={() => {
+                // A hidden field cannot take focus, so Notas has to be showing first.
+                flushSync(() => setSideTab('notes'))
+                document.getElementById(NOTE_FIELD_ID)?.focus()
+              }}
             />
           ) : (
             <>
@@ -195,62 +217,65 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           )}
         </main>
 
-        <aside className="room-side" aria-labelledby="room-side-title">
-          <div className="room-panel__header">
-            <h2 id="room-side-title" className="room-panel__title">
-              {t('room.details.title')}
-            </h2>
-          </div>
+        <aside className="room-side" aria-label={t('room.side.label')}>
           <AnonymousNotice />
-          {detailsEntry && (
-            <CurrentHand
-              entry={detailsEntry}
-              tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
-              participants={view.participants}
-              isMaster={isMaster && loadedEntry !== undefined}
-              onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
-            />
-          )}
-          {table?.payout && <Payout payout={table.payout} />}
-          <section className="room-side__section" aria-labelledby="room-participants-title">
-            <h3 id="room-participants-title" className="room-side__title">
-              {t('room.participants.title')}
-            </h3>
-            {/* Always mounted, so screen readers announce a change of Master when it happens. */}
-            <p className="room-participants__status" role="status">
-              {masterNotice}
-            </p>
-            <ul className="room-participants" aria-live="polite">
-              {view.participants.map((participant) => (
-                <ParticipantRow
-                  key={participant.identityId}
-                  participant={participant}
-                  presence={presenceOf(view.presence, participant.identityId)}
-                  isYou={participant.identityId === view.you}
-                  authored={authoredCount(view.queue, participant.identityId)}
-                  onHandOver={
-                    isMaster && participant.identityId !== view.you
-                      ? () => commands.handOverMaster(participant.identityId)
-                      : undefined
-                  }
-                  onKick={
-                    isMaster && participant.identityId !== view.you
-                      ? () => setDecision({ kind: 'kick', participant })
-                      : undefined
-                  }
-                />
-              ))}
-            </ul>
-          </section>
-          {detailsEntry && (
-            <HandNotes
-              handId={detailsEntry.handId}
-              notes={view.notes}
-              you={view.you}
-              isMaster={isMaster}
-              commands={commands}
-            />
-          )}
+          <div className="room-side__tabs" role="tablist">
+            {SIDE_TABS.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={`room-tab-${name}`}
+                aria-controls={`room-tabpanel-${name}`}
+                aria-selected={sideTab === name}
+                className="room-side__tab"
+                onClick={() => setSideTab(name)}
+              >
+                {t(`room.side.tab.${name}`)}{' '}
+                {name === 'notes' && noteCount > 0 && <span className="room-side__count ro-mono">{noteCount}</span>}
+              </button>
+            ))}
+          </div>
+          {/* Both stay mounted: a half-written Note, an edit and an undo outlive a look at the other tab. */}
+          <div
+            id="room-tabpanel-details"
+            role="tabpanel"
+            aria-labelledby="room-tab-details"
+            className="room-side__panel"
+            hidden={sideTab !== 'details'}
+          >
+            {detailsEntry ? (
+              <CurrentHand
+                entry={detailsEntry}
+                tableSize={load.state === 'loaded' ? load.hand.tableSize : null}
+                participants={view.participants}
+                isMaster={isMaster && loadedEntry !== undefined}
+                onReassign={(authorId) => commands.reassignAuthor(detailsEntry.handId, authorId)}
+              />
+            ) : (
+              <NoHandLoaded />
+            )}
+            {table?.payout && <Payout payout={table.payout} />}
+          </div>
+          <div
+            id="room-tabpanel-notes"
+            role="tabpanel"
+            aria-labelledby="room-tab-notes"
+            className="room-side__panel"
+            hidden={sideTab !== 'notes'}
+          >
+            {detailsEntry ? (
+              <HandNotes
+                handId={detailsEntry.handId}
+                notes={view.notes}
+                you={view.you}
+                isMaster={isMaster}
+                commands={commands}
+              />
+            ) : (
+              <NoHandLoaded />
+            )}
+          </div>
         </aside>
       </div>
       {importing && (
@@ -385,6 +410,9 @@ function RoomDecisionDialog({
 
 /** The Note field the loaded Hand's "Nota" button takes you to. */
 const NOTE_FIELD_ID = 'room-note-field'
+
+const SIDE_TABS = ['details', 'notes'] as const
+type SideTab = (typeof SIDE_TABS)[number]
 
 /**
  * The Queue panel, from the "Sala" boards: Author, date, Positions, Stake,
@@ -602,19 +630,23 @@ function QueuePanel({
 function RoomHeader({
   view,
   isMaster,
+  masterNotice,
+  onHandOver,
+  onKick,
   onStartLive,
   onLeave,
 }: {
   view: InRoom
   isMaster: boolean
+  masterNotice: string | null
+  onHandOver: (identityId: string) => void
+  onKick: (participant: Participant) => void
   onStartLive: () => void
   /** A Guest walks out; the Master is asked to hand the role over or close first. */
   onLeave: () => void
 }) {
   const { t } = useI18n()
   const master = view.participants.find((p) => p.role === 'master')
-  // Guests see the Master named apart, so the stack shows everyone else.
-  const stacked = isMaster ? view.participants : view.participants.filter((p) => p.role !== 'master')
   const [copied, copy] = useCopied()
 
   return (
@@ -670,14 +702,7 @@ function RoomHeader({
           </span>
         </span>
       )}
-      <span className="room-header__people">
-        <span className="ro-avatar-stack">
-          {stacked.map((p) => (
-            <Avatar key={p.identityId} name={p.displayName} seed={p.identityId} />
-          ))}
-        </span>
-        <span className="room-header__count">{t('room.inRoom', { count: view.participants.length })}</span>
-      </span>
+      <RoomParticipants view={view} isMaster={isMaster} notice={masterNotice} onHandOver={onHandOver} onKick={onKick} />
       <span className="room-header__role" data-role={isMaster ? 'master' : 'guest'}>
         <Icon name={isMaster ? 'master' : 'profile'} size={14} />
         {t(isMaster ? 'room.master' : 'room.guest')}
@@ -711,6 +736,7 @@ function LoadedHand({
   onGoTo,
   onHideOpponentNames,
   onSetMark,
+  onJumpToNote,
 }: {
   view: InRoom
   handId: string
@@ -727,6 +753,7 @@ function LoadedHand({
   onGoTo: (actionIndex: number) => void
   onHideOpponentNames: (hidden: boolean) => void
   onSetMark: (marked: boolean) => void
+  onJumpToNote: () => void
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -772,7 +799,7 @@ function LoadedHand({
               variant="ghost"
               size="compact"
               className="room-stage__note"
-              onClick={() => document.getElementById(NOTE_FIELD_ID)?.focus()}
+              onClick={onJumpToNote}
             >
               <Icon name="note" size={14} />
               {t('room.notes.jump')}
@@ -928,8 +955,14 @@ function CurrentHand({
   )
 }
 
+/** What either tab of the side panel says while no Hand is loaded. */
+function NoHandLoaded() {
+  const { t } = useI18n()
+  return <p className="room-side__empty">{t('room.side.empty')}</p>
+}
+
 /**
- * The "Notas de la mano" panel of the "Sala" boards: what the group concluded
+ * The Notas tab of the "Sala" boards: what the group concluded
  * about the loaded Hand. Any Participant writes one; its writer or the Master
  * rewrites or deletes it, and a deletion can be undone for ten seconds.
  * Anyone else sees those controls locked with the reason, never hidden.
@@ -975,57 +1008,52 @@ function HandNotes({
   }
 
   return (
-    <section className="room-side__section room-notes" aria-labelledby="room-notes-title">
-      <h3 id="room-notes-title" className="room-side__title">
-        {t('room.notes.title')}
-      </h3>
-      {onHand.length > 0 && (
-        <ul className="room-notes__list">
-          {onHand.map((note) =>
-            editing === note.id ? (
-              <li key={note.id} className="room-notes__note">
-                <NoteEditor
-                  note={note}
-                  onSave={(body) => {
-                    commands.editNote(note.id, body)
-                    setEditing(null)
-                  }}
-                  onCancel={() => setEditing(null)}
+    <div className="room-side__section room-notes">
+      <ul className="room-notes__list">
+        {onHand.map((note) =>
+          editing === note.id ? (
+            <li key={note.id} className="room-notes__note">
+              <NoteEditor
+                note={note}
+                onSave={(body) => {
+                  commands.editNote(note.id, body)
+                  setEditing(null)
+                }}
+                onCancel={() => setEditing(null)}
+              />
+            </li>
+          ) : (
+            <li key={note.id} className="room-notes__note">
+              <div className="room-notes__by">
+                <Avatar name={note.writer.displayName} seed={note.writer.identityId} size={18} />
+                <span className="room-notes__writer">{note.writer.displayName}</span>
+                {/* Dated by when it was written; a rewrite is said apart, never in its place. */}
+                <span className="room-notes__when ro-mono" title={dateTimeLabel(note.writtenAt, i18n)}>
+                  {i18n.formatRelative(new Date(note.writtenAt))}
+                  {note.editedAt && ` · ${t('room.notes.edited')}`}
+                </span>
+              </div>
+              <p className="room-notes__body">{note.body}</p>
+              <div className="room-notes__controls">
+                <IconButton
+                  icon="edit"
+                  label={t('room.notes.edit', { name: note.writer.displayName })}
+                  size="compact"
+                  disabledReason={lockedReason(note)}
+                  onClick={() => setEditing(note.id)}
                 />
-              </li>
-            ) : (
-              <li key={note.id} className="room-notes__note">
-                <div className="room-notes__by">
-                  <Avatar name={note.writer.displayName} seed={note.writer.identityId} size={18} />
-                  <span className="room-notes__writer">{note.writer.displayName}</span>
-                  {/* Dated by when it was written; a rewrite is said apart, never in its place. */}
-                  <span className="room-notes__when ro-mono" title={dateTimeLabel(note.writtenAt, i18n)}>
-                    {i18n.formatRelative(new Date(note.writtenAt))}
-                    {note.editedAt && ` · ${t('room.notes.edited')}`}
-                  </span>
-                </div>
-                <p className="room-notes__body">{note.body}</p>
-                <div className="room-notes__controls">
-                  <IconButton
-                    icon="edit"
-                    label={t('room.notes.edit', { name: note.writer.displayName })}
-                    size="compact"
-                    disabledReason={lockedReason(note)}
-                    onClick={() => setEditing(note.id)}
-                  />
-                  <IconButton
-                    icon="delete"
-                    label={t('room.notes.delete', { name: note.writer.displayName })}
-                    size="compact"
-                    disabledReason={lockedReason(note)}
-                    onClick={() => removal.remove(note.id, commands.removeNote)}
-                  />
-                </div>
-              </li>
-            ),
-          )}
-        </ul>
-      )}
+                <IconButton
+                  icon="delete"
+                  label={t('room.notes.delete', { name: note.writer.displayName })}
+                  size="compact"
+                  disabledReason={lockedReason(note)}
+                  onClick={() => removal.remove(note.id, commands.removeNote)}
+                />
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
       {removal.pendingId && (
         <div className="room-notes__undo" role="status">
           <span>{t('room.notes.removed')}</span>
@@ -1045,7 +1073,7 @@ function HandNotes({
       <Button variant="secondary" className="room-notes__save" onClick={write}>
         {t(isMaster ? 'room.notes.save' : 'room.notes.post')}
       </Button>
-    </section>
+    </div>
   )
 }
 
@@ -1280,6 +1308,169 @@ function usePasteToImport(code: string, enabled: boolean, report: (outcome: Impo
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
   }, [code, token, enabled, report])
+}
+
+/**
+ * The avatars in the header and who they stand for: a panel with every
+ * Participant and, for the Master, the actions on each. Below it, for a few
+ * seconds, the notice of a change of Master.
+ */
+function RoomParticipants({
+  view,
+  isMaster,
+  notice,
+  onHandOver,
+  onKick,
+}: {
+  view: InRoom
+  isMaster: boolean
+  notice: string | null
+  onHandOver: (identityId: string) => void
+  onKick: (participant: Participant) => void
+}) {
+  const { t } = useI18n()
+  const { open, rootProps, triggerProps, closeBeforeConfirming } = useParticipantsPanel()
+
+  // Guests see the Master named apart, so the stack shows everyone else.
+  const stacked = isMaster ? view.participants : view.participants.filter((p) => p.role !== 'master')
+
+  return (
+    <div {...rootProps} className="room-header__people">
+      <button
+        {...triggerProps}
+        type="button"
+        className="room-header__people-trigger"
+        aria-label={t('room.participants.trigger', { count: view.participants.length })}
+        aria-expanded={open}
+      >
+        <span className="ro-avatar-stack">
+          {stacked.map((p) => (
+            <Avatar key={p.identityId} name={p.displayName} seed={p.identityId} />
+          ))}
+        </span>
+        <span className="room-header__count">{t('room.inRoom', { count: view.participants.length })}</span>
+      </button>
+      <div className="room-header-participants">
+        {open && (
+          <div className="room-header-participants__panel" role="group" aria-label={t('room.participants.title')}>
+            <ul className="room-participants" aria-live="polite">
+              {view.participants.map((participant) => {
+                const canAct = isMaster && participant.identityId !== view.you
+                return (
+                  <ParticipantRow
+                    key={participant.identityId}
+                    participant={participant}
+                    presence={presenceOf(view.presence, participant.identityId)}
+                    isYou={participant.identityId === view.you}
+                    authored={authoredCount(view.queue, participant.identityId)}
+                    onHandOver={canAct ? () => onHandOver(participant.identityId) : undefined}
+                    onKick={
+                      canAct
+                        ? () => {
+                            closeBeforeConfirming()
+                            onKick(participant)
+                          }
+                        : undefined
+                    }
+                  />
+                )
+              })}
+            </ul>
+          </div>
+        )}
+        {/* Always mounted, so screen readers announce a change of Master with the panel closed. */}
+        <span role="status">{notice && <span className="room-header-participants__notice">{notice}</span>}</span>
+      </div>
+    </div>
+  )
+}
+
+const PARTICIPANTS_PANEL_CLOSE_AFTER_MS = 150
+
+/**
+ * When the panel of who is in the Room shows. A mouse governs it by hovering
+ * alone; a tap toggles it; keyboard focus opens it and Esc closes it, returning
+ * focus to the trigger. Spread the props on the element that holds trigger and
+ * panel, and on the trigger.
+ */
+function useParticipantsPanel() {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const pointerInside = useRef(false)
+  const pressedWith = useRef('')
+  const returningFocus = useRef(false)
+  const focusWasInside = useRef(false)
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
+
+  const focusInside = () => root.current?.contains(document.activeElement) ?? false
+
+  function returnFocus() {
+    // Focus coming back to the trigger is not someone arriving at it.
+    returningFocus.current = true
+    trigger.current?.focus()
+    returningFocus.current = false
+  }
+
+  // React fires no blur when the focused element unmounts, as a Master's buttons
+  // do on handing over the role: focus would fall to the page, out of Esc's reach.
+  useLayoutEffect(() => {
+    if (focusWasInside.current && document.activeElement === document.body) returnFocus()
+  })
+
+  const rootProps = {
+    ref: root,
+    onPointerEnter: (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return
+      pointerInside.current = true
+      clearTimeout(closeTimer.current)
+      setOpen(true)
+    },
+    onPointerLeave: (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return
+      pointerInside.current = false
+      closeTimer.current = setTimeout(() => {
+        if (!focusInside()) setOpen(false)
+      }, PARTICIPANTS_PANEL_CLOSE_AFTER_MS)
+    },
+    // A press never takes focus here, or focus would hold the panel open after the mouse has left.
+    onMouseDown: (event: ReactMouseEvent) => event.preventDefault(),
+    onFocus: () => {
+      focusWasInside.current = true
+    },
+    onBlur: (event: FocusEvent<HTMLDivElement>) => {
+      focusWasInside.current = false
+      if (!pointerInside.current && !event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+    },
+    onKeyDown: (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !open) return
+      setOpen(false)
+      returnFocus()
+    },
+  }
+
+  const triggerProps = {
+    ref: trigger,
+    onPointerDown: (event: PointerEvent) => {
+      pressedWith.current = event.pointerType
+    },
+    onFocus: () => {
+      if (!returningFocus.current) setOpen(true)
+    },
+    onClick: (event: ReactMouseEvent) => {
+      // Enter and Space click with no detail; a mouse has already opened it by hovering.
+      if (event.detail > 0 && pressedWith.current === 'mouse') return
+      setOpen((wasOpen) => !wasOpen)
+    },
+  }
+
+  function closeBeforeConfirming() {
+    setOpen(false)
+    if (focusInside()) returnFocus()
+  }
+
+  return { open, rootProps, triggerProps, closeBeforeConfirming }
 }
 
 function ParticipantRow({

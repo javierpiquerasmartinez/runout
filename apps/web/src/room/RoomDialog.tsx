@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import './RoomDialog.css'
@@ -27,7 +27,8 @@ export function RoomDialog({
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
 
-  useEffect(() => {
+  // Before the dialog leaves the page: only a dialog still on it hands focus back to where it was.
+  useLayoutEffect(() => {
     const element = dialog.current
     if (!element) return
     element.showModal()
