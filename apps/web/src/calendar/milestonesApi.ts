@@ -16,8 +16,8 @@ export type MilestoneChange = Partial<{ title: string; description: string; date
 
 const pathOf = (id: string) => `/calendar/milestones/${encodeURIComponent(id)}`
 
-/** The Account's Milestones dated within the span, and whether it has any Milestone at all. */
-export function listMilestones(token: Token, span: CalendarSpan): Promise<{ milestones: Milestone[]; hasAny: boolean }> {
+/** The Account's Milestones dated within the span. */
+export function listMilestones(token: Token, span: CalendarSpan): Promise<{ milestones: Milestone[] }> {
   return api(`/calendar/milestones?from=${span.from}&to=${span.to}`, { token: token ?? undefined })
 }
 

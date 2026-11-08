@@ -55,7 +55,7 @@ beforeEach(() => {
         const from = query.get('from')!
         const to = query.get('to')!
         const milestones = stored.filter(({ date }) => date >= from && date <= to)
-        return Response.json({ milestones, hasAny: stored.length > 0 })
+        return Response.json({ milestones })
       },
     }),
   )

@@ -20,10 +20,9 @@ export interface Milestone {
   createdAt: Date;
 }
 
-/** The Milestones of a span, and whether the Account has any Milestone at all. */
+/** The Milestones of a span. */
 export interface MilestoneList {
   milestones: Milestone[];
-  hasAny: boolean;
 }
 
 /** What creating a Milestone sends. */
@@ -85,16 +84,7 @@ export class MilestonesService {
         asc(milestones.createdAt),
         asc(milestones.id),
       );
-    const hasAny =
-      rows.length > 0 ||
-      (
-        await this.db
-          .select({ id: milestones.id })
-          .from(milestones)
-          .where(eq(milestones.identityId, account.id))
-          .limit(1)
-      ).length > 0;
-    return { milestones: rows, hasAny };
+    return { milestones: rows };
   }
 
   /** A new Milestone on its date, not done. */

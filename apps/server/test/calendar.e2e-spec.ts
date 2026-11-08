@@ -19,7 +19,6 @@ interface Milestone {
 
 interface MilestoneList {
   milestones: Milestone[];
-  hasAny: boolean;
 }
 
 describe('Milestones in the Calendar (e2e)', () => {
@@ -105,7 +104,6 @@ describe('Milestones in the Calendar (e2e)', () => {
     });
     expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
       milestones: [created.body],
-      hasAny: true,
     });
   });
 
@@ -143,22 +141,6 @@ describe('Milestones in the Calendar (e2e)', () => {
       'Middle',
       late.title,
     ]);
-  });
-
-  it('says whether the Account has any Milestone at all', async () => {
-    const account = await newAccount(running.httpServer);
-
-    expect(await list(account.token, '2026-11-01', '2026-11-30')).toEqual({
-      milestones: [],
-      hasAny: false,
-    });
-
-    await plan(account.token, '2027-05-04', 'Far away');
-
-    expect(await list(account.token, '2026-11-01', '2026-11-30')).toEqual({
-      milestones: [],
-      hasAny: true,
-    });
   });
 
   it('refuses a title that is empty or too long', async () => {
@@ -250,7 +232,6 @@ describe('Milestones in the Calendar (e2e)', () => {
 
     expect(await list(stranger.token, '2026-11-01', '2026-11-30')).toEqual({
       milestones: [],
-      hasAny: false,
     });
   });
 
@@ -264,7 +245,6 @@ describe('Milestones in the Calendar (e2e)', () => {
     expect(done.body).toEqual({ ...squeeze, done: true });
     expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
       milestones: [{ ...squeeze, done: true }],
-      hasAny: true,
     });
 
     const undone = await change(account.token, squeeze.id, {
@@ -351,7 +331,6 @@ describe('Milestones in the Calendar (e2e)', () => {
     }
     expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
       milestones: [squeeze],
-      hasAny: true,
     });
   });
 
@@ -373,7 +352,6 @@ describe('Milestones in the Calendar (e2e)', () => {
     }
     expect(await list(owner.token, '2026-11-10', '2026-11-10')).toEqual({
       milestones: [mine],
-      hasAny: true,
     });
   });
 
@@ -403,7 +381,6 @@ describe('Milestones in the Calendar (e2e)', () => {
     }
     expect(await list(account.token, '2026-11-10', '2026-11-10')).toEqual({
       milestones: [kept],
-      hasAny: true,
     });
   });
 
@@ -544,7 +521,6 @@ describe('Milestones during Impersonation (e2e)', () => {
       .expect(200);
     expect(list.body).toEqual({
       milestones: [{ ...kept.body, title: 'Squeeze vs BTN', done: true }],
-      hasAny: true,
     });
   });
 });
