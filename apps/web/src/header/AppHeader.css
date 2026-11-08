@@ -1,8 +1,8 @@
 /*
  * The header of the "Biblioteca" board, shared by the Account side: 56 px, the
  * brand, the navigation, where the person is, "Nueva sala" and the avatar's menu.
- * No board draws it on a phone: there it keeps everything but loses what can
- * go without words, so it fits without scrolling sideways.
+ * On a phone, as the Calendar's narrow boards draw it, it keeps everything but
+ * loses what can go without words, and its sections scroll sideways.
  */
 
 .app-header {
@@ -25,7 +25,9 @@
   font-weight: 600;
 }
 
+/* Positioned, so its sections measure where they sit from its own edge. */
 .app-header__nav {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -186,8 +188,43 @@
   .app-header__account {
     flex-shrink: 0;
   }
+  /*
+   * The four sections don't fit at phone width: they scroll sideways, kept to
+   * the right while they fit, the current one in view, fading out on each side
+   * where more are hidden.
+   */
+  .app-header__nav {
+    --fade-start: #000;
+    --fade-end: #000;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, var(--fade-start) 0, #000 22px, #000 calc(100% - 22px), var(--fade-end) 100%);
+    mask-image: linear-gradient(to right, var(--fade-start) 0, #000 22px, #000 calc(100% - 22px), var(--fade-end) 100%);
+  }
+  .app-header__nav[data-hidden-start] {
+    --fade-start: transparent;
+  }
+  .app-header__nav[data-hidden-end] {
+    --fade-end: transparent;
+  }
+  .app-header__nav::-webkit-scrollbar {
+    display: none;
+  }
+  .app-header__nav ~ .app-header__spacer {
+    display: none;
+  }
   .app-header__nav-item {
+    flex-shrink: 0;
     padding: 0 8px;
+    white-space: nowrap;
+  }
+  .app-header__nav-item:first-child {
+    margin-left: auto;
+  }
+  .app-header__nav-item:focus-visible {
+    outline-offset: -2px;
   }
   /* "Nueva sala" keeps its name for screen readers, and shows only its plus. */
   .app-header__new-room-label {

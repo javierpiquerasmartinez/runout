@@ -225,6 +225,13 @@
       "when": 1794059013904,
       "tag": "0031_room_master_away",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794091310914,
+      "tag": "0032_milestones",
+      "breakpoints": true
     }
   ]
 }

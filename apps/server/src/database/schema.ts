@@ -6,6 +6,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   foreignKey,
   index,
   integer,
@@ -612,5 +613,30 @@ export const rangeTagLinks = pgTable(
   (table) => [
     primaryKey({ columns: [table.rangeId, table.tagId] }),
     index('range_tag_links_tag_id_idx').on(table.tagId),
+  ],
+);
+
+/**
+ * A Milestone: a topic an Account means to study on a given day, in its
+ * Calendar. The date is a calendar date with no time and no zone. Only its
+ * owner sees it.
+ */
+export const milestones = pgTable(
+  'milestones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    title: text('title').notNull(),
+    /** Empty when there is none. */
+    description: text('description').notNull().default(''),
+    date: date('date', { mode: 'string' }).notNull(),
+    done: boolean('done').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index('milestones_identity_id_date_idx').on(table.identityId, table.date),
   ],
 );

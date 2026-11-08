@@ -489,6 +489,77 @@
   cursor: pointer;
 }
 
+/* ---------- Breadcrumb: links back in secondary text, the current page in primary, cut short ---------- */
+
+.ro-breadcrumb {
+  display: flex;
+  min-width: 0;
+}
+
+.ro-breadcrumb__trail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 32px;
+}
+
+.ro-breadcrumb__step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.ro-breadcrumb__step--current {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.ro-breadcrumb__link {
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.ro-breadcrumb__link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.ro-breadcrumb__separator {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.ro-breadcrumb__current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/*
+ * On a phone the last part alone can't always make room (a week across a year
+ * and a long title): the parts between the first and the last give way too,
+ * reluctantly, cut with an ellipsis. The first keeps its whole name.
+ */
+@media (max-width: 760px) {
+  .ro-breadcrumb__step:not(:first-child, .ro-breadcrumb__step--current) {
+    min-width: 0;
+    flex-shrink: 0.25;
+  }
+  .ro-breadcrumb__step:not(:first-child, .ro-breadcrumb__step--current) .ro-breadcrumb__link {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* ---------- Avatar ---------- */
 
 .ro-avatar {

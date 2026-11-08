@@ -208,6 +208,9 @@ export const drawings = {
       <circle {...fill} cx="12" cy="8" r="1" />
     </>
   ),
+
+  // The Calendar's done tick, drawn inside a check box: heavier than the rest, at any size.
+  check: <path {...stroke} strokeWidth="3" d="m7 12.4 3.2 3.2L17 8.8" />,
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof drawings

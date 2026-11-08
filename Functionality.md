@@ -77,7 +77,7 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Nine epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand.
+Eleven epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, and the Calendar after the Lab, as a place to plan that study day by day. Administration runs alongside them for the trial.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |
@@ -90,6 +90,7 @@ Nine epics cover the product. Five are essential for a session to work end to en
 | E7 · Library and Results | Keep, find, classify and measure your own Hands, and bring them to a Room | Second release |
 | E8 · Accounts and preferences | Sign in, read the table your own way, and be recognised in Hand Histories | Partial in MVP |
 | E9 · Lab | Build, measure, name and find your own preflop Ranges | After the second release |
+| E11 · Calendar | Plan what to study on each day with Milestones, tick them off and replan what slipped | After the Lab |
 | E10 · Administration | Decide who gets an Account, see how Runout is used, and help someone from inside their Account | Trial |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
@@ -537,7 +538,8 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
 
-- The Library, a Library Hand, **Salas**, the Lab and Settings share the same header: the brand, **Biblioteca**, **Salas** and **Laboratorio** with the current one marked, **Nueva sala** and the avatar menu.
+- The Library, a Library Hand, **Salas**, the Lab, the Calendar and Settings share the same header: the brand, **Biblioteca**, **Salas**, **Laboratorio** and **Calendario** with the current one marked, **Nueva sala** and the avatar menu.
+- On a phone the four sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
 - An anonymous Participant who steps out to Settings sees only the brand and a way back, and their Room carries on behind it. Without any identity, Settings sends me to `/login`.
@@ -710,6 +712,67 @@ The Lab is where a player builds their preflop Ranges, sees how wide they are an
 - While the Range is narrowed the brush is locked, saying why: painting cells the Narrowing hides would mean nothing. Going back to the flop, or removing every step of the trail, unlocks it.
 - The address holds the Narrowings, the Categories kept on each Street, so reloading or going back keeps the hand I am reading.
 - With two sides (H9.16) each side narrows on its own: dealing the next card turns each side's own selection into its Narrowing, and the Equity between them (H9.17) is worked out between the two narrowed Ranges. Each side has its own trail, **Acotado · Rango 1** and **Acotado · Rango 2**, whose remove buttons name the side, and its own brush lock. Loading or clearing one side drops only its Narrowings; adding or removing the second side keeps the first's. The address holds both.
+
+## E11 · Calendar
+
+The Calendar is where a player plans what they are going to study, one day at a time, with Milestones. A Milestone is a title, an optional description and whether it is done, on a date of the calendar: never on a time, so it stays on its day wherever the player is. Several can fall on one day; none spans days or repeats. Like the Lab, the Calendar has nothing to do with Rooms or the Library: nothing in it comes from a Hand or a Range or goes into one. It needs an Account, and nobody else sees it.
+
+**H11.1 — Open the Calendar.** As a player, I want a place to plan my study, so I know what I meant to work on each day.
+
+- **Calendario** sits in the shared header after **Laboratorio**, and is marked while I am in the Calendar (H8.9).
+- `/calendar` opens on the current month, at `/calendar/month/<yyyy-mm>`; the week view lives at `/calendar/week/<yyyy-mm-dd>` of its Monday, and a Milestone at `/calendar/milestones/:id`. A week written on another day opens at its Monday's address, and a period that doesn't exist opens on the current month, both in place of the address written.
+- "Today" is the day where my browser is.
+- Without an Account, every Calendar address sends me to `/login`. An anonymous Participant has no way into the Calendar.
+- My Milestones are seen by nobody else. An Administrator impersonating me (H10.5) sees and changes them as I would; the panel shows nothing of them.
+
+**H11.2 — See a month.** As a player, I want the month at a glance, so I see what is planned and where there is room.
+
+- The month is laid out Monday first, in four to six weeks, with the neighbouring months' days set apart and today's number in a brass circle.
+- Each day shows up to three Milestones' titles, cut short with the whole title on hover, then **+N más**, which leads to that day's week.
+- A day lists its Milestones not done first, then the done ones, each in the order they were created.
+- Previous and next move a month, **Hoy** goes to the current month, and each move is a new address that back undoes.
+- While I have no Milestone at all, a hint over the grid says "Pulsa un día para planear qué estudiar." If they can't be loaded, the Calendar says so.
+
+**H11.3 — See a week.** As a player, I want a week in detail, so I see every Milestone of each day.
+
+- **Mes / Semana** switches views. From the current month it opens today's week, from another month the week of its first day, and from a week its Monday's month; each switch is a new address.
+- The week shows seven columns, Monday to Sunday, each with every Milestone of its day as a card whose whole title wraps, in the day's order, and with today marked. Its heading names the week, as "9 – 15 nov 2026", naming a month or a year only where the week crosses into another.
+- Previous, next and **Hoy** move by a week.
+
+**H11.4 — Plan a Milestone.** As a player, I want to put something to study on a day in one click.
+
+- A click on a day's empty space, or on its "+", opens **Nuevo hito** on that day; hovering an empty day shows "+ Nuevo hito". The **Nuevo hito** button above the grid opens it on today. A click on a Milestone is the Milestone's, never the day's.
+- The dialog asks for a title (up to 80 characters, with a counter), an optional description (up to 500) and the date, which I can change to plan on another day. An empty title is refused in place; **Cancelar** or Escape creates nothing; a refusal from the server is said in the dialog, which stays open.
+- **Crear hito** adds it to its day at once. Any day can be planned, past ones too.
+
+**H11.5 — Tick a Milestone off.** As a player, I want to mark what I studied, and see at a glance what slipped.
+
+- Each Milestone has a check that marks it done or not done at once, wherever it is shown. A done one is dimmed, never struck through, and goes after the ones not done of its day.
+- A Milestone not done on a day before today is pending: its check is drawn in brass. Nothing else marks it, and it stays on its day until I move it.
+- If saving the check fails, it goes back and the Calendar says which Milestone was not saved.
+
+**H11.6 — Replan by dragging.** As a player at a desk, I want to drag a Milestone to another day, so replanning is one move.
+
+- In either view, pressing a Milestone and moving the pointer a few pixels drags it: it follows the pointer, raised, its own slot dimmed, and the day under it is highlighted. Dropping it on another day moves it there at once, in that day's order.
+- Dropping it on its own day or outside any day, or pressing Escape first, changes nothing. A short press stays a click and opens the Milestone; a press on its check only ticks it.
+- If the move can't be saved, the Milestone goes back to its day and the Calendar says so.
+- Dragging is mouse and pen only, and not offered on a narrow screen (H11.8): there the date is changed on the Milestone's page.
+
+**H11.7 — Open a Milestone.** As a player, I want a Milestone's own page, to edit it at length or delete it.
+
+- Clicking a Milestone's title opens its page. A breadcrumb at the top, **Calendario › <period> › <title>**, leads back: the period is the month or week I opened it from, and going back through it finds that view as I left it; opened from its address, the period is the month of its date.
+- I edit the title, the description (with a counter) and the date, and keep them with **Guardar**. An empty title or an invalid date is refused in place, and a refusal from the server is said beside its field.
+- Leaving the page with unsaved changes asks whether to discard them; closing the tab or reloading uses the browser's own prompt.
+- The done check saves at once, as in the Calendar, saying since when it is pending if it is.
+- **Borrar** asks for confirmation, says there is no undo, then takes me back to the view I came from.
+- A Milestone that is not mine, or no longer exists, says it is not in my Calendar, with a way back to it.
+
+**H11.8 — Plan on a phone.** As a player away from my desk, I want the Calendar to fit my phone.
+
+- On a narrow screen the heading and **Nuevo hito** share a row, with previous, next, **Hoy** and **Mes / Semana** on the next.
+- The month shows, under each day's number, how many Milestones it has instead of their titles: in brass when one slipped, muted when all are done. A day is read out with its count and how many are pending. Tapping a day opens its week, as a new address.
+- The week becomes a list of its seven days, one under another, each with its name, its "+" and its Milestones in 44 px rows, or "Nada planeado." when it has none. Tapping a day's empty space or its "+" opens **Nuevo hito** on that day, and tapping a Milestone opens its page.
+- Dragging is not offered; a Milestone's day is changed on its page, whose breadcrumb also fits, shortening the period and the title.
 
 ## E10 · Administration
 
