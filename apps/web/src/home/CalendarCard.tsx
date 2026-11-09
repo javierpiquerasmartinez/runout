@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { calendarPath, intlDate, milestonePath, orderDay, todayOf, type Milestone } from '../calendar/calendar'
+import { calendarPath, intlDate, milestonePath, orderDay, type CalendarDate, type Milestone } from '../calendar/calendar'
 import { weekdayLong } from '../calendar/calendarText'
 import { CreateMilestoneDialog } from '../calendar/CreateMilestoneDialog'
 import { milestoneOutlook } from '../calendar/milestonesApi'
@@ -16,9 +16,8 @@ import './CalendarCard.css'
 const MOST_SHOWN = 5
 
 /** Today's Milestones, to tick off where they are, and the way to note down a new one without leaving Home. */
-export function CalendarCard() {
+export function CalendarCard({ today }: { today: CalendarDate }) {
   const { t, formatDate } = useI18n()
-  const today = todayOf()
   const [creating, setCreating] = useState(false)
   const { milestones, loading, failed, reload: reloadToday, setDone, unsaved } = useMilestones({ from: today, to: today })
   const readOutlook = useCallback((token: string) => milestoneOutlook(token, today), [today])
