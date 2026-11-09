@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { todayOf, type CalendarDate } from '../calendar/calendar'
+import type { CalendarDate } from '../calendar/calendar'
 import { GoalNumbers } from '../goals/GoalNumbers'
 import { barFill, goalsPath, goalStatusOn, orderGoals, type Goal } from '../goals/goals'
 import { useGoals } from '../goals/useGoals'
@@ -22,18 +22,18 @@ const selectGoals = (goals: readonly Goal[], today: CalendarDate) =>
 /**
  * A bar for each Goal In Progress. Which Goals those are is settled once and
  * then held, so that a change of Current Value updates its row and a Goal that
- * has just been Achieved stays where it is until they are selected again.
+ * has just been Achieved stays where it is until they are selected again, on
+ * the next day or the next time Home is loaded.
  */
-export function GoalsCard() {
+export function GoalsCard({ today }: { today: CalendarDate }) {
   const { t } = useI18n()
   const { goals, status, reload, changeCurrentValue } = useGoals()
-  const [selected, setSelected] = useState<string[] | null>(null)
-  const today = todayOf()
+  const [selected, setSelected] = useState<{ on: CalendarDate; ids: string[] } | null>(null)
 
-  const selectAgain = () => setSelected(selectGoals(goals, today).map((goal) => goal.id))
-  if (status === 'loaded' && selected === null) selectAgain()
+  const selectAgain = () => setSelected({ on: today, ids: selectGoals(goals, today).map((goal) => goal.id) })
+  if (status === 'loaded' && selected?.on !== today) selectAgain()
 
-  const shown = (selected ?? []).flatMap((id) => goals.filter((goal) => goal.id === id))
+  const shown = (selected?.ids ?? []).flatMap((id) => goals.filter((goal) => goal.id === id))
   const seeAll = (
     <a className="goals-card__all" href={goalsPath} onClick={followLink}>
       {t('home.goals.seeAll')}
