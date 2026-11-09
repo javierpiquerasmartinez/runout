@@ -893,7 +893,7 @@ Home is an Account's first screen, called **Inicio**: one card per section, so t
 
 **H13.8 — Look at Home on a phone.** As a player away from my desk, I want Home to fit my phone with today first.
 
-- On a narrow screen the cards go in one column, with no sideways scrolling: **Salas** and **Calendario** first, then **Biblioteca**, **Objetivos** and **Laboratorio**.
+- On a narrow screen the cards go in one column, with no sideways scrolling, in the order of the header's sections: **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos**.
 - The small graph is drawn to the phone's width, with its figures at their usual size. The month's three numbers stay side by side.
 - Long names of Rooms and Goals are cut with an ellipsis, and long Milestones wrap, without breaking the layout.
 - Everything on Home can be pressed across at least 44 px, whatever size it is drawn.

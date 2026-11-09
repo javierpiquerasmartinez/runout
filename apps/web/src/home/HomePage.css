@@ -55,7 +55,7 @@
   grid-column: span 3;
 }
 
-/* One column, what concerns today first. */
+/* One column, in the order of the header's sections. */
 @media (max-width: 760px) {
   .home-page__main {
     gap: 12px;
