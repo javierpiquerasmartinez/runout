@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import type { CalendarDate } from '../calendar/calendar'
+import { IconButton } from '../ui/IconButton'
 import { GoalNumbers } from './GoalNumbers'
 import { barFill, countdownOn, goalStatusOn, type Countdown, type Goal, type GoalStatus } from './goals'
 
@@ -30,10 +31,12 @@ export function GoalCard({
   goal,
   today,
   onChangeValue,
+  onEdit,
 }: {
   goal: Goal
   today: CalendarDate
   onChangeValue: (value: number) => Promise<void>
+  onEdit: () => void
 }) {
   const { t } = useI18n()
   const nameId = useId()
@@ -42,9 +45,12 @@ export function GoalCard({
   return (
     <article className="goal-card" data-status={status} aria-labelledby={nameId}>
       <div className="goal-card__heading">
-        <h2 id={nameId} className="goal-card__name">
-          {goal.name}
-        </h2>
+        <div className="goal-card__top">
+          <h2 id={nameId} className="goal-card__name">
+            {goal.name}
+          </h2>
+          <IconButton icon="edit" size="compact" className="goal-card__edit" label={t('goals.card.edit', { name: goal.name })} onClick={onEdit} />
+        </div>
         {goal.description !== '' && (
           <p className="goal-card__description" title={goal.description}>
             {goal.description}

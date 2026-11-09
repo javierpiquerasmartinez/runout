@@ -17,6 +17,8 @@ let createReply: (() => Response) | null
 let listReply: (() => Response) | null
 /** What changing a Goal answers instead of changing it, when set. */
 let patchReply: ((call: ApiCall) => Response | Promise<Response>) | null
+/** What deleting a Goal answers instead of deleting it, when set. */
+let deleteReply: (() => Response | Promise<Response>) | null
 /** What the faked server answers, by request; a Goal it holds adds its own. */
 let answers: Parameters<typeof fakeApi>[0]
 
@@ -39,6 +41,11 @@ function held(goal: Partial<Goal> = {}): Goal {
     Object.assign(made, call.body)
     return Response.json(made)
   }
+  answers[`DELETE /goals/${made.id}`] = () => {
+    if (deleteReply) return deleteReply()
+    stored.splice(stored.indexOf(made), 1)
+    return new Response(null, { status: 204 })
+  }
   return made
 }
 
@@ -50,6 +57,7 @@ beforeEach(() => {
   createReply = null
   listReply = null
   patchReply = null
+  deleteReply = null
   answers = {
     'GET /goals': () => (listReply ? listReply() : Response.json({ goals: stored })),
     'POST /goals': ({ body }) => {
@@ -596,6 +604,380 @@ describe('GoalsPage · changing the Current Value', () => {
     await waitFor(() => expect(changes()).toHaveLength(2))
     waiting[1](Response.json({ ...stored[0], currentValue: 20 }))
     expect(await control('Manos', '20')).toBeTruthy()
+  })
+})
+
+const openEdit = async (name: string) => userEvent.click(await screen.findByRole('button', { name: `Edit “${name}”` }))
+const save = () => userEvent.click(within(dialog('Edit goal')).getByRole('button', { name: 'Save' }))
+const editField = (label: string | RegExp) => within(dialog('Edit goal')).getByLabelText<HTMLInputElement>(label)
+const retype = async (label: string | RegExp, text: string) => {
+  await userEvent.clear(editField(label))
+  await userEvent.type(editField(label), text)
+}
+const patches = () => calls.filter(({ method }) => method === 'PATCH')
+const deletes = () => calls.filter(({ method }) => method === 'DELETE')
+const valueControl = (name: string, value: string) => screen.findByRole('button', { name: `Current value of “${name}”: ${value}. Change` })
+
+/** Writes a new Current Value on a Goal's card. */
+async function changeValueTo(name: string, value: string, text: string) {
+  await userEvent.click(await valueControl(name, value))
+  const typed = screen.getByRole('textbox', { name: `Current value of “${name}”` })
+  await userEvent.clear(typed)
+  await userEvent.type(typed, `${text}{Enter}`)
+}
+
+/** Answers each change only when the test says so. */
+function answersHeldBack() {
+  const waiting: ((reply: Response) => void)[] = []
+  patchReply = () => new Promise((resolve) => waiting.push(resolve))
+  return waiting
+}
+
+describe('GoalsPage · editing a Goal', () => {
+  it('opens the dialog from the card holding the fields of the Goal, and never its Current Value', async () => {
+    held({ name: 'Manos', description: 'Solo NL50', target: 1234.5, currentValue: 320, startDate: '2026-11-01', deadline: '2026-12-31' })
+    renderGoals()
+
+    await openEdit('Manos')
+
+    expect(editField('Name').value).toBe('Manos')
+    expect(editField(/^Description/).value).toBe('Solo NL50')
+    expect(editField('Target').value).toBe('1,234.5')
+    expect(editField('Start date').value).toBe('2026-11-01')
+    expect(editField('Deadline').value).toBe('2026-12-31')
+    expect(within(dialog('Edit goal')).queryByLabelText(/Current value/)).toBeNull()
+    expect(within(dialog('Edit goal')).queryByDisplayValue('320')).toBeNull()
+  })
+
+  it('does not open from the Current Value, which has a control of its own', async () => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+
+    await userEvent.click(await valueControl('Manos', '320'))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('writes the Target the way the UI language does, and saves it unchanged', async () => {
+    held({ name: 'Manos', target: 12000.5 })
+    renderGoals('es')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar «Manos»' }))
+    const form = within(screen.getByRole('dialog', { name: 'Editar objetivo' }))
+    expect(form.getByLabelText<HTMLInputElement>('Meta').value).toBe('12.000,5')
+    await userEvent.click(form.getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(patches()).toHaveLength(1))
+    expect(patches()[0].body).toMatchObject({ target: 12000.5 })
+  })
+
+  it('saves the fields, and the card follows without reloading', async () => {
+    held({ name: 'Manos', description: 'Antes', target: 100, currentValue: 50, deadline: '2026-12-31' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await retype('Name', 'Otras manos')
+    await retype(/^Description/, 'Después')
+    await retype('Target', '200')
+    await retype('Start date', '2026-11-02')
+    await retype('Deadline', '2026-11-19')
+    await save()
+
+    const goal = within(await card('Otras manos'))
+    expect(goal.getByText('Después')).toBeTruthy()
+    expect(goal.getByText('/ 200')).toBeTruthy()
+    expect(goal.getByText('25%')).toBeTruthy()
+    expect(goal.getByText('12 days left')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(patches()).toHaveLength(1)
+    expect(patches()[0]).toMatchObject({ path: '/goals/g1' })
+    expect(patches()[0].body).toEqual({
+      name: 'Otras manos',
+      description: 'Después',
+      target: 200,
+      startDate: '2026-11-02',
+      deadline: '2026-11-19',
+    })
+  })
+
+  it('makes the Goal Achieved when the Target goes below the Current Value', async () => {
+    held({ name: 'Manos', target: 1000, currentValue: 320, deadline: '2026-12-31' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await retype('Target', '100')
+    await save()
+
+    await waitFor(async () => expect(within(await card('Manos')).getByText('Achieved')).toBeTruthy())
+    const goal = await card('Manos')
+    expect(within(goal).getByText('320%')).toBeTruthy()
+    expect(goal.textContent).not.toMatch(/\bdays?\b/)
+  })
+
+  it('returns an Expired Goal to In Progress when its Deadline moves forward, and to its place in the list', async () => {
+    held({ name: 'Abierto', deadline: '2026-11-15' })
+    held({ name: 'Vencido', deadline: '2026-11-04' })
+    renderGoals()
+    await card('Vencido')
+    const shown = () => screen.getAllByRole('article').map((goal) => within(goal).getByRole('heading').textContent)
+    expect(shown()).toEqual(['Abierto', 'Vencido'])
+    await openEdit('Vencido')
+
+    await retype('Deadline', '2026-11-10')
+    await save()
+
+    await waitFor(async () => expect(within(await card('Vencido')).getByText('In progress')).toBeTruthy())
+    expect(within(await card('Vencido')).getByText('3 days left')).toBeTruthy()
+    expect(shown()).toEqual(['Vencido', 'Abierto'])
+  })
+
+  it.each([
+    ['Achieved', { target: 10, currentValue: 10 }],
+    ['Expired', { deadline: '2026-11-04' }],
+    ['Not Started', { startDate: '2026-11-12', deadline: '2026-11-30' }],
+  ])('edits a Goal that is %s', async (_, standing) => {
+    held({ name: 'Una meta', ...standing })
+    renderGoals()
+    await openEdit('Una meta')
+
+    await retype('Name', 'Otra meta')
+    await save()
+
+    expect(await card('Otra meta')).toBeTruthy()
+  })
+
+  it('refuses invalid fields in place under the rules of creating, keeping what was typed and sending nothing', async () => {
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await userEvent.clear(editField('Name'))
+    await retype('Target', '0')
+    await retype('Deadline', '2026-10-31')
+    await save()
+
+    expect(within(dialog('Edit goal')).getByText('Write a name.')).toBeTruthy()
+    expect(within(dialog('Edit goal')).getByText('Write a number above 0.')).toBeTruthy()
+    expect(within(dialog('Edit goal')).getByText('It is before the start date.')).toBeTruthy()
+    expect(editField('Target').value).toBe('0')
+    expect(patches()).toHaveLength(0)
+  })
+
+  it("shows the server's refusal beside its field, keeping the dialog open", async () => {
+    patchReply = () => refusal(400, 'goal-deadline-before-start')
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await retype('Name', 'Otro')
+    await save()
+
+    expect(await within(dialog('Edit goal')).findByText('It is before the start date.')).toBeTruthy()
+    expect(editField('Name').value).toBe('Otro')
+  })
+
+  it('says so inside the dialog when it can not be saved', async () => {
+    patchReply = () => new Response('', { status: 500 })
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await save()
+
+    expect((await within(dialog('Edit goal')).findByRole('alert')).textContent).toBe("We couldn't reach the server. Try again.")
+  })
+
+  it('discards what was typed when cancelled', async () => {
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await retype('Name', 'Otro')
+    await userEvent.click(within(dialog('Edit goal')).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(patches()).toHaveLength(0)
+    await openEdit('Manos')
+    expect(editField('Name').value).toBe('Manos')
+  })
+
+  it('does not close another dialog when a save cancelled on the way comes through', async () => {
+    const waiting = answersHeldBack()
+    held({ name: 'Manos' })
+    held({ name: 'Spots' })
+    renderGoals()
+    await openEdit('Manos')
+    await save()
+    await waitFor(() => expect(waiting).toHaveLength(1))
+    await userEvent.click(within(dialog('Edit goal')).getByRole('button', { name: 'Cancel' }))
+    await openEdit('Spots')
+
+    waiting[0](Response.json({ ...stored[0], name: 'Otras' }))
+
+    await card('Otras')
+    expect(editField('Name').value).toBe('Spots')
+  })
+
+  it('waits for a pending save of the Current Value, and then keeps that value', async () => {
+    const waiting = answersHeldBack()
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals()
+    await changeValueTo('Manos', '3', '10')
+    await waitFor(() => expect(waiting).toHaveLength(1))
+    await openEdit('Manos')
+
+    await retype('Name', 'Otras')
+    await save()
+
+    expect(patches()).toHaveLength(1)
+    waiting[0](Response.json({ ...stored[0], currentValue: 10 }))
+    await waitFor(() => expect(patches()).toHaveLength(2))
+    expect(patches()[1].body).not.toHaveProperty('currentValue')
+    waiting[1](Response.json({ ...stored[0], name: 'Otras', currentValue: 10 }))
+
+    expect(await valueControl('Otras', '10')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('still reports a save of the Current Value that fails with an edit behind it, and the value goes back', async () => {
+    const waiting = answersHeldBack()
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals()
+    await changeValueTo('Manos', '3', '10')
+    await waitFor(() => expect(waiting).toHaveLength(1))
+    await openEdit('Manos')
+
+    await retype('Name', 'Otras')
+    await save()
+    waiting[0](new Response('', { status: 500 }))
+    await waitFor(() => expect(patches()).toHaveLength(2))
+    waiting[1](Response.json({ ...stored[0], name: 'Otras' }))
+
+    expect(await valueControl('Otras', '3')).toBeTruthy()
+    expect((await within(await card('Otras')).findByRole('alert')).textContent).toBe("The change wasn't saved. Try again.")
+  })
+})
+
+describe('GoalsPage · deleting a Goal', () => {
+  const askToDelete = () => userEvent.click(within(dialog('Edit goal')).getByRole('button', { name: 'Delete' }))
+  const confirmation = () => dialog('Delete this goal?')
+  const confirm = () => userEvent.click(within(confirmation()).getByRole('button', { name: 'Delete goal' }))
+
+  it('is not offered when creating', async () => {
+    renderGoals()
+    await openDialog()
+
+    expect(within(dialog()).queryByRole('button', { name: 'Delete' })).toBeNull()
+  })
+
+  it('asks first, in the place of the dialog, and says there is no undo', async () => {
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await askToDelete()
+
+    expect(within(confirmation()).getByText('“Manos” disappears from your list.')).toBeTruthy()
+    expect(within(confirmation()).getByText("It can't be undone.")).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(deletes()).toHaveLength(0)
+  })
+
+  it('asks in Spanish with the words of the board', async () => {
+    held({ name: 'Manos' })
+    renderGoals('es')
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar «Manos»' }))
+
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Editar objetivo' })).getByRole('button', { name: 'Borrar' }))
+
+    const asking = within(screen.getByRole('dialog', { name: '¿Borrar este objetivo?' }))
+    expect(asking.getByText('«Manos» desaparece de tu lista.')).toBeTruthy()
+    expect(asking.getByText('No se puede deshacer.')).toBeTruthy()
+    expect(asking.getByRole('button', { name: 'Cancelar' })).toBeTruthy()
+    expect(asking.getByRole('button', { name: 'Borrar objetivo' })).toBeTruthy()
+  })
+
+  it('deletes it on confirming, and returns to the list', async () => {
+    held({ name: 'Manos' })
+    held({ name: 'Se queda' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await askToDelete()
+    await confirm()
+
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'Manos' })).toBeNull())
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('article', { name: 'Se queda' })).toBeTruthy()
+    expect(deletes()).toEqual([expect.objectContaining({ path: '/goals/g1' })])
+  })
+
+  it('leaves the empty state when the last one goes', async () => {
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await askToDelete()
+    await confirm()
+
+    expect(await screen.findByText(/You have no goals yet/)).toBeTruthy()
+  })
+
+  it('deletes nothing when the confirmation is cancelled, and goes back to the dialog as it was', async () => {
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+    await retype('Name', 'A medias')
+
+    await askToDelete()
+    await userEvent.click(within(confirmation()).getByRole('button', { name: 'Cancel' }))
+
+    expect(deletes()).toHaveLength(0)
+    expect(editField('Name').value).toBe('A medias')
+    expect(screen.getByRole('article', { name: 'Manos' })).toBeTruthy()
+  })
+
+  it('says so and keeps the Goal when it can not be deleted', async () => {
+    deleteReply = () => new Response('', { status: 500 })
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await askToDelete()
+    await confirm()
+
+    expect((await within(dialog('Edit goal')).findByRole('alert')).textContent).toBe("The goal couldn't be deleted. Try again.")
+    expect(screen.getByRole('article', { name: 'Manos' })).toBeTruthy()
+  })
+
+  it('takes away a Goal that was already gone', async () => {
+    deleteReply = () => refusal(404, 'goal-not-found')
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    await askToDelete()
+    await confirm()
+
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'Manos' })).toBeNull())
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('waits for a pending save of the Current Value', async () => {
+    const waiting = answersHeldBack()
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals()
+    await changeValueTo('Manos', '3', '10')
+    await waitFor(() => expect(waiting).toHaveLength(1))
+    await openEdit('Manos')
+
+    await askToDelete()
+    await confirm()
+
+    expect(deletes()).toHaveLength(0)
+    waiting[0](Response.json({ ...stored[0], currentValue: 10 }))
+    await waitFor(() => expect(deletes()).toHaveLength(1))
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'Manos' })).toBeNull())
   })
 })
 

@@ -184,7 +184,14 @@ describe('Goals (e2e)', () => {
   ])("refuses a %s that isn't a real date", async (field, reason) => {
     const account = await newAccount(running.httpServer);
 
-    for (const date of [undefined, '', '2026-02-30', '2026-13-01', '1/12/2026', 7]) {
+    for (const date of [
+      undefined,
+      '',
+      '2026-02-30',
+      '2026-13-01',
+      '1/12/2026',
+      7,
+    ]) {
       await expectRefused(account.token, { [field]: date }, reason);
     }
   });
@@ -266,17 +273,20 @@ describe('Goals (e2e)', () => {
     ['with two decimals', 5.55],
     ['with a decimal prone to binary error', 1234567.89],
     ['to the largest', 999999999],
-  ])('changes the Current Value %s, and it comes back exact', async (_case, currentValue) => {
-    const account = await newAccount(running.httpServer);
-    const goal = await goalOf(account.token);
+  ])(
+    'changes the Current Value %s, and it comes back exact',
+    async (_case, currentValue) => {
+      const account = await newAccount(running.httpServer);
+      const goal = await goalOf(account.token);
 
-    const changed = await change(account.token, goal.id, {
-      currentValue,
-    }).expect(200);
+      const changed = await change(account.token, goal.id, {
+        currentValue,
+      }).expect(200);
 
-    expect(changed.body).toEqual({ ...goal, currentValue });
-    expect(await list(account.token)).toEqual([changed.body]);
-  });
+      expect(changed.body).toEqual({ ...goal, currentValue });
+      expect(await list(account.token)).toEqual([changed.body]);
+    },
+  );
 
   it('lets the Current Value go down, and back to 0', async () => {
     const account = await newAccount(running.httpServer);
@@ -294,19 +304,161 @@ describe('Goals (e2e)', () => {
     expect(zero.body).toMatchObject({ currentValue: 0 });
   });
 
-  it('changes nothing but the Current Value', async () => {
+  it('changes every field of a Goal but its Current Value, which stays as it was', async () => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+    await change(account.token, goal.id, { currentValue: 7 }).expect(200);
+
+    const changed = await change(account.token, goal.id, {
+      name: '  Otro nombre ',
+      description: ' Solo en NL50. \n',
+      target: 1234567.89,
+      startDate: '2026-12-01',
+      deadline: '2027-01-15',
+    }).expect(200);
+
+    expect(changed.body).toEqual({
+      ...goal,
+      name: 'Otro nombre',
+      description: 'Solo en NL50.',
+      target: 1234567.89,
+      currentValue: 7,
+      startDate: '2026-12-01',
+      deadline: '2027-01-15',
+    });
+    expect(await list(account.token)).toEqual([changed.body]);
+  });
+
+  it.each([
+    ['name', { name: 'Otro nombre' }],
+    ['description', { description: 'Otra' }],
+    ['target', { target: 3 }],
+    ['startDate', { startDate: '2026-11-02' }],
+    ['deadline', { deadline: '2026-11-02' }],
+  ])('changes only the %s when only that is sent', async (_field, sent) => {
     const account = await newAccount(running.httpServer);
     const goal = await goalOf(account.token);
 
-    const changed = await change(account.token, goal.id, {
-      name: 'Otro nombre',
-      target: 1,
-      startDate: '2020-01-01',
-      deadline: '2020-01-02',
-      currentValue: 7,
+    const changed = await change(account.token, goal.id, sent).expect(200);
+
+    expect(changed.body).toEqual({ ...goal, ...sent });
+  });
+
+  it('empties a description', async () => {
+    const account = await newAccount(running.httpServer);
+    const created = await create(account.token, {
+      ...valid,
+      description: 'Algo',
+    }).expect(201);
+
+    const changed = await change(account.token, created.body.id as string, {
+      description: '   ',
     }).expect(200);
 
-    expect(changed.body).toEqual({ ...goal, currentValue: 7 });
+    expect(changed.body).toMatchObject({ description: '' });
+  });
+
+  it('can lower the Target below the Current Value', async () => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+    await change(account.token, goal.id, { currentValue: 320 }).expect(200);
+
+    const changed = await change(account.token, goal.id, {
+      target: 100,
+    }).expect(200);
+
+    expect(changed.body).toMatchObject({ target: 100, currentValue: 320 });
+  });
+
+  it.each([
+    ['a blank name', { name: '   ' }, 'invalid-goal-name'],
+    ['a name too long', { name: 'n'.repeat(81) }, 'invalid-goal-name'],
+    ['a name that is nothing', { name: null }, 'invalid-goal-name'],
+    [
+      'a description too long',
+      { description: 'd'.repeat(501) },
+      'invalid-goal-description',
+    ],
+    [
+      'a description that is nothing',
+      { description: null },
+      'invalid-goal-description',
+    ],
+    ['a Target of 0', { target: 0 }, 'invalid-goal-target'],
+    ['a Target too large', { target: 1000000000 }, 'invalid-goal-target'],
+    ['a Target with three decimals', { target: 5.555 }, 'invalid-goal-target'],
+    ['a Target that is nothing', { target: null }, 'invalid-goal-target'],
+    [
+      'a Start Date that is not real',
+      { startDate: '2026-02-30' },
+      'invalid-goal-start-date',
+    ],
+    [
+      'a Deadline that is malformed',
+      { deadline: '1/12/2026' },
+      'invalid-goal-deadline',
+    ],
+    ['a Deadline that is nothing', { deadline: null }, 'invalid-goal-deadline'],
+  ])('refuses %s, and changes nothing', async (_case, sent, reason) => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+
+    const res = await change(account.token, goal.id, {
+      name: 'Otro nombre',
+      ...sent,
+    }).expect(400);
+
+    expect(res.body).toMatchObject({ reason });
+    expect(await list(account.token)).toEqual([goal]);
+  });
+
+  it.each([
+    ['the Deadline alone before the Start Date', { deadline: '2026-10-31' }],
+    ['the Start Date alone after the Deadline', { startDate: '2027-01-01' }],
+    [
+      'both dates the wrong way round',
+      { startDate: '2026-12-02', deadline: '2026-12-01' },
+    ],
+  ])('refuses %s, and changes nothing', async (_case, sent) => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+
+    const res = await change(account.token, goal.id, {
+      name: 'Otro nombre',
+      ...sent,
+    }).expect(400);
+
+    expect(res.body).toMatchObject({ reason: 'goal-deadline-before-start' });
+    expect(await list(account.token)).toEqual([goal]);
+  });
+
+  it.each([
+    ['the Deadline alone onto the Start Date', { deadline: '2026-11-01' }],
+    ['the Start Date alone onto the Deadline', { startDate: '2026-12-31' }],
+    [
+      'both dates past the old Deadline',
+      { startDate: '2027-02-01', deadline: '2027-03-01' },
+    ],
+  ])('accepts %s', async (_case, sent) => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+
+    const changed = await change(account.token, goal.id, sent).expect(200);
+
+    expect(changed.body).toEqual({ ...goal, ...sent });
+  });
+
+  it("answers 404 for another Account's Goal even when its dates would be refused", async () => {
+    const ana = await newAccount(running.httpServer);
+    const berta = await newAccount(running.httpServer);
+    const goal = await goalOf(ana.token);
+
+    const res = await change(berta.token, goal.id, {
+      deadline: '2026-10-31',
+    }).expect(404);
+
+    expect(res.body).toMatchObject({ reason: 'goal-not-found' });
+    expect(await list(ana.token)).toEqual([goal]);
   });
 
   it.each([
@@ -357,6 +509,66 @@ describe('Goals (e2e)', () => {
     expect(res.body).toMatchObject({ reason: 'goal-not-found' });
   });
 
+  function remove(token: string, id: string) {
+    return request(running.httpServer)
+      .delete(`/api/goals/${id}`)
+      .set('Authorization', `Bearer ${token}`);
+  }
+
+  it('deletes a Goal for good', async () => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+    const kept = await goalOf(account.token);
+
+    await remove(account.token, goal.id).expect(204);
+
+    expect(await list(account.token)).toEqual([kept]);
+    const again = await remove(account.token, goal.id).expect(404);
+    expect(again.body).toMatchObject({ reason: 'goal-not-found' });
+  });
+
+  it("answers 404 for deleting another Account's Goal, and leaves it alone", async () => {
+    const ana = await newAccount(running.httpServer);
+    const berta = await newAccount(running.httpServer);
+    const goal = await goalOf(ana.token);
+
+    const res = await remove(berta.token, goal.id).expect(404);
+
+    expect(res.body).toMatchObject({ reason: 'goal-not-found' });
+    expect(await list(ana.token)).toEqual([goal]);
+  });
+
+  it("answers 404 for deleting an id that can't be any Goal's", async () => {
+    const account = await newAccount(running.httpServer);
+
+    const res = await remove(account.token, 'not-an-id').expect(404);
+
+    expect(res.body).toMatchObject({ reason: 'goal-not-found' });
+  });
+
+  it('refuses deleting to anyone without an Account', async () => {
+    const master = await newAccount(running.httpServer);
+    const room = await request(running.httpServer)
+      .post('/api/rooms')
+      .set('Authorization', `Bearer ${master.token}`)
+      .send({ name: 'Martes NL10', displayName: 'Javier' });
+    const guest = await request(running.httpServer)
+      .post(`/api/rooms/${room.body.code as string}/guests`)
+      .send({ displayName: 'Marta' })
+      .expect(201);
+    const goal = await goalOf(master.token);
+
+    await request(running.httpServer)
+      .delete(`/api/goals/${goal.id}`)
+      .expect(401);
+    const refused = await remove(guest.body.token as string, goal.id).expect(
+      403,
+    );
+
+    expect(refused.body).toMatchObject({ reason: 'account-required' });
+    expect(await list(master.token)).toEqual([goal]);
+  });
+
   it('refuses anyone without an Account', async () => {
     const master = await newAccount(running.httpServer);
     const room = await request(running.httpServer)
@@ -370,7 +582,10 @@ describe('Goals (e2e)', () => {
     const token = guest.body.token as string;
 
     await request(running.httpServer).get('/api/goals').expect(401);
-    await request(running.httpServer).post('/api/goals').send(valid).expect(401);
+    await request(running.httpServer)
+      .post('/api/goals')
+      .send(valid)
+      .expect(401);
     const listed = await request(running.httpServer)
       .get('/api/goals')
       .set('Authorization', `Bearer ${token}`)
@@ -459,5 +674,46 @@ describe('Goals during Impersonation (e2e)', () => {
       .expect(200);
 
     expect(changed.body).toEqual({ ...kept.body, currentValue: 320 });
+  });
+
+  it('lets an Administrator impersonating an Account edit and delete its Goals', async () => {
+    const administrator = await signInAdministrator(running);
+    const ana = await invitedAccount(
+      running,
+      administrator.token,
+      uniqueEmail('ana'),
+    );
+    const kept = await request(running.httpServer)
+      .post('/api/goals')
+      .set('Authorization', `Bearer ${ana.token}`)
+      .send(valid)
+      .expect(201);
+    const impersonation = await request(running.httpServer)
+      .post(`/api/admin/accounts/${ana.id}/impersonations`)
+      .set('Authorization', `Bearer ${administrator.token}`)
+      .expect(201);
+    const token = impersonation.body.token as string;
+    const goal = `/api/goals/${kept.body.id as string}`;
+
+    const edited = await request(running.httpServer)
+      .patch(goal)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Otro nombre', deadline: '2027-01-31' })
+      .expect(200);
+    expect(edited.body).toEqual({
+      ...kept.body,
+      name: 'Otro nombre',
+      deadline: '2027-01-31',
+    });
+
+    await request(running.httpServer)
+      .delete(goal)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+    const after = await request(running.httpServer)
+      .get('/api/goals')
+      .set('Authorization', `Bearer ${ana.token}`)
+      .expect(200);
+    expect(after.body).toEqual({ goals: [] });
   });
 });

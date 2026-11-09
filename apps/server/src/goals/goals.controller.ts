@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -60,6 +63,17 @@ export class GoalsController {
   ): Promise<Goal> {
     const account = await this.authenticate(authorization);
     return this.goals.change(account, id, body);
+  }
+
+  /** Deletes a Goal, for good. Someone else's is `goal-not-found`. */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<void> {
+    const account = await this.authenticate(authorization);
+    await this.goals.delete(account, id);
   }
 
   private authenticate(authorization: string | undefined) {

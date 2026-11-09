@@ -8,7 +8,7 @@ type Token = string | null
 export type NewGoal = Pick<Goal, 'name' | 'description' | 'target' | 'startDate' | 'deadline'>
 
 /** What changing a Goal sends. */
-export type GoalChange = Pick<Goal, 'currentValue'>
+export type GoalChange = Pick<Goal, 'currentValue'> | NewGoal
 
 /** All the Account's Goals. */
 export function listGoals(token: Token): Promise<{ goals: Goal[] }> {
@@ -23,4 +23,9 @@ export function createGoal(token: Token, goal: NewGoal): Promise<Goal> {
 /** The Goal as it ends up once changed; `goal-not-found` for anyone else's. */
 export function changeGoal(token: Token, id: string, change: GoalChange): Promise<Goal> {
   return api(`/goals/${id}`, { token: token ?? undefined, method: 'PATCH', body: change })
+}
+
+/** Deletes one of the Account's Goals, with no undo; `goal-not-found` for anyone else's. */
+export async function deleteGoal(token: Token, id: string): Promise<void> {
+  await api(`/goals/${id}`, { token: token ?? undefined, method: 'DELETE' })
 }

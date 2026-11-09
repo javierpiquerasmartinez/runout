@@ -4,21 +4,23 @@ import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { CreateGoalDialog } from './CreateGoalDialog'
 import { GoalCard } from './GoalCard'
-import { orderGoals } from './goals'
+import { GoalDialog } from './GoalDialog'
+import { orderGoals, type Goal } from './goals'
 import { useGoals } from './useGoals'
 import './GoalsPage.css'
 
 /**
  * Goals ("Objetivos"): the Account's Goals as cards, and "Nuevo objetivo" to
- * add one. With no Goals at all, a short phrase takes the list's place and
- * the button goes with it.
+ * add one; each card opens the same dialog to edit or delete its Goal. With
+ * no Goals at all, a short phrase takes the list's place and the button goes
+ * with it.
  */
 export function GoalsPage() {
   const { t } = useI18n()
-  const { goals, status, add, changeCurrentValue } = useGoals()
+  const { goals, status, create, changeCurrentValue, edit, remove } = useGoals()
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Goal | null>(null)
   const empty = status === 'loaded' && goals.length === 0
   const today = todayOf()
 
@@ -51,18 +53,24 @@ export function GoalsPage() {
         {goals.length > 0 && (
           <div className="goals-page__list">
             {orderGoals(goals, today).map((goal) => (
-              <GoalCard key={goal.id} goal={goal} today={today} onChangeValue={(value) => changeCurrentValue(goal.id, value)} />
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                today={today}
+                onChangeValue={(value) => changeCurrentValue(goal.id, value)}
+                onEdit={() => setEditing(goal)}
+              />
             ))}
           </div>
         )}
       </main>
-      {creating && (
-        <CreateGoalDialog
-          onClose={() => setCreating(false)}
-          onCreated={(goal) => {
-            add(goal)
-            setCreating(false)
-          }}
+      {creating && <GoalDialog onClose={() => setCreating(false)} onSave={create} />}
+      {editing && (
+        <GoalDialog
+          goal={editing}
+          onClose={() => setEditing(null)}
+          onSave={(fields) => edit(editing.id, fields)}
+          onDelete={() => remove(editing.id)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-/* Goals, as the "Objetivos" boards draw them: a centred column of cards, and the dialog that creates one. */
+/* Goals, as the "Objetivos" boards draw them: a centred column of cards, and the dialog that creates or edits one. */
 
 .goals-page {
   min-height: 100vh;
@@ -95,7 +95,18 @@
   flex-direction: column;
   gap: 6px;
 }
+.goal-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* A little taller than the name's line, without making the card taller. */
+.goal-card__edit {
+  margin-bottom: -5.5px;
+}
 .goal-card__name {
+  min-width: 0;
   margin: 0;
   font-size: 15px;
   font-weight: 600;
@@ -298,4 +309,13 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 6px;
+}
+.goal-dialog__delete {
+  margin-right: auto;
+}
+.goal-dialog__no-undo {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
 }

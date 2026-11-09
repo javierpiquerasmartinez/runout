@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
 import { calendarDate } from '../calendar/calendar-date.js';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -37,8 +37,8 @@ export interface GoalBody {
   deadline?: unknown;
 }
 
-/** What changing a Goal sends. */
-export interface GoalChange {
+/** What changing a Goal sends: whichever of its fields are to change. */
+export interface GoalChange extends GoalBody {
   currentValue?: unknown;
 }
 
@@ -110,8 +110,10 @@ export class GoalsService {
 
   /**
    * Changes whichever fields of a Goal are sent, with their rules; the rest
-   * stay as they were. Another Account's Goal is `goal-not-found`, even when
-   * the body is refused: only a refused body costs a second read.
+   * stay as they were. The dates are checked against the Goal as it would end
+   * up, in the same statement that writes them. Another Account's Goal is
+   * `goal-not-found`, even when the change is refused: only a refused change
+   * costs a second read.
    */
   async change(
     account: Identity,
@@ -124,25 +126,52 @@ export class GoalsService {
       changes = changesOf(body);
     } catch (refused) {
       // Not being there wins over a refused body.
-      const [found] = await this.db
-        .select({ id: goals.id })
-        .from(goals)
-        .where(owned);
-      if (!found) throw new Rejected('goal-not-found');
+      if (!(await this.exists(owned))) throw new Rejected('goal-not-found');
       throw refused;
     }
     const [changed] = await this.db
       .update(goals)
       .set({ ...changes, updatedAt: this.clock.now() })
-      .where(owned)
+      .where(and(owned, keepsAPeriod(changes)))
       .returning(selection);
-    if (!changed) throw new Rejected('goal-not-found');
-    return changed;
+    if (changed) return changed;
+    throw new Rejected(
+      (await this.exists(owned))
+        ? 'goal-deadline-before-start'
+        : 'goal-not-found',
+    );
+  }
+
+  /** Deletes a Goal, for good; `goal-not-found` for anyone else's. */
+  async delete(account: Identity, goalId: string): Promise<void> {
+    const deleted = await this.db
+      .delete(goals)
+      .where(ownedBy(account, goalId))
+      .returning({ id: goals.id });
+    if (deleted.length === 0) throw new Rejected('goal-not-found');
+  }
+
+  private async exists(owned: SQL | undefined): Promise<boolean> {
+    const [found] = await this.db
+      .select({ id: goals.id })
+      .from(goals)
+      .where(owned);
+    return found !== undefined;
   }
 }
 
 /** The fields of a Goal a change can set. */
-type GoalFields = Partial<Pick<Goal, 'currentValue'>>;
+type GoalFields = Partial<
+  Pick<
+    Goal,
+    | 'name'
+    | 'description'
+    | 'target'
+    | 'currentValue'
+    | 'startDate'
+    | 'deadline'
+  >
+>;
 
 /**
  * Picks out the Goal with this id among the Account's own; `goal-not-found`
@@ -156,10 +185,26 @@ function ownedBy(account: Identity, goalId: string): SQL | undefined {
 /** Whichever fields a change sends, each checked with its own rules. */
 function changesOf(body: GoalChange): GoalFields {
   const changes: GoalFields = {};
+  if (body.name !== undefined) changes.name = nameOf(body.name);
+  if (body.description !== undefined) {
+    changes.description = descriptionOf(body.description);
+  }
+  if (body.target !== undefined) changes.target = targetOf(body.target);
   if (body.currentValue !== undefined) {
     changes.currentValue = currentValueOf(body.currentValue);
   }
+  if (body.startDate !== undefined) {
+    changes.startDate = calendarDate(body.startDate, 'invalid-goal-start-date');
+  }
+  if (body.deadline !== undefined) {
+    changes.deadline = calendarDate(body.deadline, 'invalid-goal-deadline');
+  }
   return changes;
+}
+
+/** Whether a Goal would still have a real period once these changes are made. */
+function keepsAPeriod({ startDate, deadline }: GoalFields): SQL {
+  return sql`${startDate ?? goals.startDate}::date <= ${deadline ?? goals.deadline}::date`;
 }
 
 /**

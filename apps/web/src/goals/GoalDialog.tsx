@@ -1,42 +1,70 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { reasonOf } from '../backend/api'
 import { todayOf } from '../calendar/calendar'
 import { DescriptionField, LengthCount } from '../calendar/MilestoneFields'
 import { useI18n } from '../i18n'
-import { useSession } from '../identity/context'
+import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
+import { Icon } from '../ui/Icon'
 import { TextField } from '../ui/TextField'
 import { draftRefusals, serverRefusal, type GoalField, type Refusals } from './goalForm'
-import { MAX_GOAL_NAME_LENGTH, readAmount, type Goal } from './goals'
-import { createGoal } from './goalsApi'
+import { MAX_GOAL_NAME_LENGTH, readAmount, writeAmount, type Goal } from './goals'
+import type { NewGoal } from './goalsApi'
 
 /**
- * Creating a Goal: its name, an optional description, its Target and its two
- * dates, the Start Date filled in with today. Whatever is invalid is refused
- * in place, all at once and before anything is sent, keeping what was typed;
- * the server's refusal of a field shows beside it too.
+ * Creating a Goal, or editing one: its name, an optional description, its
+ * Target and its two dates; never its Current Value. A new Goal starts with
+ * the Start Date on today. Whatever is invalid is refused in place, all at
+ * once and before anything is sent, keeping what was typed; the server's
+ * refusal of a field shows beside it too. A Goal being edited can be deleted,
+ * after a confirmation that takes the dialog's place.
  */
-export function CreateGoalDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (goal: Goal) => void }) {
+export function GoalDialog({
+  goal,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  /** The Goal being edited; none when creating one. */
+  goal?: Goal
+  onClose: () => void
+  onSave: (fields: NewGoal) => Promise<void>
+  onDelete?: () => Promise<void>
+}) {
   const { t, locale } = useI18n()
-  const { token } = useSession()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [target, setTarget] = useState('')
-  const [startDate, setStartDate] = useState(() => todayOf())
-  const [deadline, setDeadline] = useState('')
+  const [name, setName] = useState(goal?.name ?? '')
+  const [description, setDescription] = useState(goal?.description ?? '')
+  const [target, setTarget] = useState(goal ? writeAmount(goal.target, locale) : '')
+  const [startDate, setStartDate] = useState(() => goal?.startDate ?? todayOf())
+  const [deadline, setDeadline] = useState(goal?.deadline ?? '')
   const [refusals, setRefusals] = useState<Refusals>({})
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  // Cancelled while it was still being saved: closing again would close whatever is open by then.
+  const closed = useRef(false)
 
   useEffect(() => {
+    closed.current = false
+    return () => {
+      closed.current = true
+    }
+  }, [])
+
+  // Before the dialog leaves the page: only a dialog still on it hands focus back to where it was.
+  useLayoutEffect(() => {
     const element = dialog.current
     if (!element) return
     element.showModal()
     return () => element.close()
-  }, [])
+  }, [confirming])
 
-  async function create(event: FormEvent) {
+  const finish = () => {
+    if (!closed.current) onClose()
+  }
+
+  async function save(event: FormEvent) {
     event.preventDefault()
     if (busy) return
     const refused = draftRefusals({ name, target, startDate, deadline }, locale)
@@ -44,9 +72,23 @@ export function CreateGoalDialog({ onClose, onCreated }: { onClose: () => void; 
     if (Object.keys(refused).length > 0) return
     setBusy(true)
     try {
-      onCreated(await createGoal(token, { name, description, target: readAmount(target, locale)!, startDate, deadline }))
+      await onSave({ name, description, target: readAmount(target, locale)!, startDate, deadline })
+      finish()
     } catch (caught) {
       setRefusals(serverRefusal(reasonOf(caught)))
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (busy || !onDelete) return
+    setBusy(true)
+    try {
+      await onDelete()
+      finish()
+    } catch {
+      setRefusals({ form: 'goals.delete.failed' })
+      setConfirming(false)
       setBusy(false)
     }
   }
@@ -60,6 +102,23 @@ export function CreateGoalDialog({ onClose, onCreated }: { onClose: () => void; 
     setRefusals(({ [field]: _corrected, ...others }) => others)
   }
 
+  if (confirming && goal) {
+    return (
+      <RoomDialog
+        title={t('goals.delete.title')}
+        body={t('goals.delete.body', { name: goal.name })}
+        onClose={() => setConfirming(false)}
+        actions={
+          <Button variant="destructive" aria-busy={busy || undefined} onClick={() => void remove()}>
+            {t('goals.delete.confirm')}
+          </Button>
+        }
+      >
+        <p className="goal-dialog__no-undo">{t('goals.delete.undo')}</p>
+      </RoomDialog>
+    )
+  }
+
   return (
     <dialog
       ref={dialog}
@@ -71,9 +130,9 @@ export function CreateGoalDialog({ onClose, onCreated }: { onClose: () => void; 
         onClose()
       }}
     >
-      <form className="goal-dialog__form" onSubmit={create} noValidate>
+      <form className="goal-dialog__form" onSubmit={save} noValidate>
         <h2 id={titleId} className="goal-dialog__title ro-serif">
-          {t('goals.new')}
+          {t(goal ? 'goals.edit' : 'goals.new')}
         </h2>
         <div className="goal-dialog__name">
           <TextField
@@ -128,11 +187,17 @@ export function CreateGoalDialog({ onClose, onCreated }: { onClose: () => void; 
           </p>
         )}
         <div className="goal-dialog__actions">
+          {goal && onDelete && (
+            <Button variant="destructive" className="goal-dialog__delete" onClick={() => setConfirming(true)}>
+              <Icon name="delete" size={14} />
+              {t('goals.form.delete')}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>
             {t('goals.form.cancel')}
           </Button>
           <Button type="submit" variant="primary" aria-busy={busy || undefined}>
-            {t('goals.form.create')}
+            {t(goal ? 'goals.form.save' : 'goals.form.create')}
           </Button>
         </div>
       </form>
