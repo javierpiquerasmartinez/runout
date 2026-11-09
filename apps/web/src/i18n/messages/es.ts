@@ -1411,6 +1411,11 @@ export const es = {
   // Home: the Library card.
   // Home: the Rooms card.
   // Home: the Goals card.
+  'home.goals.seeAll': 'Ver todos',
+  'home.goals.none.title': 'Ningún objetivo en curso',
+  'home.goals.none.text': 'Los que empiezan más adelante, los vencidos y los conseguidos están en Objetivos.',
+  'home.goals.empty.title': 'Aún no tienes objetivos',
+  'home.goals.empty.text': 'Ponte una meta con fecha y sigue aquí cómo avanza.',
   // Home: the Calendar card.
   // Home: the Lab card.
   'home.lab.ranges.one': 'rango',
