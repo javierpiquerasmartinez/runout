@@ -13,5 +13,5 @@ We rejected tying the Library and the Results Graph to the Author, or to the per
 - Importing into a Room a Hand already in the Importer's Library queues the Library Hand, so Notes from the review are not lost.
 - Notes on a Library Hand can be edited outside a Room by anyone who has it in their Library; inside a Room only the Master edits them.
 - The Library needs an Account (ADR 0005).
-- Imports into a Library use the same flow and 20 MB limit as Room imports; a background import for whole Tracker databases is a separate component, left for later.
+- Imports into a Library use the same flow and 20 MB limit as Room imports, up to 2,000 Hands; anything larger, such as a whole Tracker database, is a Bulk Import (ADR 0010).
 - All existing data (identities, Rooms, Hands) is wiped rather than migrated.
