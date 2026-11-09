@@ -15,7 +15,7 @@ An Administrator's offer to one email address to create an Account, sent to it a
 _Avoid_: Invite code, registration code, invitación (UI only)
 
 **Administrator**:
-An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms, ends Live in them and Impersonates people. A role of the Account, not of any Room; it has nothing to do with being Master.
+An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms, ends Live in them, watches over every Bulk Import and Impersonates people. A role of the Account, not of any Room; it has nothing to do with being Master.
 _Avoid_: Admin, superuser, owner, Master
 
 **Suspension**:
@@ -82,6 +82,10 @@ _Avoid_: Owner, uploader
 The Participant who brought a Hand into Runout. Recorded for audit only; carries no meaning for attribution.
 _Avoid_: Author
 
+**Bulk Import**:
+An import into a Library too large to wait for, of more than 2,000 Hands and at most 2 million: Runout completes it on its own, Hands joining the Library as it goes, and tells the Importer how it ended. The UI just says "importación".
+_Avoid_: Job, background task, batch
+
 **Note**:
 A written conclusion attached to a Hand, with its writer and date. Visible wherever the Hand is seen. Inside a Room any Participant writes one and edits or deletes their own, and the Master edits or deletes any, whether the Room is Live or in Free Review; outside a Room, anyone who has the Hand in their Library can write, edit or delete.
 _Avoid_: Comment, annotation
@@ -95,7 +99,7 @@ A private flag a person puts on a Hand to find it again. Only they see it.
 _Avoid_: Favourite, bookmark, star
 
 **Library**:
-A person's own repository: the Hands they imported into it, whatever their Hero, and nothing else. Several Libraries can hold the same Hand. Hands seen in other people's Rooms are not in it.
+A person's own repository: the Hands they imported into it, whatever their Hero, and nothing else, up to 10 million. Several Libraries can hold the same Hand. Hands seen in other people's Rooms are not in it.
 _Avoid_: Shared with me, collection, archive, database
 
 **Room Hand**:
