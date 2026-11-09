@@ -1412,6 +1412,11 @@ export const en: Messages = {
   // Home: the Library card.
   // Home: the Rooms card.
   // Home: the Goals card.
+  'home.goals.seeAll': 'See all',
+  'home.goals.none.title': 'No goals in progress',
+  'home.goals.none.text': 'The ones starting later, expired and achieved are in Goals.',
+  'home.goals.empty.title': "You don't have any goals yet",
+  'home.goals.empty.text': 'Set yourself a target with a date and follow how it goes here.',
   // Home: the Calendar card.
   'home.calendar.today': 'Today, {date}',
   'home.calendar.seeAll': 'See all',
