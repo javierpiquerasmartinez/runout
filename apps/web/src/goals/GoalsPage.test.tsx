@@ -15,6 +15,10 @@ let calls: ApiCall[]
 let createReply: (() => Response) | null
 /** What listing answers instead of the Goals, when set. */
 let listReply: (() => Response) | null
+/** What changing a Goal answers instead of changing it, when set. */
+let patchReply: ((call: ApiCall) => Response | Promise<Response>) | null
+/** What the faked server answers, by request; a Goal it holds adds its own. */
+let answers: Parameters<typeof fakeApi>[0]
 
 /** A Goal the faked server holds, with whatever a test cares about. */
 function held(goal: Partial<Goal> = {}): Goal {
@@ -30,6 +34,11 @@ function held(goal: Partial<Goal> = {}): Goal {
     ...goal,
   }
   stored.push(made)
+  answers[`PATCH /goals/${made.id}`] = (call) => {
+    if (patchReply) return patchReply(call)
+    Object.assign(made, call.body)
+    return Response.json(made)
+  }
   return made
 }
 
@@ -40,14 +49,16 @@ beforeEach(() => {
   stored = []
   createReply = null
   listReply = null
-  calls = fakeApi({
+  patchReply = null
+  answers = {
     'GET /goals': () => (listReply ? listReply() : Response.json({ goals: stored })),
     'POST /goals': ({ body }) => {
       if (createReply) return createReply()
       const sent = body as Pick<Goal, 'name' | 'description' | 'target' | 'startDate' | 'deadline'>
       return Response.json(held({ ...sent, name: sent.name.trim(), description: sent.description.trim() }), { status: 201 })
     },
-  })
+  }
+  calls = fakeApi(answers)
 })
 
 afterEach(() => {
@@ -225,6 +236,366 @@ describe('GoalsPage · the order of the list', () => {
     await card('Antes')
 
     expect(shown()).toEqual(['Antes', 'Más tarde'])
+  })
+})
+
+describe('GoalsPage · changing the Current Value', () => {
+  const changes = () => calls.filter(({ method }) => method === 'PATCH')
+  const control = (name: string, value: string) => screen.findByRole('button', { name: `Current value of “${name}”: ${value}. Change` })
+  const valueField = (name: string) => screen.getByRole<HTMLInputElement>('textbox', { name: `Current value of “${name}”` })
+  const shown = () => screen.getAllByRole('article').map((goal) => within(goal).getByRole('heading').textContent)
+
+  /** Opens a Goal's field and leaves in it what is given, without saving. */
+  async function typeValue(name: string, value: string, text: string) {
+    await userEvent.click(await control(name, value))
+    await userEvent.clear(valueField(name))
+    if (text !== '') await userEvent.type(valueField(name), text)
+  }
+
+  it('turns the control into a field holding the present value, focused, on a numeric keyboard', async () => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+
+    await userEvent.click(await control('Manos', '320'))
+
+    expect(valueField('Manos').value).toBe('320')
+    expect(valueField('Manos').inputMode).toBe('decimal')
+    expect(document.activeElement).toBe(valueField('Manos'))
+  })
+
+  it('saves on Enter, replacing the old value, and hands the focus back', async () => {
+    held({ name: 'Manos', target: 1000, currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', '500')
+
+    await userEvent.keyboard('{Enter}')
+
+    const saved = await control('Manos', '500')
+    expect(document.activeElement).toBe(saved)
+    expect(within(await card('Manos')).getByText('50%')).toBeTruthy()
+    await waitFor(() => expect(changes()).toHaveLength(1))
+    expect(changes()[0]).toMatchObject({ path: '/goals/g1', body: { currentValue: 500 } })
+  })
+
+  it('saves on leaving the field, once', async () => {
+    held({ name: 'Manos', target: 1000, currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', '500')
+
+    await userEvent.tab()
+
+    await control('Manos', '500')
+    await waitFor(() => expect(changes()).toHaveLength(1))
+  })
+
+  it('sends one change for one Enter, however the field goes away', async () => {
+    held({ name: 'Manos', target: 1000, currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', '500')
+    await userEvent.keyboard('{Enter}')
+    await control('Manos', '500')
+
+    await userEvent.tab()
+
+    await waitFor(() => expect(changes()).toHaveLength(1))
+    expect(changes()).toHaveLength(1)
+  })
+
+  it('restores the value on Escape, sending nothing, and hands the focus back', async () => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', '500')
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(document.activeElement).toBe(await control('Manos', '320'))
+    expect(changes()).toHaveLength(0)
+  })
+
+  it('sends nothing when the value is left as it was', async () => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+    await userEvent.click(await control('Manos', '320'))
+
+    await userEvent.keyboard('{Enter}')
+
+    await control('Manos', '320')
+    expect(changes()).toHaveLength(0)
+  })
+
+  it('types and shows the value the way the UI language writes numbers', async () => {
+    held({ name: 'Manos', target: 50000, currentValue: 12000.5 })
+    renderGoals('es')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Valor actual de «Manos»: 12.000,5. Cambiar' }))
+    const typed = screen.getByRole<HTMLInputElement>('textbox', { name: 'Valor actual de «Manos»' })
+    expect(typed.value).toBe('12.000,5')
+
+    await userEvent.clear(typed)
+    await userEvent.type(typed, '25.000,75{Enter}')
+
+    expect(await screen.findByRole('button', { name: 'Valor actual de «Manos»: 25.000,75. Cambiar' })).toBeTruthy()
+    await waitFor(() => expect(changes()).toHaveLength(1))
+    expect(changes()[0].body).toEqual({ currentValue: 25000.75 })
+  })
+
+  it.each([
+    ['above the Target', 1200, 'Achieved', '120%'],
+    ['to 0', 0, 'In progress', '0%'],
+  ])('accepts a value %s', async (_, value, status, percent) => {
+    held({ name: 'Manos', target: 1000, currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', String(value))
+
+    await userEvent.keyboard('{Enter}')
+
+    const goal = within(await card('Manos'))
+    expect(goal.getByText(status)).toBeTruthy()
+    expect(goal.getByText(percent)).toBeTruthy()
+    await waitFor(() => expect(changes()).toHaveLength(1))
+  })
+
+  it('drops an Achieved Goal back when the value is lowered, with its countdown', async () => {
+    held({ name: 'Manos', target: 1000, currentValue: 1000, deadline: '2026-11-19' })
+    renderGoals()
+    await typeValue('Manos', '1,000', '999.99')
+
+    await userEvent.keyboard('{Enter}')
+
+    const goal = within(await card('Manos'))
+    expect(goal.getByText('In progress')).toBeTruthy()
+    expect(goal.getByText('12 days left')).toBeTruthy()
+    expect(goal.getByText('99%')).toBeTruthy()
+  })
+
+  it('updates a Goal that is Not Started', async () => {
+    held({ name: 'Manos', target: 10, startDate: '2026-11-12', deadline: '2026-11-30' })
+    renderGoals()
+    await typeValue('Manos', '0', '3')
+
+    await userEvent.keyboard('{Enter}')
+
+    const goal = within(await card('Manos'))
+    expect(goal.getByText('Not started')).toBeTruthy()
+    expect(goal.getByText('30%')).toBeTruthy()
+  })
+
+  it('makes an Expired Goal Achieved on reaching its Target, without any countdown', async () => {
+    held({ name: 'Vencido', target: 10, currentValue: 3, deadline: '2026-11-04' })
+    renderGoals()
+    await typeValue('Vencido', '3', '10')
+
+    await userEvent.keyboard('{Enter}')
+
+    const goal = await card('Vencido')
+    expect(within(goal).getByText('Achieved')).toBeTruthy()
+    expect(goal.textContent).not.toMatch(/\bdays?\b/)
+  })
+
+  it('takes a Goal to its place in the list when it stops being open', async () => {
+    held({ name: 'Pronto', target: 10, currentValue: 3, deadline: '2026-11-20' })
+    held({ name: 'Tarde', target: 10, currentValue: 3, deadline: '2026-12-31' })
+    renderGoals()
+    await card('Pronto')
+    expect(shown()).toEqual(['Pronto', 'Tarde'])
+    await typeValue('Pronto', '3', '10')
+
+    await userEvent.keyboard('{Enter}')
+
+    await control('Pronto', '10')
+    expect(shown()).toEqual(['Tarde', 'Pronto'])
+  })
+
+  it('keeps the Goal Status and the Progress on the saved value while typing', async () => {
+    held({ name: 'Manos', target: 10, currentValue: 3 })
+    renderGoals()
+
+    await typeValue('Manos', '3', '10')
+
+    const goal = within(await card('Manos'))
+    expect(goal.getByText('In progress')).toBeTruthy()
+    expect(goal.getByText('30%')).toBeTruthy()
+  })
+
+  const invalidMessage = 'Write a number between 0 and 999,999,999, with two decimals at most.'
+
+  it.each([
+    ['below 0', '-3'],
+    ['above 999,999,999', '1000000000'],
+    ['with more than two decimals', '5.555'],
+    ['that is not a number', 'mucho'],
+    ['empty', ''],
+  ])('keeps a value %s in the field with a message, and sends nothing', async (_, text) => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', text)
+
+    await userEvent.keyboard('{Enter}')
+
+    expect(within(await card('Manos')).getByRole('alert').textContent).toBe(invalidMessage)
+    expect(valueField('Manos').value).toBe(text)
+    expect(valueField('Manos').getAttribute('aria-invalid')).toBe('true')
+    expect(changes()).toHaveLength(0)
+  })
+
+  it('keeps an invalid value in the field on leaving it too', async () => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', '-3')
+
+    await userEvent.tab()
+
+    expect(within(await card('Manos')).getByRole('alert').textContent).toBe(invalidMessage)
+    expect(valueField('Manos').value).toBe('-3')
+    expect(changes()).toHaveLength(0)
+  })
+
+  it('takes the message away as the value is corrected, and Escape leaves the old value', async () => {
+    held({ name: 'Manos', currentValue: 320 })
+    renderGoals()
+    await typeValue('Manos', '320', '-3')
+    await userEvent.keyboard('{Enter}')
+    const goal = within(await card('Manos'))
+
+    await userEvent.type(valueField('Manos'), '{Backspace}')
+    expect(goal.queryByRole('alert')).toBeNull()
+
+    await userEvent.keyboard('{Enter}{Escape}')
+    expect(await control('Manos', '320')).toBeTruthy()
+    expect(goal.queryByRole('alert')).toBeNull()
+    expect(changes()).toHaveLength(0)
+  })
+
+  it('applies the value at once, before the server answers', async () => {
+    let answer: (reply: Response) => void = () => {}
+    patchReply = () => new Promise((resolve) => (answer = resolve))
+    held({ name: 'Manos', target: 10, currentValue: 3 })
+    renderGoals()
+    await typeValue('Manos', '3', '10')
+
+    await userEvent.keyboard('{Enter}')
+
+    expect(await control('Manos', '10')).toBeTruthy()
+    expect(within(await card('Manos')).getByText('Achieved')).toBeTruthy()
+    await waitFor(() => expect(changes()).toHaveLength(1))
+    answer(Response.json({ ...stored[0], currentValue: 10 }))
+  })
+
+  it.each([
+    ['the server failing', () => new Response('', { status: 500 })],
+    ['the Goal being gone', () => refusal(404, 'goal-not-found')],
+  ])('goes back with a message on %s', async (_, reply) => {
+    patchReply = reply
+    held({ name: 'Manos', target: 10, currentValue: 3 })
+    renderGoals()
+    await typeValue('Manos', '3', '10')
+
+    await userEvent.keyboard('{Enter}')
+
+    const goal = within(await card('Manos'))
+    expect((await goal.findByRole('alert')).textContent).toBe("The change wasn't saved. Try again.")
+    expect(await control('Manos', '3')).toBeTruthy()
+    expect(goal.getByText('In progress')).toBeTruthy()
+    expect(goal.getByText('30%')).toBeTruthy()
+  })
+
+  it('says it was not saved in Spanish too', async () => {
+    patchReply = () => new Response('', { status: 500 })
+    held({ name: 'Manos', target: 10, currentValue: 3 })
+    renderGoals('es')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Valor actual de «Manos»: 3. Cambiar' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Valor actual de «Manos»' }), '0{Enter}')
+
+    expect((await screen.findByRole('alert')).textContent).toBe('No se ha guardado el cambio. Vuelve a intentarlo.')
+  })
+
+  it('refuses an invalid value in Spanish with the words of the board', async () => {
+    held({ name: 'Manos', currentValue: 3 })
+    renderGoals('es')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Valor actual de «Manos»: 3. Cambiar' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Valor actual de «Manos»' }), 'x{Enter}')
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Escribe un número entre 0 y 999.999.999, con dos decimales como mucho.')
+  })
+
+  it('takes the failure message away when the value is opened again', async () => {
+    patchReply = () => new Response('', { status: 500 })
+    held({ name: 'Manos', target: 10, currentValue: 3 })
+    renderGoals()
+    await typeValue('Manos', '3', '10')
+    await userEvent.keyboard('{Enter}')
+    const goal = within(await card('Manos'))
+    await goal.findByRole('alert')
+
+    await userEvent.click(await control('Manos', '3'))
+
+    expect(goal.queryByRole('alert')).toBeNull()
+  })
+
+  /** Answers each change only when the test says so, in the order the test wants. */
+  function heldAnswers() {
+    const waiting: ((reply: Response) => void)[] = []
+    patchReply = () => new Promise((resolve) => waiting.push(resolve))
+    return waiting
+  }
+
+  it('does not let a failed save undo a later one', async () => {
+    const waiting = heldAnswers()
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals()
+    await typeValue('Manos', '3', '10')
+    await userEvent.keyboard('{Enter}')
+    await typeValue('Manos', '10', '20')
+    await userEvent.keyboard('{Enter}')
+    await control('Manos', '20')
+
+    await waitFor(() => expect(waiting).toHaveLength(1))
+    waiting[0](new Response('', { status: 500 }))
+    await waitFor(() => expect(waiting).toHaveLength(2))
+    waiting[1](Response.json({ ...stored[0], currentValue: 20 }))
+
+    await waitFor(() => expect(changes()).toHaveLength(2))
+    expect(changes()[1].body).toEqual({ currentValue: 20 })
+    expect(await control('Manos', '20')).toBeTruthy()
+    expect(within(await card('Manos')).queryByRole('alert')).toBeNull()
+  })
+
+  it('goes back to the last value saved when the latest save fails', async () => {
+    const waiting = heldAnswers()
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals()
+    await typeValue('Manos', '3', '10')
+    await userEvent.keyboard('{Enter}')
+    await typeValue('Manos', '10', '20')
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(() => expect(waiting).toHaveLength(1))
+    waiting[0](Response.json({ ...stored[0], currentValue: 10 }))
+    await waitFor(() => expect(waiting).toHaveLength(2))
+    waiting[1](new Response('', { status: 500 }))
+
+    expect(await control('Manos', '10')).toBeTruthy()
+    expect((await within(await card('Manos')).findByRole('alert')).textContent).toBe("The change wasn't saved. Try again.")
+  })
+
+  it('sends the saves of one Goal one after the other, so the last one written is the last one typed', async () => {
+    const waiting = heldAnswers()
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals()
+    await typeValue('Manos', '3', '10')
+    await userEvent.keyboard('{Enter}')
+    await typeValue('Manos', '10', '20')
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(waiting).toHaveLength(1))
+
+    expect(changes()).toHaveLength(1)
+
+    waiting[0](Response.json({ ...stored[0], currentValue: 10 }))
+    await waitFor(() => expect(changes()).toHaveLength(2))
+    waiting[1](Response.json({ ...stored[0], currentValue: 20 }))
+    expect(await control('Manos', '20')).toBeTruthy()
   })
 })
 

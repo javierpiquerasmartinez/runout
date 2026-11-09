@@ -1,10 +1,20 @@
-import { Body, Controller, Get, Header, Headers, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Headers,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
 import {
   GoalsService,
   type Goal,
   type GoalBody,
+  type GoalChange,
   type GoalList,
 } from './goals.service.js';
 
@@ -36,6 +46,20 @@ export class GoalsController {
   ): Promise<Goal> {
     const account = await this.authenticate(authorization);
     return this.goals.create(account, body);
+  }
+
+  /**
+   * Changes whichever of a Goal's fields are sent. Someone else's Goal is
+   * `goal-not-found`.
+   */
+  @Patch(':id')
+  async change(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+    @Body() body: GoalChange = {},
+  ): Promise<Goal> {
+    const account = await this.authenticate(authorization);
+    return this.goals.change(account, id, body);
   }
 
   private authenticate(authorization: string | undefined) {

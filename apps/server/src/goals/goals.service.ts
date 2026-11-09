@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, type SQL } from 'drizzle-orm';
 import { calendarDate } from '../calendar/calendar-date.js';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { goals } from '../database/schema.js';
+import { isUuid } from '../database/uuid.js';
 import type { Identity } from '../identity/identity.service.js';
 import { Rejected } from '../rejection/rejection.js';
 
@@ -36,13 +37,18 @@ export interface GoalBody {
   deadline?: unknown;
 }
 
+/** What changing a Goal sends. */
+export interface GoalChange {
+  currentValue?: unknown;
+}
+
 /** How long a Goal's name may be, in characters, once trimmed. */
 const MAX_NAME_LENGTH = 80;
 
 /** How long a Goal's description may be, in characters, once trimmed. */
 const MAX_DESCRIPTION_LENGTH = 500;
 
-/** The largest a Target may be. */
+/** The largest a Target or a Current Value may be. */
 const MAX_AMOUNT = 999_999_999;
 
 const selection = {
@@ -101,22 +107,83 @@ export class GoalsService {
       .returning(selection);
     return created;
   }
+
+  /**
+   * Changes whichever fields of a Goal are sent, with their rules; the rest
+   * stay as they were. Another Account's Goal is `goal-not-found`, even when
+   * the body is refused: only a refused body costs a second read.
+   */
+  async change(
+    account: Identity,
+    goalId: string,
+    body: GoalChange,
+  ): Promise<Goal> {
+    const owned = ownedBy(account, goalId);
+    let changes: GoalFields;
+    try {
+      changes = changesOf(body);
+    } catch (refused) {
+      // Not being there wins over a refused body.
+      const [found] = await this.db
+        .select({ id: goals.id })
+        .from(goals)
+        .where(owned);
+      if (!found) throw new Rejected('goal-not-found');
+      throw refused;
+    }
+    const [changed] = await this.db
+      .update(goals)
+      .set({ ...changes, updatedAt: this.clock.now() })
+      .where(owned)
+      .returning(selection);
+    if (!changed) throw new Rejected('goal-not-found');
+    return changed;
+  }
+}
+
+/** The fields of a Goal a change can set. */
+type GoalFields = Partial<Pick<Goal, 'currentValue'>>;
+
+/**
+ * Picks out the Goal with this id among the Account's own; `goal-not-found`
+ * when the id can't be any Goal's.
+ */
+function ownedBy(account: Identity, goalId: string): SQL | undefined {
+  if (!isUuid(goalId)) throw new Rejected('goal-not-found');
+  return and(eq(goals.id, goalId), eq(goals.identityId, account.id));
+}
+
+/** Whichever fields a change sends, each checked with its own rules. */
+function changesOf(body: GoalChange): GoalFields {
+  const changes: GoalFields = {};
+  if (body.currentValue !== undefined) {
+    changes.currentValue = currentValueOf(body.currentValue);
+  }
+  return changes;
 }
 
 /**
- * A Goal's Target: a number above 0, up to `MAX_AMOUNT`, with at most two
- * decimals; `invalid-goal-target` otherwise. The decimals are read from how
- * the number is written, where multiplying by 100 would add binary error.
+ * Whether this can be an amount of a Goal: a number from 0 to `MAX_AMOUNT`
+ * with at most two decimals. The decimals are read from how the number is
+ * written, where multiplying by 100 would add binary error.
  */
+function isAmount(raw: unknown): raw is number {
+  return (
+    typeof raw === 'number' &&
+    raw <= MAX_AMOUNT &&
+    /^\d+(\.\d{1,2})?$/.test(String(raw))
+  );
+}
+
+/** A Goal's Target: an amount above 0; `invalid-goal-target` otherwise. */
 function targetOf(raw: unknown): number {
-  if (
-    typeof raw !== 'number' ||
-    raw <= 0 ||
-    raw > MAX_AMOUNT ||
-    !/^\d+(\.\d{1,2})?$/.test(String(raw))
-  ) {
-    throw new Rejected('invalid-goal-target');
-  }
+  if (!isAmount(raw) || raw <= 0) throw new Rejected('invalid-goal-target');
+  return raw;
+}
+
+/** A Goal's Current Value; `invalid-goal-current-value` when it can't be one. */
+function currentValueOf(raw: unknown): number {
+  if (!isAmount(raw)) throw new Rejected('invalid-goal-current-value');
   return raw;
 }
 

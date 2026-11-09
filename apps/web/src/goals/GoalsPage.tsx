@@ -17,7 +17,7 @@ import './GoalsPage.css'
  */
 export function GoalsPage() {
   const { t } = useI18n()
-  const { goals, status, add } = useGoals()
+  const { goals, status, add, changeCurrentValue } = useGoals()
   const [creating, setCreating] = useState(false)
   const empty = status === 'loaded' && goals.length === 0
   const today = todayOf()
@@ -51,7 +51,7 @@ export function GoalsPage() {
         {goals.length > 0 && (
           <div className="goals-page__list">
             {orderGoals(goals, today).map((goal) => (
-              <GoalCard key={goal.id} goal={goal} today={today} />
+              <GoalCard key={goal.id} goal={goal} today={today} onChangeValue={(value) => changeCurrentValue(goal.id, value)} />
             ))}
           </div>
         )}

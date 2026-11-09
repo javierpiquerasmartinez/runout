@@ -32,7 +32,7 @@ export const goalsPath = '/goals'
 /** How long a Goal's name may be, in characters. */
 export const MAX_GOAL_NAME_LENGTH = 80
 
-/** The largest a Target may be. */
+/** The largest a Target or a Current Value may be. */
 const MAX_AMOUNT = 999_999_999
 
 /** An amount has two decimals at most, so in hundredths it is a whole number. */
@@ -121,7 +121,12 @@ export function writeAmount(amount: number, locale: Locale): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(amount)
 }
 
-/** Whether a number can be a Target: above 0, up to 999,999,999, with two decimals at most. */
+/** Whether a number can be a Current Value: from 0 up to 999,999,999, with two decimals at most. */
+export function isValidCurrentValue(amount: number): boolean {
+  return amount <= MAX_AMOUNT && /^\d+(\.\d{1,2})?$/.test(String(amount))
+}
+
+/** Whether a number can be a Target: as a Current Value, but above 0. */
 export function isValidTarget(amount: number): boolean {
-  return amount > 0 && amount <= MAX_AMOUNT && /^\d+(\.\d{1,2})?$/.test(String(amount))
+  return amount > 0 && isValidCurrentValue(amount)
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barFill, countdownOn, goalStatusOn, isValidTarget, orderGoals, progressOf, readAmount, writeAmount } from './goals'
+import { barFill, countdownOn, goalStatusOn, isValidCurrentValue, isValidTarget, orderGoals, progressOf, readAmount, writeAmount } from './goals'
 import type { Goal } from './goals'
 
 describe('progressOf', () => {
@@ -104,6 +104,16 @@ describe('isValidTarget', () => {
 
   it.each([0, -1, 5.555, 1e-7, 999999999.01, 1000000000])('refuses %d', (target) => {
     expect(isValidTarget(target)).toBe(false)
+  })
+})
+
+describe('isValidCurrentValue', () => {
+  it.each([0, 0.01, 5.55, 1234567.89, 999999999])('accepts %d', (value) => {
+    expect(isValidCurrentValue(value)).toBe(true)
+  })
+
+  it.each([-1, -0.01, 5.555, 1e-7, 999999999.01, 1000000000])('refuses %d', (value) => {
+    expect(isValidCurrentValue(value)).toBe(false)
   })
 })
 

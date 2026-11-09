@@ -62,6 +62,8 @@ export type RejectionReason =
   | 'invalid-goal-name'
   | 'invalid-goal-description'
   | 'invalid-goal-target'
+  | 'invalid-goal-current-value'
+  | 'goal-not-found'
   | 'invalid-goal-start-date'
   | 'invalid-goal-deadline'
   | 'goal-deadline-before-start'

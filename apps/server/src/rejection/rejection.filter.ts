@@ -67,6 +67,8 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'invalid-goal-name': HttpStatus.BAD_REQUEST,
   'invalid-goal-description': HttpStatus.BAD_REQUEST,
   'invalid-goal-target': HttpStatus.BAD_REQUEST,
+  'invalid-goal-current-value': HttpStatus.BAD_REQUEST,
+  'goal-not-found': HttpStatus.NOT_FOUND,
   'invalid-goal-start-date': HttpStatus.BAD_REQUEST,
   'invalid-goal-deadline': HttpStatus.BAD_REQUEST,
   'goal-deadline-before-start': HttpStatus.BAD_REQUEST,

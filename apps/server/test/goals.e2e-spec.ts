@@ -247,6 +247,116 @@ describe('Goals (e2e)', () => {
     expect(await list(berta.token)).toEqual([]);
   });
 
+  function change(token: string, id: string, body: object) {
+    return request(running.httpServer)
+      .patch(`/api/goals/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  }
+
+  /** A Goal of this Account, for a test to change. */
+  async function goalOf(token: string): Promise<Goal> {
+    const created = await create(token, valid).expect(201);
+    return created.body as Goal;
+  }
+
+  it.each([
+    ['up', 320],
+    ['past the Target', 60000],
+    ['with two decimals', 5.55],
+    ['with a decimal prone to binary error', 1234567.89],
+    ['to the largest', 999999999],
+  ])('changes the Current Value %s, and it comes back exact', async (_case, currentValue) => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+
+    const changed = await change(account.token, goal.id, {
+      currentValue,
+    }).expect(200);
+
+    expect(changed.body).toEqual({ ...goal, currentValue });
+    expect(await list(account.token)).toEqual([changed.body]);
+  });
+
+  it('lets the Current Value go down, and back to 0', async () => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+    await change(account.token, goal.id, { currentValue: 320 }).expect(200);
+
+    const lower = await change(account.token, goal.id, {
+      currentValue: 12.5,
+    }).expect(200);
+    expect(lower.body).toMatchObject({ currentValue: 12.5 });
+
+    const zero = await change(account.token, goal.id, {
+      currentValue: 0,
+    }).expect(200);
+    expect(zero.body).toMatchObject({ currentValue: 0 });
+  });
+
+  it('changes nothing but the Current Value', async () => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+
+    const changed = await change(account.token, goal.id, {
+      name: 'Otro nombre',
+      target: 1,
+      startDate: '2020-01-01',
+      deadline: '2020-01-02',
+      currentValue: 7,
+    }).expect(200);
+
+    expect(changed.body).toEqual({ ...goal, currentValue: 7 });
+  });
+
+  it.each([
+    ['negative', -1],
+    ['too large', 1000000000],
+    ['too large by a cent', 999999999.01],
+    ['with three decimals', 5.555],
+    ['tiny', 1e-7],
+    ['a number written as text', '320'],
+    ['not a number', 'mucho'],
+    ['nothing', null],
+  ])('refuses a Current Value that is %s', async (_case, currentValue) => {
+    const account = await newAccount(running.httpServer);
+    const goal = await goalOf(account.token);
+
+    const res = await change(account.token, goal.id, {
+      currentValue,
+    }).expect(400);
+
+    expect(res.body).toMatchObject({ reason: 'invalid-goal-current-value' });
+    expect(await list(account.token)).toEqual([goal]);
+  });
+
+  it("answers 404 for another Account's Goal, even with an invalid value, and leaves it alone", async () => {
+    const ana = await newAccount(running.httpServer);
+    const berta = await newAccount(running.httpServer);
+    const goal = await goalOf(ana.token);
+
+    for (const currentValue of [7, -1]) {
+      const res = await change(berta.token, goal.id, {
+        currentValue,
+      }).expect(404);
+      expect(res.body).toMatchObject({ reason: 'goal-not-found' });
+    }
+    expect(await list(ana.token)).toEqual([goal]);
+  });
+
+  it.each([
+    ['that no Goal has', 'b0a7c1de-3f4e-4c55-9a11-2f3b4c5d6e7f'],
+    ["that can't be any Goal's", 'not-an-id'],
+  ])('answers 404 for an id %s', async (_case, id) => {
+    const account = await newAccount(running.httpServer);
+
+    const res = await change(account.token, id, { currentValue: 7 }).expect(
+      404,
+    );
+
+    expect(res.body).toMatchObject({ reason: 'goal-not-found' });
+  });
+
   it('refuses anyone without an Account', async () => {
     const master = await newAccount(running.httpServer);
     const room = await request(running.httpServer)
@@ -268,6 +378,16 @@ describe('Goals (e2e)', () => {
     expect(listed.body).toMatchObject({ reason: 'account-required' });
     const created = await create(token, valid).expect(403);
     expect(created.body).toMatchObject({ reason: 'account-required' });
+    const goal = await goalOf(master.token);
+    await request(running.httpServer)
+      .patch(`/api/goals/${goal.id}`)
+      .send({ currentValue: 7 })
+      .expect(401);
+    const changed = await change(token, goal.id, { currentValue: 7 }).expect(
+      403,
+    );
+    expect(changed.body).toMatchObject({ reason: 'account-required' });
+    expect(await list(master.token)).toEqual([goal]);
   });
 });
 
@@ -313,5 +433,31 @@ describe('Goals during Impersonation (e2e)', () => {
       .expect(201);
     const after = await listOf(ana.token);
     expect(after.body.goals).toContainEqual(created.body);
+  });
+
+  it("lets an Administrator impersonating an Account change its Goals' Current Value", async () => {
+    const administrator = await signInAdministrator(running);
+    const ana = await invitedAccount(
+      running,
+      administrator.token,
+      uniqueEmail('ana'),
+    );
+    const kept = await request(running.httpServer)
+      .post('/api/goals')
+      .set('Authorization', `Bearer ${ana.token}`)
+      .send(valid)
+      .expect(201);
+    const impersonation = await request(running.httpServer)
+      .post(`/api/admin/accounts/${ana.id}/impersonations`)
+      .set('Authorization', `Bearer ${administrator.token}`)
+      .expect(201);
+
+    const changed = await request(running.httpServer)
+      .patch(`/api/goals/${kept.body.id as string}`)
+      .set('Authorization', `Bearer ${impersonation.body.token as string}`)
+      .send({ currentValue: 320 })
+      .expect(200);
+
+    expect(changed.body).toEqual({ ...kept.body, currentValue: 320 });
   });
 });

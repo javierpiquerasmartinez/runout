@@ -1,7 +1,8 @@
 import { useId, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import type { CalendarDate } from '../calendar/calendar'
-import { barFill, countdownOn, goalStatusOn, progressOf, writeAmount, type Countdown, type Goal, type GoalStatus } from './goals'
+import { GoalNumbers } from './GoalNumbers'
+import { barFill, countdownOn, goalStatusOn, type Countdown, type Goal, type GoalStatus } from './goals'
 
 /** Each Goal Status has a shape of its own, so that it doesn't rest on colour alone. */
 const statusMarks: Record<GoalStatus, ReactNode> = {
@@ -25,8 +26,16 @@ function useCountdownText(countdown: Countdown): string | null {
 }
 
 /** A Goal on its card, as it stands today: its name, its description if it has one, its Goal Status and countdown, its numbers and its Progress. */
-export function GoalCard({ goal, today }: { goal: Goal; today: CalendarDate }) {
-  const { t, locale, formatNumber } = useI18n()
+export function GoalCard({
+  goal,
+  today,
+  onChangeValue,
+}: {
+  goal: Goal
+  today: CalendarDate
+  onChangeValue: (value: number) => Promise<void>
+}) {
+  const { t } = useI18n()
   const nameId = useId()
   const status = goalStatusOn(goal, today)
   const countdown = useCountdownText(countdownOn(goal, today))
@@ -52,11 +61,7 @@ export function GoalCard({ goal, today }: { goal: Goal; today: CalendarDate }) {
         {countdown !== null && <span className="goal-card__countdown">{countdown}</span>}
       </div>
       <div className="goal-card__progress">
-        <div className="goal-card__numbers">
-          <span className="goal-card__current ro-mono">{writeAmount(goal.currentValue, locale)}</span>
-          <span className="goal-card__target ro-mono">{`/ ${writeAmount(goal.target, locale)}`}</span>
-          <span className="goal-card__percent ro-mono">{t('goals.card.percent', { percent: formatNumber(progressOf(goal)) })}</span>
-        </div>
+        <GoalNumbers goal={goal} onChangeValue={onChangeValue} />
         <div className="goal-card__bar" aria-hidden="true">
           <div className="goal-card__fill" style={{ width: `${barFill(goal)}%` }} />
         </div>

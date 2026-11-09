@@ -151,9 +151,46 @@
   gap: 7px;
   white-space: nowrap;
 }
-.goal-card__current {
+.goal-card__value,
+.goal-card__field {
+  height: 32px;
+  padding: 0 9px;
+  box-sizing: border-box;
+  border-radius: 7px;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
+}
+/* 32 px to the eye, 44 px to the finger. */
+.goal-card__value {
+  position: relative;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+.goal-card__value::after {
+  content: '';
+  position: absolute;
+  inset: -7px 0;
+}
+.goal-card__value:hover {
+  background: var(--color-hover);
+}
+.goal-card__value:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.goal-card__field {
+  width: 112px;
+  border: 1px solid var(--sync);
+  background: var(--color-canvas);
+  box-shadow: 0 0 0 3px var(--sync-glow);
+  outline: none;
+}
+.goal-card__field[aria-invalid] {
+  border-color: var(--alert);
+  box-shadow: none;
 }
 .goal-card__target {
   color: var(--text-secondary);
@@ -163,6 +200,12 @@
   margin-left: auto;
   font-size: 14px;
   font-weight: 600;
+}
+.goal-card__message {
+  margin: 0;
+  color: var(--alert-ink);
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 .goal-card__bar {
   height: 6px;
