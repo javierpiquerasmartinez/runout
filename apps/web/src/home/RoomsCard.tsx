@@ -1,4 +1,103 @@
-/** The Rooms' card on Home: its slot stays empty until the card is built. */
+import { api } from '../backend/api'
+import { useI18n } from '../i18n'
+import { useImpersonationLock } from '../identity/impersonationLock'
+import { roomPath } from '../room/roomCode'
+import type { OpenRoom } from '../rooms/RoomsList'
+import { requestNewRoom, roomsPath } from '../rooms/rooms'
+import { followLink } from '../routing'
+import { Button } from '../ui/Button'
+import { Icon } from '../ui/Icon'
+import { HomeCard, HomeCardMessage } from './HomeCard'
+import { useCardRead } from './useCardRead'
+import './RoomsCard.css'
+
+const MOST_ROOMS = 4
+
+const readRooms = (token: string) => api<OpenRoom[]>('/rooms', { token })
+
+const latestFirst = (a: OpenRoom, b: OpenRoom) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt)
+
+/** The Rooms this card has room for: the Live ones first, then the most recently active. */
+function firstRooms(rooms: OpenRoom[]): OpenRoom[] {
+  const liveOnes = rooms.filter((room) => room.state === 'live').sort(latestFirst)
+  const others = rooms.filter((room) => room.state !== 'live').sort(latestFirst)
+  return [...liveOnes, ...others].slice(0, MOST_ROOMS)
+}
+
+/** The Account's open Rooms, to go back into one with a click. An Impersonation sees them but never enters one. */
 export function RoomsCard() {
-  return null
+  const { t } = useI18n()
+  const noRooms = useImpersonationLock('rooms')
+  const { status, data: rooms, reload } = useCardRead(readRooms)
+  const listed = rooms !== null && rooms.length > 0
+  return (
+    <HomeCard
+      title={t('header.nav.rooms')}
+      href={roomsPath}
+      status={status}
+      onRetry={reload}
+      action={
+        listed && !noRooms ? (
+          <a className="rooms-card__all" href={roomsPath} onClick={followLink}>
+            {t('home.rooms.seeAll')}
+          </a>
+        ) : undefined
+      }
+    >
+      {rooms?.length === 0 && (
+        <HomeCardMessage title={t('home.rooms.empty.title')} text={t('home.rooms.empty.text')}>
+          <Button
+            size="compact"
+            aria-label={noRooms ? t('header.newRoom') : undefined}
+            disabledReason={noRooms}
+            onClick={requestNewRoom}
+          >
+            <Icon name="add" size={14} />
+            {t('header.newRoom')}
+          </Button>
+        </HomeCardMessage>
+      )}
+      {listed && noRooms && <p className="rooms-card__locked">{noRooms}</p>}
+      {listed && (
+        <ul className="rooms-card__rows">
+          {firstRooms(rooms).map((room) => (
+            <li key={room.code}>
+              {noRooms ? (
+                <div className="rooms-card__row" data-live={room.state === 'live' || undefined} aria-disabled="true">
+                  <RoomRowContent room={room} />
+                </div>
+              ) : (
+                <a
+                  className="rooms-card__row"
+                  data-live={room.state === 'live' || undefined}
+                  href={roomPath(room.code)}
+                  onClick={followLink}
+                >
+                  <RoomRowContent room={room} />
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </HomeCard>
+  )
+}
+
+function RoomRowContent({ room }: { room: OpenRoom }) {
+  const { t } = useI18n()
+  return (
+    <>
+      <span className="rooms-card__about">
+        <span className="rooms-card__name">{room.name}</span>
+        <span className="rooms-card__state">
+          <span className="rooms-card__dot" aria-hidden="true" />
+          {t(room.state === 'live' ? 'rooms.row.live' : 'home.rooms.freeReview')}
+        </span>
+      </span>
+      <span className="rooms-card__connected">
+        {t(room.connected === 1 ? 'home.rooms.connected.one' : 'home.rooms.connected.other', { count: room.connected })}
+      </span>
+    </>
+  )
 }

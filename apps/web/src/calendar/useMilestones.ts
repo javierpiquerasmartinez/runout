@@ -11,7 +11,7 @@ export interface Unsaved {
 
 /** What the Calendar knows of the Account's Milestones for a span. */
 interface Fetched {
-  /** The span the Milestones are of. */
+  /** The span the Milestones are of, and which reading of it. */
   key: string
   milestones: Milestone[]
 }
@@ -21,11 +21,12 @@ interface Fetched {
  * created here is added at once, without asking again, even when the span it
  * lands in is still being asked for. Marking one done or not done, or moving
  * it to another day, shows at once; if saving it fails, it goes back and
- * `unsaved` says so.
+ * `unsaved` says so. `reload` asks again, back through loading.
  */
 export function useMilestones({ from, to }: CalendarSpan) {
   const { token } = useSession()
-  const key = `${from}/${to}`
+  const [attempt, setAttempt] = useState(0)
+  const key = `${from}/${to}#${attempt}`
   const [fetched, setFetched] = useState<Fetched | null>(null)
   const [failedKey, setFailedKey] = useState<string | null>(null)
   const [unsaved, setUnsaved] = useState<Unsaved | null>(null)
@@ -67,6 +68,7 @@ export function useMilestones({ from, to }: CalendarSpan) {
     milestones: fresh ? fetched.milestones : [],
     loading: !fresh && failedKey !== key,
     failed: failedKey === key,
+    reload: () => setAttempt((n) => n + 1),
     add(milestone: Milestone) {
       created.current.push(milestone)
       setFetched((before) => {

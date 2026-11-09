@@ -1420,8 +1420,23 @@ export const es = {
   'home.library.empty.title': 'Aún no tienes manos',
   'home.library.empty.text': 'Importa tus historiales y aquí verás cómo te va el mes: manos, resultado y gráfica.',
   // Home: the Rooms card.
+  'home.rooms.seeAll': 'Ver todas',
+  'home.rooms.empty.title': 'No estás en ninguna sala',
+  'home.rooms.empty.text': 'Crea una para repasar manos con tu grupo.',
+  'home.rooms.freeReview': 'Revisión libre',
+  'home.rooms.connected.one': '{count} conectado',
+  'home.rooms.connected.other': '{count} conectados',
   // Home: the Goals card.
+  'home.goals.seeAll': 'Ver todos',
+  'home.goals.none.title': 'Ningún objetivo en curso',
+  'home.goals.none.text': 'Los que empiezan más adelante, los vencidos y los conseguidos están en Objetivos.',
+  'home.goals.empty.title': 'Aún no tienes objetivos',
+  'home.goals.empty.text': 'Ponte una meta con fecha y sigue aquí cómo avanza.',
   // Home: the Calendar card.
+  'home.calendar.today': 'Hoy, {date}',
+  'home.calendar.seeAll': 'Ver todos',
+  'home.calendar.empty.title': 'Nada planeado para hoy',
+  'home.calendar.empty.text': 'Apunta qué vas a estudiar y lo verás aquí ese día.',
   // Home: the Lab card.
   'home.lab.ranges.one': 'rango',
   'home.lab.ranges.other': 'rangos',

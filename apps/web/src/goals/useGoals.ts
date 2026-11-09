@@ -21,6 +21,8 @@ export function useGoals() {
   /** The latest save of the Current Value of each Goal that has had one. */
   const valueSaves = useRef(new Map<string, Promise<Goal>>())
 
+  const [attempt, setAttempt] = useState(0)
+
   useEffect(() => {
     let current = true
     listGoals(token)
@@ -33,7 +35,13 @@ export function useGoals() {
     return () => {
       current = false
     }
-  }, [token])
+  }, [token, attempt])
+
+  /** Asks for the Goals again, back through loading. */
+  const reload = () => {
+    setStatus('loading')
+    setAttempt((n) => n + 1)
+  }
 
   /** Sends this about a Goal once whatever was sent before it has been answered, however that went. */
   const inTurn = <T>(id: string, send: () => Promise<T>): Promise<T> => {
@@ -64,6 +72,7 @@ export function useGoals() {
   return {
     goals: saved.map((goal) => (goal.id in unsaved ? { ...goal, currentValue: unsaved[goal.id] } : goal)),
     status,
+    reload,
     create: async (fields: NewGoal): Promise<void> => {
       const goal = await createGoal(token, fields)
       setSaved((before) => [...before, goal])

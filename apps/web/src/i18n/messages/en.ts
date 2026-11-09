@@ -1421,8 +1421,23 @@ export const en: Messages = {
   'home.library.empty.title': 'No hands yet',
   'home.library.empty.text': 'Import your hand histories and see how your month is going here: hands, result and graph.',
   // Home: the Rooms card.
+  'home.rooms.seeAll': 'See all',
+  'home.rooms.empty.title': "You're not in any room",
+  'home.rooms.empty.text': 'Create one to review hands with your group.',
+  'home.rooms.freeReview': 'Free review',
+  'home.rooms.connected.one': '{count} connected',
+  'home.rooms.connected.other': '{count} connected',
   // Home: the Goals card.
+  'home.goals.seeAll': 'See all',
+  'home.goals.none.title': 'No goals in progress',
+  'home.goals.none.text': 'The ones starting later, expired and achieved are in Goals.',
+  'home.goals.empty.title': "You don't have any goals yet",
+  'home.goals.empty.text': 'Set yourself a target with a date and follow how it goes here.',
   // Home: the Calendar card.
+  'home.calendar.today': 'Today, {date}',
+  'home.calendar.seeAll': 'See all',
+  'home.calendar.empty.title': 'Nothing planned for today',
+  'home.calendar.empty.text': "Note down what you're going to study and you'll see it here on the day.",
   // Home: the Lab card.
   'home.lab.ranges.one': 'range',
   'home.lab.ranges.other': 'ranges',
