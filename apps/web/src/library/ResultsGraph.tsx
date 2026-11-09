@@ -14,17 +14,14 @@ import {
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
-import { graphColour, type DisplayUnit, type Preferences } from '../preferences/preferences'
+import { graphColour, type Preferences } from '../preferences/preferences'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { CLICK_THRESHOLD, graphGesture } from './graphGesture'
 import { libraryHandPath } from './library'
-import { LINE_COLOUR, RESULT_LINES, type ResultLine, type ResultLines, type Results, type Zoom } from './results'
+import { formatValue, LINE_COLOUR, RESULT_LINES, winRate, type GraphUnit, type ResultLine, type ResultLines, type Results, type Zoom } from './results'
 import './ResultsGraph.css'
-
-/** What the graph adds up in: big blinds always, Amounts only in one currency. */
-type GraphUnit = Exclude<DisplayUnit, 'both'>
 
 /** A point as drawn; the start point stands for no Hand, so it has no cards. */
 type Point = { hand: number; handId?: string; holeCards?: string[] } & ResultLines
@@ -316,7 +313,7 @@ export function ResultsGraph({
                     {t(`library.results.line.${line}`)}
                   </dt>
                   <dd className="ro-mono">
-                    {i18n.formatNumber((results.totals.bigBlinds[line] / results.hands) * 100, {
+                    {i18n.formatNumber(winRate(results, line), {
                       minimumFractionDigits: 1,
                       maximumFractionDigits: 1,
                       signDisplay: 'exceptZero',
@@ -404,20 +401,6 @@ function Readout({
       ))}
     </div>
   )
-}
-
-/** A line's value, signed: "+4.9 BB", "-€0.09". With `auto`, only a negative one is. */
-function formatValue(
-  value: number,
-  unit: GraphUnit,
-  currency: string | null,
-  i18n: Translator,
-  signDisplay: 'exceptZero' | 'auto' = 'exceptZero',
-): string {
-  if (unit === 'amount' && currency) return i18n.formatCurrency(value / 100, currency, { signDisplay })
-  return i18n.t('room.table.bigBlinds', {
-    value: i18n.formatNumber(value, { maximumFractionDigits: 2, signDisplay }),
-  })
 }
 
 /** An axis tick, short: "120", "€1.5K". */

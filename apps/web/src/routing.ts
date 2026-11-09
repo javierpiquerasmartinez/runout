@@ -97,5 +97,5 @@ export function isPlainClick(event: MouseEvent<Element>): boolean {
 export function followLink(event: MouseEvent<HTMLAnchorElement>) {
   if (!isPlainClick(event)) return
   event.preventDefault()
-  navigate(event.currentTarget.pathname)
+  navigate(event.currentTarget.pathname + event.currentTarget.search)
 }

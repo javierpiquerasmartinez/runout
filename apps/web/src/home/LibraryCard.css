@@ -1,0 +1,81 @@
+/* The Library's card on Home, as the "Inicio" boards draw it. */
+
+.library-card__stats {
+  display: flex;
+  gap: 36px;
+}
+
+.library-card__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.library-card__label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.library-card__value {
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 28px;
+  white-space: nowrap;
+}
+
+.library-card__value[data-sign='0'] {
+  color: var(--text-secondary);
+}
+
+.library-card__value[data-sign='1'] {
+  color: var(--sync-ink);
+}
+
+.library-card__value[data-sign='-1'] {
+  color: var(--alert-ink);
+}
+
+.library-card__way,
+.library-card__way:hover {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The way to the Library stays comfortable to press. */
+.library-card__way::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  min-width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.library-card__graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.library-card__rule {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.library-card__tick {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

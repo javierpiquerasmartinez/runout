@@ -21,6 +21,17 @@ const emptyLibrary = {
   counts: { all: 0, marked: 0 },
 }
 
+const noLines = { result: 0, allInEv: 0, showdown: 0, nonShowdown: 0 }
+const emptyResults = {
+  hands: 0,
+  currency: null,
+  totals: { bigBlinds: noLines, amounts: noLines },
+  start: { bigBlinds: noLines, amounts: noLines },
+  zoom: null,
+  rakeGenerated: { bigBlinds: 0, amounts: 0 },
+  points: [],
+}
+
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
@@ -30,7 +41,7 @@ beforeEach(() => {
       if (path === '/rooms/RNT4K9PX') return Response.json({ code: 'RNT4K9PX', name: 'Martes NL50' })
       if (path.startsWith('/rooms/')) return Response.json({ reason: 'room-not-found' }, { status: 404 })
       if (path === '/library/hands') return Response.json(emptyLibrary)
-      if (path === '/library/results') return Response.json({ points: [] })
+      if (path === '/library/results') return Response.json(emptyResults)
       if (path.endsWith('/notes')) return Response.json({ notes: [], marked: false })
       if (path === '/hands/split-pot') return Response.json(splitPot)
       if (path === '/lab/ranges') return Response.json([])

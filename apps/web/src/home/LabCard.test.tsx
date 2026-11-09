@@ -122,7 +122,8 @@ describe('Home · the Lab card', () => {
     })
     renderHome()
 
-    const lab = await loaded("Couldn't load this")
+    const lab = card()
+    await lab.findByText("Couldn't load this")
     expect(lab.getByText('The rest of the screen still works.')).toBeTruthy()
     expect(lab.getByRole('link', { name: 'Lab' })).toBeTruthy()
     expect(lab.queryByRole('link', { name: 'Analysis' })).toBeNull()
@@ -139,7 +140,8 @@ describe('Home · the Lab card', () => {
     fakeApi({ 'GET /lab/ranges': () => refusal(500, 'internal') })
     renderHome('es')
 
-    const lab = await loaded('No se ha podido cargar')
+    const lab = card('Laboratorio')
+    await lab.findByText('No se ha podido cargar')
     expect(lab.getByText('El resto de la pantalla sigue funcionando.')).toBeTruthy()
     expect(lab.getByRole('button', { name: 'Reintentar' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Inicio', level: 1 })).toBeTruthy()
