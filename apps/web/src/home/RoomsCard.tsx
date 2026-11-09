@@ -7,7 +7,8 @@ import { requestNewRoom, roomsPath } from '../rooms/rooms'
 import { followLink } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { HomeCard, HomeCardMessage } from './HomeCard'
+import { lockedProps } from '../ui/locked'
+import { HomeCard, HomeCardLink, HomeCardMessage } from './HomeCard'
 import { useCardRead } from './useCardRead'
 import './RoomsCard.css'
 
@@ -38,9 +39,7 @@ export function RoomsCard() {
       onRetry={reload}
       action={
         listed && !noRooms ? (
-          <a className="rooms-card__all" href={roomsPath} onClick={followLink}>
-            {t('home.rooms.seeAll')}
-          </a>
+          <HomeCardLink href={roomsPath}>{t('home.rooms.seeAll')}</HomeCardLink>
         ) : undefined
       }
     >
@@ -62,20 +61,7 @@ export function RoomsCard() {
         <ul className="rooms-card__rows">
           {firstRooms(rooms).map((room) => (
             <li key={room.code}>
-              {noRooms ? (
-                <div className="rooms-card__row" data-live={room.state === 'live' || undefined} aria-disabled="true">
-                  <RoomRowContent room={room} />
-                </div>
-              ) : (
-                <a
-                  className="rooms-card__row"
-                  data-live={room.state === 'live' || undefined}
-                  href={roomPath(room.code)}
-                  onClick={followLink}
-                >
-                  <RoomRowContent room={room} />
-                </a>
-              )}
+              <RoomRow room={room} locked={noRooms} />
             </li>
           ))}
         </ul>
@@ -84,20 +70,34 @@ export function RoomsCard() {
   )
 }
 
-function RoomRowContent({ room }: { room: OpenRoom }) {
+/** One Room: a way into it, or, during an Impersonation, what stands in its place, as reachable and saying why it is locked. */
+function RoomRow({ room, locked }: { room: OpenRoom; locked: string | undefined }) {
   const { t } = useI18n()
-  return (
+  const live = room.state === 'live'
+  const state = t(live ? 'rooms.row.live' : 'home.rooms.freeReview')
+  const connected = t(room.connected === 1 ? 'home.rooms.connected.one' : 'home.rooms.connected.other', { count: room.connected })
+  const content = (
     <>
       <span className="rooms-card__about">
         <span className="rooms-card__name">{room.name}</span>
         <span className="rooms-card__state">
           <span className="rooms-card__dot" aria-hidden="true" />
-          {t(room.state === 'live' ? 'rooms.row.live' : 'home.rooms.freeReview')}
+          {state}
         </span>
       </span>
-      <span className="rooms-card__connected">
-        {t(room.connected === 1 ? 'home.rooms.connected.one' : 'home.rooms.connected.other', { count: room.connected })}
-      </span>
+      <span className="rooms-card__connected ro-mono">{connected}</span>
     </>
+  )
+  if (locked === undefined) {
+    return (
+      <a className="rooms-card__row" data-live={live || undefined} href={roomPath(room.code)} onClick={followLink}>
+        {content}
+      </a>
+    )
+  }
+  return (
+    <div className="rooms-card__row" data-live={live || undefined} role="link" tabIndex={0} {...lockedProps(t('home.rooms.row', { name: room.name, state, connected }), locked)}>
+      {content}
+    </div>
   )
 }

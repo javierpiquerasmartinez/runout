@@ -1,30 +1,5 @@
 /* The Goals' card on Home, as the "Inicio" boards draw it: the Goals screen's control and bar, smaller. */
 
-.goals-card__all,
-.goals-card__all:hover {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  height: 32px;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* 32 px to the eye, 44 px to the finger. */
-.goals-card__all::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  min-width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
 .goals-card__list {
   display: flex;
   flex-direction: column;
@@ -98,18 +73,6 @@
   font-size: 12.5px;
 }
 
-/* 26 px to the eye, 44 px to the finger, on every screen. */
-.goals-card__line .goal-card__value::after {
-  content: '';
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  min-width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
 .goals-card__line .goal-card__field {
   width: 112px;
 }
@@ -126,9 +89,19 @@
 }
 
 @media (max-width: 760px) {
+  /* The first name's 44 px clear of the card's head. */
+  .goals-card__list {
+    padding-top: 1px;
+  }
+
+  /* As wide as a finger, so that its target stays off the name beside it. */
+  .goals-card__line .goal-card__value {
+    min-width: var(--control-touch);
+  }
+
   /* What is being typed in, where a fingertip and the phone's keyboard expect it. */
   .goals-card__line .goal-card__field {
-    height: 44px;
+    height: var(--control-touch);
     font-size: 16px;
   }
 }

@@ -170,18 +170,11 @@
   font-size: 14px;
   font-weight: 600;
 }
-/* 32 px to the eye, 44 px to the finger. */
 .goal-card__value {
-  position: relative;
   border: 1px solid var(--color-border-strong);
   background: transparent;
   cursor: pointer;
   transition: background-color var(--transition);
-}
-.goal-card__value::after {
-  content: '';
-  position: absolute;
-  inset: -7px 0;
 }
 .goal-card__value:hover {
   background: var(--color-hover);
@@ -358,10 +351,6 @@
   .goal-card__field {
     height: 44px;
     font-size: 15px;
-  }
-  /* Already 44 px to the eye. */
-  .goal-card__value::after {
-    content: none;
   }
   .goal-card__field {
     width: 128px;

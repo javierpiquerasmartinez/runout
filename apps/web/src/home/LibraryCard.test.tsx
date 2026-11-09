@@ -63,7 +63,7 @@ function results({ hands = 3482, currency = 'EUR', bigBlinds = 146.5, amounts = 
 
 const answering = (month: Month = {}) => fakeApi({ 'GET /library/results': () => Response.json(results(month)) })
 const loaded = async (text: string) => within((await screen.findByText(text)).closest('section')!)
-const stat = (label: string) => screen.getByText(label).nextElementSibling?.textContent
+const figure = (label: string) => screen.getByText(label).nextElementSibling?.textContent
 
 describe('Home · the Library card', () => {
   it('shows the Hands, Result and Win Rate of the month it names', async () => {
@@ -72,9 +72,9 @@ describe('Home · the Library card', () => {
 
     const library = await loaded('Hands')
     expect(library.getByText('November')).toBeTruthy()
-    expect(stat('Hands')).toBe('3,482')
-    expect(stat('Result')).toBe('+146.5 BB')
-    expect(stat('Win rate')).toBe('4.21')
+    expect(figure('Hands')).toBe('3,482')
+    expect(figure('Result')).toBe('+146.5 BB')
+    expect(figure('Win rate')).toBe('4.21')
   })
 
   it('reads the Hands played this month, in the viewer\'s days', async () => {
@@ -105,11 +105,22 @@ describe('Home · the Library card', () => {
     expect((await loaded('Hands')).getByText('+146.5 BB')).toBeTruthy()
   })
 
-  it('reads "both" as big blinds, as the Results Graph does', async () => {
+  it('reads "both" as the Library list does: big blinds, and the Amount beside them', async () => {
     answering()
     renderHome('en', { displayUnit: 'both' })
 
-    expect((await loaded('Hands')).getByText('+146.5 BB')).toBeTruthy()
+    const library = await loaded('Hands')
+    expect(library.getByText('+146.5 BB')).toBeTruthy()
+    expect(library.getByText('+€73.25')).toBeTruthy()
+  })
+
+  it('reads "both" as big blinds alone when the month mixes currencies', async () => {
+    answering({ currency: null, amounts: null })
+    renderHome('en', { displayUnit: 'both' })
+
+    const library = await loaded('Hands')
+    expect(figure('Result')).toBe('+146.5 BB')
+    expect(library.queryByText(/€/)).toBeNull()
   })
 
   it('reads in Spanish, month and numbers included', async () => {
@@ -118,9 +129,9 @@ describe('Home · the Library card', () => {
 
     const library = await loaded('Manos')
     expect(library.getByText('Noviembre')).toBeTruthy()
-    expect(stat('Manos')).toBe('3.482')
-    expect(stat('Resultado')).toBe('+146,5 BB')
-    expect(stat('Win rate')).toBe('4,21')
+    expect(figure('Manos')).toBe('3.482')
+    expect(figure('Resultado')).toBe('+146,5 BB')
+    expect(figure('Win rate')).toBe('4,21')
   })
 
   it('leads from its title to the Library on the current month', async () => {
@@ -295,8 +306,8 @@ describe('Home · the Library card', () => {
       await userEvent.click((await loaded('Hands')).getByRole('button', { name: 'Import' }))
       await importOneHand()
 
-      await waitFor(() => expect(stat('Hands')).toBe('11'))
-      expect(stat('Result')).toBe('+8 BB')
+      await waitFor(() => expect(figure('Hands')).toBe('11'))
+      expect(figure('Result')).toBe('+8 BB')
       expect(screen.queryByRole('dialog', { name: 'Import hands into your library' })).toBeNull()
       expect(window.location.pathname).toBe('/')
       expect(reads(calls)).toHaveLength(2)
@@ -311,8 +322,8 @@ describe('Home · the Library card', () => {
 
       await waitFor(() => expect(reads(calls)).toHaveLength(2))
       await screen.findByText('Hands')
-      expect(stat('Hands')).toBe('10')
-      expect(stat('Result')).toBe('+5 BB')
+      expect(figure('Hands')).toBe('10')
+      expect(figure('Result')).toBe('+5 BB')
     })
 
     it('tells a first import of earlier months apart from a Library still empty', async () => {
@@ -343,7 +354,7 @@ describe('Home · the Library card', () => {
       await userEvent.click(within(importDialog()).getByRole('button', { name: 'Cancel' }))
 
       expect(screen.queryByRole('dialog', { name: 'Import hands into your library' })).toBeNull()
-      expect(stat('Hands')).toBe('3,482')
+      expect(figure('Hands')).toBe('3,482')
       expect(reads(calls)).toHaveLength(1)
     })
   })
@@ -367,7 +378,7 @@ describe('Home · the Library card', () => {
       await userEvent.click(failed().getByRole('button', { name: 'Retry' }))
 
       await loaded('Hands')
-      expect(stat('Hands')).toBe('3,482')
+      expect(figure('Hands')).toBe('3,482')
     })
 
     it('fails too when it cannot tell whether there are Hands in other months', async () => {

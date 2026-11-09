@@ -1425,6 +1425,7 @@ export const en: Messages = {
   'home.rooms.empty.title': "You're not in any room",
   'home.rooms.empty.text': 'Create one to review hands with your group.',
   'home.rooms.freeReview': 'Free review',
+  'home.rooms.row': '{name}, {state}, {connected}',
   'home.rooms.connected.one': '{count} connected',
   'home.rooms.connected.other': '{count} connected',
   // Home: the Goals card.
@@ -1436,8 +1437,8 @@ export const en: Messages = {
   // Home: the Calendar card.
   'home.calendar.today': 'Today, {date}',
   'home.calendar.seeAll': 'See all',
-  'home.calendar.next': 'Next:',
-  'home.calendar.next.day': '{weekday}, {date}',
+  'home.calendar.next.before': 'Next: ',
+  'home.calendar.next.after': ', {weekday}, {date}',
   'home.calendar.overdue.one': '{count} pending from earlier days →',
   'home.calendar.overdue.other': '{count} pending from earlier days →',
   'home.calendar.empty.title': 'Nothing planned for today',

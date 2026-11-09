@@ -1,27 +1,5 @@
 /* The Rooms' card on Home, as the "Inicio" boards draw it. */
 
-.rooms-card__all,
-.rooms-card__all:hover {
-  color: var(--text-secondary);
-}
-
-.rooms-card__all {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  height: 32px;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-/* 44 px to press, with the 32 the board draws. */
-.rooms-card__all::after {
-  position: absolute;
-  inset: -6px 0;
-  content: '';
-}
-
 .rooms-card__locked {
   margin: 0;
   color: var(--text-secondary);
@@ -60,8 +38,20 @@
   border-color: var(--sync-soft-border);
 }
 
-.rooms-card__row[aria-disabled='true'] {
+/* Locked, never hidden: dashed like a locked button, and only what it holds dims, so its focus ring doesn't. */
+.rooms-card__row[data-locked],
+.rooms-card__row[data-locked][data-live] {
+  border: 1px dashed var(--disabled-border);
+  cursor: not-allowed;
+}
+
+.rooms-card__row[data-locked] > * {
   opacity: 0.55;
+}
+
+.rooms-card__row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .rooms-card__about {

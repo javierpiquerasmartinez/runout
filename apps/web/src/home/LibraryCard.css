@@ -1,11 +1,11 @@
 /* The Library's card on Home, as the "Inicio" boards draw it. */
 
-.library-card__stats {
+.library-card__figures {
   display: flex;
   gap: 36px;
 }
 
-.library-card__stat {
+.library-card__figure {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -34,32 +34,16 @@
   color: var(--sync-ink);
 }
 
-.library-card__value[data-sign='-1'] {
-  color: var(--alert-ink);
+.library-card__amounts {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
-.library-card__way,
-.library-card__way:hover {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
+.library-card__secondary {
   color: var(--text-secondary);
   font-size: 12.5px;
-  font-weight: 600;
   white-space: nowrap;
-}
-
-/* The way to the Library stays comfortable to press. */
-.library-card__way::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  min-width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
 }
 
 .library-card__graph {
@@ -81,7 +65,7 @@
 }
 
 @media (max-width: 760px) {
-  .library-card__stats {
+  .library-card__figures {
     flex-wrap: wrap;
     gap: 4px 18px;
   }

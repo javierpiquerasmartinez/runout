@@ -85,7 +85,7 @@ export function GoalNumbers({ goal, onChangeValue }: { goal: Goal; onChangeValue
           <button
             ref={control}
             type="button"
-            className="goal-card__value ro-mono"
+            className="goal-card__value ro-mono ro-touch-target"
             aria-label={t('goals.card.valueChange', { name: goal.name, value })}
             onClick={open}
           >

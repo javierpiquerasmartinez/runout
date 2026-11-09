@@ -17,7 +17,7 @@ export function LabCard() {
     <HomeCard title={t('header.nav.lab')} href={labAnalysisPath} status={status} onRetry={reload}>
       {ranges?.length === 0 && (
         <HomeCardMessage title={t('home.lab.empty.title')} text={t('home.lab.empty.text')}>
-          <HomeCardLink href={labRangesPath}>
+          <HomeCardLink look="button" href={labRangesPath}>
             <Icon name="add" size={14} />
             {t('home.lab.empty.create')}
           </HomeCardLink>
@@ -30,8 +30,8 @@ export function LabCard() {
             <span className="lab-card__unit">{t(ranges.length === 1 ? 'home.lab.ranges.one' : 'home.lab.ranges.other')}</span>
           </div>
           <div className="lab-card__ways">
-            <HomeCardLink href={labAnalysisPath}>{t('lab.analysis')}</HomeCardLink>
-            <HomeCardLink href={labRangesPath}>{t('lab.nav.ranges')}</HomeCardLink>
+            <HomeCardLink look="button" href={labAnalysisPath}>{t('lab.analysis')}</HomeCardLink>
+            <HomeCardLink look="button" href={labRangesPath}>{t('lab.nav.ranges')}</HomeCardLink>
           </div>
         </>
       )}

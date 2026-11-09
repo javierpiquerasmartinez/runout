@@ -77,7 +77,7 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Twelve epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, and Goals after the Calendar, as a place to say what all of it is aiming for. Administration runs alongside them for the trial.
+Thirteen epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, Goals after the Calendar, as a place to say what all of it is aiming for, and Home after Goals, as the first screen that says how all of them are going. Administration runs alongside them for the trial.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |

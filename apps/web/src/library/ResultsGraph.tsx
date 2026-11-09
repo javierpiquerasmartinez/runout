@@ -12,7 +12,6 @@ import {
   YAxis,
 } from 'recharts'
 import { useI18n } from '../i18n'
-import type { Translator } from '../i18n/translator'
 import { usePreferences } from '../preferences/context'
 import { graphColour, type Preferences } from '../preferences/preferences'
 import { Button } from '../ui/Button'
@@ -20,7 +19,7 @@ import { Card } from '../ui/Card'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { CLICK_THRESHOLD, graphGesture } from './graphGesture'
 import { libraryHandPath } from './library'
-import { formatValue, LINE_COLOUR, RESULT_LINES, winRate, type GraphUnit, type ResultLine, type ResultLines, type Results, type Zoom } from './results'
+import { formatTick, formatValue, graphUnit, LINE_COLOUR, linesIn, RESULT_LINES, winRate, type GraphUnit, type ResultLine, type ResultLines, type Results, type Zoom } from './results'
 import './ResultsGraph.css'
 
 /** A point as drawn; the start point stands for no Hand, so it has no cards. */
@@ -87,11 +86,10 @@ export function ResultsGraph({
   const [hidden, setHidden] = useState<ReadonlySet<ResultLine>>(new Set())
   // Amounts when the reader reads them first, as long as the Hands allow it.
   const [wantsAmounts, setWantsAmounts] = useState(displayUnit === 'amount')
-  const unit: GraphUnit = wantsAmounts && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
+  const unit = graphUnit(wantsAmounts, results)
   const format = (value: number) => formatValue(value, unit, results.currency, i18n)
   // As Amounts in the Amounts unit, when they're there; in big blinds otherwise.
-  const inUnit = <T,>(both: { bigBlinds: T; amounts: T | null }): T =>
-    unit === 'amount' && both.amounts !== null ? both.amounts : both.bigBlinds
+  const inUnit = <T,>(both: { bigBlinds: T; amounts: T | null }): T => linesIn(unit, both)
 
   // Every line starts where it stood before the first Hand drawn: nothing, unless zoomed.
   const data: Point[] = [
@@ -401,12 +399,4 @@ function Readout({
       ))}
     </div>
   )
-}
-
-/** An axis tick, short: "120", "€1.5K". */
-function formatTick(value: number, unit: GraphUnit, currency: string | null, i18n: Translator): string {
-  if (unit === 'amount' && currency) {
-    return i18n.formatCurrency(value / 100, currency, { notation: 'compact', maximumFractionDigits: 1 })
-  }
-  return i18n.formatNumber(value, { notation: 'compact', maximumFractionDigits: 1 })
 }

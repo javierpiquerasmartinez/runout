@@ -28,11 +28,26 @@ export function quantity(
   /** For the big blinds: digits, sign. The Amount keeps its currency's digits. */
   options?: Intl.NumberFormatOptions,
 ): Quantity {
-  // An Amount in the Hand's currency, the way the UI language writes money: "0,65 €", "€0.65".
-  const money = () => i18n.formatCurrency(amount / 100, scale.currency, { signDisplay: options?.signDisplay })
-  if (unit === 'amount') return { primary: money(), secondary: null }
-  const bigBlinds = i18n.t('room.table.bigBlinds', {
-    value: i18n.formatNumber(amount / scale.bigBlind, { maximumFractionDigits: 1, ...options }),
+  return quantityOf(amount / scale.bigBlind, { amount, currency: scale.currency }, unit, i18n, options)
+}
+
+/**
+ * The same for what is already counted in both units, as a sum over Hands of
+ * different Stakes is. Without an Amount, because the Hands mix currencies, it
+ * stays in big blinds whatever the unit.
+ */
+export function quantityOf(
+  bigBlinds: number,
+  money: { amount: number; currency: string } | null,
+  unit: DisplayUnit,
+  i18n: Translator,
+  options?: Intl.NumberFormatOptions,
+): Quantity {
+  // An Amount in its currency, the way the UI language writes money: "0,65 €", "€0.65".
+  const written = money && i18n.formatCurrency(money.amount / 100, money.currency, { signDisplay: options?.signDisplay })
+  if (unit === 'amount' && written !== null) return { primary: written, secondary: null }
+  const primary = i18n.t('room.table.bigBlinds', {
+    value: i18n.formatNumber(bigBlinds, { maximumFractionDigits: 1, ...options }),
   })
-  return { primary: bigBlinds, secondary: unit === 'both' ? money() : null }
+  return { primary, secondary: unit === 'both' ? written : null }
 }

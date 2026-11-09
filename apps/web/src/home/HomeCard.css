@@ -41,22 +41,6 @@
   color: var(--text-primary);
 }
 
-.home-card__title a {
-  position: relative;
-}
-
-/* 22 px to the eye, 44 px to the finger. */
-.home-card__title a::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  min-width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
 .home-card__subtitle {
   color: var(--text-muted);
   font-size: 12px;
@@ -111,4 +95,17 @@
 .home-card__link,
 .home-card__link:hover {
   color: var(--text-primary);
+}
+
+/* A plain link: 32 px to the eye, 44 px to the finger through `ro-touch-target`. */
+.home-card__text-link,
+.home-card__text-link:hover {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: var(--control-compact);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
 }

@@ -3,8 +3,9 @@ import { useI18n } from '../i18n'
 import type { CalendarDate } from '../calendar/calendar'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
+import { GoalBar } from './GoalBar'
 import { GoalNumbers } from './GoalNumbers'
-import { barFill, countdownOn, goalStatusOn, type Countdown, type Goal, type GoalStatus } from './goals'
+import { countdownOn, goalStatusOn, type Countdown, type Goal, type GoalStatus } from './goals'
 
 /** Each Goal Status has a shape of its own, so that it doesn't rest on colour alone. */
 const statusMarks: Record<GoalStatus, IconName> = {
@@ -62,9 +63,7 @@ export function GoalCard({
       </div>
       <div className="goal-card__progress">
         <GoalNumbers goal={goal} onChangeValue={onChangeValue} />
-        <div className="goal-card__bar" aria-hidden="true">
-          <div className="goal-card__fill" style={{ width: `${barFill(goal)}%` }} />
-        </div>
+        <GoalBar goal={goal} />
       </div>
     </article>
   )

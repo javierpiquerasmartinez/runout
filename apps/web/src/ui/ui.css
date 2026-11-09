@@ -12,7 +12,9 @@
 .ro-icon-btn,
 .ro-toggle,
 .ro-segmented__option,
-.ro-chip__remove {
+.ro-chip__remove,
+.ro-brand,
+.ro-touch-target {
   position: relative;
 }
 
@@ -20,7 +22,9 @@
 .ro-icon-btn::after,
 .ro-toggle::after,
 .ro-segmented__option::after,
-.ro-chip__remove::after {
+.ro-chip__remove::after,
+.ro-brand::after,
+.ro-touch-target::after {
   content: '';
   position: absolute;
   top: 50%;

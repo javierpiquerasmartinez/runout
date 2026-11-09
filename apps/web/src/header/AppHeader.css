@@ -188,6 +188,10 @@
   .app-header__account {
     flex-shrink: 0;
   }
+  /* "Nueva sala" and the avatar, each 44 px to the finger, without sharing any. */
+  .app-header__account {
+    margin-left: 6px;
+  }
   /*
    * The sections don't fit at phone width: they scroll sideways, kept to
    * the right while they fit, the current one in view, fading out on each side
@@ -218,26 +222,9 @@
     display: none;
   }
   .app-header__nav-item {
-    position: relative;
     flex-shrink: 0;
     padding: 0 8px;
     white-space: nowrap;
-  }
-  /* 32 px to the eye, 44 px to the finger, like the brand and the avatar. */
-  .app-header__nav-item::after,
-  .app-header .ro-brand::after,
-  .app-header__avatar::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: max(100%, 44px);
-    height: 44px;
-    transform: translate(-50%, -50%);
-  }
-  .app-header .ro-brand,
-  .app-header__avatar {
-    position: relative;
   }
   /* Over the first section, which starts inside its 44 px. */
   .app-header .ro-brand {

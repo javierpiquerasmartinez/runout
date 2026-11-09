@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { CalendarDate } from '../calendar/calendar'
+import { GoalBar } from '../goals/GoalBar'
 import { GoalNumbers } from '../goals/GoalNumbers'
-import { barFill, goalsPath, goalStatusOn, orderGoals, type Goal } from '../goals/goals'
+import { goalsPath, goalStatusOn, orderGoals, type Goal } from '../goals/goals'
 import { useGoals } from '../goals/useGoals'
 import { useI18n } from '../i18n'
 import { followLink } from '../routing'
@@ -35,16 +36,14 @@ export function GoalsCard({ today }: { today: CalendarDate }) {
 
   const shown = (selected?.ids ?? []).flatMap((id) => goals.filter((goal) => goal.id === id))
   const seeAll = (
-    <a className="goals-card__all" href={goalsPath} onClick={followLink}>
-      {t('home.goals.seeAll')}
-    </a>
+    <HomeCardLink href={goalsPath}>{t('home.goals.seeAll')}</HomeCardLink>
   )
 
   return (
     <HomeCard title={t('header.nav.goals')} href={goalsPath} status={status} onRetry={reload} action={shown.length > 0 && seeAll}>
       {goals.length === 0 && (
         <HomeCardMessage title={t('home.goals.empty.title')} text={t('home.goals.empty.text')}>
-          <HomeCardLink href={goalsPath}>
+          <HomeCardLink look="button" href={goalsPath}>
             <Icon name="add" size={14} />
             {t('goals.new')}
           </HomeCardLink>
@@ -68,9 +67,7 @@ export function GoalsCard({ today }: { today: CalendarDate }) {
                   {achieved && <span className="goals-card__achieved">{t('goals.status.achieved')}</span>}
                   <GoalNumbers goal={goal} onChangeValue={(value) => changeCurrentValue(goal.id, value)} />
                 </div>
-                <div className="goal-card__bar" aria-hidden="true">
-                  <div className="goal-card__fill" style={{ width: `${barFill(goal)}%` }} />
-                </div>
+                <GoalBar goal={goal} />
               </li>
             )
           })}

@@ -79,24 +79,4 @@
   .home-page__slot--lab {
     grid-column: auto;
   }
-
-  .home-page__slot--rooms {
-    order: 1;
-  }
-
-  .home-page__slot--calendar {
-    order: 2;
-  }
-
-  .home-page__slot--library {
-    order: 3;
-  }
-
-  .home-page__slot--goals {
-    order: 4;
-  }
-
-  .home-page__slot--lab {
-    order: 5;
-  }
 }

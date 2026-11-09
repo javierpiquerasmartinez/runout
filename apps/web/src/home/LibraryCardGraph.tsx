@@ -1,6 +1,6 @@
 import { useNarrowScreen } from '../calendar/narrowScreen'
 import { useI18n } from '../i18n'
-import { LINE_COLOUR, formatValue, type GraphUnit, type LinesInBothUnits, type Results } from '../library/results'
+import { LINE_COLOUR, formatTick, formatValue, linesIn, type GraphUnit, type LinesInBothUnits, type Results } from '../library/results'
 import { usePreferences } from '../preferences/context'
 import { graphColour } from '../preferences/preferences'
 
@@ -22,17 +22,16 @@ export function LibraryCardGraph({
   results,
   unit,
   monthName,
-  resultIn,
 }: {
   results: Results
   unit: GraphUnit
   monthName: string
-  resultIn: (lines: LinesInBothUnits) => number
 }) {
   const i18n = useI18n()
-  const { t, formatNumber, formatCurrency } = i18n
+  const { t, formatNumber } = i18n
   const preferences = usePreferences()
   const { width, height, plot, labelBaseline } = useNarrowScreen() ? NARROW : WIDE
+  const resultIn = (lines: LinesInBothUnits) => linesIn(unit, lines).result
   const line = [{ hand: 0, value: resultIn(results.start) }, ...results.points.map((point) => ({ hand: point.hand, value: resultIn(point) }))]
   const values = line.map(({ value }) => value)
   const lowest = Math.min(0, ...values)
@@ -44,10 +43,7 @@ export function LibraryCardGraph({
   // On the side the line went furthest; a line that never left 0 has no figure to mark.
   const extent = Math.max(highest, -lowest)
   const figure = extent > 0 ? roundFigure(extent) * (highest >= -lowest ? 1 : -1) : null
-  const tick = (value: number) =>
-    unit === 'amount' && results.currency
-      ? formatCurrency(value / 100, results.currency, { signDisplay: 'exceptZero', minimumFractionDigits: 0, maximumFractionDigits: 2 })
-      : formatNumber(value, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })
+  const tick = (value: number) => formatTick(value, unit, results.currency, i18n, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })
   return (
     <svg
       className="library-card__graph"
