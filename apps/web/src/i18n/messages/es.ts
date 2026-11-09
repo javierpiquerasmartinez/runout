@@ -1409,6 +1409,16 @@ export const es = {
   'home.failed.text': 'El resto de la pantalla sigue funcionando.',
   'home.retry': 'Reintentar',
   // Home: the Library card.
+  'home.library.hands': 'Manos',
+  'home.library.result': 'Resultado',
+  'home.library.winRate': 'Win rate',
+  'home.library.graph': 'Resultado de {month}, mano a mano: termina en {result}',
+  'home.library.import': 'Importar',
+  'home.library.noneThisMonth.title': 'Sin manos en {month}',
+  'home.library.noneThisMonth.text': 'Las manos que jugaste otros meses siguen en tu biblioteca.',
+  'home.library.noneThisMonth.link': 'Ver biblioteca',
+  'home.library.empty.title': 'Aún no tienes manos',
+  'home.library.empty.text': 'Importa tus historiales y aquí verás cómo te va el mes: manos, resultado y gráfica.',
   // Home: the Rooms card.
   // Home: the Goals card.
   // Home: the Calendar card.

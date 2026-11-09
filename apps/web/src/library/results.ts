@@ -1,4 +1,5 @@
-import type { GraphColourPreference } from '../preferences/preferences'
+import type { Translator } from '../i18n/translator'
+import type { DisplayUnit, GraphColourPreference } from '../preferences/preferences'
 
 /*
  * The running Results over the Hands a Library filter keeps, as the server's
@@ -67,4 +68,26 @@ export interface Results {
   rakeGenerated: RakeGenerated
   /** Downsampled by the server; the last one is the series' last Hand. Each keeps the running totals from Hand 1. */
   points: ResultsPoint[]
+}
+
+/** What a graph adds up in: big blinds always, Amounts only in one currency. */
+export type GraphUnit = Exclude<DisplayUnit, 'both'>
+
+/** A line's Win Rate, in big blinds per 100 Hands of the series; only asked of a series that has Hands. */
+export function winRate(results: Pick<Results, 'hands' | 'totals'>, line: ResultLine): number {
+  return (results.totals.bigBlinds[line] / results.hands) * 100
+}
+
+/** A line's value, signed: "+4.9 BB", "-€0.09". With `auto`, only a negative one is. */
+export function formatValue(
+  value: number,
+  unit: GraphUnit,
+  currency: string | null,
+  i18n: Translator,
+  signDisplay: 'exceptZero' | 'auto' = 'exceptZero',
+): string {
+  if (unit === 'amount' && currency) return i18n.formatCurrency(value / 100, currency, { signDisplay })
+  return i18n.t('room.table.bigBlinds', {
+    value: i18n.formatNumber(value, { maximumFractionDigits: 2, signDisplay }),
+  })
 }

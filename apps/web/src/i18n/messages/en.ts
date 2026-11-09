@@ -1410,6 +1410,16 @@ export const en: Messages = {
   'home.failed.text': 'The rest of the screen still works.',
   'home.retry': 'Retry',
   // Home: the Library card.
+  'home.library.hands': 'Hands',
+  'home.library.result': 'Result',
+  'home.library.winRate': 'Win rate',
+  'home.library.graph': "{month}'s Result, hand by hand: ends at {result}",
+  'home.library.import': 'Import',
+  'home.library.noneThisMonth.title': 'No hands in {month}',
+  'home.library.noneThisMonth.text': 'The hands you played in other months are still in your library.',
+  'home.library.noneThisMonth.link': 'See library',
+  'home.library.empty.title': 'No hands yet',
+  'home.library.empty.text': 'Import your hand histories and see how your month is going here: hands, result and graph.',
   // Home: the Rooms card.
   // Home: the Goals card.
   // Home: the Calendar card.
