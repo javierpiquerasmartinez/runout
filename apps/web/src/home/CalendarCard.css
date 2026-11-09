@@ -6,7 +6,8 @@
   gap: 8px;
   min-height: 0;
   margin: 0;
-  padding: 0;
+  /* Room for the last row's 44 px target, which would otherwise make the list scroll. */
+  padding: 0 0 2px;
   overflow-y: auto;
   list-style: none;
 }
@@ -126,6 +127,7 @@
 @media (max-width: 760px) {
   /* The card grows with its rows, and nothing clips the rows' targets. */
   .calendar-card__list {
+    padding: 0;
     overflow-y: visible;
   }
 
