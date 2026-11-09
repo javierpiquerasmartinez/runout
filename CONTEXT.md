@@ -4,6 +4,12 @@ Where a poker player keeps their own Hands, sees how they are doing and studies 
 
 ## Language
 
+### Home
+
+**Home**:
+The screen an Account opens on, where they see at a glance how each section of Runout is going and go into any of them, with a few quick actions. It holds nothing of its own: all it shows belongs to its section. The UI calls it "Inicio".
+_Avoid_: Dashboard, overview, tablero, landing
+
 ### People and roles
 
 **Account**:
