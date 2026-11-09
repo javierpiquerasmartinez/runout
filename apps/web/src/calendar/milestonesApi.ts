@@ -14,11 +14,22 @@ export interface NewMilestone {
 /** What changing a Milestone sends: whichever of its fields change. */
 export type MilestoneChange = Partial<{ title: string; description: string; date: CalendarDate; done: boolean }>
 
+/** What lies around a day, beyond what a span can reach. */
+export interface MilestoneOutlook {
+  next: Milestone | null
+  overdue: number
+}
+
 const pathOf = (id: string) => `/calendar/milestones/${encodeURIComponent(id)}`
 
 /** The Account's Milestones dated within the span. */
 export function listMilestones(token: Token, span: CalendarSpan): Promise<{ milestones: Milestone[] }> {
   return api(`/calendar/milestones?from=${span.from}&to=${span.to}`, { token: token ?? undefined })
+}
+
+/** The first Milestone not done after the viewer's `today`, if any, and how many not done are dated before it. */
+export function milestoneOutlook(token: Token, today: CalendarDate): Promise<MilestoneOutlook> {
+  return api(`/calendar/milestones/outlook?today=${today}`, { token: token ?? undefined })
 }
 
 /** One of the Account's Milestones; `milestone-not-found` for anyone else's. */

@@ -21,6 +21,11 @@ interface MilestoneList {
   milestones: Milestone[];
 }
 
+interface MilestoneOutlook {
+  next: Milestone | null;
+  overdue: number;
+}
+
 describe('Milestones in the Calendar (e2e)', () => {
   let running: RunningApp;
 
@@ -232,6 +237,103 @@ describe('Milestones in the Calendar (e2e)', () => {
 
     expect(await list(stranger.token, '2026-11-01', '2026-11-30')).toEqual({
       milestones: [],
+    });
+  });
+
+  describe('the outlook', () => {
+    const TODAY = '2026-11-09';
+
+    function outlooking(token: string, query: Record<string, string>) {
+      return request(running.httpServer)
+        .get('/api/calendar/milestones/outlook')
+        .query(query)
+        .set('Authorization', `Bearer ${token}`);
+    }
+
+    async function outlook(token: string): Promise<MilestoneOutlook> {
+      const res = await outlooking(token, { today: TODAY }).expect(200);
+      return res.body as MilestoneOutlook;
+    }
+
+    it('answers with the earliest Milestone after today, the first created on a tie', async () => {
+      const account = await newAccount(running.httpServer);
+      await plan(account.token, '2026-11-20', 'Later');
+      const first = await plan(account.token, '2026-11-12', 'Planned first');
+      await plan(account.token, '2026-11-12', 'Planned second');
+
+      expect(await outlook(account.token)).toEqual({ next: first, overdue: 0 });
+    });
+
+    it('counts the Milestones before today, further back than a span can reach', async () => {
+      const account = await newAccount(running.httpServer);
+      await plan(account.token, '2026-11-08', 'Yesterday');
+      await plan(account.token, '2026-09-07', 'Sixty-three days ago');
+      await plan(account.token, '2021-03-01', 'Years ago');
+
+      expect(await outlook(account.token)).toEqual({ next: null, overdue: 3 });
+    });
+
+    it('leaves out the done Milestones, on either side of today', async () => {
+      const account = await newAccount(running.httpServer);
+      const past = await plan(account.token, '2026-11-02', 'Past, done');
+      const soon = await plan(account.token, '2026-11-10', 'Soon, done');
+      await plan(account.token, '2026-11-03', 'Past, pending');
+      const later = await plan(account.token, '2026-11-11', 'Later, pending');
+      await change(account.token, past.id, { done: true }).expect(200);
+      await change(account.token, soon.id, { done: true }).expect(200);
+
+      expect(await outlook(account.token)).toEqual({ next: later, overdue: 1 });
+    });
+
+    it("leaves today's Milestones out of both answers", async () => {
+      const account = await newAccount(running.httpServer);
+      await plan(account.token, TODAY, 'Today');
+
+      expect(await outlook(account.token)).toEqual({ next: null, overdue: 0 });
+    });
+
+    it("never sees another Account's Milestones", async () => {
+      const owner = await newAccount(running.httpServer);
+      const stranger = await newAccount(running.httpServer);
+      await plan(owner.token, '2026-11-01', 'Overdue, mine');
+      await plan(owner.token, '2026-11-12', 'Next, mine');
+
+      expect(await outlook(stranger.token)).toEqual({ next: null, overdue: 0 });
+    });
+
+    it('refuses a missing or invalid date, as it does an invalid span', async () => {
+      const account = await newAccount(running.httpServer);
+
+      for (const query of [
+        {},
+        { today: '' },
+        { today: 'today' },
+        { today: '2026-02-30' },
+        { today: '2026-11-9' },
+      ]) {
+        const res = await outlooking(account.token, query);
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ reason: 'invalid-calendar-span' });
+      }
+    });
+
+    it('refuses anyone without an Account', async () => {
+      const master = await newAccount(running.httpServer);
+      const room = await request(running.httpServer)
+        .post('/api/rooms')
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ name: 'Martes NL10', displayName: 'Javier' });
+      const guest = await request(running.httpServer)
+        .post(`/api/rooms/${room.body.code as string}/guests`)
+        .send({ displayName: 'Marta' })
+        .expect(201);
+
+      const res = await outlooking(guest.body.token as string, {
+        today: TODAY,
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ reason: 'account-required' });
     });
   });
 
