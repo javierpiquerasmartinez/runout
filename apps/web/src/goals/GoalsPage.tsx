@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { todayOf } from '../calendar/calendar'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { CreateGoalDialog } from './CreateGoalDialog'
 import { GoalCard } from './GoalCard'
+import { orderGoals } from './goals'
 import { useGoals } from './useGoals'
 import './GoalsPage.css'
 
@@ -18,6 +20,7 @@ export function GoalsPage() {
   const { goals, status, add } = useGoals()
   const [creating, setCreating] = useState(false)
   const empty = status === 'loaded' && goals.length === 0
+  const today = todayOf()
 
   const newGoal = (size: 'compact' | 'standard') => (
     <Button size={size} onClick={() => setCreating(true)}>
@@ -47,8 +50,8 @@ export function GoalsPage() {
         )}
         {goals.length > 0 && (
           <div className="goals-page__list">
-            {goals.map((goal) => (
-              <GoalCard key={goal.id} goal={goal} />
+            {orderGoals(goals, today).map((goal) => (
+              <GoalCard key={goal.id} goal={goal} today={today} />
             ))}
           </div>
         )}

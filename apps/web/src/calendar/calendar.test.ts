@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   addDays,
+  daysBetween,
   dayOfMonth,
   intlDate,
   calendarPath,
@@ -68,6 +69,24 @@ describe('calendar dates', () => {
   it('take today from the local clock', () => {
     expect(todayOf(new Date(2026, 10, 7, 23, 59))).toBe('2026-11-07')
     expect(todayOf(new Date(2026, 0, 1, 0, 0))).toBe('2026-01-01')
+  })
+})
+
+describe('daysBetween', () => {
+  it('counts the days from one date to another', () => {
+    expect(daysBetween('2026-11-07', '2026-11-07')).toBe(0)
+    expect(daysBetween('2026-11-07', '2026-11-08')).toBe(1)
+    expect(daysBetween('2026-12-31', '2027-01-01')).toBe(1)
+    expect(daysBetween('2028-02-28', '2028-03-01')).toBe(2)
+  })
+
+  it('is negative when the second date comes first', () => {
+    expect(daysBetween('2026-11-08', '2026-11-07')).toBe(-1)
+  })
+
+  it('is whole across a daylight-saving change', () => {
+    expect(daysBetween('2026-03-28', '2026-03-30')).toBe(2)
+    expect(daysBetween('2026-10-24', '2026-10-26')).toBe(2)
   })
 })
 

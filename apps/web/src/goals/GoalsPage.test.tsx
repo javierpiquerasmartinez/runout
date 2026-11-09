@@ -130,6 +130,104 @@ describe('GoalsPage · the list', () => {
   })
 })
 
+describe('GoalsPage · where each Goal stands', () => {
+  // Today is 7 November 2026.
+  it.each([
+    ['Not Started', { startDate: '2026-11-12', deadline: '2026-11-30' }, 'Not started', 'Starts in 5 days'],
+    ['Not Started by a day', { startDate: '2026-11-08', deadline: '2026-11-30' }, 'Not started', 'Starts in 1 day'],
+    ['In Progress', { deadline: '2026-11-19' }, 'In progress', '12 days left'],
+    ['In Progress by a day', { deadline: '2026-11-08' }, 'In progress', '1 day left'],
+    ['on its Deadline', { deadline: '2026-11-07' }, 'In progress', 'Last day'],
+    ['Expired', { deadline: '2026-11-04' }, 'Expired', 'Expired 3 days ago'],
+    ['Expired by a day', { deadline: '2026-11-06' }, 'Expired', 'Expired 1 day ago'],
+  ])('says so of a Goal %s, in English', async (_, dates, status, countdown) => {
+    held({ name: 'Una meta', target: 10, currentValue: 3, startDate: '2026-11-01', ...dates })
+    renderGoals()
+
+    const goal = within(await card('Una meta'))
+    expect(goal.getByText(status)).toBeTruthy()
+    expect(goal.getByText(countdown)).toBeTruthy()
+  })
+
+  it.each([
+    ['Sin empezar', { startDate: '2026-11-12', deadline: '2026-11-30' }, 'Empieza en 5 días'],
+    ['Sin empezar', { startDate: '2026-11-08', deadline: '2026-11-30' }, 'Empieza en 1 día'],
+    ['En curso', { deadline: '2026-11-19' }, 'Quedan 12 días'],
+    ['En curso', { deadline: '2026-11-08' }, 'Queda 1 día'],
+    ['En curso', { deadline: '2026-11-07' }, 'Último día'],
+    ['Vencido', { deadline: '2026-11-04' }, 'Venció hace 3 días'],
+    ['Vencido', { deadline: '2026-11-06' }, 'Venció hace 1 día'],
+  ])('says %s and «%s» in Spanish', async (status, dates, countdown) => {
+    held({ name: 'Una meta', target: 10, currentValue: 3, startDate: '2026-11-01', ...dates })
+    renderGoals('es')
+
+    const goal = within(await card('Una meta'))
+    expect(goal.getByText(status)).toBeTruthy()
+    expect(goal.getByText(countdown)).toBeTruthy()
+  })
+
+  it.each([
+    ['before its Start Date', '2026-11-12', '2026-11-30'],
+    ['after its Deadline', '2026-10-01', '2026-11-01'],
+  ])('reads Achieved %s and says nothing about time', async (_, startDate, deadline) => {
+    held({ name: 'Hecho', target: 10, currentValue: 10, startDate, deadline })
+    renderGoals()
+
+    const goal = await card('Hecho')
+    expect(within(goal).getByText('Achieved')).toBeTruthy()
+    expect(goal.textContent).not.toMatch(/\bdays?\b|Starts|Expired/i)
+  })
+
+  it.each([
+    ['first thing', new Date(2026, 10, 7, 0, 5)],
+    ['last thing', new Date(2026, 10, 7, 23, 55)],
+  ])('takes today from the local date, %s at night', async (_, now) => {
+    vi.setSystemTime(now)
+    held({ name: 'Hoy acaba', deadline: '2026-11-07' })
+    held({ name: 'Mañana empieza', startDate: '2026-11-08', deadline: '2026-11-30' })
+    renderGoals()
+
+    expect(within(await card('Hoy acaba')).getByText('Last day')).toBeTruthy()
+    expect(within(await card('Mañana empieza')).getByText('Starts in 1 day')).toBeTruthy()
+  })
+})
+
+describe('GoalsPage · the order of the list', () => {
+  const shown = () => screen.getAllByRole('article').map((goal) => within(goal).getByRole('heading').textContent)
+
+  it('puts what needs attention first and what is over after it', async () => {
+    held({ name: 'Vencido antes', deadline: '2026-11-02', createdAt: '2026-10-01T09:00:00.000Z' })
+    held({ name: 'En curso lejos', deadline: '2026-12-31' })
+    held({ name: 'Conseguido', target: 10, currentValue: 10, deadline: '2026-11-20' })
+    held({ name: 'Empata, el nuevo', deadline: '2026-11-20', createdAt: '2026-11-02T09:00:00.000Z' })
+    held({ name: 'Sin empezar pronto', startDate: '2026-11-10', deadline: '2026-11-15' })
+    held({ name: 'Empata, el viejo', deadline: '2026-11-20', createdAt: '2026-10-20T09:00:00.000Z' })
+    renderGoals()
+    await card('Conseguido')
+
+    expect(shown()).toEqual([
+      'Sin empezar pronto',
+      'Empata, el viejo',
+      'Empata, el nuevo',
+      'En curso lejos',
+      'Conseguido',
+      'Vencido antes',
+    ])
+  })
+
+  it('puts a new Goal in its place', async () => {
+    held({ name: 'Más tarde', deadline: '2026-12-31' })
+    renderGoals()
+    await card('Más tarde')
+    await openDialog()
+    await fillIn({ name: 'Antes', deadline: '2026-11-30' })
+    await submit()
+    await card('Antes')
+
+    expect(shown()).toEqual(['Antes', 'Más tarde'])
+  })
+})
+
 describe('GoalsPage · with no Goals', () => {
   it('shows a short phrase and the way to create one, once', async () => {
     renderGoals()
