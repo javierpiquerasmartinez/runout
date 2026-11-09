@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider, type Locale } from '../i18n'
@@ -232,6 +232,120 @@ describe('Home · the Library card', () => {
     renderHome()
 
     expect((await loaded('Hands')).getByRole('button', { name: 'Import' })).toBeTruthy()
+  })
+
+  describe('importing from Home', () => {
+    const importDialog = () => screen.getByRole('dialog', { name: 'Import hands into your library' })
+    const preview = { id: 'p1', format: 'pokerstars', tried: ['pokerstars'], discarded: [], hands: [] as unknown[] }
+    const previewHand = {
+      hero: 'Marta88',
+      heroNamed: true,
+      playedAt: '2026-09-18T12:34:30.000Z',
+      stake: { limit: 'no-limit', smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+      board: [],
+      overview: { positions: ['BTN', 'BB'], finalPot: 105, finalStreet: 'river', showdown: true },
+    }
+    const importAnswers = {
+      'POST /library/imports/previews': () => Response.json({ ...preview, hands: [previewHand] }, { status: 201 }),
+      'POST /library/imports': () => Response.json({ imported: 1 }, { status: 201 }),
+    }
+    const reads = (calls: ApiCall[]) => calls.filter(({ method, path }) => method === 'GET' && path === '/library/results')
+
+    async function importOneHand() {
+      const file = new File(['a hand history'], 'session.txt', { type: 'text/plain' })
+      await userEvent.upload(within(importDialog()).getByLabelText('Choose files'), file)
+      await userEvent.click(await within(importDialog()).findByRole('button', { name: 'Add 1 hand to your library' }))
+    }
+
+    it('opens the Library\'s import dialog from "Import", staying on Home', async () => {
+      answering()
+      renderHome()
+
+      await userEvent.click((await loaded('Hands')).getByRole('button', { name: 'Import' }))
+
+      expect(within(importDialog()).getByRole('button', { name: 'Choose files' })).toBeTruthy()
+      expect(window.location.pathname).toBe('/')
+    })
+
+    it('opens it from "Import hands" when the Library is empty', async () => {
+      fakeApi({
+        'GET /library/results': () => Response.json(results({ hands: 0, line: [] })),
+        'GET /library/hands': () => Response.json({ total: 0, hands: [] }),
+      })
+      renderHome()
+
+      await userEvent.click((await loaded('No hands yet')).getByRole('button', { name: 'Import hands' }))
+
+      expect(importDialog()).toBeTruthy()
+      expect(window.location.pathname).toBe('/')
+    })
+
+    it('stays on Home when an import finishes, and the card reloads with the new Hands', async () => {
+      let month: Month = { hands: 10, bigBlinds: 5, line: [5] }
+      const calls = fakeApi({
+        'GET /library/results': () => Response.json(results(month)),
+        ...importAnswers,
+        'POST /library/imports': () => {
+          month = { hands: 11, bigBlinds: 8, line: [5, 8] }
+          return Response.json({ imported: 1 }, { status: 201 })
+        },
+      })
+      renderHome()
+
+      await userEvent.click((await loaded('Hands')).getByRole('button', { name: 'Import' }))
+      await importOneHand()
+
+      await waitFor(() => expect(stat('Hands')).toBe('11'))
+      expect(stat('Result')).toBe('+8 BB')
+      expect(screen.queryByRole('dialog', { name: 'Import hands into your library' })).toBeNull()
+      expect(window.location.pathname).toBe('/')
+      expect(reads(calls)).toHaveLength(2)
+    })
+
+    it('leaves the month as it was when the imported Hands are from earlier months', async () => {
+      const calls = fakeApi({ 'GET /library/results': () => Response.json(results({ hands: 10, bigBlinds: 5, line: [5] })), ...importAnswers })
+      renderHome()
+
+      await userEvent.click((await loaded('Hands')).getByRole('button', { name: 'Import' }))
+      await importOneHand()
+
+      await waitFor(() => expect(reads(calls)).toHaveLength(2))
+      await screen.findByText('Hands')
+      expect(stat('Hands')).toBe('10')
+      expect(stat('Result')).toBe('+5 BB')
+    })
+
+    it('tells a first import of earlier months apart from a Library still empty', async () => {
+      let total = 0
+      fakeApi({
+        'GET /library/results': () => Response.json(results({ hands: 0, line: [] })),
+        'GET /library/hands': () => Response.json({ total, hands: [] }),
+        ...importAnswers,
+        'POST /library/imports': () => {
+          total = 1
+          return Response.json({ imported: 1 }, { status: 201 })
+        },
+      })
+      renderHome()
+
+      await userEvent.click((await loaded('No hands yet')).getByRole('button', { name: 'Import hands' }))
+      await importOneHand()
+
+      expect(await screen.findByText('No hands in November')).toBeTruthy()
+      expect(screen.queryByText('No hands yet')).toBeNull()
+    })
+
+    it('closes without reading again when cancelled', async () => {
+      const calls = answering()
+      renderHome()
+
+      await userEvent.click((await loaded('Hands')).getByRole('button', { name: 'Import' }))
+      await userEvent.click(within(importDialog()).getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByRole('dialog', { name: 'Import hands into your library' })).toBeNull()
+      expect(stat('Hands')).toBe('3,482')
+      expect(reads(calls)).toHaveLength(1)
+    })
   })
 
   describe('when a read fails', () => {
