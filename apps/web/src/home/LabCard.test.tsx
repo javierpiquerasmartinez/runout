@@ -26,7 +26,7 @@ function renderHome(locale: Locale = 'en') {
 const ranges = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `r${index}`, name: `Range ${index}` }))
 const answering = (count: number) => fakeApi({ 'GET /lab/ranges': () => Response.json(ranges(count)) })
 const card = (name = 'Lab') => within(screen.getByRole('region', { name }))
-const loaded = async (text: string) => within((await screen.findByText(text)).closest('section')!)
+const loaded = async (text: string) => within((await within(await screen.findByRole('region', { name: /^(Lab|Laboratorio)$/ })).findByText(text)).closest('section')!)
 
 describe('Home · the Lab card', () => {
   it('shows how many Ranges the Account has, and the ways into the Lab', async () => {

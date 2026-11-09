@@ -1413,6 +1413,10 @@ export const en: Messages = {
   // Home: the Rooms card.
   // Home: the Goals card.
   // Home: the Calendar card.
+  'home.calendar.today': 'Today, {date}',
+  'home.calendar.seeAll': 'See all',
+  'home.calendar.empty.title': 'Nothing planned for today',
+  'home.calendar.empty.text': "Note down what you're going to study and you'll see it here on the day.",
   // Home: the Lab card.
   'home.lab.ranges.one': 'range',
   'home.lab.ranges.other': 'ranges',

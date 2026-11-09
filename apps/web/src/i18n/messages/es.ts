@@ -1412,6 +1412,10 @@ export const es = {
   // Home: the Rooms card.
   // Home: the Goals card.
   // Home: the Calendar card.
+  'home.calendar.today': 'Hoy, {date}',
+  'home.calendar.seeAll': 'Ver todos',
+  'home.calendar.empty.title': 'Nada planeado para hoy',
+  'home.calendar.empty.text': 'Apunta qué vas a estudiar y lo verás aquí ese día.',
   // Home: the Lab card.
   'home.lab.ranges.one': 'rango',
   'home.lab.ranges.other': 'rangos',
