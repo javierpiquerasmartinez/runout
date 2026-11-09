@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { api } from '../backend/api'
 import { firstOfMonth, intlDate, monthOf, todayOf } from '../calendar/calendar'
 import { useI18n } from '../i18n'
@@ -5,6 +6,7 @@ import { libraryPath, type LibraryPage } from '../library/library'
 import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, librarySearch, quickRange } from '../library/libraryFilter'
 import { formatValue, winRate, type GraphUnit, type LinesInBothUnits, type Results } from '../library/results'
 import { usePreferences } from '../preferences/context'
+import { ImportDialog } from '../room/ImportDialog'
 import { followLink } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -41,40 +43,44 @@ const resultIn = (unit: GraphUnit, lines: LinesInBothUnits): number =>
 export function LibraryCard() {
   const { t, formatDate, locale } = useI18n()
   const { status, data: month, reload } = useCardRead(readMonth)
+  const [importing, setImporting] = useState(false)
   const monthName = formatDate(intlDate(firstOfMonth(monthOf(todayOf()))), { month: 'long', timeZone: 'UTC' })
   return (
-    <HomeCard
-      title={t('header.nav.library')}
-      href={libraryPath + librarySearch(thisMonth())}
-      status={status}
-      onRetry={reload}
-      subtitle={`${monthName.charAt(0).toLocaleUpperCase(locale)}${monthName.slice(1)}`}
-      action={
-        month?.anyHands && (
-          <Button size="compact">
-            <Icon name="import" size={14} />
-            {t('home.library.import')}
-          </Button>
-        )
-      }
-    >
-      {month && month.results.hands > 0 && <MonthResults results={month.results} monthName={monthName} />}
-      {month && month.results.hands === 0 && month.anyHands && (
-        <HomeCardMessage title={t('home.library.noneThisMonth.title', { month: monthName })} text={t('home.library.noneThisMonth.text')}>
-          <a className="library-card__way" href={libraryPath + librarySearch(EMPTY_LIBRARY_FILTER)} onClick={followLink}>
-            {t('home.library.noneThisMonth.link')}
-          </a>
-        </HomeCardMessage>
-      )}
-      {month && !month.anyHands && (
-        <HomeCardMessage title={t('home.library.empty.title')} text={t('home.library.empty.text')}>
-          <Button variant="primary" size="compact">
-            <Icon name="import" size={14} />
-            {t('library.import')}
-          </Button>
-        </HomeCardMessage>
-      )}
-    </HomeCard>
+    <>
+      <HomeCard
+        title={t('header.nav.library')}
+        href={libraryPath + librarySearch(thisMonth())}
+        status={status}
+        onRetry={reload}
+        subtitle={`${monthName.charAt(0).toLocaleUpperCase(locale)}${monthName.slice(1)}`}
+        action={
+          month?.anyHands && (
+            <Button size="compact" onClick={() => setImporting(true)}>
+              <Icon name="import" size={14} />
+              {t('home.library.import')}
+            </Button>
+          )
+        }
+      >
+        {month && month.results.hands > 0 && <MonthResults results={month.results} monthName={monthName} />}
+        {month && month.results.hands === 0 && month.anyHands && (
+          <HomeCardMessage title={t('home.library.noneThisMonth.title', { month: monthName })} text={t('home.library.noneThisMonth.text')}>
+            <a className="library-card__way" href={libraryPath + librarySearch(EMPTY_LIBRARY_FILTER)} onClick={followLink}>
+              {t('home.library.noneThisMonth.link')}
+            </a>
+          </HomeCardMessage>
+        )}
+        {month && !month.anyHands && (
+          <HomeCardMessage title={t('home.library.empty.title')} text={t('home.library.empty.text')}>
+            <Button variant="primary" size="compact" onClick={() => setImporting(true)}>
+              <Icon name="import" size={14} />
+              {t('library.import')}
+            </Button>
+          </HomeCardMessage>
+        )}
+      </HomeCard>
+      {importing && <ImportDialog destination={{ kind: 'library' }} onClose={() => setImporting(false)} onImported={reload} />}
+    </>
   )
 }
 
