@@ -35,6 +35,7 @@ beforeEach(() => {
       if (path === '/hands/split-pot') return Response.json(splitPot)
       if (path === '/lab/ranges') return Response.json([])
       if (path === '/calendar/milestones') return Response.json({ milestones: [] })
+      if (path === '/goals') return Response.json({ goals: [] })
       return Response.json({ reason: 'not-found' }, { status: 404 })
     }),
   )
@@ -318,6 +319,25 @@ describe('Routes · the Calendar, only for an Account', () => {
     ['/calendar/milestones/some-milestone', 'an anonymous identity', anonymous],
   ])('sends %s with %s to /login', async (path, _, session) => {
     renderAt(path, session())
+
+    expect(await login()).toBeTruthy()
+    expect(window.location.pathname).toBe('/login')
+  })
+})
+
+describe('Routes · Goals, only for an Account', () => {
+  it('shows them to an Account', async () => {
+    renderAt('/goals', account())
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Goals' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/goals')
+  })
+
+  it.each([
+    ['no identity', visitor],
+    ['an anonymous identity', anonymous],
+  ])('sends %s to /login', async (_, session) => {
+    renderAt('/goals', session())
 
     expect(await login()).toBeTruthy()
     expect(window.location.pathname).toBe('/login')

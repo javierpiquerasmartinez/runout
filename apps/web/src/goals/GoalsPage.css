@@ -1,0 +1,214 @@
+/* Goals, as the "Objetivos" boards draw them: a centred column of cards, and the dialog that creates one. */
+
+.goals-page {
+  min-height: 100vh;
+  background: var(--color-canvas);
+  color: var(--text-primary);
+}
+
+.goals-page__main {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: min(1072px, 100%);
+  margin: 0 auto;
+  padding: 40px 16px 56px;
+  box-sizing: border-box;
+}
+
+.goals-page__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.goals-page__title {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.goals-page__failure {
+  margin: 0;
+  color: var(--alert-ink);
+  font-size: 13px;
+}
+
+.goals-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 56px 24px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.goals-page__empty-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.goals-page__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* ---------- A card ---------- */
+
+.goal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.goal-card__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.goal-card__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.goal-card__description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.goal-card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.goal-card__numbers {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.goal-card__current {
+  font-size: 14px;
+  font-weight: 600;
+}
+.goal-card__target {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.goal-card__percent {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+}
+.goal-card__bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+.goal-card__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brass);
+}
+
+/* ---------- The dialog, on the Calendar dialog's shell ---------- */
+
+.goal-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-modal);
+}
+.goal-dialog:not([open]) {
+  display: none;
+}
+.goal-dialog::backdrop {
+  background: rgb(6 9 9 / 72%);
+}
+.goal-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.goal-dialog__title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+.goal-dialog__name {
+  display: flex;
+  flex-direction: column;
+}
+/* "0 / 80", on the error's line when there is one. */
+.goal-dialog__count {
+  margin-top: 6px;
+  line-height: 17px;
+}
+.goal-dialog__count[data-beside-error] {
+  margin-top: -17px;
+}
+.goal-dialog__description {
+  height: 76px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+.goal-dialog__target .ro-field__input {
+  width: 200px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.goal-dialog__dates {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.goal-dialog__date {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.goal-dialog__date .ro-field__input {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color-scheme: dark;
+}
+[data-theme='light'] .goal-dialog__date .ro-field__input {
+  color-scheme: light;
+}
+.goal-dialog__failure {
+  margin: 0;
+  color: var(--alert-ink);
+  font-size: 12.5px;
+}
+.goal-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
