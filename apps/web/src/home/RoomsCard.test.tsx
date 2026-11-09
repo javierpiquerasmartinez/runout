@@ -153,10 +153,24 @@ describe('Home · the Rooms card', () => {
       expect(rooms.getByText(explanation)).toBeTruthy()
       expect(rooms.getByText('Live')).toBeTruthy()
       expect(rooms.getByText('2 connected')).toBeTruthy()
-      expect(rooms.getByText('Sunday group').closest('[aria-disabled="true"]')).not.toBeNull()
       expect(entries(rooms)).toEqual([])
       expect(rooms.queryByRole('link', { name: 'See all' })).toBeNull()
       expect(rooms.getByRole('link', { name: 'Rooms' })).toBeTruthy()
+    })
+
+    it('keeps each row a focus stop that says what it is and why it is locked, and it enters nothing', async () => {
+      answering(room('Sunday group', { state: 'live', connected: 2 }))
+      renderHome({ session: impersonating() })
+
+      const rooms = await loaded('Sunday group')
+      const row = rooms.getByRole('link', { name: `Sunday group, Live, 2 connected. ${explanation}` })
+      expect(row.getAttribute('aria-disabled')).toBe('true')
+
+      row.focus()
+      expect(document.activeElement).toBe(row)
+      await userEvent.click(row)
+
+      expect(window.location.pathname).toBe('/')
     })
 
     it('locks "New room", saying why, and it opens nothing', async () => {

@@ -36,7 +36,7 @@ export function HomeCard({
       <div className="home-card__head">
         <div className="home-card__heading">
           <h2 className="home-card__title">
-            <a href={href} onClick={followLink}>
+            <a className="ro-touch-target" href={href} onClick={followLink}>
               {title}
             </a>
           </h2>
@@ -83,10 +83,21 @@ export function HomeCardMessage({
   )
 }
 
-/** A secondary compact button that leads to another screen. */
-export function HomeCardLink({ href, children }: { href: string; children: ReactNode }) {
+/** What leads from a card to another screen: a plain link, or one drawn as a secondary compact button. */
+export function HomeCardLink({
+  href,
+  look = 'text',
+  className,
+  children,
+}: {
+  href: string
+  look?: 'text' | 'button'
+  className?: string
+  children: ReactNode
+}) {
+  const drawnAs = look === 'button' ? 'ro-btn ro-btn--secondary ro-btn--compact home-card__link' : 'home-card__text-link ro-touch-target'
   return (
-    <a className="ro-btn ro-btn--secondary ro-btn--compact home-card__link" href={href} onClick={followLink}>
+    <a className={className ? `${drawnAs} ${className}` : drawnAs} href={href} onClick={followLink}>
       {children}
     </a>
   )

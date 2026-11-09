@@ -100,7 +100,7 @@ function SectionNav({ current }: { current?: Section }) {
         <a
           key={section}
           href={href}
-          className="app-header__nav-item"
+          className="app-header__nav-item ro-touch-target"
           aria-current={section === current ? 'page' : undefined}
           onClick={followLink}
         >
@@ -158,7 +158,7 @@ function AccountMenu() {
     >
       <button
         type="button"
-        className="app-header__avatar"
+        className="app-header__avatar ro-touch-target"
         aria-label={t('header.accountMenu')}
         aria-expanded={open}
         aria-controls={menuId}

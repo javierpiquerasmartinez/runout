@@ -168,6 +168,23 @@ describe('Home · in a tab left open past midnight', () => {
     expect(card.getByText('November')).toBeTruthy()
   })
 
+  const cardsInOrder = () => screen.getAllByRole('region').map((card) => card.getAttribute('aria-label'))
+
+  it('has its cards in the order of the wide grid', async () => {
+    renderHome()
+    await loadedCard('Library')
+
+    expect(cardsInOrder()).toEqual(['Library', 'Rooms', 'Goals', 'Calendar', 'Lab'])
+  })
+
+  it('has its cards in the phone order on a narrow screen, for the keyboard and screen readers too', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 760px)', addEventListener() {}, removeEventListener() {} }))
+    renderHome()
+    await loadedCard('Library')
+
+    expect(cardsInOrder()).toEqual(['Rooms', 'Calendar', 'Library', 'Goals', 'Lab'])
+  })
+
   it('catches up on coming back to the tab after the day has changed, without a midnight seen', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 10, 8, 12, 0))

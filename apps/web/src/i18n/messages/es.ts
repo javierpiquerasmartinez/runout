@@ -1424,6 +1424,7 @@ export const es = {
   'home.rooms.empty.title': 'No estás en ninguna sala',
   'home.rooms.empty.text': 'Crea una para repasar manos con tu grupo.',
   'home.rooms.freeReview': 'Revisión libre',
+  'home.rooms.row': '{name}, {state}, {connected}',
   'home.rooms.connected.one': '{count} conectado',
   'home.rooms.connected.other': '{count} conectados',
   // Home: the Goals card.
@@ -1435,8 +1436,8 @@ export const es = {
   // Home: the Calendar card.
   'home.calendar.today': 'Hoy, {date}',
   'home.calendar.seeAll': 'Ver todos',
-  'home.calendar.next': 'Próximo:',
-  'home.calendar.next.day': '{weekday} {date}',
+  'home.calendar.next.before': 'Próximo: ',
+  'home.calendar.next.after': ', {weekday} {date}',
   'home.calendar.overdue.one': '{count} pendiente de días anteriores →',
   'home.calendar.overdue.other': '{count} pendientes de días anteriores →',
   'home.calendar.empty.title': 'Nada planeado para hoy',

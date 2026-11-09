@@ -34,7 +34,6 @@
 }
 
 .calendar-card__check {
-  position: relative;
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -52,22 +51,10 @@
   z-index: 1;
 }
 
-/* The 44 px a finger needs, around a 15 px box. */
-.calendar-card__check::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
 .calendar-card__check:focus-visible,
-.calendar-card__title:focus-visible,
-.calendar-card__foot-link:focus-visible {
+.calendar-card__title:focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 1px;
+  outline-offset: var(--focus-offset);
 }
 
 .calendar-card__row[data-done] .calendar-card__check {
@@ -83,21 +70,6 @@
   font-size: 13px;
   line-height: 1.45;
   overflow-wrap: anywhere;
-}
-
-.calendar-card__title {
-  position: relative;
-}
-
-/* However many lines the title takes, at least 44 px to the finger. */
-.calendar-card__title::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 100%;
-  height: max(100%, 44px);
-  transform: translateY(-50%);
 }
 
 .calendar-card__row[data-done] .calendar-card__title {
@@ -126,7 +98,7 @@
 
 .calendar-card__next a:focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 1px;
+  outline-offset: var(--focus-offset);
 }
 
 .calendar-card__unsaved {
@@ -146,32 +118,31 @@
   margin-top: auto;
 }
 
-/* A plain link, 32 high with the 44 px a finger needs. */
-.calendar-card__foot-link,
-.calendar-card__foot-link:hover {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
+.calendar-card__overdue,
+.calendar-card__overdue:hover {
+  color: var(--brass-ink);
 }
 
-.calendar-card__foot-link--overdue,
-.calendar-card__foot-link--overdue:hover {
-  color: var(--brass);
-}
-
-.calendar-card__foot-link::after {
-  content: '';
-  position: absolute;
-  inset: -6px 0;
-}
-
-/* The card grows with its rows, and nothing clips the rows' targets. */
 @media (max-width: 760px) {
+  /* The card grows with its rows, and nothing clips the rows' targets. */
   .calendar-card__list {
     overflow-y: visible;
+  }
+
+  /* The check's 44 px end where the title's begin. */
+  .calendar-card__row {
+    gap: 15px;
+  }
+
+  /* Clear of the link below it. */
+  .calendar-card__next {
+    margin-bottom: 4px;
+  }
+
+  /* However short the title: 44 px to the finger, none to the line, and above the words around it. */
+  .calendar-card__next a {
+    position: relative;
+    margin-inline: -20px;
+    padding-inline: 20px;
   }
 }

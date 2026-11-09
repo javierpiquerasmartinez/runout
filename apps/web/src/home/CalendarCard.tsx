@@ -8,7 +8,7 @@ import { useI18n } from '../i18n'
 import { followLink } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { HomeCard, HomeCardMessage } from './HomeCard'
+import { HomeCard, HomeCardLink, HomeCardMessage } from './HomeCard'
 import { useCardRead } from './useCardRead'
 import './CalendarCard.css'
 
@@ -68,14 +68,12 @@ export function CalendarCard({ today }: { today: CalendarDate }) {
         {(overdue > 0 || seeAll) && (
           <div className="calendar-card__foot">
             {overdue > 0 && (
-              <a className="calendar-card__foot-link calendar-card__foot-link--overdue" href={calendarPath} onClick={followLink}>
+              <HomeCardLink href={calendarPath} className="calendar-card__overdue">
                 {t(overdue === 1 ? 'home.calendar.overdue.one' : 'home.calendar.overdue.other', { count: overdue })}
-              </a>
+              </HomeCardLink>
             )}
             {seeAll && (
-              <a className="calendar-card__foot-link" href={calendarPath} onClick={followLink}>
-                {t('home.calendar.seeAll')}
-              </a>
+              <HomeCardLink href={calendarPath}>{t('home.calendar.seeAll')}</HomeCardLink>
             )}
           </div>
         )}
@@ -98,14 +96,14 @@ export function CalendarCard({ today }: { today: CalendarDate }) {
 function NextMilestone({ milestone: { id, title, date } }: { milestone: Milestone }) {
   const i18n = useI18n()
   const { t, formatDate } = i18n
-  const day = t('home.calendar.next.day', { weekday: weekdayLong(i18n, date), date: formatDate(intlDate(date), { day: 'numeric', month: 'long', timeZone: 'UTC' }) })
+  const after = t('home.calendar.next.after', { weekday: weekdayLong(i18n, date), date: formatDate(intlDate(date), { day: 'numeric', month: 'long', timeZone: 'UTC' }) })
   return (
     <p className="calendar-card__next">
-      {t('home.calendar.next')}{' '}
+      {t('home.calendar.next.before')}
       <a href={milestonePath(id)} onClick={followLink}>
         {title}
       </a>
-      , {day}
+      {after}
     </p>
   )
 }
@@ -133,13 +131,13 @@ function TodaysMilestones({ milestones, onToggleDone }: { milestones: Milestone[
                   role="checkbox"
                   aria-checked={done}
                   aria-label={t(done ? 'calendar.milestone.done' : 'calendar.milestone.markDone', { title })}
-                  className="calendar-card__check"
+                  className="calendar-card__check ro-touch-target"
                   onClick={() => onToggleDone(milestone, !done)}
                 >
                   {done && <Icon name="check" size={13} />}
                 </button>
               </span>
-              <a className="calendar-card__title" href={milestonePath(id)} onClick={followLink}>
+              <a className="calendar-card__title ro-touch-target" href={milestonePath(id)} onClick={followLink}>
                 {title}
               </a>
             </li>

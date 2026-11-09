@@ -4,13 +4,13 @@ import { firstOfMonth, intlDate, monthOf, todayOf, type CalendarDate } from '../
 import { useI18n } from '../i18n'
 import { libraryPath, type LibraryPage } from '../library/library'
 import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, librarySearch } from '../library/libraryFilter'
-import { formatValue, winRate, type GraphUnit, type LinesInBothUnits, type Results } from '../library/results'
+import { graphUnit, linesIn, winRate, type Results } from '../library/results'
 import { usePreferences } from '../preferences/context'
 import { ImportDialog } from '../room/ImportDialog'
-import { followLink } from '../routing'
+import { quantityOf } from '../room/quantity'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { HomeCard, HomeCardMessage } from './HomeCard'
+import { HomeCard, HomeCardLink, HomeCardMessage } from './HomeCard'
 import { LibraryCardGraph } from './LibraryCardGraph'
 import { useCardRead } from './useCardRead'
 import './LibraryCard.css'
@@ -35,10 +35,6 @@ async function readMonth(token: string, firstDay: CalendarDate): Promise<Month> 
   const library = await api<LibraryPage>('/library/hands?page=1&pageSize=1', { token })
   return { results, anyHands: library.total > 0 }
 }
-
-/** The Result where these lines stand, in big blinds or, when the unit is Amounts, as an Amount. */
-const resultIn = (unit: GraphUnit, lines: LinesInBothUnits): number =>
-  unit === 'amount' && lines.amounts ? lines.amounts.result : lines.bigBlinds.result
 
 /** How the current month is going: its Hands, Result, Win Rate and a small graph of the Result. Read again only when the month changes. */
 export function LibraryCard({ today }: { today: CalendarDate }) {
@@ -68,9 +64,7 @@ export function LibraryCard({ today }: { today: CalendarDate }) {
         {month && month.results.hands > 0 && <MonthResults results={month.results} monthName={monthName} />}
         {month && month.results.hands === 0 && month.anyHands && (
           <HomeCardMessage title={t('home.library.noneThisMonth.title', { month: monthName })} text={t('home.library.noneThisMonth.text')}>
-            <a className="library-card__way" href={libraryPath + librarySearch(EMPTY_LIBRARY_FILTER)} onClick={followLink}>
-              {t('home.library.noneThisMonth.link')}
-            </a>
+            <HomeCardLink href={libraryPath + librarySearch(EMPTY_LIBRARY_FILTER)}>{t('home.library.noneThisMonth.link')}</HomeCardLink>
           </HomeCardMessage>
         )}
         {month && !month.anyHands && (
@@ -91,29 +85,35 @@ function MonthResults({ results, monthName }: { results: Results; monthName: str
   const i18n = useI18n()
   const { t, formatNumber } = i18n
   const { displayUnit } = usePreferences()
-  const unit: GraphUnit = displayUnit === 'amount' && results.currency && results.totals.amounts ? 'amount' : 'big-blinds'
-  const result = resultIn(unit, results.totals)
+  const { currency, totals } = results
+  const unit = graphUnit(displayUnit === 'amount', results)
+  const money = currency && totals.amounts ? { amount: totals.amounts.result, currency } : null
+  const result = quantityOf(totals.bigBlinds.result, money, displayUnit, i18n, { maximumFractionDigits: 2, signDisplay: 'exceptZero' })
   return (
     <>
-      <div className="library-card__stats">
-        <Stat label={t('home.library.hands')} value={formatNumber(results.hands, { useGrouping: true })} />
-        <Stat label={t('home.library.result')} value={formatValue(result, unit, results.currency, i18n)} sign={Math.sign(result)} />
-        <Stat
+      <div className="library-card__figures">
+        <MonthFigure label={t('home.library.hands')} value={formatNumber(results.hands, { useGrouping: true })} />
+        <MonthFigure label={t('home.library.result')} value={result.primary} secondary={result.secondary} sign={Math.sign(linesIn(unit, totals).result)} />
+        <MonthFigure
           label={t('home.library.winRate')}
           value={formatNumber(winRate(results, 'result'), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
       </div>
-      <LibraryCardGraph results={results} unit={unit} monthName={monthName} resultIn={(lines) => resultIn(unit, lines)} />
+      <LibraryCardGraph results={results} unit={unit} monthName={monthName} />
     </>
   )
 }
 
-function Stat({ label, value, sign }: { label: string; value: string; sign?: number }) {
+/** One of the month's figures, and the Amount beside it when the reader shows both. */
+function MonthFigure({ label, value, secondary, sign }: { label: string; value: string; secondary?: string | null; sign?: number }) {
   return (
-    <div className="library-card__stat">
+    <div className="library-card__figure">
       <span className="library-card__label">{label}</span>
-      <span className="library-card__value ro-mono" data-sign={sign}>
-        {value}
+      <span className="library-card__amounts">
+        <span className="library-card__value ro-mono" data-sign={sign}>
+          {value}
+        </span>
+        {secondary && <span className="library-card__secondary ro-mono">{secondary}</span>}
       </span>
     </div>
   )
