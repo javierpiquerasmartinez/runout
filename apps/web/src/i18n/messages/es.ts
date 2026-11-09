@@ -1410,6 +1410,12 @@ export const es = {
   'home.retry': 'Reintentar',
   // Home: the Library card.
   // Home: the Rooms card.
+  'home.rooms.seeAll': 'Ver todas',
+  'home.rooms.empty.title': 'No estás en ninguna sala',
+  'home.rooms.empty.text': 'Crea una para repasar manos con tu grupo.',
+  'home.rooms.freeReview': 'Revisión libre',
+  'home.rooms.connected.one': '{count} conectado',
+  'home.rooms.connected.other': '{count} conectados',
   // Home: the Goals card.
   'home.goals.seeAll': 'Ver todos',
   'home.goals.none.title': 'Ningún objetivo en curso',
