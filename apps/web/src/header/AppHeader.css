@@ -189,7 +189,7 @@
     flex-shrink: 0;
   }
   /*
-   * The four sections don't fit at phone width: they scroll sideways, kept to
+   * The five sections don't fit at phone width: they scroll sideways, kept to
    * the right while they fit, the current one in view, fading out on each side
    * where more are hidden.
    */

@@ -11,6 +11,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -639,4 +640,33 @@ export const milestones = pgTable(
   (table) => [
     index('milestones_identity_id_date_idx').on(table.identityId, table.date),
   ],
+);
+
+/** Up to 999,999,999 with two decimals, kept exact; read and written as numbers. */
+const goalNumber = (name: string) =>
+  numeric(name, { precision: 11, scale: 2, mode: 'number' });
+
+/**
+ * A Goal: something an Account is working towards, a Target to reach between
+ * a Start Date and a Deadline, calendar dates with no time and no zone. Only
+ * its owner sees it.
+ */
+export const goals = pgTable(
+  'goals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    name: text('name').notNull(),
+    /** Empty when there is none. */
+    description: text('description').notNull().default(''),
+    target: goalNumber('target').notNull(),
+    currentValue: goalNumber('current_value').notNull().default(0),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    deadline: date('deadline', { mode: 'string' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('goals_identity_id_idx').on(table.identityId)],
 );

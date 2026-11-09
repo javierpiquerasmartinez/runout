@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { adminPath } from '../admin/admin'
 import { calendarPath } from '../calendar/calendar'
+import { goalsPath } from '../goals/goals'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useImpersonationLock } from '../identity/impersonationLock'
@@ -18,10 +19,10 @@ import { Icon } from '../ui/Icon'
 import './AppHeader.css'
 
 /** The screens of the header's navigation. */
-type Section = 'library' | 'rooms' | 'lab' | 'calendar'
+type Section = 'library' | 'rooms' | 'lab' | 'calendar' | 'goals'
 
 /**
- * The header of the Account side (the Library, the Rooms screen, the Lab, the Calendar, Settings) and of
+ * The header of the Account side (the Library, the Rooms screen, the Lab, the Calendar, Goals, Settings) and of
  * Settings opened from a Room. An Account gets the brand leading to its
  * Library, the navigation with the `current` section marked, `where` for a
  * screen outside it, a way back (to a Room still held, say), "Nueva sala" and
@@ -61,7 +62,7 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
 }
 
 /**
- * "Biblioteca · Salas · Laboratorio · Calendario", the section this person is
+ * "Biblioteca · Salas · Laboratorio · Calendario · Objetivos", the section this person is
  * in marked. Where they don't all fit (a phone), they scroll sideways, opening
  * with the current one in view, and fade out on the side where more are hidden.
  */
@@ -89,6 +90,7 @@ function SectionNav({ current }: { current?: Section }) {
     { section: 'rooms', href: roomsPath, label: t('header.nav.rooms') },
     { section: 'lab', href: labAnalysisPath, label: t('header.nav.lab') },
     { section: 'calendar', href: calendarPath, label: t('header.nav.calendar') },
+    { section: 'goals', href: goalsPath, label: t('header.nav.goals') },
   ]
   return (
     <nav ref={nav} className="app-header__nav" aria-label={t('header.nav')} onScroll={(event) => markHiddenSections(event.currentTarget)}>

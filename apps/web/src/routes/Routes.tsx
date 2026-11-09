@@ -3,6 +3,8 @@ import { AdminPage } from '../admin/AdminPage'
 import { isCalendarPath, milestoneIdFromPath, periodFromPath, periodPath, todayOf, todayPeriod } from '../calendar/calendar'
 import { CalendarPage } from '../calendar/CalendarPage'
 import { MilestonePage } from '../calendar/MilestonePage'
+import { goalsPath } from '../goals/goals'
+import { GoalsPage } from '../goals/GoalsPage'
 import { invitationTokenFromPath, resetPasswordPath, resetTokenFromPath } from '../identity/accessPaths'
 import { useSession } from '../identity/context'
 import { InvitationPage } from '../identity/InvitationPage'
@@ -49,9 +51,9 @@ export function Routes() {
   if (path === settingsPath) return identity ? <SettingsPage /> : <Redirect to={loginPath} />
   // An Account has signed in already, and no sign-in returns anywhere but the Library.
   if (path === loginPath) return identity?.account ? <Redirect to={libraryPath} /> : <LoginPage />
-  // Only an Account has a Library, a Lab, a Calendar and creates Rooms (ADR 0005): anyone else is asked to sign in.
+  // Only an Account has a Library, a Lab, a Calendar, Goals and creates Rooms (ADR 0005): anyone else is asked to sign in.
   if (!identity?.account) {
-    if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`) || isLabPath(path) || isCalendarPath(path)) {
+    if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`) || isLabPath(path) || isCalendarPath(path) || path === goalsPath) {
       return <Redirect to={loginPath} />
     }
     return <LandingPage />
@@ -75,6 +77,7 @@ export function Routes() {
     if (path !== periodPath(period)) return <Redirect to={periodPath(period)} />
     return <CalendarPage period={period} />
   }
+  if (path === goalsPath) return <GoalsPage />
   // One screen for both views, so switching keeps its state; it reads which from the path.
   if (libraryViewFromPath(path)) return <LibraryPage />
   const pickingFor = roomCodeFromLibraryPath(path)

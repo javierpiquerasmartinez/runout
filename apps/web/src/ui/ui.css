@@ -293,6 +293,20 @@
 .ro-field__input.ro-mono {
   letter-spacing: 0.14em;
 }
+.ro-field__optional {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.ro-field__description {
+  resize: none;
+  font-family: inherit;
+}
+/* "12 / 80": under its field, at the end. */
+.ro-length-count {
+  align-self: flex-end;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
 .ro-field__input:focus-visible,
 .ro-field__input[data-state='focus'] {
   border-color: var(--sync);

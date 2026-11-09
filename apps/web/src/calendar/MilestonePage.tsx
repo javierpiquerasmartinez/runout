@@ -7,12 +7,14 @@ import { RoomDialog } from '../room/RoomDialog'
 import { followLink, isPlainClick, redirect, setLeaveGuard, useHistoryState } from '../routing'
 import { Breadcrumb, type BreadcrumbLink } from '../ui/Breadcrumb'
 import { Button } from '../ui/Button'
+import { DescriptionField } from '../ui/DescriptionField'
 import { Icon } from '../ui/Icon'
 import { TextField } from '../ui/TextField'
 import {
   calendarOpenedFrom,
   calendarPath,
   isPending,
+  MAX_MILESTONE_DESCRIPTION_LENGTH,
   MAX_MILESTONE_TITLE_LENGTH,
   monthOf,
   periodFromPath,
@@ -23,7 +25,6 @@ import {
   type Period,
 } from './calendar'
 import { dayName, monthHeading, weekHeading } from './calendarText'
-import { DescriptionField } from './MilestoneFields'
 import { draftRefusal, serverRefusal, type MilestoneField, type Refusal } from './milestoneForm'
 import { changeMilestone, deleteMilestone, getMilestone, type NewMilestone } from './milestonesApi'
 import './MilestonePage.css'
@@ -266,6 +267,7 @@ export function MilestonePage({ id }: { id: string }) {
                 />
                 <DescriptionField
                   className="milestone-page__description"
+                  maxLength={MAX_MILESTONE_DESCRIPTION_LENGTH}
                   value={draft.description}
                   error={errorOf('description')}
                   counted

@@ -91,6 +91,11 @@ export function addDays(date: CalendarDate, days: number): CalendarDate {
   return fromUtc(toUtc(date) + days * DAY_MS)
 }
 
+/** How many days after `from` the date `to` is; negative when it comes first. */
+export function daysBetween(from: CalendarDate, to: CalendarDate): number {
+  return (toUtc(to) - toUtc(from)) / DAY_MS
+}
+
 /** Today in the browser's own zone: the date its clock shows at `now`. */
 export function todayOf(now: Date = new Date()): CalendarDate {
   return `${pad(now.getFullYear(), 4)}-${pad(now.getMonth() + 1, 2)}-${pad(now.getDate(), 2)}`
