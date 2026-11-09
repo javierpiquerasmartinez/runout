@@ -329,3 +329,32 @@ _Avoid_: Agenda, schedule, planner, study plan
 **Milestone**:
 Something a person means to study on one particular day: a title, an optional description, and whether it is done. It falls on a date of the calendar, never on a time or an instant, so it stays on its day wherever the person is. Several can fall on the same day; none spans days or repeats. It can be planned on, or moved to, any day, past ones too, and one in the past that is not done is still pending. The UI calls it "Hito".
 _Avoid_: Event, task, session, goal, entry
+
+### Goals
+
+**Goal**:
+Something a person means to achieve over a period, measured by a number of their own: a name, an optional description, a Target, a Current Value, a Start Date and a Deadline. It belongs to one Account and nobody else sees it, and like the Calendar it has nothing to do with Rooms, the Library or the Lab: nothing in it comes from a Hand or a Range. Unrelated to a Milestone, which falls on one day and is simply done or not. The UI calls it "Objetivo".
+_Avoid_: Objective, milestone, task, KPI
+
+**Target**:
+The number a Goal's Current Value has to reach. Above zero, and with no unit: what it counts is only said in the Goal's name and description. The UI calls it "Meta".
+_Avoid_: Objective, quota, milestone
+
+**Current Value**:
+The number a person last wrote for how far they have got with a Goal. It starts at 0, is replaced each time and keeps no history. It can go down, never below 0, and it can pass the Target. The UI calls it "Valor actual".
+_Avoid_: Progress, score, count
+
+**Progress**:
+A Goal's Current Value as a percentage of its Target, past 100 % if it went beyond it. It is never weighed against how much of the period has gone by. The UI calls it "Progreso".
+_Avoid_: Completion, pace
+
+**Start Date**:
+The day a Goal's period begins. A date of the calendar, past or future, never a time or an instant. The UI calls it "Fecha de inicio".
+
+**Deadline**:
+The last day of a Goal's period, on or after its Start Date. A date of the calendar, like the Start Date. The UI calls it "Fecha límite".
+_Avoid_: Due date, end date
+
+**Goal Status**:
+Where a Goal stands, always worked out from its numbers and dates and never set by anyone: Achieved once the Current Value reaches the Target, whatever the date; otherwise Not Started before the Start Date, In Progress during the period, and Expired after the Deadline. An Expired Goal can still become Achieved. The UI says "Conseguido", "Sin empezar", "En curso" and "Vencido".
+_Avoid_: Closed, done, failed, archived
