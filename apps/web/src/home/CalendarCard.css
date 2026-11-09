@@ -48,6 +48,8 @@
   border: 1.5px solid var(--brass);
   border-radius: 4px;
   cursor: pointer;
+  /* Over the title's target, which it would otherwise lose a few pixels to. */
+  z-index: 1;
 }
 
 /* The 44 px a finger needs, around a 15 px box. */
@@ -83,6 +85,21 @@
   overflow-wrap: anywhere;
 }
 
+.calendar-card__title {
+  position: relative;
+}
+
+/* However many lines the title takes, at least 44 px to the finger. */
+.calendar-card__title::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: max(100%, 44px);
+  transform: translateY(-50%);
+}
+
 .calendar-card__row[data-done] .calendar-card__title {
   color: var(--text-muted);
   text-decoration: line-through;
@@ -100,6 +117,11 @@
 .calendar-card__next a:hover {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+/* Padding, which keeps working however the title wraps: 44 px to the finger, none to the line. */
+.calendar-card__next a {
+  padding-block: 14px;
 }
 
 .calendar-card__next a:focus-visible {
@@ -145,4 +167,11 @@
   content: '';
   position: absolute;
   inset: -6px 0;
+}
+
+/* The card grows with its rows, and nothing clips the rows' targets. */
+@media (max-width: 760px) {
+  .calendar-card__list {
+    overflow-y: visible;
+  }
 }

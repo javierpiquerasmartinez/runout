@@ -1,4 +1,4 @@
-/* Home, as the "Inicio" boards draw it: the title and a fixed bento grid with one slot per card. */
+/* Home, as the "Inicio" boards draw it: the title and a fixed bento grid with one slot per card; one column on a phone. */
 
 .home-page {
   min-height: 100vh;
@@ -53,4 +53,50 @@
 
 .home-page__slot--lab {
   grid-column: span 3;
+}
+
+/* One column, what concerns today first. */
+@media (max-width: 760px) {
+  .home-page__main {
+    gap: 12px;
+    padding: 20px 16px 32px;
+  }
+
+  .home-page__title {
+    margin-bottom: 4px;
+  }
+
+  .home-page__grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 12px;
+  }
+
+  .home-page__slot--rooms,
+  .home-page__slot--calendar,
+  .home-page__slot--library,
+  .home-page__slot--goals,
+  .home-page__slot--lab {
+    grid-column: auto;
+  }
+
+  .home-page__slot--rooms {
+    order: 1;
+  }
+
+  .home-page__slot--calendar {
+    order: 2;
+  }
+
+  .home-page__slot--library {
+    order: 3;
+  }
+
+  .home-page__slot--goals {
+    order: 4;
+  }
+
+  .home-page__slot--lab {
+    order: 5;
+  }
 }

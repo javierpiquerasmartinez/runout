@@ -399,6 +399,26 @@ describe('Home · the Library card', () => {
       expect(await graphOf(/^November's Result, hand by hand: ends at \+146\.5 BB$/)).toBeTruthy()
     })
 
+    it("is drawn at a phone's own size on a narrow screen, so that its figures aren't shrunk to fit", async () => {
+      vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 760px)', addEventListener() {}, removeEventListener() {} }))
+      answering({ line: [50, 146.5] })
+      renderHome()
+
+      const graph = await graphOf(/Result/)
+      expect(graph.getAttribute('viewBox')).toBe('0 0 320 130')
+      expect(graph.querySelector('line')!.getAttribute('x2')).toBe('320')
+      expect(within(graph).getByText('Hand 1').getAttribute('y')).toBe('126')
+      expect(heights(graph).at(-1)).toBe(12)
+    })
+
+    it('is drawn at the wide size everywhere else', async () => {
+      vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+      answering()
+      renderHome()
+
+      expect((await graphOf(/Result/)).getAttribute('viewBox')).toBe('0 0 734 250')
+    })
+
     it('draws the Result alone, from 0 at its start, one step per point', async () => {
       answering({ line: [50, -20, 146.5] })
       renderHome()

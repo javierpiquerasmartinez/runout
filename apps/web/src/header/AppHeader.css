@@ -189,7 +189,7 @@
     flex-shrink: 0;
   }
   /*
-   * The five sections don't fit at phone width: they scroll sideways, kept to
+   * The sections don't fit at phone width: they scroll sideways, kept to
    * the right while they fit, the current one in view, fading out on each side
    * where more are hidden.
    */
@@ -198,6 +198,8 @@
     --fade-end: #000;
     flex: 1 1 auto;
     min-width: 0;
+    /* Its overflow would clip the sections' 44 px otherwise. */
+    padding-block: 6px;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-mask-image: linear-gradient(to right, var(--fade-start) 0, #000 22px, #000 calc(100% - 22px), var(--fade-end) 100%);
@@ -216,9 +218,30 @@
     display: none;
   }
   .app-header__nav-item {
+    position: relative;
     flex-shrink: 0;
     padding: 0 8px;
     white-space: nowrap;
+  }
+  /* 32 px to the eye, 44 px to the finger, like the brand and the avatar. */
+  .app-header__nav-item::after,
+  .app-header .ro-brand::after,
+  .app-header__avatar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  .app-header .ro-brand,
+  .app-header__avatar {
+    position: relative;
+  }
+  /* Over the first section, which starts inside its 44 px. */
+  .app-header .ro-brand {
+    z-index: 1;
   }
   .app-header__nav-item:first-child {
     margin-left: auto;
