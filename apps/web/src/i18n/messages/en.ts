@@ -1424,6 +1424,10 @@ export const en: Messages = {
   'home.goals.empty.title': "You don't have any goals yet",
   'home.goals.empty.text': 'Set yourself a target with a date and follow how it goes here.',
   // Home: the Calendar card.
+  'home.calendar.today': 'Today, {date}',
+  'home.calendar.seeAll': 'See all',
+  'home.calendar.empty.title': 'Nothing planned for today',
+  'home.calendar.empty.text': "Note down what you're going to study and you'll see it here on the day.",
   // Home: the Lab card.
   'home.lab.ranges.one': 'range',
   'home.lab.ranges.other': 'ranges',

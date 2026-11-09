@@ -1423,6 +1423,10 @@ export const es = {
   'home.goals.empty.title': 'Aún no tienes objetivos',
   'home.goals.empty.text': 'Ponte una meta con fecha y sigue aquí cómo avanza.',
   // Home: the Calendar card.
+  'home.calendar.today': 'Hoy, {date}',
+  'home.calendar.seeAll': 'Ver todos',
+  'home.calendar.empty.title': 'Nada planeado para hoy',
+  'home.calendar.empty.text': 'Apunta qué vas a estudiar y lo verás aquí ese día.',
   // Home: the Lab card.
   'home.lab.ranges.one': 'rango',
   'home.lab.ranges.other': 'rangos',
