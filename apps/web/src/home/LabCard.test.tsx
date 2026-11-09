@@ -26,7 +26,12 @@ function renderHome(locale: Locale = 'en') {
 const ranges = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `r${index}`, name: `Range ${index}` }))
 const answering = (count: number) => fakeApi({ 'GET /lab/ranges': () => Response.json(ranges(count)) })
 const card = (name = 'Lab') => within(screen.getByRole('region', { name }))
-const loaded = async (text: string) => within((await screen.findByText(text)).closest('section')!)
+// Only inside the Lab's card: another card can show the same words, as when it fails too.
+const loaded = async (text: string) => {
+  const lab = within(await screen.findByRole('region', { name: /^Lab/ }))
+  await lab.findByText(text)
+  return lab
+}
 
 describe('Home · the Lab card', () => {
   it('shows how many Ranges the Account has, and the ways into the Lab', async () => {
