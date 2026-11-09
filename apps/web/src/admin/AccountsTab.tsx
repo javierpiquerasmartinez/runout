@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
 import { useIdentity } from '../identity/context'
-import { libraryPath } from '../library/library'
+import { homePath } from '../home/home'
 import { RoomDialog } from '../room/RoomDialog'
 import { navigate } from '../routing'
 import { Button } from '../ui/Button'
@@ -83,7 +83,7 @@ export function AccountsTab() {
     try {
       if (action === 'impersonate') {
         await impersonate(account.id)
-        navigate(libraryPath)
+        navigate(homePath)
         return
       }
       await admin(`/accounts/${account.id}/suspension`, { method: action === 'suspend' ? 'POST' : 'DELETE' })

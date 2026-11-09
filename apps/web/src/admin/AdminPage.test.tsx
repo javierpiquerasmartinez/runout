@@ -248,7 +248,8 @@ describe('the Accounts tab', () => {
     )
   })
 
-  it('starts an Impersonation after a confirmation', async () => {
+  it('starts an Impersonation after a confirmation, and lands on that Account\'s Home', async () => {
+    window.history.replaceState(null, '', '/admin/accounts')
     renderTab('accounts')
     const [, ana] = await screen.findAllByRole('row')
 
@@ -257,6 +258,7 @@ describe('the Accounts tab', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Impersonate' }))
 
     await waitFor(() => expect(session.impersonate).toHaveBeenCalledWith('ana'))
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
   })
 })
 

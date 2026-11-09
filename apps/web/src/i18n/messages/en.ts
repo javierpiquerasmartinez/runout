@@ -756,8 +756,9 @@ export const en: Messages = {
   'reason.invalid-goal-start-date': 'Choose a valid start date.',
   'reason.invalid-goal-deadline': 'Choose a valid deadline.',
   'reason.goal-deadline-before-start': 'It is before the start date.',
-  'header.brandToLibrary': 'Runout, go to your library',
+  'header.brandToHome': 'Runout, go to Home',
   'header.nav': 'Sections',
+  'header.nav.home': 'Home',
   'header.nav.library': 'Library',
   'header.nav.rooms': 'Rooms',
   'header.nav.lab': 'Lab',
@@ -1403,6 +1404,21 @@ export const en: Messages = {
   'goals.delete.confirm': 'Delete goal',
   'goals.delete.deleting': 'Deleting…',
   'goals.delete.failed': "The goal couldn't be deleted. Try again.",
+  // Home.
+  'home.title': 'Home',
+  'home.failed.title': "Couldn't load this",
+  'home.failed.text': 'The rest of the screen still works.',
+  'home.retry': 'Retry',
+  // Home: the Library card.
+  // Home: the Rooms card.
+  // Home: the Goals card.
+  // Home: the Calendar card.
+  // Home: the Lab card.
+  'home.lab.ranges.one': 'range',
+  'home.lab.ranges.other': 'ranges',
+  'home.lab.empty.title': 'No ranges',
+  'home.lab.empty.text': 'Build your first range.',
+  'home.lab.empty.create': 'Create range',
   'design.controls.breadcrumb': 'Breadcrumb',
   'design.controls.breadcrumb.fromMonth': 'From the month',
   'design.controls.breadcrumb.fromWeek': 'From the week',

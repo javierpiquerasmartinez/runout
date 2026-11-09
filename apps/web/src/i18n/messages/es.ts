@@ -755,8 +755,9 @@ export const es = {
   'reason.invalid-goal-start-date': 'Elige una fecha de inicio válida.',
   'reason.invalid-goal-deadline': 'Elige una fecha límite válida.',
   'reason.goal-deadline-before-start': 'Es anterior a la de inicio.',
-  'header.brandToLibrary': 'Runout, ir a tu biblioteca',
+  'header.brandToHome': 'Runout, ir a inicio',
   'header.nav': 'Secciones',
+  'header.nav.home': 'Inicio',
   'header.nav.library': 'Biblioteca',
   'header.nav.rooms': 'Salas',
   'header.nav.lab': 'Laboratorio',
@@ -1402,6 +1403,21 @@ export const es = {
   'goals.delete.confirm': 'Borrar objetivo',
   'goals.delete.deleting': 'Borrando…',
   'goals.delete.failed': 'No se ha podido borrar el objetivo. Inténtalo de nuevo.',
+  // Home.
+  'home.title': 'Inicio',
+  'home.failed.title': 'No se ha podido cargar',
+  'home.failed.text': 'El resto de la pantalla sigue funcionando.',
+  'home.retry': 'Reintentar',
+  // Home: the Library card.
+  // Home: the Rooms card.
+  // Home: the Goals card.
+  // Home: the Calendar card.
+  // Home: the Lab card.
+  'home.lab.ranges.one': 'rango',
+  'home.lab.ranges.other': 'rangos',
+  'home.lab.empty.title': 'Ningún rango',
+  'home.lab.empty.text': 'Construye tu primer rango.',
+  'home.lab.empty.create': 'Crear rango',
   'design.controls.breadcrumb': 'Miga de pan',
   'design.controls.breadcrumb.fromMonth': 'Desde el mes',
   'design.controls.breadcrumb.fromWeek': 'Desde la semana',

@@ -96,6 +96,7 @@ function renderSigningIn(path: string) {
 
 const landing = () => screen.findByRole('heading', { name: 'Your hands. Your numbers. Your table.' })
 const login = () => screen.findByRole('main', { name: 'Sign in' })
+const home = () => screen.findByRole('heading', { name: 'Home', level: 1 })
 const library = () => screen.findByRole('heading', { name: 'All hands' })
 const libraryGraph = async () => {
   const graph = await screen.findByRole('radio', { name: 'Graph' })
@@ -146,11 +147,19 @@ describe('Routes · the landing, for visitors', () => {
     expect(await landing()).toBeTruthy()
   })
 
-  it.each(['/', '/nowhere'])('sends an Account from %s to its Library', async (path) => {
-    renderAt(path, account())
+  it('shows an Account its Home at / instead', async () => {
+    renderAt('/', account())
 
-    expect(await library()).toBeTruthy()
-    expect(window.location.pathname).toBe('/library')
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
+    expect(screen.queryByRole('heading', { name: 'Your hands. Your numbers. Your table.' })).toBeNull()
+  })
+
+  it('sends an Account from a path that leads nowhere to its Home', async () => {
+    renderAt('/nowhere', account())
+
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
   })
 })
 
@@ -203,32 +212,32 @@ describe('Routes · /login, for anyone without an Account', () => {
     expect(screen.getByRole('link', { name: 'Back' }).getAttribute('href')).toBe('/')
   })
 
-  it('sends an Account to its Library', async () => {
+  it('sends an Account to its Home', async () => {
     renderAt('/login', account())
 
-    expect(await library()).toBeTruthy()
-    expect(window.location.pathname).toBe('/library')
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
   })
 
-  it('lands in the Library once signed in there', async () => {
+  it('lands on Home once signed in there', async () => {
     fakeGoogleIdentity('id-token-from-google')
     renderSigningIn('/login')
 
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
-    expect(await library()).toBeTruthy()
-    expect(window.location.pathname).toBe('/library')
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
   })
 
-  it('lands in the Library, not where they came from, once sent there from a protected screen', async () => {
+  it('lands on Home, not where they came from, once sent there from a protected screen', async () => {
     fakeGoogleIdentity()
     renderSigningIn('/library/hands/split-pot')
     await waitFor(() => expect(window.location.pathname).toBe('/login'))
 
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
-    expect(await library()).toBeTruthy()
-    expect(window.location.pathname).toBe('/library')
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
   })
 })
 
@@ -531,10 +540,10 @@ describe('Routes · the Administrator panel, only for an Administrator', () => {
     expect(within(tabs).getByRole('link', { name: 'Rooms' }).getAttribute('aria-current')).toBe('page')
   })
 
-  it.each(['/admin', '/admin/accounts'])('is a path that leads nowhere for another Account: %s goes to its Library', async (path) => {
+  it.each(['/admin', '/admin/accounts'])('is a path that leads nowhere for another Account: %s goes to its Home', async (path) => {
     renderAt(path, account())
 
-    await waitFor(() => expect(window.location.pathname).toBe('/library'))
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
     expect(screen.queryByRole('heading', { name: 'Administration' })).toBeNull()
   })
 
