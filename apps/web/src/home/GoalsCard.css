@@ -1,0 +1,107 @@
+/* The Goals' card on Home, as the "Inicio" boards draw it: the Goals screen's control and bar, smaller. */
+
+.goals-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goals-card__goal {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.goals-card__goal[data-status='inProgress'] {
+  --goal-status-bar: var(--brass);
+}
+
+.goals-card__goal[data-status='achieved'] {
+  --goal-status-bar: var(--sync);
+}
+
+/* The line wraps only to put a message about the value under it. */
+.goals-card__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.goals-card__name,
+.goals-card__name:hover {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Padding and not a pseudo-element, which the ellipsis' overflow would clip: 44 px to the finger, 20 to the layout. */
+.goals-card__name {
+  position: relative;
+  margin-block: -12px;
+  padding-block: 12px;
+}
+
+.goals-card__achieved {
+  color: var(--sync-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.goals-card__line .goal-card__numbers {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.goals-card__line .goal-card__message {
+  flex-basis: 100%;
+}
+
+.goals-card__line .goal-card__value,
+.goals-card__line .goal-card__field {
+  height: 26px;
+  padding: 0 7px;
+  font-size: 12.5px;
+}
+
+.goals-card__line .goal-card__field {
+  width: 112px;
+}
+
+.goals-card__line .goal-card__target {
+  font-size: 12px;
+}
+
+.goals-card__line .goal-card__percent {
+  min-width: 42px;
+  margin-left: 0;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  /* The first name's 44 px clear of the card's head. */
+  .goals-card__list {
+    padding-top: 1px;
+  }
+
+  /* As wide as a finger, so that its target stays off the name beside it. */
+  .goals-card__line .goal-card__value {
+    min-width: var(--control-touch);
+  }
+
+  /* What is being typed in, where a fingertip and the phone's keyboard expect it. */
+  .goals-card__line .goal-card__field {
+    height: var(--control-touch);
+    font-size: 16px;
+  }
+}

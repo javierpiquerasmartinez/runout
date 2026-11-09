@@ -1,0 +1,104 @@
+/* The Rooms' card on Home, as the "Inicio" boards draw it. */
+
+.rooms-card__locked {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 18.75px;
+}
+
+.rooms-card__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rooms-card__row,
+.rooms-card__row:hover {
+  color: var(--text-primary);
+}
+
+.rooms-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  min-height: 56px;
+  padding: 8px 12px;
+  background: var(--color-control);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.rooms-card__row[data-live] {
+  border-color: var(--sync-soft-border);
+}
+
+/* Locked, never hidden: dashed like a locked button, and only what it holds dims, so its focus ring doesn't. */
+.rooms-card__row[data-locked],
+.rooms-card__row[data-locked][data-live] {
+  border: 1px dashed var(--disabled-border);
+  cursor: not-allowed;
+}
+
+.rooms-card__row[data-locked] > * {
+  opacity: 0.55;
+}
+
+.rooms-card__row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.rooms-card__about {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rooms-card__name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rooms-card__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.rooms-card__row[data-live] .rooms-card__state {
+  color: var(--sync-ink);
+}
+
+.rooms-card__dot {
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 50%;
+}
+
+.rooms-card__row[data-live] .rooms-card__dot {
+  background: var(--sync);
+  border-color: var(--sync);
+}
+
+.rooms-card__connected {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}

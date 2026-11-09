@@ -1,0 +1,148 @@
+/* The Calendar's card on Home, as the "Inicio" boards draw it. */
+
+.calendar-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.calendar-card__row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  background: var(--color-control);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.calendar-card__row[data-done] {
+  background: none;
+  border-color: var(--color-rule);
+}
+
+.calendar-card__check-place {
+  display: flex;
+  padding-top: 2px;
+}
+
+.calendar-card__check {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  color: var(--color-canvas);
+  background: var(--brass-soft-bg);
+  border: 1.5px solid var(--brass);
+  border-radius: 4px;
+  cursor: pointer;
+  /* Over the title's target, which it would otherwise lose a few pixels to. */
+  z-index: 1;
+}
+
+.calendar-card__check:focus-visible,
+.calendar-card__title:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.calendar-card__row[data-done] .calendar-card__check {
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+.calendar-card__title,
+.calendar-card__title:hover {
+  flex-grow: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.calendar-card__row[data-done] .calendar-card__title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.calendar-card__next {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 19.5px;
+  overflow-wrap: anywhere;
+}
+
+.calendar-card__next a,
+.calendar-card__next a:hover {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Padding, which keeps working however the title wraps: 44 px to the finger, none to the line. */
+.calendar-card__next a {
+  padding-block: 14px;
+}
+
+.calendar-card__next a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.calendar-card__unsaved {
+  margin: 0;
+  color: var(--alert-ink);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+/* What leads on to the Calendar, kept at the bottom of the card. */
+.calendar-card__foot {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 12px;
+  margin-top: auto;
+}
+
+.calendar-card__overdue,
+.calendar-card__overdue:hover {
+  color: var(--brass-ink);
+}
+
+@media (max-width: 760px) {
+  /* The card grows with its rows, and nothing clips the rows' targets. */
+  .calendar-card__list {
+    overflow-y: visible;
+  }
+
+  /* The check's 44 px end where the title's begin. */
+  .calendar-card__row {
+    gap: 15px;
+  }
+
+  /* Clear of the link below it. */
+  .calendar-card__next {
+    margin-bottom: 4px;
+  }
+
+  /* However short the title: 44 px to the finger, none to the line, and above the words around it. */
+  .calendar-card__next a {
+    position: relative;
+    margin-inline: -20px;
+    padding-inline: 20px;
+  }
+}

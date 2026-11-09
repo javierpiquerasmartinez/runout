@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, detailOf, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
-import { libraryPath } from '../library/library'
+import { homePath } from '../home/home'
 import { Redirect } from '../routes/Redirect'
 import { Brand } from '../ui/Brand'
 import { Button } from '../ui/Button'
@@ -21,7 +21,7 @@ type Load =
 /**
  * `/invitation/<token>`: an Invitation's link. It shows the invited email and
  * lets them create their Account with Google or a password; then they choose
- * their Display Name (`FirstDisplayName`) and land in their Library. A link
+ * their Display Name (`FirstDisplayName`) and land on their Home. A link
  * that can no longer be used says why.
  */
 export function InvitationPage({ token }: { token: string }) {
@@ -52,8 +52,8 @@ export function InvitationPage({ token }: { token: string }) {
     )
   }
   const signedInAs = session.identity?.account?.email ?? null
-  // Accepted just now, or opened again by its own Account: on to the Library.
-  if (signedInAs === load.email) return <Redirect to={libraryPath} />
+  // Accepted just now, or opened again by its own Account: on to Home.
+  if (signedInAs === load.email) return <Redirect to={homePath} />
   if (load.status !== 'pending') {
     return (
       <InvitationCard>

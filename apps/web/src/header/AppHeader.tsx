@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { adminPath } from '../admin/admin'
 import { calendarPath } from '../calendar/calendar'
 import { goalsPath } from '../goals/goals'
+import { homePath } from '../home/home'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useImpersonationLock } from '../identity/impersonationLock'
@@ -19,12 +20,12 @@ import { Icon } from '../ui/Icon'
 import './AppHeader.css'
 
 /** The screens of the header's navigation. */
-type Section = 'library' | 'rooms' | 'lab' | 'calendar' | 'goals'
+type Section = 'home' | 'library' | 'rooms' | 'lab' | 'calendar' | 'goals'
 
 /**
- * The header of the Account side (the Library, the Rooms screen, the Lab, the Calendar, Goals, Settings) and of
+ * The header of the Account side (Home, the Library, the Rooms screen, the Lab, the Calendar, Goals, Settings) and of
  * Settings opened from a Room. An Account gets the brand leading to its
- * Library, the navigation with the `current` section marked, `where` for a
+ * Home, the navigation with the `current` section marked, `where` for a
  * screen outside it, a way back (to a Room still held, say), "Nueva sala" and
  * the avatar's menu. An anonymous Participant gets only the brand, `where`
  * and the way back: no Library, no Rooms to create, no Sign-in to end.
@@ -36,7 +37,7 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
   const noRooms = useImpersonationLock('rooms')
   return (
     <header className="app-header">
-      {account ? <Brand href={libraryPath} label={t('header.brandToLibrary')} /> : <Brand />}
+      {account ? <Brand href={homePath} label={t('header.brandToHome')} /> : <Brand />}
       <span className="app-header__divider" aria-hidden="true" />
       {account && <SectionNav current={current} />}
       {account && where && <span className="app-header__divider" aria-hidden="true" />}
@@ -62,7 +63,7 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
 }
 
 /**
- * "Biblioteca · Salas · Laboratorio · Calendario · Objetivos", the section this person is
+ * "Inicio · Biblioteca · Salas · Laboratorio · Calendario · Objetivos", the section this person is
  * in marked. Where they don't all fit (a phone), they scroll sideways, opening
  * with the current one in view, and fade out on the side where more are hidden.
  */
@@ -86,6 +87,7 @@ function SectionNav({ current }: { current?: Section }) {
   }, [current])
 
   const sections: { section: Section; href: string; label: string }[] = [
+    { section: 'home', href: homePath, label: t('header.nav.home') },
     { section: 'library', href: libraryPath, label: t('header.nav.library') },
     { section: 'rooms', href: roomsPath, label: t('header.nav.rooms') },
     { section: 'lab', href: labAnalysisPath, label: t('header.nav.lab') },
@@ -98,7 +100,7 @@ function SectionNav({ current }: { current?: Section }) {
         <a
           key={section}
           href={href}
-          className="app-header__nav-item"
+          className="app-header__nav-item ro-touch-target"
           aria-current={section === current ? 'page' : undefined}
           onClick={followLink}
         >
@@ -156,7 +158,7 @@ function AccountMenu() {
     >
       <button
         type="button"
-        className="app-header__avatar"
+        className="app-header__avatar ro-touch-target"
         aria-label={t('header.accountMenu')}
         aria-expanded={open}
         aria-controls={menuId}

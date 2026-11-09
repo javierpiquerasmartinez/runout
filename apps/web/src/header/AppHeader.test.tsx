@@ -134,10 +134,10 @@ describe('AppHeader · getting around', () => {
     )
 
     const links = within(screen.getByRole('navigation', { name: 'Secciones' })).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Biblioteca', 'Salas', 'Laboratorio', 'Calendario', 'Objetivos'])
-    expect(links[3].getAttribute('href')).toBe('/calendar')
-    expect(links[3].getAttribute('aria-current')).toBe('page')
-    expect(links[2].getAttribute('aria-current')).toBeNull()
+    expect(links.map((link) => link.textContent)).toEqual(['Inicio', 'Biblioteca', 'Salas', 'Laboratorio', 'Calendario', 'Objetivos'])
+    expect(links[4].getAttribute('href')).toBe('/calendar')
+    expect(links[4].getAttribute('aria-current')).toBe('page')
+    expect(links[3].getAttribute('aria-current')).toBeNull()
   })
 
   it('leads to Goals after the Calendar, marked as current inside it', () => {
@@ -150,10 +150,10 @@ describe('AppHeader · getting around', () => {
     )
 
     const links = within(screen.getByRole('navigation', { name: 'Sections' })).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Library', 'Rooms', 'Lab', 'Calendar', 'Goals'])
-    expect(links[4].getAttribute('href')).toBe('/goals')
-    expect(links[4].getAttribute('aria-current')).toBe('page')
-    expect(links[3].getAttribute('aria-current')).toBeNull()
+    expect(links.map((link) => link.textContent)).toEqual(['Home', 'Library', 'Rooms', 'Lab', 'Calendar', 'Goals'])
+    expect(links[5].getAttribute('href')).toBe('/goals')
+    expect(links[5].getAttribute('aria-current')).toBe('page')
+    expect(links[4].getAttribute('aria-current')).toBeNull()
   })
 
   it('leads to the Lab after Rooms, marked as current inside it', () => {
@@ -167,9 +167,9 @@ describe('AppHeader · getting around', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Sections' })
     const links = within(nav).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Library', 'Rooms', 'Lab', 'Calendar', 'Goals'])
-    expect(links[2].getAttribute('href')).toBe('/lab/analysis')
-    expect(links[2].getAttribute('aria-current')).toBe('page')
+    expect(links.map((link) => link.textContent)).toEqual(['Home', 'Library', 'Rooms', 'Lab', 'Calendar', 'Goals'])
+    expect(links[3].getAttribute('href')).toBe('/lab/analysis')
+    expect(links[3].getAttribute('aria-current')).toBe('page')
     expect(links[0].getAttribute('aria-current')).toBeNull()
   })
 
@@ -189,8 +189,31 @@ describe('AppHeader · getting around', () => {
         </I18nProvider>,
       )
 
-      // The Calendar runs from 282 to 372: the nav shows 172 to 372.
-      expect(screen.getByRole('navigation', { name: 'Sections' }).scrollLeft).toBe(172)
+      // The Calendar runs from 376 to 466: the nav shows 266 to 466.
+      expect(screen.getByRole('navigation', { name: 'Sections' }).scrollLeft).toBe(266)
+    } finally {
+      restore()
+    }
+  })
+
+  it('opens on Home with Inicio in view and the other sections further along', () => {
+    const restore = layOut({
+      clientWidth: (element) => (element.tagName === 'NAV' ? 200 : 0),
+      offsetLeft: (element) => (element.tagName === 'A' ? [...element.parentElement!.children].indexOf(element) * 94 : 0),
+      offsetWidth: (element) => (element.tagName === 'A' ? 90 : 0),
+    })
+    try {
+      render(
+        <I18nProvider initialLocale="es">
+          <SessionContext.Provider value={fakeSession()}>
+            <AppHeader current="home" />
+          </SessionContext.Provider>
+        </I18nProvider>,
+      )
+
+      const nav = screen.getByRole('navigation', { name: 'Secciones' })
+      expect(nav.scrollLeft).toBe(0)
+      expect(nav.querySelector('a')).toBe(screen.getByRole('link', { name: 'Inicio', current: 'page' }))
     } finally {
       restore()
     }
@@ -211,10 +234,26 @@ describe('AppHeader · getting around', () => {
     }
   })
 
-  it('leads the brand to the Library', () => {
+  it('leads the brand to Home, and says so', () => {
     renderHeader()
 
-    expect(screen.getByRole('link', { name: 'Runout, go to your library' }).getAttribute('href')).toBe('/library')
+    expect(screen.getByRole('link', { name: 'Runout, go to Home' }).getAttribute('href')).toBe('/')
+  })
+
+  it('opens with Home, marked on it', () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionContext.Provider value={fakeSession()}>
+          <AppHeader current="home" />
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+
+    const [first, second] = within(screen.getByRole('navigation', { name: 'Sections' })).getAllByRole('link')
+    expect(first.textContent).toBe('Home')
+    expect(first.getAttribute('href')).toBe('/')
+    expect(first.getAttribute('aria-current')).toBe('page')
+    expect(second.getAttribute('aria-current')).toBeNull()
   })
 
   it('opens Rooms from "New room"', async () => {

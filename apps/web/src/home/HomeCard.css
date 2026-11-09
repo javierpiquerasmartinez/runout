@@ -1,0 +1,111 @@
+/* What every card of Home shares, as the "Inicio" boards draw it: the frame, the head, and the states of its read. */
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.home-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.home-card__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.home-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22.5px;
+}
+
+.home-card__title a,
+.home-card__title a:hover {
+  color: var(--text-primary);
+}
+
+.home-card__subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.home-card__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-card__placeholder {
+  border-radius: 6px;
+  background: var(--color-panel-border);
+}
+
+.home-card__placeholder--line {
+  width: 60%;
+  height: 26px;
+}
+
+.home-card__placeholder--block {
+  width: 100%;
+  height: 86px;
+}
+
+.home-card__message {
+  display: flex;
+  flex-grow: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+}
+
+.home-card__message-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.home-card__message-text {
+  max-width: 420px;
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 19.5px;
+}
+
+.home-card__link,
+.home-card__link:hover {
+  color: var(--text-primary);
+}
+
+/* A plain link: 32 px to the eye, 44 px to the finger through `ro-touch-target`. */
+.home-card__text-link,
+.home-card__text-link:hover {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: var(--control-compact);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}

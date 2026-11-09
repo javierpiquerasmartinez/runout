@@ -14,13 +14,14 @@ import {
 } from '@nestjs/common';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
-import { parseCalendarSpan } from './calendar-date.js';
+import { parseCalendarSpan, parseCalendarToday } from './calendar-date.js';
 import {
   MilestonesService,
   type Milestone,
   type MilestoneBody,
   type MilestoneChange,
   type MilestoneList,
+  type MilestoneOutlook,
 } from './milestones.service.js';
 
 /**
@@ -47,6 +48,21 @@ export class MilestonesController {
   ): Promise<MilestoneList> {
     const account = await this.authenticate(authorization);
     return this.milestones.list(account, parseCalendarSpan(query));
+  }
+
+  /**
+   * What lies around the viewer's `today`, a calendar date because the server
+   * doesn't know which day it is for them. Declared before the read of one
+   * Milestone, which would otherwise take `outlook` for an id.
+   */
+  @Get('outlook')
+  @Header('Cache-Control', 'private, no-cache')
+  async outlook(
+    @Headers('authorization') authorization: string | undefined,
+    @Query() query: Record<string, unknown>,
+  ): Promise<MilestoneOutlook> {
+    const account = await this.authenticate(authorization);
+    return this.milestones.outlook(account, parseCalendarToday(query));
   }
 
   /** Creates a Milestone from a title, a description and a date. */
