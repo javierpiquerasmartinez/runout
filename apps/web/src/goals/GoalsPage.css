@@ -304,8 +304,10 @@
   color: var(--alert-ink);
   font-size: 12.5px;
 }
+/* Where the three buttons don't fit on one line, Borrar goes on its own above the other two. */
 .goal-dialog__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 6px;
@@ -313,9 +315,66 @@
 .goal-dialog__delete {
   margin-right: auto;
 }
+.goal-dialog__answers {
+  display: flex;
+  gap: 8px;
+}
 .goal-dialog__no-undo {
   margin: 0;
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.5;
+}
+
+/* ---------- A phone, as the board "En el móvil" draws it ---------- */
+
+@media (max-width: 760px) {
+  .goals-page__main {
+    gap: 12px;
+    padding: 16px 16px 32px;
+  }
+  .goals-page__title {
+    font-size: 26px;
+    line-height: 32px;
+  }
+  .goals-page__head .ro-btn {
+    height: var(--control-standard);
+  }
+  .goals-page__list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .goal-card {
+    padding: 16px;
+  }
+  .goal-card__edit {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 0;
+  }
+  .goal-card__value,
+  .goal-card__field {
+    height: 44px;
+    font-size: 15px;
+  }
+  /* Already 44 px to the eye. */
+  .goal-card__value::after {
+    content: none;
+  }
+  .goal-card__field {
+    width: 128px;
+  }
+  /* The largest numbers don't fit on one line: the percentage goes under them. */
+  .goal-card__numbers {
+    flex-wrap: wrap;
+  }
+
+  /* Side by side while each date can still show its year. */
+  .goal-dialog__dates {
+    flex-wrap: wrap;
+  }
+  .goal-dialog__date {
+    flex-basis: 124px;
+  }
 }

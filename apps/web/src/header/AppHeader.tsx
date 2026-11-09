@@ -22,7 +22,7 @@ import './AppHeader.css'
 type Section = 'library' | 'rooms' | 'lab' | 'calendar' | 'goals'
 
 /**
- * The header of the Account side (the Library, the Rooms screen, the Lab, the Calendar, Settings) and of
+ * The header of the Account side (the Library, the Rooms screen, the Lab, the Calendar, Goals, Settings) and of
  * Settings opened from a Room. An Account gets the brand leading to its
  * Library, the navigation with the `current` section marked, `where` for a
  * screen outside it, a way back (to a Room still held, say), "Nueva sala" and

@@ -193,12 +193,14 @@ export function GoalDialog({
               {t('goals.form.delete')}
             </Button>
           )}
-          <Button variant="ghost" onClick={onClose}>
-            {t('goals.form.cancel')}
-          </Button>
-          <Button type="submit" variant="primary" aria-busy={busy || undefined}>
-            {t(goal ? 'goals.form.save' : 'goals.form.create')}
-          </Button>
+          <div className="goal-dialog__answers">
+            <Button variant="ghost" onClick={onClose}>
+              {t('goals.form.cancel')}
+            </Button>
+            <Button type="submit" variant="primary" aria-busy={busy || undefined}>
+              {t(goal ? 'goals.form.save' : 'goals.form.create')}
+            </Button>
+          </div>
         </div>
       </form>
     </dialog>
