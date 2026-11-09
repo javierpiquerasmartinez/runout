@@ -1,8 +1,9 @@
+import { useCallback } from 'react'
 import { api } from '../backend/api'
-import { firstOfMonth, intlDate, monthOf, todayOf } from '../calendar/calendar'
+import { firstOfMonth, intlDate, monthOf, todayOf, type CalendarDate } from '../calendar/calendar'
 import { useI18n } from '../i18n'
 import { libraryPath, type LibraryPage } from '../library/library'
-import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, librarySearch, quickRange } from '../library/libraryFilter'
+import { EMPTY_LIBRARY_FILTER, libraryFilterQuery, librarySearch } from '../library/libraryFilter'
 import { formatValue, winRate, type GraphUnit, type LinesInBothUnits, type Results } from '../library/results'
 import { usePreferences } from '../preferences/context'
 import { followLink } from '../routing'
@@ -13,7 +14,8 @@ import { LibraryCardGraph } from './LibraryCardGraph'
 import { useCardRead } from './useCardRead'
 import './LibraryCard.css'
 
-const thisMonth = () => ({ ...EMPTY_LIBRARY_FILTER, ...quickRange('this-month') })
+/** The month that begins on this day, up to today: the Library's quick period for the month. */
+const monthSoFar = (firstDay: CalendarDate) => ({ ...EMPTY_LIBRARY_FILTER, from: firstDay, to: todayOf() })
 
 /** The small graph only needs enough points to draw. */
 const GRAPH_POINTS = 200
@@ -24,8 +26,8 @@ interface Month {
   anyHands: boolean
 }
 
-async function readMonth(token: string): Promise<Month> {
-  const query = libraryFilterQuery(thisMonth())
+async function readMonth(token: string, firstDay: CalendarDate): Promise<Month> {
+  const query = libraryFilterQuery(monthSoFar(firstDay))
   query.set('points', String(GRAPH_POINTS))
   const results = await api<Results>(`/library/results?${query}`, { token })
   if (results.hands > 0) return { results, anyHands: true }
@@ -37,15 +39,17 @@ async function readMonth(token: string): Promise<Month> {
 const resultIn = (unit: GraphUnit, lines: LinesInBothUnits): number =>
   unit === 'amount' && lines.amounts ? lines.amounts.result : lines.bigBlinds.result
 
-/** How the current month is going: its Hands, Result, Win Rate and a small graph of the Result. */
-export function LibraryCard() {
+/** How the current month is going: its Hands, Result, Win Rate and a small graph of the Result. Read again only when the month changes. */
+export function LibraryCard({ today }: { today: CalendarDate }) {
   const { t, formatDate, locale } = useI18n()
-  const { status, data: month, reload } = useCardRead(readMonth)
-  const monthName = formatDate(intlDate(firstOfMonth(monthOf(todayOf()))), { month: 'long', timeZone: 'UTC' })
+  const firstDay = firstOfMonth(monthOf(today))
+  const read = useCallback((token: string) => readMonth(token, firstDay), [firstDay])
+  const { status, data: month, reload } = useCardRead(read)
+  const monthName = formatDate(intlDate(firstDay), { month: 'long', timeZone: 'UTC' })
   return (
     <HomeCard
       title={t('header.nav.library')}
-      href={libraryPath + librarySearch(thisMonth())}
+      href={libraryPath + librarySearch(monthSoFar(firstDay))}
       status={status}
       onRetry={reload}
       subtitle={`${monthName.charAt(0).toLocaleUpperCase(locale)}${monthName.slice(1)}`}

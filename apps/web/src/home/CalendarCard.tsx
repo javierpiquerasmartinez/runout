@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { calendarPath, intlDate, milestonePath, orderDay, todayOf, type Milestone } from '../calendar/calendar'
+import { calendarPath, intlDate, milestonePath, orderDay, type CalendarDate, type Milestone } from '../calendar/calendar'
 import { CreateMilestoneDialog } from '../calendar/CreateMilestoneDialog'
 import { useMilestones } from '../calendar/useMilestones'
 import { useI18n } from '../i18n'
@@ -13,11 +13,10 @@ import './CalendarCard.css'
 const MOST_SHOWN = 5
 
 /** Today's Milestones, to tick off where they are, and the way to note down a new one without leaving Home. */
-export function CalendarCard() {
+export function CalendarCard({ today }: { today: CalendarDate }) {
   const { t, formatDate } = useI18n()
-  const today = todayOf()
   const [creating, setCreating] = useState(false)
-  const { milestones,loading, failed, reload, setDone, unsaved } = useMilestones({ from: today, to: today })
+  const { milestones, loading, failed, reload, setDone, unsaved } = useMilestones({ from: today, to: today })
   const subtitle = t('home.calendar.today', { date: formatDate(intlDate(today), { day: 'numeric', month: 'short', timeZone: 'UTC' }) })
   const newMilestone = (
     <Button size="compact" onClick={() => setCreating(true)}>
