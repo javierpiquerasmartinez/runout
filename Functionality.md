@@ -77,7 +77,7 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Eleven epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, and the Calendar after the Lab, as a place to plan that study day by day. Administration runs alongside them for the trial.
+Twelve epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, and Goals after the Calendar, as a place to say what all of it is aiming for. Administration runs alongside them for the trial.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |
@@ -91,6 +91,7 @@ Eleven epics cover the product. Five are essential for a session to work end to 
 | E8 · Accounts and preferences | Sign in, read the table your own way, and be recognised in Hand Histories | Partial in MVP |
 | E9 · Lab | Build, measure, name and find your own preflop Ranges | After the second release |
 | E11 · Calendar | Plan what to study on each day with Milestones, tick them off and replan what slipped | After the Lab |
+| E12 · Goals | Say what you are aiming for and by when, and see how far you have got | After the Calendar |
 | E10 · Administration | Decide who gets an Account, see how Runout is used, and help someone from inside their Account | Trial |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
@@ -538,8 +539,8 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
 
-- The Library, a Library Hand, **Salas**, the Lab, the Calendar and Settings share the same header: the brand, **Biblioteca**, **Salas**, **Laboratorio** and **Calendario** with the current one marked, **Nueva sala** and the avatar menu.
-- On a phone the four sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
+- The Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, **Nueva sala** and the avatar menu.
+- On a phone the five sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
 - An anonymous Participant who steps out to Settings sees only the brand and a way back, and their Room carries on behind it. Without any identity, Settings sends me to `/login`.
@@ -773,6 +774,65 @@ The Calendar is where a player plans what they are going to study, one day at a 
 - The month shows, under each day's number, how many Milestones it has instead of their titles: in brass when one slipped, muted when all are done. A day is read out with its count and how many are pending. Tapping a day opens its week, as a new address.
 - The week becomes a list of its seven days, one under another, each with its name, its "+" and its Milestones in 44 px rows, or "Nada planeado." when it has none. Tapping a day's empty space or its "+" opens **Nuevo hito** on that day, and tapping a Milestone opens its page.
 - Dragging is not offered; a Milestone's day is changed on its page, whose breadcrumb also fits, shortening the period and the title.
+
+## E12 · Goals
+
+Goals are where a player writes down what they are aiming for, by when, and how far they have got. A Goal is a name, an optional description, a Target, a Current Value, a Start Date and a Deadline. The Target is a number with no unit: what it counts is only said in the name and the description. The two dates are days of the calendar, never times. Runout works out the Progress and the Goal Status from the numbers and the dates; nobody closes or archives a Goal by hand. Like the Calendar, Goals have nothing to do with Rooms, the Library or the Lab: nothing in them comes from a Hand or a Range. They need an Account, and nobody else sees them.
+
+**H12.1 — Open my Goals.** As a player, I want a place for what I am aiming for, beside the rest of my study.
+
+- **Objetivos** sits in the shared header after **Calendario**, and is marked while I am in Goals (H8.9).
+- Goals live on one page, at `/goals`; the dialogs have no address of their own.
+- "Today" is the day where my browser is.
+- Without an Account, `/goals` sends me to `/login`. An anonymous Participant has no way into Goals.
+- My Goals are seen by nobody else. An Administrator impersonating me (H10.5) sees and changes them as I would; the panel shows nothing of them.
+
+**H12.2 — See how each Goal is going.** As a player, I want all my Goals on one page, so I see at a glance how each one stands.
+
+- Each Goal is a card with its name, which wraps as many lines as it needs, and its description if it has one, cut to two lines with the whole text on hover. A Goal with no description leaves no gap.
+- Every card shows its Goal Status as a mark and a word, its Current Value over its Target, its Progress as a percentage and a bar, and its countdown. There is no percentage across Goals.
+- The Progress is rounded down to a whole number, so a Goal at 99.6 % never reads 100 %. Past the Target it stays real, as 120 %, and the bar stops at full.
+- Numbers are written the way my language writes them: 12.000 and 5,5 in Spanish.
+- With no Goals, a short phrase and **Nuevo objetivo** take the place of the list. If my Goals can't be loaded, the page says so.
+
+**H12.3 — Know where a Goal stands.** As a player, I want each Goal to say whether it is still open and how long it has.
+
+- **Conseguido**: the Current Value has reached the Target, whatever the date. It shows no countdown.
+- **Sin empezar**: before the Start Date, with "Empieza en 5 días".
+- **En curso**: from the Start Date up to and including the Deadline, with "Quedan 12 días", "Queda 1 día", and "Último día" on the Deadline itself.
+- **Vencido**: past the Deadline without reaching the Target, with "Venció hace 3 días". Never drawn in red.
+- Goals Sin empezar and En curso come first, the closest Deadline on top; then those Conseguido and Vencido, the most recent Deadline on top. Goals with the same Deadline keep the order they were created in.
+
+**H12.4 — Create a Goal.** As a player, I want to add a Goal in one go.
+
+- **Nuevo objetivo** opens a dialog asking for a name (up to 80 characters, with a counter), an optional description (up to 500, with a counter), a Target, a Start Date and a Deadline. It never asks for the Current Value: a new Goal starts at 0.
+- The Start Date holds today and can be moved into the past or the future; the Deadline starts empty.
+- The Target is above 0 and at most 999.999.999, with up to two decimals, typed the way my language writes numbers.
+- A Deadline can be the Start Date itself, never a day before it.
+- Whatever is invalid is refused in place, all at once and keeping what I typed; a refusal from the server is said beside its field, and the dialog stays open.
+- **Cancelar** or Escape creates nothing. **Crear objetivo** puts the Goal in its place in the list at once.
+
+**H12.5 — Update the Current Value.** As a player, I want to say how far I have got in one gesture.
+
+- The Current Value is a control on the card. Activating it turns it into a field holding the present value, and what I write replaces the old one. It can go down, and past the Target.
+- Enter or leaving the field saves; Escape leaves the value as it was.
+- A value below 0, above 999.999.999 or with more than two decimals stays in the field with a message, and is not sent.
+- While I type, the Goal Status and the Progress keep the saved value. On saving, the Progress, the Goal Status, the countdown and the card's place in the list follow at once.
+- If saving fails, the value goes back and the card says it was not saved.
+- A Goal can be updated whatever its Goal Status: one Vencido can still become Conseguido, and one Conseguido can drop back.
+
+**H12.6 — Edit or delete a Goal.** As a player, I want to adjust a Goal as things change, or get rid of it.
+
+- The card's edit button, apart from the Current Value, opens **Editar objetivo**, the same dialog with the same rules, whatever the Goal Status. **Cancelar** or Escape discards what I typed.
+- The Goal Status follows from what I save: lowering a Target to the Current Value makes the Goal Conseguido, and moving a Deadline forward takes one Vencido back to En curso.
+- **Borrar** asks for confirmation in the dialog's place, saying the Goal disappears from my list and there is no undo. **Cancelar** goes back to editing; **Borrar objetivo** deletes it for good and returns to the list. If deleting fails, the dialog says so.
+
+**H12.7 — Keep track on a phone.** As a player away from my desk, I want Goals to fit my phone.
+
+- On a narrow screen the cards go in one column, with no sideways scrolling, and **Nuevo objetivo** stays beside the title.
+- **Objetivos** is reached from the header like every other section, as the last of the sections that scroll sideways (H8.9).
+- The Current Value and the edit button are 44 px tall; tapping the Current Value opens the field on a numeric keyboard, and the Target in the dialog uses one too.
+- The dialogs and the delete confirmation fit the screen: where they don't fit its height they scroll, where the dates can no longer show their year they go one under the other, and where **Borrar** doesn't fit beside **Cancelar** and **Guardar** it goes above them.
 
 ## E10 · Administration
 
