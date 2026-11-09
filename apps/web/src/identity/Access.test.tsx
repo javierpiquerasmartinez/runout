@@ -189,6 +189,14 @@ describe('the Invitation page', () => {
     expect((await screen.findByRole('alert')).textContent).toBe("This invitation link doesn't exist.")
   })
 
+  it('sends its own Account on to Home', async () => {
+    invitation('accepted')
+    window.history.replaceState(null, '', '/invitation/tok')
+    renderWith(fakeSession({ account: { email: 'ana@x.com', signInMethods: ['password'] } }), <InvitationPage token="tok" />)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+  })
+
   it('tells someone signed in as another Account whose it is, and offers to sign out', async () => {
     invitation('pending')
     const session = fakeSession({ account: { email: 'bea@x.com' } })

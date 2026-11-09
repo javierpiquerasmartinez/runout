@@ -5,6 +5,8 @@ import { CalendarPage } from '../calendar/CalendarPage'
 import { MilestonePage } from '../calendar/MilestonePage'
 import { goalsPath } from '../goals/goals'
 import { GoalsPage } from '../goals/GoalsPage'
+import { homePath } from '../home/home'
+import { HomePage } from '../home/HomePage'
 import { invitationTokenFromPath, resetPasswordPath, resetTokenFromPath } from '../identity/accessPaths'
 import { useSession } from '../identity/context'
 import { InvitationPage } from '../identity/InvitationPage'
@@ -49,8 +51,8 @@ export function Routes() {
   if (path === enterRoomPath) return identity?.account ? <Redirect to={roomsPath} /> : <EnterRoomPage />
   // Settings are an identity's: without one there is nothing to set yet.
   if (path === settingsPath) return identity ? <SettingsPage /> : <Redirect to={loginPath} />
-  // An Account has signed in already, and no sign-in returns anywhere but the Library.
-  if (path === loginPath) return identity?.account ? <Redirect to={libraryPath} /> : <LoginPage />
+  // An Account has signed in already, and no sign-in returns anywhere but Home.
+  if (path === loginPath) return identity?.account ? <Redirect to={homePath} /> : <LoginPage />
   // Only an Account has a Library, a Lab, a Calendar, Goals and creates Rooms (ADR 0005): anyone else is asked to sign in.
   if (!identity?.account) {
     if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`) || isLabPath(path) || isCalendarPath(path) || path === goalsPath) {
@@ -84,8 +86,9 @@ export function Routes() {
   if (pickingFor) return <RoomLibrary code={pickingFor} />
   const handId = libraryHandIdFromPath(path)
   if (handId) return <LibraryHandPage key={handId} handId={handId} />
-  // For an Account the landing, or a path that leads nowhere, is its Library.
-  return <Redirect to={libraryPath} />
+  if (path === homePath) return <HomePage />
+  // For an Account a path that leads nowhere is its Home.
+  return <Redirect to={homePath} />
 }
 
 export { Redirect }

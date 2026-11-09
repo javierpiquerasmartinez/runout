@@ -1,0 +1,25 @@
+/* The Lab's card on Home, as the "Inicio" boards draw it. */
+
+.lab-card__count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lab-card__number {
+  color: var(--text-primary);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 40px;
+}
+
+.lab-card__unit {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.lab-card__ways {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}

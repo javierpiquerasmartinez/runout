@@ -12,7 +12,7 @@ export const loginPath = '/login'
 /**
  * `/login`: the brand, Google's button, the password form and the way back
  * to the landing. Runout is invitation-only, and it says so. Once signed in,
- * `routes/Routes` takes the Account to its Library.
+ * `routes/Routes` takes the Account to its Home.
  */
 export function LoginPage() {
   const { t } = useI18n()
