@@ -1411,6 +1411,12 @@ export const en: Messages = {
   'home.retry': 'Retry',
   // Home: the Library card.
   // Home: the Rooms card.
+  'home.rooms.seeAll': 'See all',
+  'home.rooms.empty.title': "You're not in any room",
+  'home.rooms.empty.text': 'Create one to review hands with your group.',
+  'home.rooms.freeReview': 'Free review',
+  'home.rooms.connected.one': '{count} connected',
+  'home.rooms.connected.other': '{count} connected',
   // Home: the Goals card.
   // Home: the Calendar card.
   // Home: the Lab card.
