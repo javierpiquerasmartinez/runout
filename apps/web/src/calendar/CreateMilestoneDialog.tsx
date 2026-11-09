@@ -3,9 +3,10 @@ import { reasonOf } from '../backend/api'
 import { useI18n } from '../i18n'
 import { useSession } from '../identity/context'
 import { Button } from '../ui/Button'
+import { DescriptionField } from '../ui/DescriptionField'
+import { LengthCount } from '../ui/LengthCount'
 import { TextField } from '../ui/TextField'
-import { MAX_MILESTONE_TITLE_LENGTH, type CalendarDate, type Milestone } from './calendar'
-import { DescriptionField, LengthCount } from './MilestoneFields'
+import { MAX_MILESTONE_DESCRIPTION_LENGTH, MAX_MILESTONE_TITLE_LENGTH, type CalendarDate, type Milestone } from './calendar'
 import { draftRefusal, serverRefusal, type MilestoneField, type Refusal } from './milestoneForm'
 import { createMilestone } from './milestonesApi'
 
@@ -91,6 +92,7 @@ export function CreateMilestoneDialog({
         </div>
         <DescriptionField
           className="calendar-create__description"
+          maxLength={MAX_MILESTONE_DESCRIPTION_LENGTH}
           placeholder={t('calendar.create.descriptionPlaceholder')}
           value={description}
           error={errorOf('description')}

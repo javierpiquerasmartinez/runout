@@ -42,7 +42,7 @@ export function useGoals() {
     return turn
   }
 
-  const keep = (goal: Goal) => setSaved((before) => before.map((other) => (other.id === goal.id ? goal : other)))
+  const replaceSaved = (goal: Goal) => setSaved((before) => before.map((other) => (other.id === goal.id ? goal : other)))
 
   /** Saves a new Current Value. Rejects if it can't be saved and no later value has taken its place. */
   const changeCurrentValue = async (id: string, currentValue: number): Promise<void> => {
@@ -51,7 +51,7 @@ export function useGoals() {
     valueSaves.current.set(id, save)
     const isLatest = () => valueSaves.current.get(id) === save
     try {
-      keep(await save)
+      replaceSaved(await save)
     } catch (failure) {
       if (isLatest()) throw failure
     } finally {
@@ -71,7 +71,7 @@ export function useGoals() {
     changeCurrentValue,
     /** Saves what the dialog holds, after any save of the Current Value still under way. */
     edit: async (id: string, fields: NewGoal): Promise<void> => {
-      keep(await inTurn(id, () => changeGoal(token, id, fields)))
+      replaceSaved(await inTurn(id, () => changeGoal(token, id, fields)))
     },
     /** Deletes a Goal; one that was already gone goes from the list just the same. */
     remove: async (id: string): Promise<void> => {

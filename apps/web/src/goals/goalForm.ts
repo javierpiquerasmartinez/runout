@@ -1,7 +1,7 @@
 import type { FailureReason, RejectionReason } from '../backend/api'
 import { parseDate } from '../calendar/calendar'
 import type { Locale, MessageKey } from '../i18n'
-import { isValidTarget, readAmount } from './goals'
+import { readGoalNumber, readTarget } from './goals'
 
 /** A field of a Goal that is written in its dialog. */
 export type GoalField = 'name' | 'description' | 'target' | 'startDate' | 'deadline'
@@ -29,9 +29,9 @@ const refusedField: Partial<Record<RejectionReason, GoalField>> = {
 
 /** What is wrong with a typed Target; undefined when it can be one. */
 function targetRefusal(target: string, locale: Locale): MessageKey | undefined {
-  const amount = readAmount(target, locale)
-  if (amount === null || amount <= 0) return 'goals.form.targetRequired'
-  return isValidTarget(amount) ? undefined : 'goals.form.targetInvalid'
+  const value = readGoalNumber(target, locale)
+  if (value === null || value <= 0) return 'goals.form.targetRequired'
+  return readTarget(target, locale) === null ? 'goals.form.targetInvalid' : undefined
 }
 
 /** What is wrong with the Deadline, given the Start Date; undefined when nothing is. */

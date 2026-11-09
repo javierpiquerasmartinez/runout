@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { barFill, countdownOn, goalStatusOn, isValidCurrentValue, isValidTarget, orderGoals, progressOf, readAmount, writeAmount } from './goals'
+import { createTranslator } from '../i18n/translator'
+import { barFill, countdownOn, goalStatusOn, isValidCurrentValue, isValidTarget, orderGoals, progressOf, readCurrentValue, readGoalNumber, readTarget, writeGoalNumber } from './goals'
 import type { Goal } from './goals'
 
 describe('progressOf', () => {
@@ -48,7 +49,7 @@ describe('barFill', () => {
   })
 })
 
-describe('readAmount', () => {
+describe('readGoalNumber', () => {
   it.each([
     ['es', '5,5', 5.5],
     ['es', '12.000', 12000],
@@ -60,8 +61,8 @@ describe('readAmount', () => {
     ['en', '12,000', 12000],
     ['en', '12,000.75', 12000.75],
     ['en', '50000', 50000],
-  ] as const)('reads, in %s, %s', (locale, text, amount) => {
-    expect(readAmount(text, locale)).toBe(amount)
+  ] as const)('reads, in %s, %s', (locale, text, value) => {
+    expect(readGoalNumber(text, locale)).toBe(value)
   })
 
   it.each([
@@ -79,11 +80,11 @@ describe('readAmount', () => {
     ['en', '12,00'],
     ['en', '1.2.3'],
   ] as const)("doesn't read, in %s, «%s»", (locale, text) => {
-    expect(readAmount(text, locale)).toBeNull()
+    expect(readGoalNumber(text, locale)).toBeNull()
   })
 })
 
-describe('writeAmount', () => {
+describe('writeGoalNumber', () => {
   it.each([
     ['es', 12000, '12.000'],
     ['es', 5.5, '5,5'],
@@ -92,8 +93,60 @@ describe('writeAmount', () => {
     ['en', 12000, '12,000'],
     ['en', 5.5, '5.5'],
     ['en', 1234567.89, '1,234,567.89'],
-  ] as const)('writes, in %s, %d', (locale, amount, text) => {
-    expect(writeAmount(amount, locale)).toBe(text)
+  ] as const)('writes, in %s, %d', (locale, value, text) => {
+    expect(writeGoalNumber(value, createTranslator(locale).formatNumber)).toBe(text)
+  })
+})
+
+describe.each([
+  ['readTarget', readTarget],
+  ['readCurrentValue', readCurrentValue],
+] as const)('%s', (_name, read) => {
+  it.each([
+    ['es', '50.000', 50000],
+    ['es', '5,5', 5.5],
+    ['es', '5,50', 5.5],
+    ['es', '12.000,75', 12000.75],
+    ['en', '50,000', 50000],
+    ['en', '5.50', 5.5],
+    ['en', '999,999,999', 999999999],
+  ] as const)('reads, in %s, %s', (locale, text, value) => {
+    expect(read(text, locale)).toBe(value)
+  })
+
+  it.each([
+    ['es', '50,000'],
+    ['es', '5,500'],
+    ['es', '5,555'],
+    ['es', '12.000,750'],
+    ['en', '50.000'],
+    ['en', '5.500'],
+    ['en', '5.555'],
+    ['en', '12,000.750'],
+  ] as const)('refuses, in %s, %s, by the decimals as typed', (locale, text) => {
+    expect(read(text, locale)).toBeNull()
+  })
+
+  it.each([
+    ['es', 'mucho'],
+    ['es', '5.5'],
+    ['es', '1.000.000.000'],
+    ['en', '-5'],
+    ['en', '1,000,000,000'],
+  ] as const)('refuses, in %s, «%s»', (locale, text) => {
+    expect(read(text, locale)).toBeNull()
+  })
+})
+
+describe('readTarget', () => {
+  it.each(['0', '0,00'])('refuses «%s», which is not above 0', (text) => {
+    expect(readTarget(text, 'es')).toBeNull()
+  })
+})
+
+describe('readCurrentValue', () => {
+  it.each(['0', '0,00'])('reads «%s» as 0', (text) => {
+    expect(readCurrentValue(text, 'es')).toBe(0)
   })
 })
 

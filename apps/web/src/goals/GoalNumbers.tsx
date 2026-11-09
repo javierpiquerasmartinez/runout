@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useI18n, type MessageKey } from '../i18n'
-import { isValidCurrentValue, progressOf, readAmount, writeAmount, type Goal } from './goals'
+import { progressOf, readCurrentValue, writeGoalNumber, type Goal } from './goals'
 
 /**
  * A Goal's Current Value over its Target and its Progress. The Current Value
@@ -20,7 +20,7 @@ export function GoalNumbers({ goal, onChangeValue }: { goal: Goal; onChangeValue
   // Removing a focused field can fire its blur, which must not save a second time.
   const settled = useRef(true)
   const focusControl = useRef(false)
-  const value = writeAmount(goal.currentValue, locale)
+  const value = writeGoalNumber(goal.currentValue, formatNumber)
 
   useEffect(() => {
     if (editing) field.current?.focus()
@@ -43,13 +43,13 @@ export function GoalNumbers({ goal, onChangeValue }: { goal: Goal; onChangeValue
 
   const save = (handFocusBack: boolean) => {
     if (settled.current || typed === null) return
-    const amount = readAmount(typed, locale)
-    if (amount === null || !isValidCurrentValue(amount)) {
+    const newValue = readCurrentValue(typed, locale)
+    if (newValue === null) {
       setMessage('goals.card.valueInvalid')
       return
     }
     close(handFocusBack)
-    if (amount !== goal.currentValue) onChangeValue(amount).catch(() => setMessage('goals.card.valueNotSaved'))
+    if (newValue !== goal.currentValue) onChangeValue(newValue).catch(() => setMessage('goals.card.valueNotSaved'))
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -92,7 +92,7 @@ export function GoalNumbers({ goal, onChangeValue }: { goal: Goal; onChangeValue
             {value}
           </button>
         )}
-        <span className="goal-card__target ro-mono">{`/ ${writeAmount(goal.target, locale)}`}</span>
+        <span className="goal-card__target ro-mono">{t('goals.card.target', { target: writeGoalNumber(goal.target, formatNumber) })}</span>
         <span className="goal-card__percent ro-mono">{t('goals.card.percent', { percent: formatNumber(progressOf(goal)) })}</span>
       </div>
       {message !== null && (

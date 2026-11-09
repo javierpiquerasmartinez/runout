@@ -211,6 +211,17 @@ export const drawings = {
 
   // The Calendar's done tick, drawn inside a check box: heavier than the rest, at any size.
   check: <path {...stroke} strokeWidth="3" d="m7 12.4 3.2 3.2L17 8.8" />,
+
+  // The four Goal Status marks: a shape each, drawn heavy because they are shown at 12 px.
+  'goal-not-started': <circle {...stroke} strokeWidth="3" cx="12" cy="12" r="8" />,
+  'goal-in-progress': <circle {...fill} cx="12" cy="12" r="7" />,
+  'goal-achieved': <path {...stroke} strokeWidth="3.4" d="m4.5 12.8 5 5L19.5 7" />,
+  'goal-expired': (
+    <>
+      <circle {...stroke} strokeWidth="3" cx="12" cy="12" r="8" />
+      <path {...stroke} strokeWidth="3" d="M8.5 12h7" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof drawings

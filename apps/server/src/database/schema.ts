@@ -643,7 +643,7 @@ export const milestones = pgTable(
 );
 
 /** Up to 999,999,999 with two decimals, kept exact; read and written as numbers. */
-const goalAmount = (name: string) =>
+const goalNumber = (name: string) =>
   numeric(name, { precision: 11, scale: 2, mode: 'number' });
 
 /**
@@ -661,8 +661,8 @@ export const goals = pgTable(
     name: text('name').notNull(),
     /** Empty when there is none. */
     description: text('description').notNull().default(''),
-    target: goalAmount('target').notNull(),
-    currentValue: goalAmount('current_value').notNull().default(0),
+    target: goalNumber('target').notNull(),
+    currentValue: goalNumber('current_value').notNull().default(0),
     startDate: date('start_date', { mode: 'string' }).notNull(),
     deadline: date('deadline', { mode: 'string' }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { todayOf } from '../calendar/calendar'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
@@ -8,6 +7,7 @@ import { GoalCard } from './GoalCard'
 import { GoalDialog } from './GoalDialog'
 import { orderGoals, type Goal } from './goals'
 import { useGoals } from './useGoals'
+import { useToday } from './useToday'
 import './GoalsPage.css'
 
 /**
@@ -22,10 +22,12 @@ export function GoalsPage() {
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Goal | null>(null)
   const empty = status === 'loaded' && goals.length === 0
-  const today = todayOf()
+  const today = useToday()
+
+  const lockedReason = { loading: t('goals.newLocked.loading'), failed: t('goals.newLocked.loadFailed'), loaded: undefined }[status]
 
   const newGoal = (size: 'compact' | 'standard') => (
-    <Button size={size} onClick={() => setCreating(true)}>
+    <Button size={size} aria-label={t('goals.new')} disabledReason={lockedReason} onClick={() => setCreating(true)}>
       <Icon name="add" size={14} />
       {t('goals.new')}
     </Button>
@@ -37,7 +39,7 @@ export function GoalsPage() {
       <main className="goals-page__main" aria-busy={status === 'loading' || undefined}>
         <div className="goals-page__head">
           <h1 className="goals-page__title ro-serif">{t('goals.title')}</h1>
-          {status !== 'loading' && !empty && newGoal('compact')}
+          {!empty && newGoal('compact')}
         </div>
         {status === 'failed' && (
           <p role="alert" className="goals-page__failure">

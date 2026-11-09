@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider, type Locale } from '../i18n'
@@ -14,7 +14,7 @@ let calls: ApiCall[]
 /** What the next create answers instead of creating, when set. */
 let createReply: (() => Response) | null
 /** What listing answers instead of the Goals, when set. */
-let listReply: (() => Response) | null
+let listReply: (() => Response | Promise<Response>) | null
 /** What changing a Goal answers instead of changing it, when set. */
 let patchReply: ((call: ApiCall) => Response | Promise<Response>) | null
 /** What deleting a Goal answers instead of deleting it, when set. */
@@ -93,6 +93,11 @@ const dialog = (name = 'New goal') => screen.getByRole('dialog', { name })
 const openDialog = async () => userEvent.click(await screen.findByRole('button', { name: 'New goal' }))
 const field = (label: string | RegExp) => within(dialog()).getByLabelText<HTMLInputElement>(label)
 const submit = () => userEvent.click(within(dialog()).getByRole('button', { name: 'Create goal' }))
+
+/** Escape on a dialog, as a browser does it: a key press that, unless stopped, asks the dialog to cancel. */
+function pressEscape(on: HTMLElement) {
+  if (fireEvent.keyDown(on, { key: 'Escape' })) fireEvent(on, new Event('cancel', { cancelable: true }))
+}
 
 /** Fills in what a Goal needs to be accepted; the rest stays as the dialog opened. */
 async function fillIn({ name = 'Estudiar ICM', target = '20', deadline = '2026-11-30' } = {}) {
@@ -518,6 +523,19 @@ describe('GoalsPage · changing the Current Value', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('No se ha guardado el cambio. Vuelve a intentarlo.')
   })
 
+  it('refuses a value with more than two decimals as typed, even when they are zeros', async () => {
+    held({ name: 'Manos', target: 100, currentValue: 3 })
+    renderGoals('es')
+    await userEvent.click(await screen.findByRole('button', { name: 'Valor actual de «Manos»: 3. Cambiar' }))
+    const typed = screen.getByRole('textbox', { name: 'Valor actual de «Manos»' })
+    await userEvent.clear(typed)
+
+    await userEvent.type(typed, '5,500{Enter}')
+
+    expect(within(await card('Manos')).getByRole('alert').textContent).toBe('Escribe un número entre 0 y 999.999.999, con dos decimales como mucho.')
+    expect(calls.filter(({ method }) => method === 'PATCH')).toHaveLength(0)
+  })
+
   it('refuses an invalid value in Spanish with the words of the board', async () => {
     held({ name: 'Manos', currentValue: 3 })
     renderGoals('es')
@@ -801,21 +819,51 @@ describe('GoalsPage · editing a Goal', () => {
     expect(editField('Name').value).toBe('Manos')
   })
 
-  it('does not close another dialog when a save cancelled on the way comes through', async () => {
+  it('locks its ways out while the save is under way, so that what shows is what happens', async () => {
     const waiting = answersHeldBack()
     held({ name: 'Manos' })
-    held({ name: 'Spots' })
     renderGoals()
     await openEdit('Manos')
     await save()
     await waitFor(() => expect(waiting).toHaveLength(1))
-    await userEvent.click(within(dialog('Edit goal')).getByRole('button', { name: 'Cancel' }))
-    await openEdit('Spots')
+
+    const open = within(dialog('Edit goal'))
+    await userEvent.click(open.getByRole('button', { name: 'Cancel. Saving…' }))
+    await userEvent.click(open.getByRole('button', { name: 'Delete. Saving…' }))
+    pressEscape(dialog('Edit goal'))
+
+    expect(dialog('Edit goal')).toBeTruthy()
+    expect(editField('Name').value).toBe('Manos')
 
     waiting[0](Response.json({ ...stored[0], name: 'Otras' }))
 
     await card('Otras')
-    expect(editField('Name').value).toBe('Spots')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens its ways out again when the save fails', async () => {
+    const waiting = answersHeldBack()
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+    await save()
+    await waitFor(() => expect(waiting).toHaveLength(1))
+
+    waiting[0](new Response('', { status: 500 }))
+
+    await within(dialog('Edit goal')).findByRole('alert')
+    await userEvent.click(within(dialog('Edit goal')).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('still closes with Escape when nothing is being saved', async () => {
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+
+    pressEscape(dialog('Edit goal'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('waits for a pending save of the Current Value, and then keeps that value', async () => {
@@ -950,6 +998,26 @@ describe('GoalsPage · deleting a Goal', () => {
     expect(screen.getByRole('article', { name: 'Manos' })).toBeTruthy()
   })
 
+  it('locks its ways out while the Goal is being deleted', async () => {
+    let answer: (reply: Response) => void = () => undefined
+    deleteReply = () => new Promise((resolve) => (answer = resolve))
+    held({ name: 'Manos' })
+    renderGoals()
+    await openEdit('Manos')
+    await askToDelete()
+    await confirm()
+    await waitFor(() => expect(deletes()).toHaveLength(1))
+
+    await userEvent.click(within(confirmation()).getByRole('button', { name: 'Cancel. Deleting…' }))
+    pressEscape(confirmation())
+
+    expect(confirmation()).toBeTruthy()
+
+    answer(new Response(null, { status: 204 }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
   it('takes away a Goal that was already gone', async () => {
     deleteReply = () => refusal(404, 'goal-not-found')
     held({ name: 'Manos' })
@@ -997,6 +1065,75 @@ describe('GoalsPage · when the Goals can not be loaded', () => {
 
     expect((await screen.findByRole('alert')).textContent).toBe("Couldn't load your goals.")
     expect(screen.queryByText(/You have no goals yet/)).toBeNull()
+  })
+
+  it('locks New goal, saying why, instead of creating beside a list that is not all there', async () => {
+    listReply = () => new Response('', { status: 500 })
+    renderGoals()
+
+    await userEvent.click(await screen.findByRole('button', { name: "New goal. Your goals couldn't be loaded. Reload the page to add one." }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('GoalsPage · while the Goals are loading', () => {
+  it('shows New goal locked, saying why', async () => {
+    let answer: (reply: Response) => void = () => undefined
+    listReply = () => new Promise((resolve) => (answer = resolve))
+    renderGoals()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New goal. Loading your goals…' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    held({ name: 'Manos' })
+    answer(Response.json({ goals: stored }))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New goal' }))
+    expect(dialog()).toBeTruthy()
+  })
+})
+
+describe('GoalsPage · as the days go by in an open tab', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('moves on to the new day at local midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 10, 7, 23, 59, 30))
+    held({ name: 'Una meta', target: 10, currentValue: 3, deadline: '2026-11-08' })
+    renderGoals()
+    const goal = within(await card('Una meta'))
+    expect(goal.getByText('1 day left')).toBeTruthy()
+
+    act(() => vi.advanceTimersByTime(31_000))
+
+    expect(goal.getByText('Last day')).toBeTruthy()
+  })
+
+  it('keeps moving on, night after night', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 10, 7, 23, 59, 30))
+    held({ name: 'Una meta', target: 10, currentValue: 3, deadline: '2026-11-08' })
+    renderGoals()
+    const goal = within(await card('Una meta'))
+
+    act(() => vi.advanceTimersByTime(31_000))
+    act(() => vi.advanceTimersByTime(24 * 60 * 60_000))
+
+    expect(goal.getByText('Expired')).toBeTruthy()
+    expect(goal.getByText('Expired 1 day ago')).toBeTruthy()
+  })
+
+  it('catches up on coming back to the tab', async () => {
+    held({ name: 'Una meta', target: 10, currentValue: 3, deadline: '2026-11-08' })
+    renderGoals()
+    const goal = within(await card('Una meta'))
+
+    vi.setSystemTime(new Date(2026, 10, 9, 9, 0))
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    act(() => void document.dispatchEvent(new Event('visibilitychange')))
+
+    expect(goal.getByText('Expired 1 day ago')).toBeTruthy()
   })
 })
 
@@ -1100,6 +1237,19 @@ describe('GoalsPage · creating a Goal', () => {
 
     await card('Estudiar ICM')
     expect(created()[0].body).toMatchObject({ startDate: '2026-11-07', deadline: '2026-11-07' })
+  })
+
+  it('refuses a Target with more than two decimals as typed, even when they are zeros', async () => {
+    renderGoals('es')
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo objetivo' }))
+    await userEvent.type(within(dialog('Nuevo objetivo')).getByLabelText('Nombre'), 'Manos')
+    await userEvent.type(within(dialog('Nuevo objetivo')).getByLabelText('Meta'), '50,000')
+    await userEvent.type(within(dialog('Nuevo objetivo')).getByLabelText('Fecha límite'), '2026-11-30')
+
+    await userEvent.click(within(dialog('Nuevo objetivo')).getByRole('button', { name: 'Crear objetivo' }))
+
+    expect(within(dialog('Nuevo objetivo')).getByText('Escribe un número mayor que 0 y hasta 999.999.999, con dos decimales como mucho.')).toBeTruthy()
+    expect(created()).toHaveLength(0)
   })
 
   it('takes a refusal away as its field is corrected', async () => {

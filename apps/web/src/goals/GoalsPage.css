@@ -143,8 +143,6 @@
 .goal-card__mark {
   display: block;
   flex-shrink: 0;
-  width: 12px;
-  height: 12px;
 }
 .goal-card__countdown {
   color: var(--text-secondary);
@@ -279,8 +277,12 @@
 }
 .goal-dialog__target .ro-field__input {
   width: 200px;
-  font-family: var(--font-mono);
   font-size: 12.5px;
+}
+/* Figures, not a Room Code: none of the code's wide spacing. */
+.goal-dialog__target .ro-field__input.ro-mono,
+.goal-dialog__date .ro-field__input.ro-mono {
+  letter-spacing: normal;
 }
 .goal-dialog__dates {
   display: flex;
@@ -292,7 +294,6 @@
   min-width: 0;
 }
 .goal-dialog__date .ro-field__input {
-  font-family: var(--font-mono);
   font-size: 12.5px;
   color-scheme: dark;
 }

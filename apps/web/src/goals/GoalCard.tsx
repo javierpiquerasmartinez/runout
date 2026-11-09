@@ -1,21 +1,17 @@
-import { useId, type ReactNode } from 'react'
+import { useId } from 'react'
 import { useI18n } from '../i18n'
 import type { CalendarDate } from '../calendar/calendar'
+import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { GoalNumbers } from './GoalNumbers'
 import { barFill, countdownOn, goalStatusOn, type Countdown, type Goal, type GoalStatus } from './goals'
 
 /** Each Goal Status has a shape of its own, so that it doesn't rest on colour alone. */
-const statusMarks: Record<GoalStatus, ReactNode> = {
-  notStarted: <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="3" />,
-  inProgress: <circle cx="12" cy="12" r="7" fill="currentColor" />,
-  achieved: <path d="m4.5 12.8 5 5L19.5 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />,
-  expired: (
-    <>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="3" />
-      <path d="M8.5 12h7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </>
-  ),
+const statusMarks: Record<GoalStatus, IconName> = {
+  notStarted: 'goal-not-started',
+  inProgress: 'goal-in-progress',
+  achieved: 'goal-achieved',
+  expired: 'goal-expired',
 }
 
 /** The countdown in words; nothing for a Goal that has none. */
@@ -59,9 +55,7 @@ export function GoalCard({
       </div>
       <div className="goal-card__standing">
         <span className="goal-card__status">
-          <svg className="goal-card__mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            {statusMarks[status]}
-          </svg>
+          <Icon name={statusMarks[status]} size={12} className="goal-card__mark" />
           {t(`goals.status.${status}`)}
         </span>
         {countdown !== null && <span className="goal-card__countdown">{countdown}</span>}

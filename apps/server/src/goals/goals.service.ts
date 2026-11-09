@@ -49,7 +49,7 @@ const MAX_NAME_LENGTH = 80;
 const MAX_DESCRIPTION_LENGTH = 500;
 
 /** The largest a Target or a Current Value may be. */
-const MAX_AMOUNT = 999_999_999;
+const MAX_GOAL_NUMBER = 999_999_999;
 
 const selection = {
   id: goals.id,
@@ -63,7 +63,7 @@ const selection = {
 };
 
 /**
- * An Account's Goals. The server stores and validates them; what they amount
+ * An Account's Goals. The server stores and validates them; what they come
  * to on a given day is the browser's to work out, because "today" is its own.
  */
 @Injectable()
@@ -208,27 +208,27 @@ function keepsAPeriod({ startDate, deadline }: GoalFields): SQL {
 }
 
 /**
- * Whether this can be an amount of a Goal: a number from 0 to `MAX_AMOUNT`
- * with at most two decimals. The decimals are read from how the number is
- * written, where multiplying by 100 would add binary error.
+ * Whether this can be a Goal number, a Target or a Current Value: from 0 to
+ * `MAX_GOAL_NUMBER` with at most two decimals. The decimals are read from how
+ * the number is written, where multiplying by 100 would add binary error.
  */
-function isAmount(raw: unknown): raw is number {
+function isGoalNumber(raw: unknown): raw is number {
   return (
     typeof raw === 'number' &&
-    raw <= MAX_AMOUNT &&
+    raw <= MAX_GOAL_NUMBER &&
     /^\d+(\.\d{1,2})?$/.test(String(raw))
   );
 }
 
-/** A Goal's Target: an amount above 0; `invalid-goal-target` otherwise. */
+/** A Goal's Target: a Goal number above 0; `invalid-goal-target` otherwise. */
 function targetOf(raw: unknown): number {
-  if (!isAmount(raw) || raw <= 0) throw new Rejected('invalid-goal-target');
+  if (!isGoalNumber(raw) || raw <= 0) throw new Rejected('invalid-goal-target');
   return raw;
 }
 
 /** A Goal's Current Value; `invalid-goal-current-value` when it can't be one. */
 function currentValueOf(raw: unknown): number {
-  if (!isAmount(raw)) throw new Rejected('invalid-goal-current-value');
+  if (!isGoalNumber(raw)) throw new Rejected('invalid-goal-current-value');
   return raw;
 }
 
