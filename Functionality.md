@@ -92,6 +92,7 @@ Twelve epics cover the product. Five are essential for a session to work end to 
 | E9 · Lab | Build, measure, name and find your own preflop Ranges | After the second release |
 | E11 · Calendar | Plan what to study on each day with Milestones, tick them off and replan what slipped | After the Lab |
 | E12 · Goals | Say what you are aiming for and by when, and see how far you have got | After the Calendar |
+| E13 · Home | See how every section is going as soon as I come in, and do the quickest things without leaving | After Goals |
 | E10 · Administration | Decide who gets an Account, see how Runout is used, and help someone from inside their Account | Trial |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
@@ -382,9 +383,9 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - Hands whose Hero is not me (a friend's export, a forum Hand) are accepted, as are CoinPoker Hands whose Hero is written `Hero`.
 - If someone else already imported the same Hand from the same seat, my import still succeeds: we share the Hand, and I see the Notes already written on it.
 
-**H7.2 — See my Library.** As a player, I want my Library to be where I land, so I can go to my Hands without being in a Room.
+**H7.2 — See my Library.** As a player, I want my Library always within reach, so I can go to my Hands without being in a Room.
 
-- Signing in, or opening Runout already signed in, takes me to my Library. **Biblioteca** in the header, and the brand, take me back to it from any screen with the shared header (H8.9).
+- Signing in, or opening Runout already signed in, takes me to Home (E13). **Biblioteca** in the header takes me to my Library from any screen with the shared header (H8.9).
 - The list view, at `/library`, lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands. Its headers sort it another way (H7.10).
 - Each row shows the hole cards, the Positions involved, Hero, Poker Site, Stake, final pot, Final Street, Showdown, my Result, the date and my Tags.
 - The title row says how many Hands match the current filters. With Hands selected, the selection actions (tag, remove, add to the Room) appear in it next to **Importar manos**.
@@ -523,7 +524,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 - Without an Account, `/` shows a landing told over a video my scroll drives: a golden ribbon waves like a graph, plunges and draws a poker table. Under the brand and its beta tag, it says what Runout does for me (Results, the Library, Rooms), that it is invitation-only, and ends on the lit table with a **Iniciar sesión** button and a "¿Tienes un código de sala?" link to `/room`. If my system asks for reduced motion, I get a still of the table instead of the video.
 - **Iniciar sesión** takes me to `/login`, which says Runout is invitation-only and offers Google, the email and password form (H8.11) and a way back. I can also sign in from a Room's link (H1.4).
-- Signing in on `/login` takes me to my Library, wherever I was sent there from. Signed in, `/` and `/login` take me to my Library too.
+- Signing in on `/login` takes me to Home (E13), wherever I was sent there from. Signed in, `/` is Home and `/login` takes me there too.
 - Google finds my Account by my Google account, or else by its email: an Account created with a password gets Google linked the first time, so both reach the same Account. A Google account whose email another Account already has is refused, never merged.
 - Without an Account or an Invitation, Google sign-in is refused with "Runout funciona solo por invitación" and creates nothing. Accounts are only created from an Invitation (H8.15).
 - I am recognised on any device where I sign in, with everything my Account holds: Library, Screen Names, Display Name, Preferences, Marks and Tags.
@@ -539,8 +540,8 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
 
-- The Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, **Nueva sala** and the avatar menu.
-- On a phone the five sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
+- Home, the Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, which leads to Home, **Inicio**, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, **Nueva sala** and the avatar menu.
+- On a phone the six sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
 - An anonymous Participant who steps out to Settings sees only the brand and a way back, and their Room carries on behind it. Without any identity, Settings sends me to `/login`.
@@ -576,7 +577,7 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 - The Invitation email says who invited me, has a single-use link and says when it expires (7 days).
 - The link opens `/invitation/<token>`, showing the email I was invited with, **Continuar con Google** and a password form. Google must say the invited email; otherwise I'm told which email was invited.
-- Accepting creates my Account with that email, its Preferences in the Invitation's language, asks for my Display Name and lands me in my Library.
+- Accepting creates my Account with that email, its Preferences in the Invitation's language, asks for my Display Name and lands me on Home (E13).
 - An expired, cancelled, already used or unknown link says which it is, and to ask for a new one. Signed in as another Account, I'm told "Esta invitación es para ana@x.com" and offered to sign out to continue.
 
 ## E9 · Lab
@@ -834,6 +835,70 @@ Goals are where a player writes down what they are aiming for, by when, and how 
 - The Current Value and the edit button are 44 px tall; tapping the Current Value opens the field on a numeric keyboard, and the Target in the dialog uses one too.
 - The dialogs and the delete confirmation fit the screen: where they don't fit its height they scroll, where the dates can no longer show their year they go one under the other, and where **Borrar** doesn't fit beside **Cancelar** and **Guardar** it goes above them.
 
+## E13 · Home
+
+Home is an Account's first screen, called **Inicio**: one card per section, so that a player sees how everything is going without visiting each section in turn. It owns nothing of its own: every card shows what its section already holds, and loads, fails and retries on its own, so a slow or broken card takes nothing else with it. It is mostly for looking and leaving, and only four things can be done without leaving it: ticking one of today's Milestones, changing a Goal's Current Value, importing Hands and creating a Milestone. It needs an Account.
+
+**H13.1 — Come in to Home.** As a player, I want one first screen, so every way in leads to the same place.
+
+- With an Account, `/` is Home. Without one it stays the landing (H8.7), and an anonymous Participant has no Home.
+- Signing in by any method, accepting an Invitation, opening `/login` already signed in, opening an address that leads nowhere and starting an Impersonation (H10.5) all land me on Home.
+- **Inicio** is the first section of the shared header and is marked while I am on Home; the brand leads to it too, and says so to a screen reader (H8.9).
+- The other sections keep their own addresses.
+- The grid is fixed: **Biblioteca** large with **Salas** beside it, then **Objetivos**, **Calendario** and **Laboratorio**. Cards can't be moved, hidden or resized.
+- A card is never a link as a whole, because it holds controls: its title leads to its section.
+- Each card shows it is loading on its own. One that fails says so and offers **Reintentar**, and the rest keep working.
+
+**H13.2 — See how the month is going.** As a player, I want the month's numbers as soon as I come in.
+
+- The **Biblioteca** card names the month ("Noviembre") and shows its Hands, Result and Win Rate, going by the day each Hand was played and not by when it was imported.
+- The Result is in my Display Unit, and in big blinds if the month mixes currencies. The Win Rate is always in big blinds.
+- A small Results Graph draws only the Result line from 0, in the colour I chose for it, with no hover, Zoom or legend.
+- The title leads to the Library on that month.
+- With Hands only from other months it says there are none this month and offers **Ver biblioteca**. With no Hands ever it offers **Importar manos**.
+- **Importar** opens the Library's own dialog. I stay on Home, and the card reloads when the import finishes.
+
+**H13.3 — Get back into a Room.** As a player, I want my open Rooms at hand.
+
+- The **Salas** card lists up to four of my open Rooms, those Live first and then the most recently active, with **Ver todas** leading to the Rooms screen.
+- Each row shows the Room's name, whether it is **En directo** or **Revisión libre** and how many are connected, and pressing it takes me in.
+- With no open Room it says so and offers **Nueva sala**.
+- During an Impersonation the rows and **Nueva sala** are locked, with the usual reason.
+
+**H13.4 — Follow my Goals.** As a player, I want to see how my Goals are going, and write down my progress.
+
+- The **Objetivos** card shows up to five Goals En curso, the nearest Deadline first, with **Ver todos** leading to the Goals screen. A Goal's name leads there too.
+- Each has its Current Value over its Target, its Progress and a bar that stops at full past the Target, while the number stays honest.
+- Pressing the Current Value changes it as on the Goals screen (H12.5). A Goal that has just reached its Target stays on the card marked **Conseguido** until I next come to Home.
+- With Goals but none En curso, it says so and leads to the Goals screen. With no Goals, it offers **Nuevo objetivo**, which leads there.
+
+**H13.5 — Know what I planned for today.** As a player, I want today's Milestones in front of me, so they aren't forgotten.
+
+- The **Calendario** card shows today's date and up to five of today's Milestones, those pending first, with **Ver todos** leading to the Calendar when there are more.
+- I can tick one on the card. It stays on the list, crossed out, so a mistaken tick can be undone.
+- A Milestone's title opens it.
+- With nothing today, it shows my next pending Milestone and its day, however far off. With nothing planned at all, it says so and offers **Nuevo hito**.
+- Milestones left undone on earlier days are counted, however old, and the count leads to the Calendar.
+- **Nuevo hito** opens the Calendar's dialog with today already filled in, and the card reloads.
+
+**H13.6 — Get to the Lab.** As a player, I want the Lab to have its place on Home.
+
+- The **Laboratorio** card shows how many Ranges I have and leads to **Análisis** and **Rangos**. Its title leads to the Analysis.
+- With no Ranges it offers **Crear rango**, which leads to the Ranges screen.
+
+**H13.7 — Leave Home open.** As a player, I want Home to stay true past midnight.
+
+- Cards load when I come to Home and after the actions above; nothing polls, and a Room going Live while I look doesn't show until I come back.
+- On a new day the Calendar card moves on and the Goals are chosen again. On a new month, the Library card does too.
+
+**H13.8 — Look at Home on a phone.** As a player away from my desk, I want Home to fit my phone with today first.
+
+- On a narrow screen the cards go in one column, with no sideways scrolling: **Salas** and **Calendario** first, then **Biblioteca**, **Objetivos** and **Laboratorio**.
+- The small graph is drawn to the phone's width, with its figures at their usual size. The month's three numbers stay side by side.
+- Long names of Rooms and Goals are cut with an ellipsis, and long Milestones wrap, without breaking the layout.
+- Everything on Home can be pressed across at least 44 px, whatever size it is drawn.
+- The header opens with **Inicio** in view and the other sections reachable by scrolling sideways (H8.9).
+
 ## E10 · Administration
 
 Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administrator is an Account named as one in the server's configuration (`ADMINISTRATOR_EMAILS`), never from Runout itself. They have **Administración** in the header's menu, leading to `/admin` with three tabs, each its own route. For anyone else neither the entry nor `/admin` exists: the path leads nowhere, as any unknown path does.
@@ -865,7 +930,7 @@ Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administ
 
 **H10.5 — Impersonation.** As an Administrator, I want to see Runout as someone sees it when they report a problem.
 
-- From an Account's row, after a confirmation, I use Runout as that Account: its Library, Lab and Settings, and can change things there.
+- From an Account's row, after a confirmation, I land on that Account's Home (E13) and use Runout as that Account: its Library, Lab and Settings, and can change things there.
 - A banner on every screen reads "Viendo como X" with **Salir**, which ends it and brings me back to the panel as myself. It ends on its own after one hour.
 - Rooms are refused while impersonating, and their entry points are locked with the reason; so are passwords and sign-in methods, and the panel itself.
 - Nobody can impersonate an Administrator or a suspended Account. Every Impersonation is recorded with who, whom, start and end, and shown on the Account's row. The Account's own Sign-ins and last activity are untouched.

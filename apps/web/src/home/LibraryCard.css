@@ -79,3 +79,14 @@
   font-family: var(--font-mono);
   font-size: 11px;
 }
+
+@media (max-width: 760px) {
+  .library-card__stats {
+    flex-wrap: wrap;
+    gap: 4px 18px;
+  }
+
+  .library-card__value {
+    font-size: 18px;
+  }
+}

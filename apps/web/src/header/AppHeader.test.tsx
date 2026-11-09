@@ -196,6 +196,29 @@ describe('AppHeader · getting around', () => {
     }
   })
 
+  it('opens on Home with Inicio in view and the other sections further along', () => {
+    const restore = layOut({
+      clientWidth: (element) => (element.tagName === 'NAV' ? 200 : 0),
+      offsetLeft: (element) => (element.tagName === 'A' ? [...element.parentElement!.children].indexOf(element) * 94 : 0),
+      offsetWidth: (element) => (element.tagName === 'A' ? 90 : 0),
+    })
+    try {
+      render(
+        <I18nProvider initialLocale="es">
+          <SessionContext.Provider value={fakeSession()}>
+            <AppHeader current="home" />
+          </SessionContext.Provider>
+        </I18nProvider>,
+      )
+
+      const nav = screen.getByRole('navigation', { name: 'Secciones' })
+      expect(nav.scrollLeft).toBe(0)
+      expect(nav.querySelector('a')).toBe(screen.getByRole('link', { name: 'Inicio', current: 'page' }))
+    } finally {
+      restore()
+    }
+  })
+
   it('leaves the sections unscrolled when the current one is in view', () => {
     const restore = layOut({
       clientWidth: (element) => (element.tagName === 'NAV' ? 200 : 0),

@@ -68,6 +68,13 @@
   white-space: nowrap;
 }
 
+/* Padding and not a pseudo-element, which the ellipsis' overflow would clip: 44 px to the finger, 20 to the layout. */
+.goals-card__name {
+  position: relative;
+  margin-block: -12px;
+  padding-block: 12px;
+}
+
 .goals-card__achieved {
   color: var(--sync-ink);
   font-size: 11.5px;
@@ -116,4 +123,12 @@
   margin-left: 0;
   font-size: 12.5px;
   text-align: right;
+}
+
+@media (max-width: 760px) {
+  /* What is being typed in, where a fingertip and the phone's keyboard expect it. */
+  .goals-card__line .goal-card__field {
+    height: 44px;
+    font-size: 16px;
+  }
 }
