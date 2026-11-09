@@ -70,6 +70,7 @@ beforeEach(() => {
       const query = new URLSearchParams(search)
       return Response.json({ milestones: milestones.filter(({ date }) => date >= query.get('from')! && date <= query.get('to')!) })
     },
+    'GET /calendar/milestones/outlook': () => Response.json({ next: null, overdue: 0 }),
     'GET /goals': () => Response.json({ goals }),
     'GET /library/results': () => Response.json(monthWith(0)),
     'GET /library/hands': () => Response.json({ total: 1, hands: [] }),
@@ -99,6 +100,7 @@ describe('Home · in a tab left open past midnight', () => {
     expect(calendar.queryByRole('link', { name: 'Repasar 3-bet' })).toBeNull()
     expect(calendar.getByText('Today, Nov 9')).toBeTruthy()
     expect(new URLSearchParams(readsOf('/calendar/milestones').at(-1)!.search).get('from')).toBe('2026-11-09')
+    expect(new URLSearchParams(readsOf('/calendar/milestones/outlook').at(-1)!.search).get('today')).toBe('2026-11-09')
   })
 
   it('selects the Goals again for the new day', async () => {

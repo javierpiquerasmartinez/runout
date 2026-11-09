@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { calendarPath, intlDate, milestonePath, orderDay, type CalendarDate, type Milestone } from '../calendar/calendar'
+import { weekdayLong } from '../calendar/calendarText'
 import { CreateMilestoneDialog } from '../calendar/CreateMilestoneDialog'
+import { milestoneOutlook } from '../calendar/milestonesApi'
 import { useMilestones } from '../calendar/useMilestones'
 import { useI18n } from '../i18n'
 import { followLink } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { HomeCard, HomeCardMessage } from './HomeCard'
+import { useCardRead } from './useCardRead'
 import './CalendarCard.css'
 
 /** How many of today's Milestones the card lists. */
@@ -16,7 +19,13 @@ const MOST_SHOWN = 5
 export function CalendarCard({ today }: { today: CalendarDate }) {
   const { t, formatDate } = useI18n()
   const [creating, setCreating] = useState(false)
-  const { milestones, loading, failed, reload, setDone, unsaved } = useMilestones({ from: today, to: today })
+  const { milestones, loading, failed, reload: reloadToday, setDone, unsaved } = useMilestones({ from: today, to: today })
+  const readOutlook = useCallback((token: string) => milestoneOutlook(token, today), [today])
+  const { status: outlookStatus, data: outlook, reload: reloadOutlook } = useCardRead(readOutlook)
+  const reload = () => {
+    reloadToday()
+    reloadOutlook()
+  }
   const subtitle = t('home.calendar.today', { date: formatDate(intlDate(today), { day: 'numeric', month: 'short', timeZone: 'UTC' }) })
   const newMilestone = (
     <Button size="compact" onClick={() => setCreating(true)}>
@@ -25,20 +34,29 @@ export function CalendarCard({ today }: { today: CalendarDate }) {
     </Button>
   )
   const nothingToday = milestones.length === 0
+  const next = outlook?.next ?? null
+  const overdue = outlook?.overdue ?? 0
+  const bareEmpty = nothingToday && next === null && overdue === 0
+  const seeAll = milestones.length > MOST_SHOWN
   return (
     <>
       <HomeCard
         title={t('header.nav.calendar')}
         href={calendarPath}
-        status={loading ? 'loading' : failed ? 'failed' : 'loaded'}
+        status={loading || outlookStatus === 'loading' ? 'loading' : failed || outlookStatus === 'failed' ? 'failed' : 'loaded'}
         onRetry={reload}
         subtitle={subtitle}
-        action={nothingToday ? undefined : newMilestone}
+        action={bareEmpty ? undefined : newMilestone}
       >
-        {nothingToday ? (
+        {bareEmpty ? (
           <HomeCardMessage title={t('home.calendar.empty.title')} text={t('home.calendar.empty.text')}>
             {newMilestone}
           </HomeCardMessage>
+        ) : nothingToday ? (
+          <>
+            <p className="home-card__message-title">{t('home.calendar.empty.title')}</p>
+            {next && <NextMilestone milestone={next} />}
+          </>
         ) : (
           <TodaysMilestones milestones={milestones} onToggleDone={setDone} />
         )}
@@ -47,10 +65,19 @@ export function CalendarCard({ today }: { today: CalendarDate }) {
             {t(unsaved.message, { title: unsaved.title })}
           </p>
         )}
-        {milestones.length > MOST_SHOWN && (
-          <a className="calendar-card__all" href={calendarPath} onClick={followLink}>
-            {t('home.calendar.seeAll')}
-          </a>
+        {(overdue > 0 || seeAll) && (
+          <div className="calendar-card__foot">
+            {overdue > 0 && (
+              <a className="calendar-card__foot-link calendar-card__foot-link--overdue" href={calendarPath} onClick={followLink}>
+                {t(overdue === 1 ? 'home.calendar.overdue.one' : 'home.calendar.overdue.other', { count: overdue })}
+              </a>
+            )}
+            {seeAll && (
+              <a className="calendar-card__foot-link" href={calendarPath} onClick={followLink}>
+                {t('home.calendar.seeAll')}
+              </a>
+            )}
+          </div>
         )}
       </HomeCard>
       {creating && (
@@ -64,6 +91,22 @@ export function CalendarCard({ today }: { today: CalendarDate }) {
         />
       )}
     </>
+  )
+}
+
+/** The next Milestone to come and its day. */
+function NextMilestone({ milestone: { id, title, date } }: { milestone: Milestone }) {
+  const i18n = useI18n()
+  const { t, formatDate } = i18n
+  const day = t('home.calendar.next.day', { weekday: weekdayLong(i18n, date), date: formatDate(intlDate(date), { day: 'numeric', month: 'long', timeZone: 'UTC' }) })
+  return (
+    <p className="calendar-card__next">
+      {t('home.calendar.next')}{' '}
+      <a href={milestonePath(id)} onClick={followLink}>
+        {title}
+      </a>
+      , {day}
+    </p>
   )
 }
 

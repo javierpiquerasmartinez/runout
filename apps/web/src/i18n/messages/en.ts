@@ -1436,6 +1436,10 @@ export const en: Messages = {
   // Home: the Calendar card.
   'home.calendar.today': 'Today, {date}',
   'home.calendar.seeAll': 'See all',
+  'home.calendar.next': 'Next:',
+  'home.calendar.next.day': '{weekday}, {date}',
+  'home.calendar.overdue.one': '{count} pending from earlier days →',
+  'home.calendar.overdue.other': '{count} pending from earlier days →',
   'home.calendar.empty.title': 'Nothing planned for today',
   'home.calendar.empty.text': "Note down what you're going to study and you'll see it here on the day.",
   // Home: the Lab card.
