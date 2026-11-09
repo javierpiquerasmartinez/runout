@@ -63,7 +63,7 @@
 
 .calendar-card__check:focus-visible,
 .calendar-card__title:focus-visible,
-.calendar-card__all:focus-visible {
+.calendar-card__foot-link:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 1px;
 }
@@ -88,6 +88,25 @@
   text-decoration: line-through;
 }
 
+.calendar-card__next {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 19.5px;
+  overflow-wrap: anywhere;
+}
+
+.calendar-card__next a,
+.calendar-card__next a:hover {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.calendar-card__next a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
 .calendar-card__unsaved {
   margin: 0;
   color: var(--alert-ink);
@@ -95,22 +114,34 @@
   line-height: 18px;
 }
 
-/* A plain link at the foot of the card, 32 high with the 44 px a finger needs. */
-.calendar-card__all,
-.calendar-card__all:hover {
+/* What leads on to the Calendar, kept at the bottom of the card. */
+.calendar-card__foot {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 12px;
+  margin-top: auto;
+}
+
+/* A plain link, 32 high with the 44 px a finger needs. */
+.calendar-card__foot-link,
+.calendar-card__foot-link:hover {
   position: relative;
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
-  align-self: flex-start;
   height: 32px;
-  margin-top: auto;
   color: var(--text-secondary);
   font-size: 12.5px;
   font-weight: 600;
 }
 
-.calendar-card__all::after {
+.calendar-card__foot-link--overdue,
+.calendar-card__foot-link--overdue:hover {
+  color: var(--brass);
+}
+
+.calendar-card__foot-link::after {
   content: '';
   position: absolute;
   inset: -6px 0;

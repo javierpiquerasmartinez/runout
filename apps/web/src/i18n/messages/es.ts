@@ -1435,6 +1435,10 @@ export const es = {
   // Home: the Calendar card.
   'home.calendar.today': 'Hoy, {date}',
   'home.calendar.seeAll': 'Ver todos',
+  'home.calendar.next': 'Próximo:',
+  'home.calendar.next.day': '{weekday} {date}',
+  'home.calendar.overdue.one': '{count} pendiente de días anteriores →',
+  'home.calendar.overdue.other': '{count} pendientes de días anteriores →',
   'home.calendar.empty.title': 'Nada planeado para hoy',
   'home.calendar.empty.text': 'Apunta qué vas a estudiar y lo verás aquí ese día.',
   // Home: the Lab card.

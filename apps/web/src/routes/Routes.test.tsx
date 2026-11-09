@@ -46,6 +46,7 @@ beforeEach(() => {
       if (path === '/hands/split-pot') return Response.json(splitPot)
       if (path === '/lab/ranges') return Response.json([])
       if (path === '/calendar/milestones') return Response.json({ milestones: [] })
+      if (path === '/calendar/milestones/outlook') return Response.json({ next: null, overdue: 0 })
       if (path === '/goals') return Response.json({ goals: [] })
       return Response.json({ reason: 'not-found' }, { status: 404 })
     }),

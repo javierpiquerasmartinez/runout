@@ -32,6 +32,14 @@ export function calendarDate(raw: unknown, reason: RejectionReason): string {
 }
 
 /**
+ * Reads the viewer's today from a request's query (`today`, a real date);
+ * `invalid-calendar-span` if it can't.
+ */
+export function parseCalendarToday(query: Record<string, unknown>): string {
+  return calendarDate(query.today, 'invalid-calendar-span');
+}
+
+/**
  * Reads the span from a request's query (`from` and `to`, both real dates,
  * `from` not after `to`, at most `MAX_SPAN_DAYS` days);
  * `invalid-calendar-span` if it can't.

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, lte, type SQL } from 'drizzle-orm';
+import { and, asc, count, eq, gt, gte, lt, lte, type SQL } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { isUuid } from '../database/uuid.js';
@@ -23,6 +23,14 @@ export interface Milestone {
 /** The Milestones of a span. */
 export interface MilestoneList {
   milestones: Milestone[];
+}
+
+/** What lies around a day, beyond what a span can reach. */
+export interface MilestoneOutlook {
+  /** The first Milestone not done after the day, if there is one. */
+  next: Milestone | null;
+  /** How many Milestones not done are dated before the day, however long ago. */
+  overdue: number;
 }
 
 /** What creating a Milestone sends. */
@@ -85,6 +93,37 @@ export class MilestonesService {
         asc(milestones.id),
       );
     return { milestones: rows };
+  }
+
+  /** What lies around `today`, for the Account alone. */
+  async outlook(account: Identity, today: string): Promise<MilestoneOutlook> {
+    const [next] = await this.db
+      .select(selection)
+      .from(milestones)
+      .where(
+        and(
+          eq(milestones.identityId, account.id),
+          eq(milestones.done, false),
+          gt(milestones.date, today),
+        ),
+      )
+      .orderBy(
+        asc(milestones.date),
+        asc(milestones.createdAt),
+        asc(milestones.id),
+      )
+      .limit(1);
+    const [{ overdue }] = await this.db
+      .select({ overdue: count() })
+      .from(milestones)
+      .where(
+        and(
+          eq(milestones.identityId, account.id),
+          eq(milestones.done, false),
+          lt(milestones.date, today),
+        ),
+      );
+    return { next: next ?? null, overdue };
   }
 
   /** A new Milestone on its date, not done. */
