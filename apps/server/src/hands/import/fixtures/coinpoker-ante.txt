@@ -98,3 +98,58 @@ Seat 2: 91d01ae5 folded before Flop (didn't bet)
 Seat 3: Hero folded before Flop (didn't bet)
 Seat 4: 12ce8028 showed [6c 5c] and won (₮25.18) with Three Of A Kind
 
+CoinPoker Hand #174473000347: NLH (₮0.10/₮0.25/₮0.06) 2026/11/09 20:39:30 CET
+Table '202103' 6-max Seat #5 is the button
+Seat 1: d6fec7b1 (₮15.28 in chips)
+Seat 2: 2906ebbd (₮33.87 in chips)
+Seat 3: Hero (₮45.56 in chips)
+Seat 4: 519eb755 (₮25.80 in chips)
+Seat 5: d5ee0849 (₮33.88 in chips)
+Seat 6: 4d3cdf53 (₮48.20 in chips)
+d6fec7b1: posts ante ₮0.06
+2906ebbd: posts ante ₮0.06
+Hero: posts ante ₮0.06
+519eb755: posts ante ₮0.06
+d5ee0849: posts ante ₮0.06
+4d3cdf53: posts ante ₮0.06
+4d3cdf53: posts small blind ₮0.10
+d6fec7b1: posts big blind ₮0.25
+*** HOLE CARDS ***
+Dealt to d6fec7b1
+Dealt to 2906ebbd
+Dealt to Hero [As Ad]
+Dealt to 519eb755
+Dealt to d5ee0849
+Dealt to 4d3cdf53
+2906ebbd: folds
+Hero: raises ₮0.37 to ₮0.62
+519eb755: raises ₮1.46 to ₮2.08
+d5ee0849: folds
+4d3cdf53: folds
+d6fec7b1: ALLIN ₮14.97
+Hero: calls ₮14.60
+519eb755: ALLIN ₮23.66
+Hero: calls ₮10.52
+*** FLOP *** [3s 8s 7s]
+*** TURN *** [3s 8s 7s] [Kc]
+*** RIVER *** [3s 8s 7s Kc] [Ts]
+*** SHOWDOWN ***
+Hero: shows [As Ad] (Flush)
+Hero collected ₮44.73 from pot
+d6fec7b1: shows [3h 3d] (Three Of A Kind)
+d6fec7b1 cashed out the hand for ₮6.50 | Cash Out Fee ₮0.20
+Hero: shows [As Ad] (Flush)
+Hero collected ₮20.41 from pot
+519eb755: shows [Kh Ks] (Flush)
+*** SUMMARY ***
+Total pot ₮67.16 | Rake ₮2 | Splash Fee ₮0.02
+Hand was run once
+Board [ 3s 8s 7s Kc Ts ]
+Game ended: 2026/11/09 20:40:17 CET
+Seat 1: d6fec7b1 showed [3h 3d] and cashed out for ₮6.50 | Cash Out Fee ₮0.20
+Seat 2: 2906ebbd folded before Flop (didn't bet)
+Seat 3: Hero showed [As Ad] and won (₮44.73) with Flush
+Seat 4: 519eb755 showed [Kh Ks] and lost with Flush
+Seat 5: d5ee0849 folded before Flop (didn't bet)
+Seat 6: 4d3cdf53 folded before Flop (didn't bet)
+

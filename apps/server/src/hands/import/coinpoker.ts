@@ -121,7 +121,9 @@ function asPokerStars(lines: string[]): string[] {
     } else {
       // A new player's blind, posted out of turn, is a big blind like any.
       const plain = what.replace(/^posts auto big blind /, 'posts big blind ');
-      if ((match = plain.match(/^(?:posts .+|calls|bets) (\S+)$/))) {
+      // An ante is dead money, not part of the bet on the Street, so a
+      // later `ALLIN` is not raised by it.
+      if ((match = plain.match(/^(?:posts (?!ante ).+|calls|bets) (\S+)$/))) {
         bets.set(name, bet + amount(match[1]));
       } else if ((match = plain.match(/^raises \S+ to (\S+)$/))) {
         bets.set(name, amount(match[1]));
