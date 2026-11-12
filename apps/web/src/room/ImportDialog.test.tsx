@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -346,6 +346,25 @@ describe('ImportDialog', () => {
       await startConfirming()
 
       expect(screen.getByText('Importing 1,240 hands…')).toBeTruthy()
+    })
+
+    it('says so of a single Hand too', async () => {
+      confirmed = () => new Promise(() => {})
+      renderDialog({ kind: 'library' })
+      await choose('one.txt')
+      await userEvent.click(await screen.findByRole('button', { name: 'Add 1 hand to your library' }))
+
+      expect(screen.getByText('Importing 1 hand…')).toBeTruthy()
+    })
+
+    it('opens again if the browser closes it anyway', async () => {
+      const { onClose } = await startConfirming()
+      const dialog = screen.getByRole('dialog') as HTMLDialogElement
+
+      dialog.close()
+
+      await waitFor(() => expect(dialog.open).toBe(true))
+      expect(onClose).not.toHaveBeenCalled()
     })
 
     it('cannot be closed from its buttons or Escape', async () => {

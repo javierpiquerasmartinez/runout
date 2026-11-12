@@ -181,7 +181,9 @@ export function ImportDialog({
       : undefined
   // While Hands are being saved, nothing closes the dialog: the Importer
   // would take it for nothing happening.
-  const importing = confirming ? t('import.confirming', { count: formatNumber(totals.ready) }) : undefined
+  const importing = confirming
+    ? t(totals.ready === 1 ? 'import.confirming.one' : 'import.confirming.other', { count: formatNumber(totals.ready) })
+    : undefined
   const lockedReason =
     importing ??
     (totals.reading ? t('import.confirm.reading') : totals.ready === 0 ? t('import.confirm.nothing') : overLimit)
@@ -195,6 +197,11 @@ export function ImportDialog({
         // Escape closes through the Room, which unmounts the dialog.
         event.preventDefault()
         if (!confirming) onClose()
+      }}
+      onClose={() => {
+        // A browser may close it on a repeated Escape whatever the page
+        // says; while Hands are being saved it opens again.
+        if (confirming) dialog.current?.showModal()
       }}
     >
       <header className="import-dialog__header">

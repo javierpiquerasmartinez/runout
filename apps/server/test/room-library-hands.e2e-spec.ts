@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { freshHandHistory } from './support/hand-histories.js';
+import { freshHandHistory, manyHands } from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -474,5 +474,35 @@ describe('Library Hands in a Room (e2e)', () => {
       expect(rejoined.snapshot.inLibrary).toEqual([]);
       expect(martaSocket.all('queue.inLibrary')).toEqual([]);
     });
+  });
+
+  it('adds up to 200 Hands of a Library at once, past the 50 an import may queue', async () => {
+    const { marta, code } = await roomOfTwo();
+    const preview = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${marta.token}`)
+      .send({ text: manyHands(200) })
+      .expect(201);
+    await request(running.httpServer)
+      .post('/api/library/imports')
+      .set('Authorization', `Bearer ${marta.token}`)
+      .send({ previews: [preview.body.id as string] })
+      .expect(201);
+    const ids = await request(running.httpServer)
+      .get('/api/library/hands?pageSize=100')
+      .set('Authorization', `Bearer ${marta.token}`)
+      .expect(200);
+    const more = await request(running.httpServer)
+      .get('/api/library/hands?pageSize=100&page=2')
+      .set('Authorization', `Bearer ${marta.token}`)
+      .expect(200);
+    const handIds = [...ids.body.hands, ...more.body.hands].map(
+      (hand: { id: string }) => hand.id,
+    );
+
+    const res = await addFromLibrary(marta.token, code, handIds);
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ added: 200 });
   });
 });

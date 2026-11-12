@@ -8,6 +8,7 @@ import {
 } from '../database/database.js';
 import {
   hands,
+  identities,
   libraryEntries,
   marks,
   tagLinks,
@@ -179,13 +180,19 @@ export class LibraryService {
 
   /**
    * Refuses with `library-full` when `adding` more Hands would take the
-   * Library past its capacity.
+   * Library past its capacity. Holds the Account's lock until the caller's
+   * transaction ends, so that two imports at once cannot both fit.
    */
   private async requireRoomFor(
     tx: Transaction,
     account: Identity,
     adding: number,
   ): Promise<void> {
+    await tx
+      .select({ id: identities.id })
+      .from(identities)
+      .where(eq(identities.id, account.id))
+      .for('update');
     const [{ held }] = await tx
       .select({ held: count() })
       .from(libraryEntries)

@@ -12,7 +12,8 @@ const HANDS_PER_JOB = 25;
 /**
  * The Hero's Result of each Hand, All-in EV included, worked out off the
  * main thread so that an all-in's exact enumeration never stalls a Room.
- * Every path that stores imported Hands goes through this one pool.
+ * Every import path goes through this one pool; only the offline
+ * `reread-hands` script still works it out on its own thread.
  */
 @Injectable()
 export class HeroResults implements OnModuleDestroy {

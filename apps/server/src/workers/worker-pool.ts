@@ -15,10 +15,10 @@ interface Job<In, Out> {
 }
 
 /**
- * Starts a worker on `entry`. Run from the TypeScript sources, as the tests
- * do, a module (or `entry` itself) names `./x.js` where only `x.ts` exists: the worker then
- * resolves it to the `.ts`, which Node strips the types of. Built, every
- * `.js` exists and nothing changes.
+ * What every worker runs first, then imports its `entry`. Run from the
+ * TypeScript sources, as the tests do, a module (or `entry` itself) names
+ * `./x.js` where only `x.ts` exists: this resolves it to the `.ts`, which
+ * Node strips the types of. Built, every `.js` exists and nothing changes.
  */
 const BOOTSTRAP = `
 const { registerHooks } = require('node:module');
