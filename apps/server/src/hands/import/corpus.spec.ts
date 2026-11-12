@@ -366,6 +366,29 @@ const CORPUS: CorpusEntry[] = [
         rake: 133,
         fees: 2,
       },
+      {
+        // Two preflop `ALLIN`s: each raises to the chips its player had
+        // after the ante, which is dead money and no part of the bet.
+        siteHandId: '174473000347',
+        stake: USDT_10_25,
+        actions: expect.arrayContaining([
+          expect.objectContaining({
+            screenName: 'd6fec7b1',
+            type: 'raise',
+            to: 1522,
+            allIn: true,
+          }),
+          expect.objectContaining({
+            screenName: '519eb755',
+            type: 'raise',
+            to: 2574,
+            allIn: true,
+          }),
+        ]) as Hand['actions'],
+        showdown: true,
+        rake: 200,
+        fees: 2,
+      },
     ],
     discarded: [],
   },

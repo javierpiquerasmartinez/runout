@@ -122,6 +122,17 @@ describe('Replay: the Hero’s All-in EV', () => {
     expect(heroResult(hand)).toMatchObject({ result: 5300, allInEv: 7096 });
   });
 
+  it('counts a multiway all-in at a table with an ante', () => {
+    const hand = hands('coinpoker-ante.txt').find(
+      (h) => h.siteHandId === '174473000347',
+    )!;
+
+    // AsAd against KhKs and 3h3d preflop: a ₮46.12 main pot among the
+    // three and a ₮21.04 side pot with KhKs alone, before ₮2.02 of rake and
+    // Splash Fee. The Hero took ₮65.14 of it, for ₮25.80 put in.
+    expect(heroResult(hand)).toMatchObject({ result: 3934, allInEv: 2068 });
+  });
+
   it('takes the rake, and the Splash Fee, out of the pot before counting equity', () => {
     const hand = hands('coinpoker-session.txt').find(
       (h) => h.siteHandId === '160054200061',
