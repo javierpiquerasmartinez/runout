@@ -13,6 +13,7 @@ import {
   AdministratorEmails,
 } from '../../src/identity/administrators.js';
 import { MAILER } from '../../src/mail/mailer.js';
+import { LIBRARY_CAPACITY } from '../../src/library/library-limits.js';
 import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
 import { FakeInbox } from './inbox.js';
@@ -49,6 +50,8 @@ export interface StartAppOptions {
   ownDatabase?: boolean;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
   administratorEmails?: string[];
+  /** How many Hands a Library may hold; 10 million otherwise, as in production. */
+  libraryCapacity?: number;
 }
 
 /**
@@ -85,6 +88,11 @@ export async function startApp(
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)
     .useValue(new AdministratorEmails(options.administratorEmails ?? []));
+  if (options.libraryCapacity !== undefined) {
+    builder
+      .overrideProvider(LIBRARY_CAPACITY)
+      .useValue(options.libraryCapacity);
+  }
   if (databaseUrl === inject('databaseUrl')) {
     builder.overrideProvider(PlaybackService).useClass(SharedDatabasePlayback);
   }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HeroResultsModule } from '../hands/hero-results.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { MarksService } from './marks.service.js';
 import { MasterService } from './master.service.js';
@@ -10,7 +11,7 @@ import { RoomsController } from './rooms.controller.js';
 import { RoomsService } from './rooms.service.js';
 
 @Module({
-  imports: [IdentityModule],
+  imports: [HeroResultsModule, IdentityModule],
   controllers: [RoomsController],
   providers: [
     RoomsService,

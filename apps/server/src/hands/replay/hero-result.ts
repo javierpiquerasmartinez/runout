@@ -26,12 +26,30 @@ export interface HeroResult {
   rakeGenerated: number;
 }
 
+/** The Hero's Result without All-in EV, which alone needs every board to come worked out. */
+export type HeroOutcome = Omit<HeroResult, 'allInEv'>;
+
 /**
  * The Hero's Result, read off the Hand's timeline: their Stack once the pots
- * are paid out, against the Stack they started with.
+ * are paid out, against the Stack they started with. Working out All-in EV
+ * can take a third of a second for a preflop all-in, which blocks the
+ * thread: a server works it out in `HeroResults`' threads.
  */
 export function heroResult(hand: Hand): HeroResult {
   const replay = timeline(hand);
+  const outcome = outcomeOf(hand, replay);
+  return {
+    ...outcome,
+    allInEv: outcome.result - (allInLuck(hand, replay) ?? 0),
+  };
+}
+
+/** The Hero's Result, Showdown and Rake Generated: quick, as no all-in is worked out. */
+export function heroOutcome(hand: Hand): HeroOutcome {
+  return outcomeOf(hand, timeline(hand));
+}
+
+function outcomeOf(hand: Hand, replay: Timeline): HeroOutcome {
   const { seats, states, showdown } = replay;
   const name = hand.hero.screenName;
   const start = seats.find((seat) => seat.screenName === name)!;
@@ -43,7 +61,6 @@ export function heroResult(hand: Hand): HeroResult {
     .players.reduce((sum, player) => sum + player.committed, 0);
   return {
     result,
-    allInEv: result - (allInLuck(hand, replay) ?? 0),
     reachedShowdown: showdown && !end.folded,
     rakeGenerated:
       hand.rake === 0 || everyonePutIn === 0

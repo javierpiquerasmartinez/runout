@@ -54,6 +54,13 @@ export interface ImportPreview {
   discarded: { text: string; reason: DiscardReason }[]
 }
 
+/**
+ * The most Hands one import may add, by destination: the server refuses
+ * more, and the dialog says so before confirming. A Room's Queue has to stay
+ * something a group can review.
+ */
+export const IMPORT_LIMIT: Record<ImportDestination['kind'], number> = { room: 50, library: 2000 }
+
 /** The largest file the server takes. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024
 

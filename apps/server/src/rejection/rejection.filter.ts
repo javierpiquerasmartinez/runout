@@ -37,6 +37,8 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'file-too-large': HttpStatus.PAYLOAD_TOO_LARGE,
   'unreadable-file': HttpStatus.BAD_REQUEST,
   'invalid-format': HttpStatus.BAD_REQUEST,
+  'too-many-hands': HttpStatus.BAD_REQUEST,
+  'library-full': HttpStatus.CONFLICT,
   'preview-not-found': HttpStatus.NOT_FOUND,
   'author-not-in-room': HttpStatus.BAD_REQUEST,
   'invalid-queue-order': HttpStatus.BAD_REQUEST,

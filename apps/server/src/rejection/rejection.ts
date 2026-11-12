@@ -33,6 +33,8 @@ export type RejectionReason =
   | 'unreadable-file'
   | 'invalid-format'
   | 'preview-not-found'
+  | 'too-many-hands'
+  | 'library-full'
   | 'author-not-in-room'
   | 'invalid-queue-order'
   | 'entry-not-in-queue'

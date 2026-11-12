@@ -14,6 +14,7 @@ import {
   batchHands,
   batchTotals,
   emptyBatch,
+  IMPORT_LIMIT,
   importsPath,
   MAX_FILE_BYTES,
   reduceBatch,
@@ -57,7 +58,7 @@ export function ImportDialog({
   onImported: (imported: number, discarded: number) => void
 }) {
   const i18n = useI18n()
-  const { t } = i18n
+  const { t, formatNumber } = i18n
   const { token, identity } = useIdentity()
   const dialog = useRef<HTMLDialogElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -83,6 +84,14 @@ export function ImportDialog({
     element.showModal()
     return () => element.close()
   }, [])
+
+  // Closing or reloading the tab mid-confirm asks through the browser's own prompt.
+  useEffect(() => {
+    if (!confirming) return
+    const holdOn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', holdOn)
+    return () => window.removeEventListener('beforeunload', holdOn)
+  }, [confirming])
 
   function read(key: string, source: Source, format?: SourceFormat) {
     let body: FormData | { text: string; format?: SourceFormat }
@@ -165,13 +174,17 @@ export function ImportDialog({
       })
   }
 
-  const lockedReason = confirming
-    ? t(`import.${destinationKind}.confirming`)
-    : totals.reading
-      ? t('import.confirm.reading')
-      : totals.ready === 0
-        ? t('import.confirm.nothing')
-        : undefined
+  const limit = IMPORT_LIMIT[destinationKind]
+  const overLimit =
+    totals.ready > limit
+      ? t(`import.${destinationKind}.overLimit`, { count: formatNumber(totals.ready), limit: formatNumber(limit) })
+      : undefined
+  // While Hands are being saved, nothing closes the dialog: the Importer
+  // would take it for nothing happening.
+  const importing = confirming ? t('import.confirming', { count: formatNumber(totals.ready) }) : undefined
+  const lockedReason =
+    importing ??
+    (totals.reading ? t('import.confirm.reading') : totals.ready === 0 ? t('import.confirm.nothing') : overLimit)
 
   return (
     <dialog
@@ -181,7 +194,7 @@ export function ImportDialog({
       onCancel={(event) => {
         // Escape closes through the Room, which unmounts the dialog.
         event.preventDefault()
-        onClose()
+        if (!confirming) onClose()
       }}
     >
       <header className="import-dialog__header">
@@ -193,7 +206,7 @@ export function ImportDialog({
             {destination.kind === 'room' ? t('import.room.subtitle', { room: destination.name }) : t('import.library.subtitle')}
           </span>
         </div>
-        <IconButton icon="close" label={t('import.close')} size="compact" onClick={onClose} />
+        <IconButton icon="close" label={t('import.close')} size="compact" disabledReason={importing} onClick={onClose} />
       </header>
 
       <div className="import-dialog__tabs" role="tablist">
@@ -315,9 +328,10 @@ export function ImportDialog({
       <footer className="import-dialog__footer">
         <div className="import-dialog__totals" role="status">
           <span className="import-dialog__ready">
-            {totals.ready > 0
+            {importing ??
+              (totals.ready > 0
               ? t(totals.ready === 1 ? 'import.footer.ready.one' : 'import.footer.ready.other', { count: totals.ready })
-              : t('import.footer.none')}
+              : t('import.footer.none'))}
           </span>
           {totals.discarded > 0 && (
             <span className="import-dialog__left-out">
@@ -325,13 +339,14 @@ export function ImportDialog({
             </span>
           )}
         </div>
+        {overLimit && !confirmFailure && <p className="import-dialog__failure">{overLimit}</p>}
         {confirmFailure && (
           <p className="import-dialog__failure" role="alert">
             {t(`reason.${confirmFailure}`)}
           </p>
         )}
         <span className="import-dialog__spacer" />
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" disabledReason={importing} onClick={onClose}>
           {t('import.cancel')}
         </Button>
         <Button variant="primary" disabledReason={lockedReason} onClick={confirm}>

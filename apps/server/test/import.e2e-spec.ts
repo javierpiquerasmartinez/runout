@@ -1,6 +1,10 @@
 import { strToU8, zipSync } from 'fflate';
 import request from 'supertest';
-import { fixture, freshHandHistory } from './support/hand-histories.js';
+import {
+  fixture,
+  freshHandHistory,
+  manyHands,
+} from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -360,5 +364,78 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     ).expect(403);
 
     expect(res.body).toEqual({ reason: 'not-in-room' });
+  });
+
+  describe('how many Hands one import adds to a Room', () => {
+    it('refuses more than 50 Hands that would enter the Queue, and queues none of them', async () => {
+      const master = await newAccount(running.httpServer);
+      const code = await createRoom(master.token);
+      await join(master.token, code, 'Javier');
+      const preview = await upload(
+        master.token,
+        code,
+        'session.txt',
+        manyHands(51),
+      ).expect(201);
+
+      const refused = await confirm(master.token, code, [
+        preview.body.id as string,
+      ]).expect(400);
+
+      expect(refused.body).toMatchObject({
+        reason: 'too-many-hands',
+        hands: 51,
+        limit: 50,
+      });
+      // The preview was not taken: it is refused again, not lost.
+      await confirm(master.token, code, [preview.body.id as string]).expect(
+        400,
+      );
+    });
+
+    it('confirms more than 50 Hands when the rest are already in the Queue', async () => {
+      const master = await newAccount(running.httpServer);
+      const code = await createRoom(master.token);
+      const socket = await join(master.token, code, 'Javier');
+      const text = manyHands(55);
+      const preview = await upload(
+        master.token,
+        code,
+        'session.txt',
+        text,
+      ).expect(201);
+      expect((preview.body as Preview).hands).toHaveLength(55);
+      // Five of them reach the Queue before the preview is confirmed.
+      const firstFive = text
+        .split(/(?=^PokerStars Hand #)/m)
+        .slice(0, 5)
+        .join('');
+      await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text: firstFive })
+        .expect(201);
+      await socket.next('queue.entriesAdded');
+
+      const confirmed = await confirm(master.token, code, [
+        preview.body.id as string,
+      ]).expect(201);
+
+      expect(confirmed.body).toEqual({ imported: 50 });
+    });
+
+    it('refuses pasting more than 50 Hands into the Queue', async () => {
+      const master = await newAccount(running.httpServer);
+      const code = await createRoom(master.token);
+      await join(master.token, code, 'Javier');
+
+      const refused = await request(running.httpServer)
+        .post(`/api/rooms/${code}/hands`)
+        .set('Authorization', `Bearer ${master.token}`)
+        .send({ text: manyHands(51) })
+        .expect(400);
+
+      expect(refused.body).toMatchObject({ reason: 'too-many-hands' });
+    });
   });
 });
