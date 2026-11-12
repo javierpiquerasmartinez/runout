@@ -1,0 +1,41 @@
+# Runout's backend on Render. Generated from the existing service in Render's
+# panel ("Generate Blueprint") on 2026-11-12, then extended. Secrets are
+# declared with `sync: false` and set in the panel, never here. See the
+# README's "Deploying" section for the steps done in the panel.
+version: "1"
+projects:
+- name: runout
+  environments:
+  - name: Production
+    services:
+    - type: web
+      name: runout
+      runtime: node
+      repo: https://github.com/javierpiquerasmartinez/runout
+      branch: stage
+      # 0.5 CPU / 512 MB: a paid instance does not spin down when idle, and
+      # is what allows a pre-deploy command.
+      plan: 0.5c-512mb
+      envVars:
+      - key: EMAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ADMINISTRATOR_EMAILS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      region: frankfurt
+      buildCommand: pnpm install --frozen-lockfile && pnpm run build
+      # Runs after the build and before the new version starts. If a
+      # migration fails, the deploy fails and the running version stays.
+      preDeployCommand: pnpm run db:migrate
+      startCommand: pnpm run start:prod
+      autoDeployTrigger: commit
+      # No healthCheckPath: /api/health queries the database, and Render
+      # calling it every few seconds would keep Neon from ever suspending.
+      rootDir: apps/server

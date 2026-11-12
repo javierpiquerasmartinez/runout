@@ -68,9 +68,17 @@ The server persists to Postgres through [Drizzle](https://orm.drizzle.team): Neo
 
 - **Local Postgres.** `pnpm --filter @runout/server db:local` runs a Postgres that matches `.env.example` on port 5432, without Docker. It keeps its data in `apps/server/.data/postgres`; stop it with Ctrl+C. Any other Postgres works too: point `DATABASE_URL` at it.
 - **Changing the schema.** Edit `apps/server/src/database/schema.ts`, then run `pnpm --filter @runout/server db:generate` to write a versioned SQL migration into `apps/server/drizzle/`. Review it and commit it with the schema change. Never edit a migration that has already been applied anywhere; write a new one.
-- **Applying migrations.** `pnpm --filter @runout/server db:migrate` applies pending migrations to the database at `DATABASE_URL`. Run it locally after pulling, and against Neon (with Neon's `DATABASE_URL`, `sslmode=require`) before deploying a server that needs the new schema.
+- **Applying migrations.** `pnpm --filter @runout/server db:migrate` applies pending migrations to the database at `DATABASE_URL`. Run it locally after pulling. In production Render runs it before each deploy (see [Deploying](#deploying)), so it never needs running against Neon by hand.
 - **Backfilling the Stats.** Migration `0027_hand_stats` keeps the Hero's Stats in each Hand, written at import; Hands stored before it have none, and count no opportunity in Estadísticas. After applying it, run `pnpm --filter @runout/server db:backfill-stats` once against the same `DATABASE_URL` to work them out from each Hand's stored content. It replaces a Hand's rows rather than adding to them, so it can run again safely, and says how many Hands it went through.
 - **Reading stored Hands again.** A fix to a parser only reaches the Hands imported after it. To bring the Hands already stored up to date, run `pnpm --filter @runout/server db:reread-hands` against the `DATABASE_URL` after deploying the fix: it reads every Hand that keeps its Hand History again, as import does, and rewrites its content, the columns worked out from it (Result, All-in EV, Showdown, final pot, Rake, Rake Generated) and its Stat rows wherever they changed. Hands stored before their Hand History was kept (migration `0023_hand_history`) have no text to read and are left alone; import them again to fix them. It changes nothing when run again, and says how many Hands it read, rewrote, and left because their text no longer reads as the same Hand.
+
+## Deploying
+
+The web is on Vercel and the API on Render, the API declared in the Blueprint [`render.yaml`](render.yaml): a 0.5 CPU / 512 MB instance in Frankfurt, which does not spin down, deployed on every commit to `stage`. It has no health check path on purpose: `/api/health` queries the database, and Render calling it every few seconds would keep Neon from suspending. Check it by hand after a deploy.
+
+- **Migrations.** Render runs `pnpm run db:migrate` as the pre-deploy command, after the build and before the new version starts. If a migration fails the deploy fails, and the version already running keeps serving.
+- **Secrets.** The Blueprint names every environment variable with `sync: false` and no value; the values live only in Render's panel. Render asks for them when a Blueprint is first created and ignores them on later syncs, so a new secret is added to the service by hand in the panel, as well as to `render.yaml`.
+- **Changing the service.** Edit `render.yaml` and merge it: the Blueprint syncs it to the service. A setting changed only in the panel is overwritten on the next sync, and one the file leaves out falls back to Render's default.
 
 ## Tests
 
