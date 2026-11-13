@@ -1,7 +1,9 @@
+import type { BulkImportStatus } from '../library/bulkImports'
+
 /** The Administrator panel (ADR 0008): only routed for Administrators, a path like any other for everyone else. */
 export const adminPath = '/admin'
 
-export const ADMIN_TABS = ['invitations', 'accounts', 'rooms'] as const
+export const ADMIN_TABS = ['invitations', 'accounts', 'rooms', 'imports'] as const
 export type AdminTab = (typeof ADMIN_TABS)[number]
 
 export function adminTabPath(tab: AdminTab): string {
@@ -105,6 +107,39 @@ export interface RoomsPage {
   page: number
   pageSize: number
   rooms: AdminRoom[]
+}
+
+/** A Bulk Import as `GET /admin/bulk-imports` lists it: never the text of a Hand. */
+export interface AdminBulkImport {
+  id: string
+  account: Person
+  status: BulkImportStatus
+  /** No advance for a long while: Atascada, to Administrators only. */
+  stalled: boolean
+  files: { name: string; size: number }[]
+  total: number | null
+  processed: number
+  imported: number
+  duplicates: number
+  notImported: Record<string, number>
+  /** Why it ended short of adding its Hands, as the server words it. */
+  reason: string | null
+  /** Why it failed, when it did: a technical code, never a Hand's text. */
+  failureCode: string | null
+  createdAt: string
+  lastActivityAt: string
+  finishedAt: string | null
+}
+
+/** The tab's filters: Todas, En curso, Fallidas and Atascadas. */
+export const BULK_IMPORT_FILTERS = ['all', 'active', 'failed', 'stalled'] as const
+export type BulkImportFilter = (typeof BULK_IMPORT_FILTERS)[number]
+
+export interface BulkImportsPage {
+  total: number
+  page: number
+  pageSize: number
+  imports: AdminBulkImport[]
 }
 
 /** Someone as the panel names them: their Display Name, else their email. */

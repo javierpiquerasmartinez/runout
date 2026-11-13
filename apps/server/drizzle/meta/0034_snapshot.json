@@ -1,5 +1,5 @@
 {
-  "id": "f8c459bb-dbfe-484b-9fc2-53043dc873b1",
+  "id": "f31ec8b2-ed73-412c-bce3-b52420e995f6",
   "prevId": "6cf66ef8-f448-4751-a0ad-2f9f3ad13ac3",
   "version": "7",
   "dialect": "postgresql",
@@ -78,6 +78,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "stalled": {
+          "name": "stalled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "last_advanced_at": {
           "name": "last_advanced_at",

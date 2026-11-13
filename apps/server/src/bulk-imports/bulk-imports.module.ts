@@ -9,5 +9,6 @@ import { BulkImportsService } from './bulk-imports.service.js';
   imports: [FileStoreModule, IdentityModule, ImportServiceWakerModule],
   controllers: [BulkImportsController],
   providers: [BulkImportsService],
+  exports: [BulkImportsService],
 })
 export class BulkImportsModule {}

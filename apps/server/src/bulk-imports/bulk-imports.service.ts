@@ -64,7 +64,7 @@ export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
 /** What a Bulk Import reads: Hand Histories as text, or zipped. */
 const IMPORTABLE_FILE = /\.(txt|zip)$/i;
 /** An import in one of these has ended; any other is unfinished. */
-const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
+export const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
 /** How long an ended import stays listed. */
 const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -277,6 +277,19 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
    * Hands already imported stay; its files go.
    */
   async cancel(account: Identity, id: string): Promise<BulkImportView> {
+    return view(await this.cancelWhere(id, account.id));
+  }
+
+  /**
+   * Stops any Account's unfinished import `id`, exactly as its Importer
+   * cancelling would.
+   */
+  async cancelAsAdministrator(id: string): Promise<void> {
+    await this.cancelWhere(id, null);
+  }
+
+  /** Cancels `id`, if unfinished and, given `identityId`, that Account's. */
+  private async cancelWhere(id: string, identityId: string | null) {
     if (!isUuid(id)) throw new Rejected('bulk-import-not-found');
     const [row] = await this.db
       .update(bulkImports)
@@ -284,14 +297,16 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
       .where(
         and(
           eq(bulkImports.id, id),
-          eq(bulkImports.identityId, account.id),
+          identityId === null
+            ? undefined
+            : eq(bulkImports.identityId, identityId),
           notInArray(bulkImports.status, ENDED),
         ),
       )
       .returning();
     if (!row) throw new Rejected('bulk-import-not-found');
     await this.deleteFiles(row.files);
-    return view(row);
+    return row;
   }
 
   /** The files, or what was uploaded of them; one left behind is only a waste of space. */
