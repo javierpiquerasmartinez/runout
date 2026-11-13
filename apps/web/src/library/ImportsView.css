@@ -1,6 +1,6 @@
 .imports td {
   height: 52px;
-  padding: 0 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--color-panel-border);
   font-size: 13px;
   color: var(--text-secondary);
@@ -18,4 +18,99 @@
 .imports__empty {
   font-size: 13px;
   color: var(--text-secondary);
+}
+.imports__status {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 17.25px;
+  color: var(--text-secondary);
+}
+.imports__status[data-stage='inProgress'],
+.imports__status[data-stage='uploading'],
+.imports__status[data-stage='paused'] {
+  border-color: var(--brass-soft-border);
+  background: var(--brass-soft-bg);
+  color: var(--brass);
+}
+.imports__status[data-stage='completed'] {
+  border-color: var(--sync-soft-border);
+  color: var(--sync);
+}
+.imports__status[data-stage='failed'] {
+  border-color: var(--alert-border);
+  color: var(--alert);
+}
+.imports__hands {
+  width: 230px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.imports__bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+}
+.imports__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+}
+.imports__row[data-stage='failed'] .imports__bar-fill {
+  background: var(--alert);
+}
+.imports__started {
+  color: var(--text-primary);
+}
+.imports__result {
+  font-size: 12px;
+  line-height: 18px;
+}
+.imports__actions {
+  text-align: right;
+}
+.imports__kept {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+.imports-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--brass-soft-border);
+  border-radius: 8px;
+  background: var(--brass-soft-bg);
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--text-primary);
+}
+.imports-banner__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brass);
+}
+.imports-banner__text {
+  flex: 1;
+}
+.imports-banner__text .ro-mono {
+  font-variant-numeric: tabular-nums;
+}
+.imports-banner__link {
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--brass);
+}
+.imports-banner__link:hover {
+  color: var(--brass-hover);
 }
