@@ -724,6 +724,11 @@ export const bulkImports = pgTable(
      * past the limit, `unreadable-file` when a file is no text or zip.
      */
     reason: text('reason'),
+    /**
+     * Stalled: no advance for a long while. Administrators see it as
+     * Atascada; the Importer still sees it in progress.
+     */
+    stalled: boolean('stalled').notNull().default(false),
     /** When a batch last committed; null before the first. */
     lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

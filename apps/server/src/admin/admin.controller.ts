@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { BulkImportsService } from '../bulk-imports/bulk-imports.service.js';
 import type { Identity, SignedIn } from '../identity/identity.service.js';
 import {
   InvitationsService,
@@ -22,6 +23,7 @@ import {
   type Totals,
 } from './accounts.service.js';
 import { Administrator, AdministratorGuard } from './administrator.guard.js';
+import { BulkImportsAdminService } from './bulk-imports-admin.service.js';
 import { RoomsAdminService } from './rooms-admin.service.js';
 
 /**
@@ -36,6 +38,8 @@ export class AdminController {
     private readonly invitations: InvitationsService,
     private readonly accounts: AccountsService,
     private readonly rooms: RoomsAdminService,
+    private readonly bulkImportsList: BulkImportsAdminService,
+    private readonly bulkImports: BulkImportsService,
   ) {}
 
   @Get('invitations')
@@ -117,5 +121,17 @@ export class AdminController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async endLive(@Param('code') code: string): Promise<void> {
     await this.rooms.endLive(code);
+  }
+
+  @Get('bulk-imports')
+  async listBulkImports(@Query() query: Record<string, unknown>) {
+    return this.bulkImportsList.list(query);
+  }
+
+  /** Stops any Account's unfinished Bulk Import, as its Importer cancelling would. */
+  @Post('bulk-imports/:id/cancel')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async cancelBulkImport(@Param('id') id: string): Promise<void> {
+    await this.bulkImports.cancelAsAdministrator(id);
   }
 }
