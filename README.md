@@ -52,7 +52,7 @@ The server reads these from its environment (or `apps/server/.env` locally; see 
 | `GOOGLE_CLIENT_ID` | everywhere | The OAuth client ID Google ID tokens must be issued for. Required unless `DEV_SIGN_IN` is on. |
 | `FRONTEND_URL` | production | The web's origin, comma-separated for more than one. Allows CORS from it, and the first one is where the links in emails lead (`http://localhost:5173` when unset). Only production sets it. |
 | `ADMINISTRATOR_EMAILS` | anywhere | The emails of the Administrators, comma-separated, matched ignoring case. Checked on every request, never stored: changing it and restarting takes effect without touching the database. Unset, nobody is one. |
-| `RESEND_API_KEY` | production | The [Resend](https://resend.com) API key Invitations and password resets are sent with. With `FRONTEND_URL` set, the server refuses to start without it. |
+| `RESEND_API_KEY` | production, both services | The [Resend](https://resend.com) API key Invitations, password resets and the email that ends a Bulk Import are sent with. With `FRONTEND_URL` set, each service refuses to start without it; the import service copies it, `EMAIL_FROM` and `FRONTEND_URL` from the API. |
 | `EMAIL_FROM` | production | The sender, e.g. `Runout <hola@runout.app>`. It must be on a domain verified in Resend (Resend → Domains: add the domain and its DNS records). Required with `RESEND_API_KEY`. |
 | `DEV_SIGN_IN` | local only | `true` turns on Test mode (below). Refused alongside `FRONTEND_URL`. |
 | `IMPORT_SERVICE_ADDRESS` | production | Where the API reaches the import service, as `host:port` on a private network. With `FRONTEND_URL` set, the server refuses to start without it; unset elsewhere, nothing is woken. |

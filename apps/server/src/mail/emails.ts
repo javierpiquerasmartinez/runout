@@ -6,7 +6,7 @@ export type Language = 'es' | 'en';
 
 const INTL: Record<Language, string> = { es: 'es-ES', en: 'en-GB' };
 
-/** The two emails Runout sends, each in Spanish and English, links built from the web's URL. */
+/** The emails Runout sends to people, each in Spanish and English, links built from the web's URL. */
 @Injectable()
 export class EmailWriter {
   constructor(@Inject(FRONTEND_URL) private readonly frontendUrl: string) {}
@@ -54,6 +54,15 @@ export class EmailWriter {
     );
   }
 
+  /** To the Importer of a Bulk Import that completed or failed. */
+  bulkImportEnded(input: {
+    to: string;
+    language: Language;
+    bulkImport: EndedBulkImport;
+  }): Email {
+    return bulkImportEnded(this.frontendUrl, input);
+  }
+
   passwordReset(input: {
     to: string;
     language: Language;
@@ -88,6 +97,92 @@ export class EmailWriter {
       [copy.expiry, copy.ignore],
     );
   }
+}
+
+/** A Bulk Import as it ended, as its Importer is told it. */
+export interface EndedBulkImport {
+  status: 'completed' | 'failed';
+  /** Why it ended short of adding its Hands, when it did. */
+  reason: string | null;
+  fileNames: string[];
+  total: number | null;
+  processed: number;
+  imported: number;
+  duplicates: number;
+  /** Hands not imported, per reason; `library-full` counts those that did not fit. */
+  notImported: Record<string, number>;
+}
+
+/** The email to an Importer whose Bulk Import ended, in their language. */
+function bulkImportEnded(
+  frontendUrl: string,
+  input: { to: string; language: Language; bulkImport: EndedBulkImport },
+): Email {
+  const { language, bulkImport } = input;
+  const number = new Intl.NumberFormat(INTL[language]);
+  const n = (count: number) => number.format(count);
+  const notFit = bulkImport.notImported['library-full'] ?? 0;
+  const notRecognised = Object.entries(bulkImport.notImported)
+    .filter(([reason]) => reason !== 'library-full')
+    .reduce((sum, [, count]) => sum + count, 0);
+  const files = bulkImport.fileNames.join(', ');
+  const failed = bulkImport.status === 'failed';
+  const es = language === 'es';
+
+  const subject = failed
+    ? es
+      ? 'Tu importación se ha interrumpido'
+      : 'Your import was interrupted'
+    : es
+      ? 'Tu importación ha terminado'
+      : 'Your import has finished';
+  const lead = failed
+    ? es
+      ? `La importación de ${files} se interrumpió tras ${n(bulkImport.processed)} de ${n(bulkImport.total ?? 0)} manos. Las ${n(bulkImport.imported)} manos importadas se conservan en tu biblioteca; el resto no se ha importado.`
+      : `The import of ${files} was interrupted after ${n(bulkImport.processed)} of ${n(bulkImport.total ?? 0)} hands. The ${n(bulkImport.imported)} hands imported are kept in your Library; the rest were not imported.`
+    : es
+      ? `Ha terminado la importación de ${files}.`
+      : `The import of ${files} has finished.`;
+  const counts = es
+    ? [
+        `Importadas: ${n(bulkImport.imported)}`,
+        `Duplicadas: ${n(bulkImport.duplicates)}`,
+        `No reconocidas: ${n(notRecognised)}`,
+      ]
+    : [
+        `Imported: ${n(bulkImport.imported)}`,
+        `Duplicates: ${n(bulkImport.duplicates)}`,
+        `Not recognised: ${n(notRecognised)}`,
+      ];
+  const why: Record<string, string> = es
+    ? {
+        'too-many-hands':
+          'Tiene más de 2 millones de manos: no se ha importado ninguna.',
+        'unreadable-file': 'No se ha podido abrir uno de los archivos.',
+        'unrecognised-format':
+          'No hemos reconocido el formato de ninguna mano.',
+        'library-full': `Biblioteca llena: ${n(notFit)} ${notFit === 1 ? 'mano no cabía' : 'manos no cabían'}.`,
+      }
+    : {
+        'too-many-hands':
+          'It has more than 2 million hands: none was imported.',
+        'unreadable-file': 'One of the files could not be opened.',
+        'unrecognised-format': 'We did not recognise the format of any hand.',
+        'library-full': `Library full: ${n(notFit)} ${notFit === 1 ? 'hand did not fit' : 'hands did not fit'}.`,
+      };
+  const reason = bulkImport.reason ? why[bulkImport.reason] : undefined;
+  const footer = es
+    ? 'Te escribimos porque empezaste esta importación en Runout.'
+    : 'You are receiving this because you started this import on Runout.';
+  return write(
+    input.to,
+    language,
+    subject,
+    [lead, ...(reason ? [reason] : []), ...counts],
+    es ? 'Ver importaciones' : 'See imports',
+    `${frontendUrl}/library/imports`,
+    [footer],
+  );
 }
 
 const FALLBACK: Record<Language, string> = {
