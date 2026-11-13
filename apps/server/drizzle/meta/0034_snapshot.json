@@ -1,5 +1,5 @@
 {
-  "id": "5784bf00-9d83-47f6-91fa-a7d0bbe1e30e",
+  "id": "f8c459bb-dbfe-484b-9fc2-53043dc873b1",
   "prevId": "6cf66ef8-f448-4751-a0ad-2f9f3ad13ac3",
   "version": "7",
   "dialect": "postgresql",
@@ -125,6 +125,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bulk_imports_one_unfinished_idx": {
+          "name": "bulk_imports_one_unfinished_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"bulk_imports\".\"status\" not in ('completed', 'failed', 'cancelled')",
           "concurrently": false,
           "method": "btree",
           "with": {}

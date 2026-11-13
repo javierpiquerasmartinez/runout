@@ -449,7 +449,7 @@ describe('A Bulk Import (e2e)', () => {
     const account = asAccount(token);
     const text = manyHands(2500);
     // The first read counts; the second stops halfway into the second batch.
-    const release = store.holdRead({
+    const release = store.pauseRead({
       afterBytes: byteOfHand(text, 1500),
       skip: 1,
     });

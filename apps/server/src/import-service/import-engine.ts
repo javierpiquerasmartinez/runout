@@ -36,6 +36,12 @@ const ATTEMPTS = 3;
 
 type BulkImport = typeof bulkImports.$inferSelect;
 
+/**
+ * An import the engine is to advance. Every write the engine makes outside a
+ * batch asks for it too, so that one cancelled meanwhile stays cancelled.
+ */
+const active = inArray(bulkImports.status, ['waiting', 'counting', 'running']);
+
 /** The Hands of an import being read, and how many of them have been gone through. */
 interface OpenReader {
   hands: AsyncGenerator<HandRead>;
@@ -118,7 +124,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     const [next] = await this.db
       .select()
       .from(bulkImports)
-      .where(inArray(bulkImports.status, ['waiting', 'counting', 'running']))
+      .where(active)
       .orderBy(
         sql`${bulkImports.lastAdvancedAt} asc nulls first`,
         asc(bulkImports.createdAt),
@@ -157,12 +163,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       .update(bulkImports)
       .set({ status: 'failed', failureCode, finishedAt: now })
       // Not one cancelled meanwhile.
-      .where(
-        and(
-          eq(bulkImports.id, record.id),
-          inArray(bulkImports.status, ['waiting', 'counting', 'running']),
-        ),
-      );
+      .where(and(eq(bulkImports.id, record.id), active));
   }
 
   /**
@@ -173,7 +174,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     await this.db
       .update(bulkImports)
       .set({ status: 'counting' })
-      .where(eq(bulkImports.id, record.id));
+      .where(and(eq(bulkImports.id, record.id), active));
     const counted = await countHands(this.filesOf(record), this.limit);
     if (counted.overLimit) {
       await this.end(record, 'too-many-hands');
@@ -191,7 +192,8 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     await this.db
       .update(bulkImports)
       .set({ status: 'running', total: counted.hands, notImported })
-      .where(eq(bulkImports.id, record.id));
+      // Cancelled while counting, it stays so.
+      .where(and(eq(bulkImports.id, record.id), active));
   }
 
   /** Adds the next batch of Hands, with the record's counters, in one transaction. */
@@ -325,7 +327,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
         finishedAt: now,
         lastAdvancedAt: now,
       })
-      .where(eq(bulkImports.id, record.id));
+      .where(and(eq(bulkImports.id, record.id), active));
     await this.closeReader(record.id);
     await this.deleteFiles(record);
   }

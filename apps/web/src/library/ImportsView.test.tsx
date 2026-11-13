@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import type { Locale } from '../i18n/catalogue'
 import type { BulkImport } from './bulkImports'
@@ -22,10 +23,10 @@ function bulkImport(overrides: Partial<BulkImport>): BulkImport {
   }
 }
 
-function renderImports(imports: BulkImport[], locale: Locale = 'es') {
+function renderImports(imports: BulkImport[], locale: Locale = 'es', onCancel: (id: string) => void = () => {}) {
   render(
     <I18nProvider initialLocale={locale}>
-      <ImportsView imports={imports} />
+      <ImportsView imports={imports} onCancel={onCancel} />
     </I18nProvider>,
   )
   return screen.getByRole('table', { name: locale === 'es' ? 'Importaciones' : 'Imports' })
@@ -49,6 +50,7 @@ describe('ImportsView', () => {
       'Manos',
       'Inicio',
       'Resultado',
+      '',
     ])
     expect(rowOf(table, 'hm3-2024.zip')).toEqual([
       'hm3-2024.zip',
@@ -57,6 +59,7 @@ describe('ImportsView', () => {
       '2 nov 2026',
       // As Intl writes it in Spanish, like everywhere else in Runout: no point under 10.000.
       '1910 duplicadas · 42 no reconocidas',
+      '',
     ])
   })
 
@@ -75,6 +78,52 @@ describe('ImportsView', () => {
     expect(status).toBe('En curso')
     expect(hands).toBe('412.000 de 1.240.000')
     expect(result).toBe('—')
+    const bar = within(within(table).getByRole('row', { name: /pt4-2019-2026/ })).getByRole('progressbar')
+    expect(bar.getAttribute('aria-valuenow')).toBe('412000')
+    expect(bar.getAttribute('aria-valuemax')).toBe('1240000')
+  })
+
+  it('offers to cancel an unfinished import, and only those', async () => {
+    const onCancel = vi.fn()
+    const running = bulkImport({ files: [{ name: 'running.zip', size: 1 }], status: 'running', finishedAt: null })
+    const paused = bulkImport({ files: [{ name: 'paused.zip', size: 1 }], status: 'paused', finishedAt: null })
+    const table = renderImports([running, paused, bulkImport({})], 'es', onCancel)
+
+    const cancels = within(table).getAllByRole('button', { name: 'Cancelar' })
+    expect(cancels).toHaveLength(2)
+    expect(within(within(table).getByRole('row', { name: /hm3-2024/ })).queryByRole('button')).toBeNull()
+
+    await userEvent.click(within(within(table).getByRole('row', { name: /running\.zip/ })).getByRole('button', { name: 'Cancelar' }))
+
+    expect(onCancel).toHaveBeenCalledWith(running.id)
+  })
+
+  it('says a failed import was interrupted and how far it got, keeping its Hands', () => {
+    const table = renderImports([
+      bulkImport({ files: [{ name: 'sesiones-2023.zip', size: 1 }], status: 'failed', total: 210000, processed: 58000, imported: 57000 }),
+    ])
+
+    const [, status, hands, , result] = rowOf(table, 'sesiones-2023.zip')
+    expect(status).toBe('Fallida')
+    expect(hands).toBe('58.000 de 210.000')
+    expect(result).toBe('Se interrumpió. Las manos importadas se conservan.')
+  })
+
+  it('says a cancelled import kept the Hands it had imported', () => {
+    const table = renderImports([
+      bulkImport({ files: [{ name: 'coinpoker-marzo.zip', size: 1 }], status: 'cancelled', total: 50000, processed: 12400, imported: 12400 }),
+    ])
+
+    const [, status, hands, , result] = rowOf(table, 'coinpoker-marzo.zip')
+    expect(status).toBe('Cancelada')
+    expect(hands).toBe('12.400 manos')
+    expect(result).toBe('Cancelada por ti. Las manos importadas se conservan.')
+  })
+
+  it('says how long the history is kept', () => {
+    renderImports([bulkImport({})])
+
+    expect(screen.getByText('El historial se conserva 30 días.')).toBeTruthy()
   })
 
   it('reads “En curso” while waiting or counting too, and “Subiendo” while uploading', () => {
@@ -170,13 +219,14 @@ describe('ImportsView', () => {
       '318,204 hands',
       'Nov 2, 2026',
       '1,910 duplicates · 42 not recognised',
+      '',
     ])
   })
 
   it('says there are none yet', () => {
     render(
       <I18nProvider initialLocale="es">
-        <ImportsView imports={[]} />
+        <ImportsView imports={[]} onCancel={() => {}} />
       </I18nProvider>,
     )
 

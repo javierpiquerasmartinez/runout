@@ -131,7 +131,7 @@ export class MemoryFileStore implements FileStore {
    * The next read after the first `skip` stops past `afterBytes` until the
    * returned function is called.
    */
-  holdRead(options: { afterBytes: number; skip?: number }): () => void {
+  pauseRead(options: { afterBytes: number; skip?: number }): () => void {
     let release!: () => void;
     const released = new Promise<void>((resolve) => (release = resolve));
     this.faults.push({

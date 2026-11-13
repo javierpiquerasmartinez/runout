@@ -38,6 +38,7 @@ export type RejectionReason =
   | 'invalid-bulk-import'
   | 'bulk-import-not-found'
   | 'bulk-import-unavailable'
+  | 'bulk-import-unfinished'
   | 'author-not-in-room'
   | 'invalid-queue-order'
   | 'entry-not-in-queue'
