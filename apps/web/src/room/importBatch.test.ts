@@ -48,8 +48,8 @@ describe('An import batch', () => {
     const batch = added({ key: 'a', name: 'a.txt' }, { key: 'b', name: 'huge.zip', size: MAX_FILE_BYTES + 1 })
 
     expect(batch.items).toEqual([
-      { key: 'a', name: 'a.txt', state: 'reading' },
-      { key: 'b', name: 'huge.zip', state: 'failed', reason: 'file-too-large' },
+      { key: 'a', name: 'a.txt', size: 1000, state: 'reading' },
+      { key: 'b', name: 'huge.zip', size: MAX_FILE_BYTES + 1, state: 'failed', reason: 'file-too-large' },
     ])
   })
 
@@ -90,7 +90,7 @@ describe('An import batch', () => {
 
     batch = reduceBatch(batch, { type: 'rereading', key: 'a', format: 'pokerstars' })
 
-    expect(batch.items[0]).toEqual({ key: 'a', name: 'a.txt', state: 'reading', format: 'pokerstars' })
+    expect(batch.items[0]).toEqual({ key: 'a', name: 'a.txt', size: 1000, state: 'reading', format: 'pokerstars' })
     expect(batchTotals(batch).previewIds).toEqual([])
   })
 

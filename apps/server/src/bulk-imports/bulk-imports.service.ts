@@ -1,5 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -9,7 +15,11 @@ import {
   type BulkImportStatus,
 } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
-import { FILE_STORE, type FileStore } from '../file-store/file-store.js';
+import {
+  FILE_STORE,
+  type FileStore,
+  type UploadedPart,
+} from '../file-store/file-store.js';
 import type { Identity } from '../identity/identity.service.js';
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -41,6 +51,14 @@ interface ChosenFile {
 /** S3 and R2 number parts from 1 to 10,000. */
 const MAX_PART_NUMBER = 10_000;
 const MAX_FILES = 100;
+/** How long an upload may go uncompleted before it is discarded. */
+export const UPLOAD_EXPIRES_MS = 24 * 60 * 60_000;
+/** How often uploads are checked, so one expired goes within this much. */
+const DISCARD_EVERY_MS = 60 * 60_000;
+/** The most one Bulk Import may upload, all its files together. */
+export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
+/** What a Bulk Import reads: Hand Histories as text, or zipped. */
+const IMPORTABLE_FILE = /\.(txt|zip)$/i;
 
 /**
  * Bulk Imports, as the Importer starts and follows them from the API. The
@@ -48,7 +66,10 @@ const MAX_FILES = 100;
  * upload's part URLs and wakes the service once the files are in.
  */
 @Injectable()
-export class BulkImportsService {
+export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(BulkImportsService.name);
+  private cancelDiscard: (() => void) | null = null;
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -56,10 +77,76 @@ export class BulkImportsService {
     private readonly waker: ImportServiceWaker,
   ) {}
 
-  /** Records a Bulk Import of these files, `uploading`, and starts each file's upload. */
+  /** Discards expired uploads now, then once an hour. Without a store there are none. */
+  onModuleInit(): void {
+    if (this.store) this.discardEvery(0);
+  }
+
+  onModuleDestroy(): void {
+    this.cancelDiscard?.();
+    this.cancelDiscard = null;
+  }
+
+  private discardEvery(delayMs: number): void {
+    this.cancelDiscard = this.clock.schedule(delayMs, async () => {
+      try {
+        await this.discardExpiredUploads();
+      } catch (error) {
+        this.logger.error('Could not discard expired uploads', error);
+      }
+      if (this.cancelDiscard) this.discardEvery(DISCARD_EVERY_MS);
+    });
+  }
+
+  /**
+   * Discards the Bulk Imports still uploading 24 hours after they started,
+   * with whatever parts they had uploaded. A file the store could not let go
+   * of keeps its import, to be tried again at the next check.
+   */
+  private async discardExpiredUploads(): Promise<void> {
+    const store = this.requireStore();
+    const cutoff = new Date(this.clock.now().getTime() - UPLOAD_EXPIRES_MS);
+    const expired = await this.db
+      .select()
+      .from(bulkImports)
+      .where(
+        and(
+          eq(bulkImports.status, 'uploading'),
+          lt(bulkImports.createdAt, cutoff),
+        ),
+      );
+    for (const row of expired) {
+      await Promise.all(
+        row.files.map(({ key, uploadId }) => store.delete(key, uploadId)),
+      );
+      await this.db
+        .delete(bulkImports)
+        .where(
+          and(eq(bulkImports.id, row.id), eq(bulkImports.status, 'uploading')),
+        );
+    }
+  }
+
+  /**
+   * Records a Bulk Import of these files, `uploading`, and starts each file's
+   * upload. The same files chosen again, by name and size, give back the
+   * import still uploading them, so that the upload continues.
+   */
   async start(account: Identity, files: unknown): Promise<BulkImportView> {
     const store = this.requireStore();
     const chosen = validFiles(files);
+    const interrupted = await this.db
+      .select()
+      .from(bulkImports)
+      .where(
+        and(
+          eq(bulkImports.identityId, account.id),
+          eq(bulkImports.status, 'uploading'),
+        ),
+      )
+      .orderBy(desc(bulkImports.createdAt));
+    const same = interrupted.find((row) => sameFiles(row.files, chosen));
+    if (same) return view(same);
     const id = randomUUID();
     const stored: BulkImportFile[] = await Promise.all(
       chosen.map(async ({ name, size }, index) => {
@@ -93,6 +180,20 @@ export class BulkImportsService {
     ];
     if (!file) throw new Rejected('bulk-import-not-found');
     return store.partUrls(file.key, file.uploadId, validPartNumbers(parts));
+  }
+
+  /** The parts of one file already uploaded, to continue its upload from. */
+  async uploadedParts(
+    account: Identity,
+    id: string,
+    fileIndex: string,
+  ): Promise<UploadedPart[]> {
+    const store = this.requireStore();
+    const file = (await this.uploading(account, id)).files[
+      validIndex(fileIndex)
+    ];
+    if (!file) throw new Rejected('bulk-import-not-found');
+    return store.uploadedParts(file.key, file.uploadId);
   }
 
   /**
@@ -192,7 +293,28 @@ function validFiles(files: unknown): ChosenFile[] {
   ) {
     throw new Rejected('invalid-bulk-import');
   }
-  return (files as ChosenFile[]).map(({ name, size }) => ({ name, size }));
+  const chosen = (files as ChosenFile[]).map(({ name, size }) => ({
+    name,
+    size,
+  }));
+  if (!chosen.every(({ name }) => IMPORTABLE_FILE.test(name))) {
+    throw new Rejected('unsupported-file');
+  }
+  const bytes = chosen.reduce((sum, { size }) => sum + size, 0);
+  if (bytes > MAX_BULK_IMPORT_BYTES) {
+    throw new Rejected('bulk-import-too-large');
+  }
+  return chosen;
+}
+
+function sameFiles(stored: BulkImportFile[], chosen: ChosenFile[]): boolean {
+  return (
+    stored.length === chosen.length &&
+    stored.every(
+      (file, index) =>
+        file.name === chosen[index].name && file.size === chosen[index].size,
+    )
+  );
 }
 
 function validIndex(index: string): number {

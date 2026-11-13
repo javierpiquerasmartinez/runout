@@ -7,6 +7,7 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import type { UploadedPart } from '../file-store/file-store.js';
 import { bearerToken } from '../identity/bearer-token.js';
 import { IdentityService } from '../identity/identity.service.js';
 import {
@@ -32,6 +33,22 @@ export class BulkImportsController {
       bearerToken(authorization),
     );
     return this.bulkImports.start(account, body.files);
+  }
+
+  /** The parts of one file already uploaded, to continue an interrupted upload. */
+  @Get(':id/files/:file/parts')
+  @Header('Cache-Control', 'private, no-cache')
+  async uploadedParts(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+    @Param('file') file: string,
+  ): Promise<{ parts: UploadedPart[] }> {
+    const account = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    return {
+      parts: await this.bulkImports.uploadedParts(account, id, file),
+    };
   }
 
   /** Where to upload these parts of one file, by its place in the import. */
