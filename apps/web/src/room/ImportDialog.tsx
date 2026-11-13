@@ -3,7 +3,7 @@ import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
-import { isImportableFile, MAX_BULK_IMPORT_BYTES, UploadFailed, uploadBulkImport } from '../library/bulkUpload'
+import { percentOf, UploadFailed, uploadBulkImport } from '../library/bulkUpload'
 import { roomLibraryPath } from '../library/library'
 import { navigate } from '../routing'
 import { Button } from '../ui/Button'
@@ -30,25 +30,14 @@ import {
 import { playedAtLabel, positionsLabel, potLabel, potSecondaryLabel, streetLabel } from './queueEntryView'
 import { usePreferences } from '../preferences/context'
 import { Secondary } from '../ui/Secondary'
+import { guardLocked, lockedProps } from '../ui/locked'
+import { BulkExplanation, BulkFiles, BulkFooter, type Bulk } from './BulkImportParts'
 import './ImportDialog.css'
 
 type Tab = 'files' | 'paste' | 'library'
 
 /** What one item is read from: an uploaded file, or pasted text. */
 type Source = File | string
-
-/**
- * A Bulk Import, which an import into the Library becomes when a file is too
- * large to read for a preview, or the Importer takes the one offered over
- * 2,000 Hands: its files are uploaded with no preview, and the import
- * service adds their Hands later.
- */
-type Bulk =
-  | { phase: 'ready' }
-  | { phase: 'uploading'; sent: number; total: number }
-  | { phase: 'uploaded' }
-  /** `upload` when storage refused a part; the same files continue on trying again. */
-  | { phase: 'failed'; reason: FailureReason | 'upload' }
 
 /**
  * The "Modal de importación de manos" board, adapted: the Importer drops
@@ -244,6 +233,8 @@ export function ImportDialog({
   const uploadingLabel = bulk?.phase === 'uploading' ? t('import.bulk.uploading', { percent: formatNumber(percentOf(bulk) / 100, { style: 'percent' }) }) : undefined
   const busy = importing ?? uploadingLabel
   const choosing = !bulk || bulk.phase === 'ready' || bulk.phase === 'failed'
+  // Uploading or uploaded, its files are set: what chooses them stays in sight, locked.
+  const choiceLocked = choosing ? undefined : (uploadingLabel ?? t('import.bulk.uploaded'))
 
   return (
     <dialog
@@ -273,8 +264,7 @@ export function ImportDialog({
         <IconButton icon="close" label={t('import.close')} size="compact" disabledReason={busy} onClick={onClose} />
       </header>
 
-      {choosing && (
-        <div className="import-dialog__tabs" role="tablist">
+      <div className="import-dialog__tabs" role="tablist">
           {tabs.map((name) => (
             <button
               key={name}
@@ -284,17 +274,16 @@ export function ImportDialog({
               aria-controls="import-tabpanel"
               aria-selected={tab === name}
               className="import-dialog__tab"
-              onClick={() => setTab(name)}
+              {...lockedProps(t(`import.tab.${name}`), choiceLocked)}
+              onClick={guardLocked(choiceLocked, () => setTab(name))}
             >
               {t(`import.tab.${name}`)}
             </button>
           ))}
-        </div>
-      )}
+      </div>
 
       <div className="import-dialog__body">
         <div className="import-dialog__main">
-          {choosing && (
             <div id="import-tabpanel" role="tabpanel" aria-labelledby={`import-tab-${tab}`}>
               {tab === 'library' && destination.kind === 'room' ? (
                 <div className="import-from-library">
@@ -318,7 +307,7 @@ export function ImportDialog({
                   <Icon name="import" size={30} className="import-drop__icon" />
                   <span className="import-drop__title">{t('import.drop.title')}</span>
                   <span className="import-drop__hint">{t(`import.${destinationKind}.dropHint`)}</span>
-                  <Button variant="secondary" size="compact" onClick={() => fileInput.current?.click()}>
+                  <Button variant="secondary" size="compact" disabledReason={choiceLocked} onClick={() => fileInput.current?.click()}>
                     {t('import.drop.choose')}
                   </Button>
                   <input
@@ -338,11 +327,16 @@ export function ImportDialog({
               ) : (
                 <label className="import-paste">
                   <span className="ro-visually-hidden">{t('import.paste.label')}</span>
-                  <textarea className="import-paste__field" placeholder={t('import.paste.placeholder')} onPaste={onPaste} />
+                  <textarea
+                    className="import-paste__field"
+                    placeholder={t('import.paste.placeholder')}
+                    readOnly={choiceLocked !== undefined}
+                    title={choiceLocked}
+                    onPaste={onPaste}
+                  />
                 </label>
               )}
             </div>
-          )}
 
           {tab !== 'library' && !bulk && (
             <ul className="import-formats" aria-label={t('import.formats.label')}>
@@ -355,11 +349,7 @@ export function ImportDialog({
           )}
 
           {bulk ? (
-            <BulkFiles
-              files={batch.items}
-              removable={choosing}
-              onRemove={remove}
-            />
+            <BulkFiles files={batch.items} lockedReason={choiceLocked} onRemove={remove} />
           ) : batch.items.length > 0 && (
             <section className="import-files" aria-labelledby="import-files-title">
               <h3 id="import-files-title" className="import-dialog__eyebrow">
@@ -446,156 +436,6 @@ export function ImportDialog({
         </footer>
       )}
     </dialog>
-  )
-}
-
-/** How far an upload has got, in whole percent. */
-function percentOf({ sent, total }: { sent: number; total: number }): number {
-  return total > 0 ? Math.floor((sent / total) * 100) : 0
-}
-
-/** "840 KB", "21.4 MB", "1.2 GB". */
-function sizeLabel(bytes: number, formatNumber: Translator['formatNumber']): string {
-  const units = [
-    ['GB', 1024 ** 3],
-    ['MB', 1024 ** 2],
-    ['KB', 1024],
-  ] as const
-  const [unit, scale] = units.find(([, scale]) => bytes >= scale) ?? units[2]
-  return `${formatNumber(bytes / scale, { maximumFractionDigits: 1 })} ${unit}`
-}
-
-/** A Bulk Import's files: their names and sizes, with nothing read from them. */
-function BulkFiles({
-  files,
-  removable,
-  onRemove,
-}: {
-  files: ImportItem[]
-  removable: boolean
-  onRemove: (key: string) => void
-}) {
-  const { t, formatNumber } = useI18n()
-  return (
-    <section className="import-files" aria-labelledby="import-files-title">
-      <h3 id="import-files-title" className="import-dialog__eyebrow">
-        {t('import.bulk.files')}
-      </h3>
-      <ul className="import-files__list">
-        {files.map((file) => {
-          const importable = isImportableFile(file.name)
-          return (
-            <li key={file.key} className="import-file" data-status={importable ? 'ok' : 'failed'}>
-              <Icon name={importable ? 'import' : 'error'} size={18} className="import-file__icon" />
-              <div className="import-file__text">
-                <span className="import-file__name">{file.name}</span>
-                <span className="import-file__meta ro-mono">
-                  {importable ? sizeLabel(file.size, formatNumber) : t('import.bulk.unsupported')}
-                </span>
-              </div>
-              {removable && (
-                <IconButton icon="close" size="compact" label={t('import.file.remove', { name: file.name })} onClick={() => onRemove(file.key)} />
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </section>
-  )
-}
-
-/** What happens to a Bulk Import, said before it starts: no preview, and an email at the end. */
-function BulkExplanation() {
-  const { t } = useI18n()
-  return (
-    <section className="import-preview import-bulk" aria-labelledby="import-bulk-title">
-      <h3 id="import-bulk-title" className="import-dialog__eyebrow">
-        {t('import.bulk.title')}
-      </h3>
-      <p className="import-bulk__text">{t('import.bulk.noPreview')}</p>
-      <p className="import-bulk__text">{t('import.bulk.how')}</p>
-      <p className="import-bulk__text">{t('import.bulk.email')}</p>
-    </section>
-  )
-}
-
-/** The footer of a Bulk Import: what will be uploaded, how far the upload has got, and when it is safe to leave. */
-function BulkFooter({
-  bulk,
-  files,
-  uploadingLabel,
-  onCancel,
-  onUpload,
-  onDone,
-}: {
-  bulk: Bulk
-  files: ImportItem[]
-  uploadingLabel: string | undefined
-  onCancel: () => void
-  onUpload: () => void
-  onDone: () => void
-}) {
-  const { t, formatNumber } = useI18n()
-  const bytes = files.reduce((sum, file) => sum + file.size, 0)
-  // Refused here, before anything is uploaded; the server checks the same.
-  const refused = !files.every((file) => isImportableFile(file.name))
-    ? t('import.bulk.unsupported')
-    : bytes > MAX_BULK_IMPORT_BYTES
-      ? t('import.bulk.tooLarge')
-      : undefined
-  const failure =
-    bulk.phase === 'failed'
-      ? bulk.reason === 'upload' || bulk.reason === 'network'
-        ? t('import.bulk.failed')
-        : t(`reason.${bulk.reason}`)
-      : undefined
-  return (
-    <footer className="import-dialog__footer">
-      <div className="import-dialog__totals" role="status">
-        <span className="import-dialog__ready">
-          {bulk.phase === 'uploaded'
-            ? t('import.bulk.uploaded')
-            : (uploadingLabel ??
-              t(files.length === 1 ? 'import.bulk.ready.one' : 'import.bulk.ready.other', {
-                count: files.length,
-                size: sizeLabel(bytes, formatNumber),
-              }))}
-        </span>
-      </div>
-      {bulk.phase === 'uploading' && (
-        <div
-          className="import-bulk__bar"
-          role="progressbar"
-          aria-label={t('import.bulk.progress')}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percentOf(bulk)}
-        >
-          <div className="import-bulk__fill" style={{ width: `${percentOf(bulk)}%` }} />
-        </div>
-      )}
-      {failure && (
-        <p className="import-dialog__failure" role="alert">
-          {failure}
-        </p>
-      )}
-      <span className="import-dialog__spacer" />
-      {bulk.phase === 'uploaded' ? (
-        <Button variant="primary" onClick={onDone}>
-          {t('import.bulk.done')}
-        </Button>
-      ) : (
-        <>
-          <Button variant="secondary" disabledReason={uploadingLabel} onClick={onCancel}>
-            {t('import.cancel')}
-          </Button>
-          <Button variant="primary" disabledReason={uploadingLabel ?? refused} onClick={onUpload}>
-            <Icon name="import" size={16} />
-            {bulk.phase === 'failed' ? t('import.bulk.retry') : t('import.bulk.upload')}
-          </Button>
-        </>
-      )}
-    </footer>
   )
 }
 

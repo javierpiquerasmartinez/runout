@@ -119,8 +119,9 @@ describe('ImportDialog, a large import', () => {
   it('takes a selection over 20 MB to a large import without reading it, and says what will happen', async () => {
     renderDialog()
 
-    await choose(sized('export.txt', 21 * MB))
+    await choose(sized('export.txt', 21 * MB), sized('more.zip', 1.25 * GB))
 
+    expect(screen.getByRole('status').textContent).toBe('2 files · 1.3 GB')
     expect(screen.getByText(/There is no preview/)).toBeTruthy()
     expect(screen.getByText(/we will email you/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Upload and import' })).toBeTruthy()
@@ -190,10 +191,10 @@ describe('ImportDialog, a large import', () => {
     it('uploads each part straight to storage, showing how far it has got', async () => {
       await startUploading()
 
-      expect(screen.getByText('Uploading… 0%')).toBeTruthy()
+      expect(screen.getByRole('status').textContent).toBe('Uploading… 0%')
       answer.get('https://storage.test/b-1/0/1')!()
 
-      expect(await screen.findByText('Uploading… 38%')).toBeTruthy()
+      await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Uploading… 38%'))
       expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('38')
     })
 
@@ -232,6 +233,21 @@ describe('ImportDialog, a large import', () => {
 
       expect(onClose).not.toHaveBeenCalled()
       expect(leaving().defaultPrevented).toBe(true)
+    })
+
+    it('keeps the tabs and each file’s remove button in sight, locked', async () => {
+      await startUploading()
+
+      for (const name of ['Upload files', 'Paste plain text']) {
+        expect(screen.getByRole('tab', { name: new RegExp(`^${name}`) }).getAttribute('aria-disabled')).toBe('true')
+      }
+      expect(screen.getByRole('tabpanel')).toBeTruthy()
+      const remove = screen.getByRole('button', { name: /^Remove export\.txt/ })
+      expect(remove.getAttribute('aria-disabled')).toBe('true')
+      await userEvent.click(remove)
+      await userEvent.click(screen.getByRole('tab', { name: /^Paste plain text/ }))
+      expect(screen.getByText('export.txt')).toBeTruthy()
+      expect(screen.getByRole('tab', { name: /^Upload files/ }).getAttribute('aria-selected')).toBe('true')
     })
 
     it('stops warning once uploaded', async () => {

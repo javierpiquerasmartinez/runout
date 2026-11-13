@@ -34,6 +34,11 @@ interface Part {
 }
 
 /** Thrown when storage refuses a part or answers without its ETag. */
+/** How far an upload has got, in whole percent. */
+export function percentOf({ sent, total }: { sent: number; total: number }): number {
+  return total > 0 ? Math.floor((sent / total) * 100) : 0
+}
+
 export class UploadFailed extends Error {}
 
 /**
