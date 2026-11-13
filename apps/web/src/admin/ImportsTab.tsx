@@ -225,6 +225,17 @@ function Reason({ bulkImport, stalled }: { bulkImport: AdminBulkImport; stalled:
     )
   }
   if (bulkImport.status === 'paused') return <>{t('admin.imports.storageFull')}</>
+  if (bulkImport.status === 'failed' && bulkImport.failureCode) {
+    // The import service gives up on a batch only after its last attempt.
+    const [before, after] = t('admin.imports.failedAfter', { code: '\u0000' }).split('\u0000')
+    return (
+      <>
+        {before}
+        <span className="ro-mono">{bulkImport.failureCode}</span>
+        {after}
+      </>
+    )
+  }
   if (bulkImport.reason) return <span className="ro-mono">{bulkImport.reason}</span>
   return <>—</>
 }

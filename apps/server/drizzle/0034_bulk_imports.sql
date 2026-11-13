@@ -9,6 +9,7 @@ CREATE TABLE "bulk_imports" (
 	"duplicates" integer DEFAULT 0 NOT NULL,
 	"not_imported" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"reason" text,
+	"failure_code" text,
 	"stalled" boolean DEFAULT false NOT NULL,
 	"last_advanced_at" timestamp with time zone,
 	"created_at" timestamp with time zone NOT NULL,

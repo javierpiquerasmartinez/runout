@@ -67,7 +67,7 @@ export function mailerFromEnv(env: NodeJS.ProcessEnv): Mailer {
   const from = env.EMAIL_FROM || undefined;
   if (!apiKey || !from) {
     throw new Error(
-      'RESEND_API_KEY and EMAIL_FROM must be set to send Invitations and password resets. See the README.',
+      'RESEND_API_KEY and EMAIL_FROM must be set to send email. See the README.',
     );
   }
   return new ResendMailer(apiKey, from);

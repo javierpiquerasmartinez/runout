@@ -68,6 +68,8 @@ export type ImportItem = {
   /** Tells items apart, even two files with the same name. */
   key: string
   name: string
+  /** In bytes, as chosen: a Bulk Import shows it, having read nothing. */
+  size: number
 } & (
   | { state: 'reading'; format?: SourceFormat }
   | { state: 'read'; preview: ImportPreview }
@@ -99,17 +101,17 @@ export function reduceBatch(batch: ImportBatch, event: BatchEvent): ImportBatch 
         items: [
           ...batch.items,
           ...event.items.map(({ key, name, size }): ImportItem =>
-            size > MAX_FILE_BYTES ? { key, name, state: 'failed', reason: 'file-too-large' } : { key, name, state: 'reading' },
+            size > MAX_FILE_BYTES ? { key, name, size, state: 'failed', reason: 'file-too-large' } : { key, name, size, state: 'reading' },
           ),
         ],
       }
     // An answer for an item removed meanwhile finds nothing to update.
     case 'read':
-      return update(event.key, ({ key, name }) => ({ key, name, state: 'read', preview: event.preview }))
+      return update(event.key, ({ key, name, size }) => ({ key, name, size, state: 'read', preview: event.preview }))
     case 'failed':
-      return update(event.key, ({ key, name }) => ({ key, name, state: 'failed', reason: event.reason }))
+      return update(event.key, ({ key, name, size }) => ({ key, name, size, state: 'failed', reason: event.reason }))
     case 'rereading':
-      return update(event.key, ({ key, name }) => ({ key, name, state: 'reading', format: event.format }))
+      return update(event.key, ({ key, name, size }) => ({ key, name, size, state: 'reading', format: event.format }))
     case 'removed':
       return { items: batch.items.filter((item) => item.key !== event.key) }
     case 'screenNameAdded': {

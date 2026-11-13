@@ -101,6 +101,24 @@ projects:
           name: runout
           type: web
           envVarKey: R2_BUCKET
+      # The email to the Importer when a Bulk Import ends: the API's Resend
+      # settings, and the web's origin its link leads to. FRONTEND_URL also
+      # marks the service as production, which then requires Resend.
+      - key: FRONTEND_URL
+        fromService:
+          name: runout
+          type: web
+          envVarKey: FRONTEND_URL
+      - key: RESEND_API_KEY
+        fromService:
+          name: runout
+          type: web
+          envVarKey: RESEND_API_KEY
+      - key: EMAIL_FROM
+        fromService:
+          name: runout
+          type: web
+          envVarKey: EMAIL_FROM
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       startCommand: pnpm run start:imports

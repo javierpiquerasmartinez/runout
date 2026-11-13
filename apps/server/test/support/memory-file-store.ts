@@ -5,6 +5,11 @@ import {
   type UploadedPart,
 } from '../../src/file-store/file-store.js';
 
+/** Something a read meets once past a point of the file. */
+type Fault = { afterBytes: number; skip: number } & (
+  { kind: 'fail'; error: Error } | { kind: 'hold'; released: Promise<void> }
+);
+
 interface Upload {
   key: string;
   parts: Map<number, { etag: string; bytes: Uint8Array }>;
@@ -84,16 +89,69 @@ export class MemoryFileStore implements FileStore {
   async *read(key: string): AsyncIterable<Uint8Array> {
     const bytes = this.stored.get(key);
     if (!bytes) throw new Error(`No file at ${key}`);
+    const next = this.faults[0];
+    const fault = next?.skip === 0 ? this.faults.shift() : undefined;
+    if (next && !fault) next.skip--;
     // In pieces, as a stream would bring them.
     for (let start = 0; start < bytes.length; start += 64 * 1024) {
+      if (fault && start >= fault.afterBytes) {
+        if (fault.kind === 'fail') throw fault.error;
+        await fault.released;
+      }
       yield bytes.subarray(start, start + 64 * 1024);
     }
+  }
+
+  /** What the reads to come will meet, in order: a read meets the first whose `skip` is used up. */
+  private readonly faults: Fault[] = [];
+
+  /**
+   * The next `times` reads after the first `skip` fail once past
+   * `afterBytes`, as a connection to storage dropped mid-file would.
+   */
+  failReads(options: {
+    afterBytes: number;
+    times: number;
+    skip?: number;
+  }): void {
+    const error = Object.assign(new Error('Connection reset by storage'), {
+      code: 'ECONNRESET',
+    });
+    for (let time = 0; time < options.times; time++) {
+      this.faults.push({
+        kind: 'fail',
+        afterBytes: options.afterBytes,
+        skip: time === 0 ? (options.skip ?? 0) : 0,
+        error,
+      });
+    }
+  }
+
+  /**
+   * The next read after the first `skip` stops past `afterBytes` until the
+   * returned function is called.
+   */
+  pauseRead(options: { afterBytes: number; skip?: number }): () => void {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    this.faults.push({
+      kind: 'hold',
+      afterBytes: options.afterBytes,
+      skip: options.skip ?? 0,
+      released,
+    });
+    return release;
   }
 
   delete(key: string, uploadId?: string): Promise<void> {
     this.stored.delete(key);
     if (uploadId) this.uploads.delete(uploadId);
     return Promise.resolve();
+  }
+
+  /** The keys of the uploads started and not yet completed or aborted. */
+  unfinishedUploads(): string[] {
+    return [...this.uploads.values()].map(({ key }) => key);
   }
 
   /** The keys of the files it holds, uploads not completed left out. */

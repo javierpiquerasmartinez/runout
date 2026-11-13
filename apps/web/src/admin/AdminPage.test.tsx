@@ -356,6 +356,7 @@ describe('the Imports tab', () => {
     duplicates: 12_000,
     notImported: {},
     reason: null,
+    failureCode: null,
     createdAt: '2026-11-02T09:12:00Z',
     lastActivityAt: '2026-11-02T10:00:00Z',
     finishedAt: null,
@@ -371,7 +372,7 @@ describe('the Imports tab', () => {
           bulkImport('1', 'jugador3@example.com', 'pt4-2019-2026.zip', firstStatus),
           bulkImport('2', 'jugador7@example.com', 'hm3-2024.zip', 'running', { stalled: true }),
           bulkImport('3', 'jugador2@example.com', 'sesiones-2023.zip', 'failed', {
-            reason: 'BATCH_INSERT_FAILED',
+            failureCode: '53100',
             finishedAt: '2026-11-02T11:00:00Z',
           }),
           bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused'),
@@ -415,7 +416,7 @@ describe('the Imports tab', () => {
     expect(rows[0].textContent).toMatch(/Account and file.*Status.*Hands.*Started.*Last activity.*Reason/)
     expect(rows[1].textContent).toMatch(/jugador3@example\.com.*pt4-2019-2026\.zip.*In progress.*412,000 of 1,240,000/)
     expect(rows[2].textContent).toMatch(/jugador7@example\.com.*Stalled.*No progress since/)
-    expect(rows[3].textContent).toMatch(/Failed.*BATCH_INSERT_FAILED/)
+    expect(rows[3].textContent).toMatch(/Failed.*53100 after 3 attempts/)
     expect(rows[4].textContent).toMatch(/Paused.*Storage at its limit/)
     expect(rows[5].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 discarded/)
     expect(calls[0].search).toContain('status=all')

@@ -159,13 +159,39 @@ describe('ImportsView', () => {
         processed: 0,
         imported: 0,
         duplicates: 0,
-        notImported: {},
+        notImported: { 'unrecognised-format': 1 },
+        reason: 'unrecognised-format',
       }),
     ])
 
     const [, , hands, , result] = rowOf(table, 'notas.txt')
     expect(hands).toBe('0 manos')
     expect(result).toBe('No hemos reconocido el formato de ninguna mano.')
+  })
+
+  it('says the Library filled up, and how many Hands did not fit', () => {
+    const table = renderImports([
+      bulkImport({
+        files: [{ name: 'pt4.zip', size: 1 }],
+        imported: 87600,
+        duplicates: 0,
+        notImported: { 'library-full': 12400, 'not-cash-holdem': 3 },
+        reason: 'library-full',
+      }),
+      bulkImport({
+        files: [{ name: 'one-more.txt', size: 1 }],
+        imported: 0,
+        duplicates: 0,
+        notImported: { 'library-full': 1 },
+        reason: 'library-full',
+      }),
+    ])
+
+    const [, status, hands, , result] = rowOf(table, 'pt4.zip')
+    expect(status).toBe('Completada')
+    expect(hands).toBe('87.600 manos')
+    expect(result).toBe('Biblioteca llena: 12.400 manos no cabían.')
+    expect(rowOf(table, 'one-more.txt')[4]).toBe('Biblioteca llena: 1 mano no cabía.')
   })
 
   it('says why an import ended adding none of its Hands', () => {

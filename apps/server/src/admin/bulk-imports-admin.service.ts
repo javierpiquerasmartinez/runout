@@ -24,8 +24,10 @@ export interface AdminBulkImportView {
   imported: number;
   duplicates: number;
   notImported: Record<string, number>;
-  /** The technical reason it ended short or failed, when it did. */
+  /** Why it ended short of adding its Hands, when it did. */
   reason: string | null;
+  /** Why it failed, when it did: a technical code, never a Hand's text. */
+  failureCode: string | null;
   createdAt: string;
   /** When it last moved: ended, advanced, or started. */
   lastActivityAt: string;
@@ -96,6 +98,7 @@ export class BulkImportsAdminService {
         duplicates: record.duplicates,
         notImported: record.notImported,
         reason: record.reason,
+        failureCode: record.failureCode,
         createdAt: record.createdAt.toISOString(),
         lastActivityAt: (
           record.finishedAt ??

@@ -131,7 +131,7 @@ describe('The Importaciones tab (e2e)', () => {
    */
   async function mark(
     id: string,
-    fields: { status?: string; reason?: string; stalled?: boolean },
+    fields: { status?: string; failureCode?: string; stalled?: boolean },
   ) {
     const client = new pg.Client(database.url);
     await client.connect();
@@ -139,14 +139,14 @@ describe('The Importaciones tab (e2e)', () => {
       await client.query(
         `update bulk_imports set
            status = coalesce($2, status),
-           reason = coalesce($3, reason),
+           failure_code = coalesce($3, failure_code),
            stalled = coalesce($4, stalled),
            finished_at = case when $2 = 'failed' then now() else finished_at end
          where id = $1`,
         [
           id,
           fields.status ?? null,
-          fields.reason ?? null,
+          fields.failureCode ?? null,
           fields.stalled ?? null,
         ],
       );
@@ -182,6 +182,7 @@ describe('The Importaciones tab (e2e)', () => {
           duplicates: 0,
           notImported: {},
           reason: null,
+          failureCode: null,
           createdAt: '2026-01-01T00:10:00.000Z',
           lastActivityAt: '2026-01-01T00:10:00.000Z',
           finishedAt: null,
@@ -198,6 +199,7 @@ describe('The Importaciones tab (e2e)', () => {
           duplicates: 0,
           notImported: {},
           reason: null,
+          failureCode: null,
           createdAt: '2026-01-01T00:00:00.000Z',
           lastActivityAt: '2026-01-01T00:00:00.000Z',
           finishedAt: '2026-01-01T00:00:00.000Z',
@@ -214,7 +216,7 @@ describe('The Importaciones tab (e2e)', () => {
     await service!.settled();
     await clock.advance(MINUTE);
     const failed = await ana.startUploading('failed.zip');
-    await mark(failed, { status: 'failed', reason: 'BATCH_INSERT_FAILED' });
+    await mark(failed, { status: 'failed', failureCode: '53100' });
     await clock.advance(MINUTE);
     const stalled = await bea.startUploading('stalled.zip');
     await mark(stalled, { status: 'running', stalled: true });
@@ -236,7 +238,8 @@ describe('The Importaciones tab (e2e)', () => {
       .imports;
     expect(listedFailed).toMatchObject({
       status: 'failed',
-      reason: 'BATCH_INSERT_FAILED',
+      reason: null,
+      failureCode: '53100',
     });
     await tab('?status=nonsense').expect(400);
   });

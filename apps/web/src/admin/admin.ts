@@ -122,8 +122,10 @@ export interface AdminBulkImport {
   imported: number
   duplicates: number
   notImported: Record<string, number>
-  /** The technical reason it ended short or failed, as the server words it. */
+  /** Why it ended short of adding its Hands, as the server words it. */
   reason: string | null
+  /** Why it failed, when it did: a technical code, never a Hand's text. */
+  failureCode: string | null
   createdAt: string
   lastActivityAt: string
   finishedAt: string | null

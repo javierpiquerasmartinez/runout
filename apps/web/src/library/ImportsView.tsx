@@ -100,16 +100,23 @@ function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel:
   )
 }
 
-/** How it ended: what was not added, or that nothing in the files was a Hand. */
+/** How it ended: what was not added, or why it ended short. */
 function Result({ bulkImport }: { bulkImport: BulkImport }) {
   const { t, formatNumber } = useI18n()
   const notImported = Object.values(bulkImport.notImported).reduce((sum, count) => sum + count, 0)
   if (bulkImport.status === 'failed') return <>{t('library.imports.failed')}</>
   if (bulkImport.status === 'cancelled') return <>{t('library.imports.cancelled')}</>
-  if (bulkImport.reason) return <>{t(`library.imports.reason.${bulkImport.reason}`)}</>
-  if (bulkImport.imported + bulkImport.duplicates === 0 && bulkImport.status === 'completed') {
-    return <>{t('library.imports.noneRecognised')}</>
+  if (bulkImport.reason === 'library-full') {
+    const notFit = bulkImport.notImported['library-full'] ?? 0
+    return (
+      <>
+        {t(notFit === 1 ? 'library.imports.reason.library-full.one' : 'library.imports.reason.library-full.other', {
+          count: formatNumber(notFit),
+        })}
+      </>
+    )
   }
+  if (bulkImport.reason) return <>{t(`library.imports.reason.${bulkImport.reason}`)}</>
   const parts = [
     bulkImport.duplicates > 0 &&
       t(bulkImport.duplicates === 1 ? 'library.imports.duplicates.one' : 'library.imports.duplicates.other', {
