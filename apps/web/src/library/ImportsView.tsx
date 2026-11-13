@@ -67,6 +67,7 @@ function ImportRow({ bulkImport }: { bulkImport: BulkImport }) {
 function Result({ bulkImport }: { bulkImport: BulkImport }) {
   const { t, formatNumber } = useI18n()
   const notImported = Object.values(bulkImport.notImported).reduce((sum, count) => sum + count, 0)
+  if (bulkImport.reason) return <>{t(`library.imports.reason.${bulkImport.reason}`)}</>
   if (bulkImport.imported + bulkImport.duplicates === 0 && bulkImport.status === 'completed') {
     return <>{t('library.imports.noneRecognised')}</>
   }

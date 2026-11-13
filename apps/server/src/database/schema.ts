@@ -719,6 +719,11 @@ export const bulkImports = pgTable(
       .$type<Record<string, number>>()
       .notNull()
       .default({}),
+    /**
+     * Why it ended short of adding its Hands, when it did: `too-many-hands`
+     * past the limit, `unreadable-file` when a file is no text or zip.
+     */
+    reason: text('reason'),
     /** When a batch last committed; null before the first. */
     lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

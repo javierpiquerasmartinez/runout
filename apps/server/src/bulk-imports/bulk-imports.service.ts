@@ -26,6 +26,8 @@ export interface BulkImportView {
   duplicates: number;
   /** Hands not imported, per reason. */
   notImported: Record<string, number>;
+  /** Why it ended short of adding its Hands, when it did. */
+  reason: string | null;
   createdAt: string;
   finishedAt: string | null;
 }
@@ -168,6 +170,7 @@ function view(row: typeof bulkImports.$inferSelect): BulkImportView {
     imported: row.imported,
     duplicates: row.duplicates,
     notImported: row.notImported,
+    reason: row.reason,
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
   };

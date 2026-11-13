@@ -162,6 +162,7 @@ beforeEach(() => {
             imported: 400000,
             duplicates: 12000,
             notImported: {},
+            reason: null,
             createdAt: '2026-11-02T10:00:00.000Z',
             finishedAt: null,
           },

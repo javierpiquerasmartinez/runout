@@ -6,6 +6,10 @@ import { inject } from 'vitest';
 import { CLOCK } from '../../src/clock/clock.js';
 import { DATABASE_URL } from '../../src/database/database.js';
 import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
+import {
+  BULK_IMPORT_LIMIT,
+  DEFAULT_BULK_IMPORT_LIMIT,
+} from '../../src/import-service/bulk-import-limit.js';
 import { WAKE_SECRET } from '../../src/import-service/import-service-config.js';
 import { ImportEngine } from '../../src/import-service/import-engine.js';
 import {
@@ -35,6 +39,8 @@ export interface StartImportServiceOptions {
   clock?: TestClock;
   /** Shared with the API that takes the uploads; an empty one otherwise. */
   fileStore?: FileStore;
+  /** The most Hands one Bulk Import may hold; 2 million otherwise, as in production. */
+  limit?: number;
 }
 
 /** Boots the import service in-process on a random port, wired like production. */
@@ -52,6 +58,8 @@ export async function startImportService(
     .useValue(options.secret)
     .overrideProvider(FILE_STORE)
     .useValue(options.fileStore ?? new MemoryFileStore())
+    .overrideProvider(BULK_IMPORT_LIMIT)
+    .useValue(options.limit ?? DEFAULT_BULK_IMPORT_LIMIT)
     .compile();
 
   const app = moduleRef.createNestApplication();

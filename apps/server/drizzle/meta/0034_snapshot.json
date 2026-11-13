@@ -1,5 +1,5 @@
 {
-  "id": "3b627aab-8747-42e8-b87d-9ad5fe336cf9",
+  "id": "e2f0f68b-3919-4420-8a95-dde2dcc15f30",
   "prevId": "6cf66ef8-f448-4751-a0ad-2f9f3ad13ac3",
   "version": "7",
   "dialect": "postgresql",
@@ -66,6 +66,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "last_advanced_at": {
           "name": "last_advanced_at",

@@ -6,6 +6,10 @@ import { fileStoreFromEnv } from '../file-store/file-store.module.js';
 import { HeroResultsModule } from '../hands/hero-results.module.js';
 import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
+import {
+  BULK_IMPORT_LIMIT,
+  DEFAULT_BULK_IMPORT_LIMIT,
+} from './bulk-import-limit.js';
 import { ImportEngine } from './import-engine.js';
 import { WakeController } from './wake.controller.js';
 
@@ -24,6 +28,7 @@ import { WakeController } from './wake.controller.js';
       provide: FILE_STORE,
       useFactory: () => fileStoreFromEnv(process.env, true),
     },
+    { provide: BULK_IMPORT_LIMIT, useValue: DEFAULT_BULK_IMPORT_LIMIT },
     ImportEngine,
   ],
 })

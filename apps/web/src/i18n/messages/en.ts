@@ -1025,6 +1025,8 @@ export const en: Messages = {
   'library.imports.notRecognised.one': '{count} not recognised',
   'library.imports.notRecognised.other': '{count} not recognised',
   'library.imports.noneRecognised': 'We did not recognise the format of any hand.',
+  'library.imports.reason.too-many-hands': 'It has more than 2 million hands: none was imported.',
+  'library.imports.reason.unreadable-file': 'One of the files could not be opened.',
   'library.imports.empty': 'You have not made any large import yet.',
   'library.stats.title': 'Stats',
   'library.stats.group.preflop': 'Preflop',

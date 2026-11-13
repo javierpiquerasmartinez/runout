@@ -1,3 +1,4 @@
+import { strToU8, zipSync } from 'fflate';
 import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
@@ -23,13 +24,14 @@ describe('A Bulk Import (e2e)', () => {
    * The API and the import service, on a database of their own: an import
    * service takes any waiting import it finds, other files' included.
    */
-  async function start() {
+  async function start(options: { limit?: number } = {}) {
     database = await freshDatabase();
     store = new MemoryFileStore();
     service = await startImportService({
       secret: SECRET,
       fileStore: store,
       databaseUrl: database.url,
+      limit: options.limit,
     });
     api = await startApp({
       databaseUrl: database.url,
@@ -98,24 +100,36 @@ describe('A Bulk Import (e2e)', () => {
     };
   }
 
-  /** Starts a Bulk Import of one file and uploads it as the browser would. */
-  async function upload(
+  /** Starts a Bulk Import of one text file and uploads it as the browser would. */
+  function upload(
     account: ReturnType<typeof asAccount>,
     name: string,
     text: string,
   ): Promise<string> {
-    const bytes = Buffer.from(text);
+    return uploadFiles(account, [{ name, bytes: Buffer.from(text) }]);
+  }
+
+  /** Starts a Bulk Import of these files and uploads each in one part. */
+  async function uploadFiles(
+    account: ReturnType<typeof asAccount>,
+    files: { name: string; bytes: Uint8Array }[],
+  ): Promise<string> {
     const started = await account
-      .start([{ name, size: bytes.length }])
+      .start(files.map(({ name, bytes }) => ({ name, size: bytes.length })))
       .expect(201);
     const id = started.body.id as string;
-    const urls = await account.partUrls(id, 0, [1]).expect(201);
-    const [{ partNumber, url }] = urls.body.parts as {
-      partNumber: number;
-      url: string;
-    }[];
-    const etag = store.receive(url, bytes);
-    await account.complete(id, [{ parts: [{ partNumber, etag }] }]).expect(201);
+    const uploaded = [];
+    for (const [index, { bytes }] of files.entries()) {
+      const urls = await account.partUrls(id, index, [1]).expect(201);
+      const [{ partNumber, url }] = urls.body.parts as {
+        partNumber: number;
+        url: string;
+      }[];
+      uploaded.push({
+        parts: [{ partNumber, etag: store.receive(url, bytes) }],
+      });
+    }
+    await account.complete(id, uploaded).expect(201);
     return id;
   }
 
@@ -141,6 +155,104 @@ describe('A Bulk Import (e2e)', () => {
         duplicates: 0,
       }),
     ]);
+  });
+
+  it('imports text files and zips together, each Hand in its own format', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const stars = manyHands(30);
+    const gg = freshHandHistory('ggpoker-session.txt');
+    const winamax = freshHandHistory('winamax-session.txt');
+    const zip = zipSync({
+      'export/gg.txt': strToU8(gg),
+      'export/notes.pdf': strToU8('not a hand history'),
+      'export/wina.txt': strToU8(winamax),
+    });
+
+    await uploadFiles(account, [
+      { name: 'stars.txt', bytes: Buffer.from(stars) },
+      { name: 'export.zip', bytes: zip },
+    ]);
+    await service!.settled();
+
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed.status).toBe('completed');
+    expect(listed.files.map((file: { name: string }) => file.name)).toEqual([
+      'stars.txt',
+      'export.zip',
+    ]);
+    expect(listed.total).toBeGreaterThan(30);
+    expect(listed.processed).toBe(listed.total);
+    expect(listed.imported).toBe(await account.libraryTotal());
+    const sites = await request(api.httpServer)
+      .get('/api/library/hands?pageSize=100')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(
+      new Set(sites.body.hands.map((hand: { site: string }) => hand.site)),
+    ).toEqual(new Set(['pokerstars', 'ggpoker', 'winamax']));
+  });
+
+  it('ends an import of more Hands than the limit, adding none of them', async () => {
+    await start({ limit: 20 });
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+
+    await upload(account, 'too-many.txt', manyHands(21));
+    await service!.settled();
+
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      reason: 'too-many-hands',
+      imported: 0,
+    });
+    expect(await account.libraryTotal()).toBe(0);
+    expect(store.files()).toEqual([]);
+  });
+
+  it('takes an import of exactly the limit', async () => {
+    await start({ limit: 20 });
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+
+    await upload(account, 'just-enough.txt', manyHands(20));
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(20);
+  });
+
+  it('counts a run of text that is no Hand, and ends saying so when nothing is one', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+
+    await upload(account, 'notes.txt', 'Dear diary,\n\nnot a hand at all.');
+    await service!.settled();
+
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      total: 0,
+      imported: 0,
+      notImported: { 'unrecognised-format': 1 },
+    });
+  });
+
+  it('ends an import whose zip is not one, saying why', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+
+    await upload(account, 'broken.zip', 'PK\u0003\u0004 not really a zip');
+    await service!.settled();
+
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      reason: 'unreadable-file',
+    });
   });
 
   it('counts the Hands already in the Library as duplicates and adds them once', async () => {

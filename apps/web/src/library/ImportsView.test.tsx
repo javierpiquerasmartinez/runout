@@ -15,6 +15,7 @@ function bulkImport(overrides: Partial<BulkImport>): BulkImport {
     imported: 318204,
     duplicates: 1910,
     notImported: { 'unrecognised-format': 42 },
+    reason: null,
     createdAt: '2026-11-02T10:00:00.000Z',
     finishedAt: '2026-11-02T12:00:00.000Z',
     ...overrides,
@@ -116,6 +117,16 @@ describe('ImportsView', () => {
     const [, , hands, , result] = rowOf(table, 'notas.txt')
     expect(hands).toBe('0 manos')
     expect(result).toBe('No hemos reconocido el formato de ninguna mano.')
+  })
+
+  it('says why an import ended adding none of its Hands', () => {
+    const table = renderImports([
+      bulkImport({ files: [{ name: 'huge.zip', size: 1 }], total: null, processed: 0, imported: 0, duplicates: 0, notImported: {}, reason: 'too-many-hands' }),
+      bulkImport({ files: [{ name: 'broken.zip', size: 1 }], total: null, processed: 0, imported: 0, duplicates: 0, notImported: {}, reason: 'unreadable-file' }),
+    ])
+
+    expect(rowOf(table, 'huge.zip')[4]).toBe('Tiene más de 2 millones de manos: no se ha importado ninguna.')
+    expect(rowOf(table, 'broken.zip')[4]).toBe('No se ha podido abrir uno de los archivos.')
   })
 
   it('leaves out what did not happen from the result', () => {

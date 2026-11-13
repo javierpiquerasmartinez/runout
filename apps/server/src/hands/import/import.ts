@@ -24,6 +24,19 @@ const FORMATS: Record<SourceFormat, Format> = {
 
 export const SOURCE_FORMATS = Object.keys(FORMATS) as SourceFormat[];
 
+/** The first format, of those tried, that recognises the block as a Hand; null for none. */
+export function recogniseBlock(
+  block: string,
+  tried: readonly SourceFormat[] = SOURCE_FORMATS,
+): SourceFormat | null {
+  return tried.find((name) => FORMATS[name].recognises(block)) ?? null;
+}
+
+/** Reads a block its format recognised; throws `Discard` when it can't. */
+export function parseBlock(block: string, format: SourceFormat): Hand {
+  return FORMATS[format].parse(block);
+}
+
 export interface Discarded {
   /** The text that was discarded, exactly as it came in. */
   text: string;
@@ -79,8 +92,7 @@ export function importHandHistory(
   for (const { start, end } of blocks(text)) {
     const block = text.slice(start, end);
     // A format picked by hand reads every block, without detection's say.
-    const format =
-      options.format ?? tried.find((name) => FORMATS[name].recognises(block));
+    const format = options.format ?? recogniseBlock(block, tried);
     if (!format) {
       extendUnrecognised(start, end);
       continue;
@@ -88,7 +100,7 @@ export function importHandHistory(
     flushUnrecognised();
     detected.set(format, (detected.get(format) ?? 0) + 1);
     try {
-      result.hands.push(FORMATS[format].parse(block));
+      result.hands.push(parseBlock(block, format));
       result.texts.push(block);
     } catch (error) {
       if (!(error instanceof Discard)) throw error;

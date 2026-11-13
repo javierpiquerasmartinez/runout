@@ -1024,6 +1024,8 @@ export const es = {
   'library.imports.notRecognised.one': '{count} no reconocida',
   'library.imports.notRecognised.other': '{count} no reconocidas',
   'library.imports.noneRecognised': 'No hemos reconocido el formato de ninguna mano.',
+  'library.imports.reason.too-many-hands': 'Tiene más de 2 millones de manos: no se ha importado ninguna.',
+  'library.imports.reason.unreadable-file': 'No se ha podido abrir uno de los archivos.',
   'library.imports.empty': 'Aún no has hecho ninguna importación grande.',
   'library.stats.title': 'Estadísticas',
   'library.stats.group.preflop': 'Preflop',
