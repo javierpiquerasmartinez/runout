@@ -59,6 +59,8 @@ import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import type { LibraryStats } from './stats'
 import { StatsView } from './StatsView'
+import type { BulkImport } from './bulkImports'
+import { ImportsView } from './ImportsView'
 import { replayFilterSearch, replaySelectedSearch, replayServerQuery } from './replay'
 import './LibraryPage.css'
 
@@ -152,6 +154,21 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       cancelled = true
     }
   }, [token, filter, revision, view])
+
+  // The Account's Bulk Imports, whatever the filter: they are not Hands it narrows.
+  const [imports, setImports] = useState<{ state: 'loaded'; imports: BulkImport[] } | { state: 'failed'; reason: FailureReason } | null>(
+    null,
+  )
+  useEffect(() => {
+    if (view !== 'imports') return
+    let cancelled = false
+    api<BulkImport[]>('/library/bulk-imports', { token })
+      .then((read) => !cancelled && setImports({ state: 'loaded', imports: read }))
+      .catch((error: unknown) => !cancelled && setImports({ state: 'failed', reason: reasonOf(error) }))
+    return () => {
+      cancelled = true
+    }
+  }, [token, revision, view])
 
   const page = load?.state === 'loaded' ? load.page : null
   // Back from a Hand, the list lands as far down as it was left, once its Hands are there again.
@@ -382,7 +399,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               {t(`reason.${load.reason}`)}
             </p>
           )}
-          {page && page.counts.all > 0 && <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />}
+          {page && page.counts.all > 0 && view !== 'imports' && (
+            <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />
+          )}
           {!room && (
             <SegmentedControl
               label={t('library.view')}
@@ -390,6 +409,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
                 { value: 'list', label: t('library.view.hands') },
                 { value: 'graph', label: t('library.view.graph') },
                 { value: 'stats', label: t('library.view.stats') },
+                { value: 'imports', label: t('library.view.imports') },
               ]}
               value={view}
               onChange={showView}
@@ -411,7 +431,13 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
           {view === 'stats' && page && page.total > 0 && stats?.state === 'loaded' && stats.stats.hands > 0 && (
             <StatsView stats={stats.stats} statHref={statHref} />
           )}
-          {page && page.total === 0 && page.counts.all > 0 && (
+          {view === 'imports' && imports?.state === 'failed' && (
+            <p className="library__failure" role="alert">
+              {t(`reason.${imports.reason}`)}
+            </p>
+          )}
+          {view === 'imports' && imports?.state === 'loaded' && <ImportsView imports={imports.imports} />}
+          {view !== 'imports' && page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{noMatches.message}</p>
               <div className="library__empty-actions">
@@ -425,7 +451,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               </div>
             </div>
           )}
-          {page && page.counts.all === 0 && (
+          {view !== 'imports' && page && page.counts.all === 0 && (
             <div className="library__empty">
               <p>{t('library.empty')}</p>
               <Button variant="primary" onClick={openImport}>

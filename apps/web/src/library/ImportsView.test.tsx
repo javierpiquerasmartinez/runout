@@ -1,0 +1,148 @@
+import { render, screen, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { I18nProvider } from '../i18n'
+import type { Locale } from '../i18n/catalogue'
+import type { BulkImport } from './bulkImports'
+import { ImportsView } from './ImportsView'
+
+function bulkImport(overrides: Partial<BulkImport>): BulkImport {
+  return {
+    id: crypto.randomUUID(),
+    status: 'completed',
+    files: [{ name: 'hm3-2024.zip', size: 1000 }],
+    total: 320156,
+    processed: 320156,
+    imported: 318204,
+    duplicates: 1910,
+    notImported: { 'unrecognised-format': 42 },
+    createdAt: '2026-11-02T10:00:00.000Z',
+    finishedAt: '2026-11-02T12:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function renderImports(imports: BulkImport[], locale: Locale = 'es') {
+  render(
+    <I18nProvider initialLocale={locale}>
+      <ImportsView imports={imports} />
+    </I18nProvider>,
+  )
+  return screen.getByRole('table', { name: locale === 'es' ? 'Importaciones' : 'Imports' })
+}
+
+/** The cells of the row naming this file. */
+function rowOf(table: HTMLElement, file: string): string[] {
+  const row = within(table).getByRole('row', { name: new RegExp(file) })
+  return within(row)
+    .getAllByRole('cell')
+    .map((cell) => cell.textContent ?? '')
+}
+
+describe('ImportsView', () => {
+  it('lists each import with its file, status, Hands, start and result', () => {
+    const table = renderImports([bulkImport({})])
+
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Archivo',
+      'Estado',
+      'Manos',
+      'Inicio',
+      'Resultado',
+    ])
+    expect(rowOf(table, 'hm3-2024.zip')).toEqual([
+      'hm3-2024.zip',
+      'Completada',
+      '318.204 manos',
+      '2 nov 2026',
+      // As Intl writes it in Spanish, like everywhere else in Runout: no point under 10.000.
+      '1910 duplicadas · 42 no reconocidas',
+    ])
+  })
+
+  it('shows how far one in progress has gone, with no result yet', () => {
+    const table = renderImports([
+      bulkImport({
+        files: [{ name: 'pt4-2019-2026.zip', size: 1000 }],
+        status: 'running',
+        total: 1240000,
+        processed: 412000,
+        finishedAt: null,
+      }),
+    ])
+
+    const [, status, hands, , result] = rowOf(table, 'pt4-2019-2026.zip')
+    expect(status).toBe('En curso')
+    expect(hands).toBe('412.000 de 1.240.000')
+    expect(result).toBe('—')
+  })
+
+  it('reads “En curso” while waiting or counting too, and “Subiendo” while uploading', () => {
+    const table = renderImports([
+      bulkImport({ files: [{ name: 'a.txt', size: 1 }], status: 'waiting', total: null, processed: 0 }),
+      bulkImport({ files: [{ name: 'b.txt', size: 1 }], status: 'counting', total: null, processed: 0 }),
+      bulkImport({ files: [{ name: 'c.txt', size: 1 }], status: 'uploading', total: null, processed: 0 }),
+    ])
+
+    expect(rowOf(table, 'a.txt')[1]).toBe('En curso')
+    expect(rowOf(table, 'b.txt')[1]).toBe('En curso')
+    expect(rowOf(table, 'c.txt')[1]).toBe('Subiendo')
+  })
+
+  it('names every file of an import', () => {
+    const table = renderImports([
+      bulkImport({
+        files: [
+          { name: 'one.txt', size: 1 },
+          { name: 'two.zip', size: 1 },
+        ],
+      }),
+    ])
+
+    expect(rowOf(table, 'one.txt')[0]).toBe('one.txt, two.zip')
+  })
+
+  it('says when no Hand in the files was recognised', () => {
+    const table = renderImports([
+      bulkImport({
+        files: [{ name: 'notas.txt', size: 1 }],
+        total: 0,
+        processed: 0,
+        imported: 0,
+        duplicates: 0,
+        notImported: {},
+      }),
+    ])
+
+    const [, , hands, , result] = rowOf(table, 'notas.txt')
+    expect(hands).toBe('0 manos')
+    expect(result).toBe('No hemos reconocido el formato de ninguna mano.')
+  })
+
+  it('leaves out what did not happen from the result', () => {
+    const table = renderImports([bulkImport({ duplicates: 0, notImported: {} })])
+
+    expect(rowOf(table, 'hm3-2024.zip')[4]).toBe('—')
+  })
+
+  it('speaks English too', () => {
+    const table = renderImports([bulkImport({})], 'en')
+
+    expect(rowOf(table, 'hm3-2024.zip')).toEqual([
+      'hm3-2024.zip',
+      'Completed',
+      '318,204 hands',
+      'Nov 2, 2026',
+      '1,910 duplicates · 42 not recognised',
+    ])
+  })
+
+  it('says there are none yet', () => {
+    render(
+      <I18nProvider initialLocale="es">
+        <ImportsView imports={[]} />
+      </I18nProvider>,
+    )
+
+    expect(screen.getByText('Aún no has hecho ninguna importación grande.')).toBeTruthy()
+  })
+})

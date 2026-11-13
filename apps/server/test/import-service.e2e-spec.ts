@@ -50,21 +50,29 @@ describe('The import service (e2e)', () => {
     const name = new URL(database.url).pathname.slice(1);
     const observer = new pg.Client(inject('databaseUrl'));
     await observer.connect();
-    const connections = async () => {
-      const { rows } = await observer.query<{ count: string }>(
-        'select count(*) from pg_stat_activity where datname = $1',
-        [name],
-      );
-      return Number(rows[0].count);
-    };
     try {
       service = await startImportService({
         secret: SECRET,
         databaseUrl: database.url,
       });
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Starting, it looks once for an import to go on with.
+      await service.settled();
 
-      expect(await connections()).toBe(0);
+      const {
+        rows: [{ now }],
+        // As text: a Date would drop the microseconds.
+      } = await observer.query<{ now: string }>(
+        'select clock_timestamp()::text as now',
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const { rows } = await observer.query<{ count: string }>(
+        `select count(*) from pg_stat_activity
+          where datname = $1
+            and (state_change > $2::timestamptz or backend_start > $2::timestamptz)`,
+        [name, now],
+      );
+
+      expect(Number(rows[0].count)).toBe(0);
     } finally {
       await service?.close();
       await observer.end();

@@ -151,6 +151,22 @@ beforeEach(() => {
         handIdsRequests.push(url)
         return Response.json({ ids: ['h1', 'h2', 'h3'] })
       }
+      if (url === '/api/library/bulk-imports') {
+        return Response.json([
+          {
+            id: 'b1',
+            status: 'running',
+            files: [{ name: 'pt4-export.zip', size: 1000 }],
+            total: 1240000,
+            processed: 412000,
+            imported: 400000,
+            duplicates: 12000,
+            notImported: {},
+            createdAt: '2026-11-02T10:00:00.000Z',
+            finishedAt: null,
+          },
+        ])
+      }
       if (url.startsWith('/api/library/stats')) {
         statsRequests.push(url)
         return statsReply()
@@ -329,6 +345,20 @@ describe('LibraryPage', () => {
       expect(window.location.pathname).toBe('/library')
       expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
       expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+    })
+
+    it('switches to the Imports at /library/imports, leaving the filters out', async () => {
+      renderLibrary()
+      const view = await screen.findByRole('radiogroup', { name: 'View' })
+      await screen.findByRole('table', { name: 'All hands' })
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Imports' }))
+
+      expect(window.location.pathname).toBe('/library/imports')
+      const shown = await screen.findByRole('table', { name: 'Imports' })
+      expect(within(shown).getByRole('row', { name: /pt4-export\.zip/ }).textContent).toContain('412,000 of 1,240,000')
+      expect(screen.queryByRole('table', { name: 'All hands' })).toBeNull()
+      expect(screen.queryByRole('group', { name: 'Filters' })).toBeNull()
     })
 
     it('switches to the Stats at /library/stats', async () => {

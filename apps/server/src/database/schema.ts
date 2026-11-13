@@ -670,3 +670,62 @@ export const goals = pgTable(
   },
   (table) => [index('goals_identity_id_idx').on(table.identityId)],
 );
+
+/** Where a Bulk Import is; the record is also the import service's queue. */
+export const BULK_IMPORT_STATUSES = [
+  'uploading',
+  'waiting',
+  'counting',
+  'running',
+  'paused',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
+export type BulkImportStatus = (typeof BULK_IMPORT_STATUSES)[number];
+
+/** One file of a Bulk Import, as stored while it is imported. */
+export interface BulkImportFile {
+  name: string;
+  /** In bytes, as the browser gave it. */
+  size: number;
+  /** Where it is in the file store. */
+  key: string;
+  /** Its multipart upload, until the upload is complete. */
+  uploadId: string;
+}
+
+/**
+ * A Bulk Import: an Account's import into its Library too large to wait for,
+ * added by the import service batch by batch. It never holds a Hand's text.
+ */
+export const bulkImports = pgTable(
+  'bulk_imports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    status: text('status', { enum: BULK_IMPORT_STATUSES }).notNull(),
+    files: jsonb('files').$type<BulkImportFile[]>().notNull(),
+    /** The Hands its files hold; null until they are counted. */
+    total: integer('total'),
+    /** Hands gone through so far, in the files' order: where it resumes. */
+    processed: integer('processed').notNull().default(0),
+    imported: integer('imported').notNull().default(0),
+    duplicates: integer('duplicates').notNull().default(0),
+    /** How many Hands were not imported, per reason. */
+    notImported: jsonb('not_imported')
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+    /** When a batch last committed; null before the first. */
+    lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('bulk_imports_identity_id_idx').on(table.identityId),
+    index('bulk_imports_status_idx').on(table.status),
+  ],
+);

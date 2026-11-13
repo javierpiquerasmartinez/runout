@@ -28,7 +28,8 @@ export class WakeController {
   @Post()
   @HttpCode(HttpStatus.NO_CONTENT)
   wake(@Headers('authorization') authorization?: string): void {
-    if (!this.carriesSecret(authorization)) throw new Rejected('unauthenticated');
+    if (!this.carriesSecret(authorization))
+      throw new Rejected('unauthenticated');
     this.engine.workUntilNothingLeft().catch((error: unknown) => {
       this.logger.error(
         `The import engine stopped: ${error instanceof Error ? error.message : String(error)}`,

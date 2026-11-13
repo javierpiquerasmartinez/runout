@@ -1,0 +1,21 @@
+.imports td {
+  height: 52px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-panel-border);
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.imports tr:last-child td {
+  border-bottom: 0;
+}
+.imports__file {
+  color: var(--text-primary);
+}
+.imports__result {
+  white-space: normal;
+}
+.imports__empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+}

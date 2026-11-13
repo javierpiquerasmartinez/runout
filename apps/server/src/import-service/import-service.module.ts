@@ -1,6 +1,9 @@
 import { type INestApplication, Module } from '@nestjs/common';
 import { ClockModule } from '../clock/clock.module.js';
 import { DatabaseModule } from '../database/database.module.js';
+import { FILE_STORE } from '../file-store/file-store.js';
+import { fileStoreFromEnv } from '../file-store/file-store.module.js';
+import { HeroResultsModule } from '../hands/hero-results.module.js';
 import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
 import { ImportEngine } from './import-engine.js';
@@ -12,10 +15,15 @@ import { WakeController } from './wake.controller.js';
  * wake.
  */
 @Module({
-  imports: [ClockModule, DatabaseModule],
+  imports: [ClockModule, DatabaseModule, HeroResultsModule],
   controllers: [WakeController],
   providers: [
     { provide: WAKE_SECRET, useFactory: () => wakeSecretFromEnv(process.env) },
+    // It has nothing to import from without one.
+    {
+      provide: FILE_STORE,
+      useFactory: () => fileStoreFromEnv(process.env, true),
+    },
     ImportEngine,
   ],
 })

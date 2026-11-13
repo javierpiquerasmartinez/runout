@@ -5,12 +5,14 @@ import type { AddressInfo } from 'node:net';
 import { inject } from 'vitest';
 import { CLOCK } from '../../src/clock/clock.js';
 import { DATABASE_URL } from '../../src/database/database.js';
+import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
 import { WAKE_SECRET } from '../../src/import-service/import-service-config.js';
 import { ImportEngine } from '../../src/import-service/import-engine.js';
 import {
   configureImportService,
   ImportServiceModule,
 } from '../../src/import-service/import-service.module.js';
+import { MemoryFileStore } from './memory-file-store.js';
 import { TestClock } from './test-clock.js';
 
 export interface RunningImportService {
@@ -18,8 +20,10 @@ export interface RunningImportService {
   httpServer: Server;
   /** `host:port`, as the API's `IMPORT_SERVICE_ADDRESS` names it. */
   address: string;
-  /** How many wakes have set the engine working. */
+  /** How many wakes have set the engine working since it started. */
   wakes(): number;
+  /** Resolves once the engine has nothing left in hand. */
+  settled(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -29,23 +33,14 @@ export interface StartImportServiceOptions {
   /** Defaults to the Postgres started for this e2e run. */
   databaseUrl?: string;
   clock?: TestClock;
-}
-
-/** The engine as the service runs it, counting the times it is set working. */
-class CountedImportEngine extends ImportEngine {
-  started = 0;
-
-  override workUntilNothingLeft(): Promise<void> {
-    this.started++;
-    return super.workUntilNothingLeft();
-  }
+  /** Shared with the API that takes the uploads; an empty one otherwise. */
+  fileStore?: FileStore;
 }
 
 /** Boots the import service in-process on a random port, wired like production. */
 export async function startImportService(
   options: StartImportServiceOptions,
 ): Promise<RunningImportService> {
-  const engine = new CountedImportEngine();
   const moduleRef = await Test.createTestingModule({
     imports: [ImportServiceModule],
   })
@@ -55,13 +50,21 @@ export async function startImportService(
     .useValue(options.clock ?? new TestClock())
     .overrideProvider(WAKE_SECRET)
     .useValue(options.secret)
-    .overrideProvider(ImportEngine)
-    .useValue(engine)
+    .overrideProvider(FILE_STORE)
+    .useValue(options.fileStore ?? new MemoryFileStore())
     .compile();
 
   const app = moduleRef.createNestApplication();
   configureImportService(app);
+  // What start-up set going is not a wake: count from here.
+  const engine = app.get(ImportEngine);
+  let wakes = 0;
+  const work = engine.workUntilNothingLeft.bind(engine);
   await app.listen(0, '127.0.0.1');
+  engine.workUntilNothingLeft = () => {
+    wakes++;
+    return work();
+  };
 
   const httpServer = app.getHttpServer() as Server;
   const { port } = httpServer.address() as AddressInfo;
@@ -70,10 +73,12 @@ export async function startImportService(
     app,
     httpServer,
     address: `127.0.0.1:${port}`,
-    wakes: () => engine.started,
+    wakes: () => wakes,
+    settled: () => engine.settled(),
     close: async () => {
       if (closed) return;
       closed = true;
+      await engine.settled();
       await app.close();
     },
   };

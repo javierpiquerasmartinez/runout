@@ -41,6 +41,15 @@ projects:
           name: runout-imports
           type: pserv
           envVarKey: IMPORT_SERVICE_SECRET
+      # The R2 bucket Bulk Imports' files are uploaded to.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       # Runs after the build and before the new version starts. If a
@@ -71,6 +80,27 @@ projects:
       # Generated once by Render, then kept.
       - key: IMPORT_SERVICE_SECRET
         generateValue: true
+      # The same bucket as the API's, set there once.
+      - key: R2_ACCOUNT_ID
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_ACCOUNT_ID
+      - key: R2_ACCESS_KEY_ID
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_ACCESS_KEY_ID
+      - key: R2_SECRET_ACCESS_KEY
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_SECRET_ACCESS_KEY
+      - key: R2_BUCKET
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_BUCKET
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       startCommand: pnpm run start:imports

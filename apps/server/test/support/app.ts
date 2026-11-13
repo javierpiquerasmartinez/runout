@@ -17,6 +17,7 @@ import {
   IMPORT_SERVICE,
   type ImportServiceAddress,
 } from '../../src/import-service/import-service-config.js';
+import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
 import { LIBRARY_CAPACITY } from '../../src/library/library-limits.js';
 import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
@@ -58,6 +59,8 @@ export interface StartAppOptions {
   libraryCapacity?: number;
   /** The import service it wakes, as `startImportService` gives it; none otherwise. */
   importService?: ImportServiceAddress;
+  /** Where Bulk Imports' files go, shared with the import service; none otherwise. */
+  fileStore?: FileStore;
 }
 
 /**
@@ -95,7 +98,9 @@ export async function startApp(
     .overrideProvider(ADMINISTRATOR_EMAILS)
     .useValue(new AdministratorEmails(options.administratorEmails ?? []))
     .overrideProvider(IMPORT_SERVICE)
-    .useValue(options.importService ?? null);
+    .useValue(options.importService ?? null)
+    .overrideProvider(FILE_STORE)
+    .useValue(options.fileStore ?? null);
   if (options.libraryCapacity !== undefined) {
     builder
       .overrideProvider(LIBRARY_CAPACITY)
@@ -112,6 +117,7 @@ export async function startApp(
 
   const httpServer = app.getHttpServer() as Server;
   const { port } = httpServer.address() as AddressInfo;
+  let closed = false;
   return {
     app,
     httpServer,
@@ -120,6 +126,8 @@ export async function startApp(
     databaseUrl,
     inbox,
     close: async () => {
+      if (closed) return;
+      closed = true;
       await app.close();
       await own?.drop();
     },

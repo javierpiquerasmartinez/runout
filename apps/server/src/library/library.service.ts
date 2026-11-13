@@ -15,17 +15,13 @@ import {
   tags,
 } from '../database/schema.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
-import {
-  keyOf,
-  storedIds,
-  storeHands,
-  type HandsRead,
-} from '../hands/hand-store.js';
+import { keyOf, type HandsRead } from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { HeroResults } from '../hands/hero-results.js';
 import { Rejected } from '../rejection/rejection.js';
+import { addToLibrary, inLibrary } from './library-entries.js';
 import { handSelection, requireInLibrary } from './library-hand.js';
 import { LIBRARY_CAPACITY, LIBRARY_IMPORT_LIMIT } from './library-limits.js';
 import { boundedInt } from './query.js';
@@ -156,26 +152,13 @@ export class LibraryService {
       });
     }
     await this.requireRoomFor(tx, account, kept.length);
-    const now = this.clock.now();
-    const handIds = await storeHands(
+    return addToLibrary(
       tx,
       this.heroResults,
       account.id,
       { hands: kept, histories },
-      now,
+      this.clock.now(),
     );
-    const added = await tx
-      .insert(libraryEntries)
-      .values(
-        handIds.map((handId) => ({
-          identityId: account.id,
-          handId,
-          addedAt: now,
-        })),
-      )
-      .onConflictDoNothing()
-      .returning({ handId: libraryEntries.handId });
-    return added.map((row) => row.handId);
   }
 
   /**
@@ -393,19 +376,7 @@ export class LibraryService {
     read: Hand[],
     db: Database | Transaction = this.db,
   ): Promise<Map<string, string>> {
-    const stored = await storedIds(db, read);
-    if (stored.size === 0) return new Map();
-    const rows = await db
-      .select({ handId: libraryEntries.handId })
-      .from(libraryEntries)
-      .where(
-        and(
-          eq(libraryEntries.identityId, account.id),
-          inArray(libraryEntries.handId, [...stored.values()]),
-        ),
-      );
-    const held = new Set(rows.map((row) => row.handId));
-    return new Map([...stored].filter(([, id]) => held.has(id)));
+    return inLibrary(db, account.id, read);
   }
 }
 

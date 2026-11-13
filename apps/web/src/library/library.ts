@@ -15,13 +15,17 @@ export const libraryGraphPath = `${libraryPath}/graph`
 /** Where the Library shows the Hero's Stats instead of its Hands. */
 export const libraryStatsPath = `${libraryPath}/stats`
 
+/** Where the Library lists the Account's Bulk Imports instead of its Hands. */
+export const libraryImportsPath = `${libraryPath}/imports`
+
 /** What the Library shows under its filters: its Hands, their Results Graph, or the Hero's Stats over them. */
-export type LibraryView = 'list' | 'graph' | 'stats'
+export type LibraryView = 'list' | 'graph' | 'stats' | 'imports'
 
 const VIEW_PATHS: Record<LibraryView, string> = {
   list: libraryPath,
   graph: libraryGraphPath,
   stats: libraryStatsPath,
+  imports: libraryImportsPath,
 }
 
 /** Where the Library shows this view. */
