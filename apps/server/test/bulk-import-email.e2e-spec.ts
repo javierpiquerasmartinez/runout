@@ -20,7 +20,9 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
   let database: { url: string; drop(): Promise<void> };
 
   /** The API and the import service, on a database of their own. */
-  async function start(options: { libraryCapacity?: number } = {}) {
+  async function start(
+    options: { libraryCapacity?: number; textLimit?: number } = {},
+  ) {
     database = await freshDatabase();
     store = new HeldFileStore();
     service = await startImportService({
@@ -28,6 +30,7 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
       fileStore: store,
       databaseUrl: database.url,
       libraryCapacity: options.libraryCapacity,
+      textLimit: options.textLimit,
     });
     api = await startApp({
       databaseUrl: database.url,
@@ -144,7 +147,7 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
     expect(email.text).toContain('Imported: 1,000');
   });
 
-  it('says the Library is full, and how many Hands did not fit', async () => {
+  it('says the Library is full, and how many Hands were left unimported', async () => {
     await start({ libraryCapacity: 1200 });
     const account = await importer();
 
@@ -153,8 +156,23 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
 
     const [email] = service!.inbox.to(account.email);
     expect(email.subject).toBe('Tu importación ha terminado');
-    expect(email.text).toContain('Biblioteca llena: 300 manos no cabían.');
+    expect(email.text).toContain(
+      'Biblioteca llena: 300 manos se quedaron sin importar.',
+    );
     expect(email.text).toContain('Importadas: 1200');
+  });
+
+  it('says when the files hold too much text', async () => {
+    await start({ textLimit: 100 });
+    const account = await importer();
+
+    await account.upload(manyHands(3));
+    await service!.settled();
+
+    const [email] = service!.inbox.to(account.email);
+    expect(email.text).toContain(
+      'Los archivos tienen más de 5 GB de texto: no se ha importado ninguna mano.',
+    );
   });
 
   it('says when no Hand was in a format it recognises', async () => {

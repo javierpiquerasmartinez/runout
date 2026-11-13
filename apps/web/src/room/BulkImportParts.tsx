@@ -1,7 +1,7 @@
 import type { FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
-import { isImportableFile, MAX_BULK_IMPORT_BYTES, percentOf } from '../library/bulkUpload'
+import { isImportableFile, MAX_BULK_IMPORT_BYTES, MAX_BULK_IMPORT_FILES, percentOf } from '../library/bulkUpload'
 import { Wrapped } from '../library/ImportParts'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -117,9 +117,11 @@ export function BulkFooter({
   // Refused here, before anything is uploaded; the server checks the same.
   const refused = !files.every((file) => isImportableFile(file.name))
     ? t('import.bulk.unsupported')
-    : bytes > MAX_BULK_IMPORT_BYTES
-      ? t('import.bulk.tooLarge')
-      : undefined
+    : files.length > MAX_BULK_IMPORT_FILES
+      ? t('import.bulk.tooManyFiles', { limit: formatNumber(MAX_BULK_IMPORT_FILES) })
+      : bytes > MAX_BULK_IMPORT_BYTES
+        ? t('import.bulk.tooLarge')
+        : undefined
   const failure =
     bulk.phase === 'failed'
       ? bulk.reason === 'upload' || bulk.reason === 'network'

@@ -8,7 +8,9 @@ import { DATABASE_URL } from '../../src/database/database.js';
 import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
 import {
   BULK_IMPORT_LIMIT,
+  BULK_IMPORT_TEXT_LIMIT,
   DEFAULT_BULK_IMPORT_LIMIT,
+  DEFAULT_BULK_IMPORT_TEXT_LIMIT,
 } from '../../src/import-service/bulk-import-limit.js';
 import {
   DEFAULT_LIBRARY_CAPACITY,
@@ -57,6 +59,8 @@ export interface StartImportServiceOptions {
   fileStore?: FileStore;
   /** The most Hands one Bulk Import may hold; 2 million otherwise, as in production. */
   limit?: number;
+  /** The most characters of text one Bulk Import's files may hold; 5 GB otherwise, as in production. */
+  textLimit?: number;
   /** The most Hands a Library may hold; 10 million otherwise, as in production. */
   libraryCapacity?: number;
   /** Where its emails go; a fresh one otherwise. */
@@ -85,6 +89,8 @@ export async function startImportService(
     .useValue(options.fileStore ?? new MemoryFileStore())
     .overrideProvider(BULK_IMPORT_LIMIT)
     .useValue(options.limit ?? DEFAULT_BULK_IMPORT_LIMIT)
+    .overrideProvider(BULK_IMPORT_TEXT_LIMIT)
+    .useValue(options.textLimit ?? DEFAULT_BULK_IMPORT_TEXT_LIMIT)
     .overrideProvider(LIBRARY_CAPACITY)
     .useValue(options.libraryCapacity ?? DEFAULT_LIBRARY_CAPACITY)
     .overrideProvider(MAILER)

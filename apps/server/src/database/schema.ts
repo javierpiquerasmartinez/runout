@@ -687,6 +687,7 @@ export type BulkImportStatus = (typeof BULK_IMPORT_STATUSES)[number];
 /** Why a Bulk Import ended short of adding its Hands. */
 export const BULK_IMPORT_REASONS = [
   'too-many-hands',
+  'too-much-text',
   'unreadable-file',
   'unrecognised-format',
   'library-full',
@@ -730,7 +731,8 @@ export const bulkImports = pgTable(
       .default({}),
     /**
      * Why it ended short of adding its Hands, when it did: `too-many-hands`
-     * past the limit, `unreadable-file` when a file is no text or zip,
+     * past the limit, `too-much-text` when the files unpack to more text than
+     * theirs, `unreadable-file` when a file is no text or zip,
      * `unrecognised-format` when nothing in the files is a Hand, and
      * `library-full` when the Library reached its capacity.
      */

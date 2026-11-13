@@ -87,11 +87,11 @@ function Result({ bulkImport }: { bulkImport: BulkImport }) {
   if (bulkImport.status === 'failed') return <>{t('library.imports.failed')}</>
   if (bulkImport.status === 'cancelled') return <>{t('library.imports.cancelled')}</>
   if (bulkImport.reason === 'library-full') {
-    const notFit = bulkImport.notImported['library-full'] ?? 0
+    const leftOut = bulkImport.notImported['library-full'] ?? 0
     return (
       <>
-        {t(notFit === 1 ? 'library.imports.reason.library-full.one' : 'library.imports.reason.library-full.other', {
-          count: formatNumber(notFit),
+        {t(leftOut === 1 ? 'library.imports.reason.library-full.one' : 'library.imports.reason.library-full.other', {
+          count: formatNumber(leftOut),
         })}
       </>
     )

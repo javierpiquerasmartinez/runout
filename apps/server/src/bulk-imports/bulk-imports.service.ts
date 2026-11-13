@@ -70,6 +70,7 @@ interface ChosenFile {
 
 /** S3 and R2 number parts from 1 to 10,000. */
 const MAX_PART_NUMBER = 10_000;
+/** The most files one Bulk Import may take; more go in a .zip. */
 const MAX_FILES = 100;
 /** How long an upload may go uncompleted before it is discarded. */
 export const UPLOAD_EXPIRES_MS = 24 * 60 * 60_000;
@@ -528,7 +529,6 @@ function validFiles(files: unknown): ChosenFile[] {
   if (
     !Array.isArray(files) ||
     files.length === 0 ||
-    files.length > MAX_FILES ||
     !files.every(
       (file: Partial<ChosenFile> | null) =>
         typeof file?.name === 'string' &&
@@ -539,6 +539,9 @@ function validFiles(files: unknown): ChosenFile[] {
     )
   ) {
     throw new Rejected('invalid-bulk-import');
+  }
+  if (files.length > MAX_FILES) {
+    throw new Rejected('too-many-files', { limit: MAX_FILES });
   }
   const chosen = (files as ChosenFile[]).map(({ name, size }) => ({
     name,

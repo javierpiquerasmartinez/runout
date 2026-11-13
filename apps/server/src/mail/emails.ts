@@ -198,7 +198,7 @@ export interface EndedBulkImport {
   processed: number;
   imported: number;
   duplicates: number;
-  /** Hands not imported, per reason; `library-full` counts those that did not fit. */
+  /** Hands not imported, per reason; `library-full` counts those left unimported when the Library filled up, read or not. */
   notImported: Record<string, number>;
 }
 
@@ -242,7 +242,7 @@ function bulkImportEnded(
   const { language, bulkImport } = input;
   const number = new Intl.NumberFormat(INTL[language]);
   const n = (count: number) => number.format(count);
-  const notFit = bulkImport.notImported['library-full'] ?? 0;
+  const leftOut = bulkImport.notImported['library-full'] ?? 0;
   const files = bulkImport.fileNames.join(', ');
   const failed = bulkImport.status === 'failed';
   const es = language === 'es';
@@ -284,17 +284,21 @@ function bulkImportEnded(
     ? {
         'too-many-hands':
           'Tiene más de 2 millones de manos: no se ha importado ninguna.',
+        'too-much-text':
+          'Los archivos tienen más de 5 GB de texto: no se ha importado ninguna mano.',
         'unreadable-file': 'No se ha podido abrir uno de los archivos.',
         'unrecognised-format':
           'No hemos reconocido el formato de ninguna mano.',
-        'library-full': `Biblioteca llena: ${n(notFit)} ${notFit === 1 ? 'mano no cabía' : 'manos no cabían'}.`,
+        'library-full': `Biblioteca llena: ${n(leftOut)} ${leftOut === 1 ? 'mano se quedó sin importar' : 'manos se quedaron sin importar'}.`,
       }
     : {
         'too-many-hands':
           'It has more than 2 million hands: none was imported.',
+        'too-much-text':
+          'The files hold more than 5 GB of text: no hand was imported.',
         'unreadable-file': 'One of the files could not be opened.',
         'unrecognised-format': 'We did not recognise the format of any hand.',
-        'library-full': `Library full: ${n(notFit)} ${notFit === 1 ? 'hand did not fit' : 'hands did not fit'}.`,
+        'library-full': `Library full: ${n(leftOut)} ${leftOut === 1 ? 'hand was left unimported' : 'hands were left unimported'}.`,
       };
   const reason = bulkImport.reason ? why[bulkImport.reason] : undefined;
   const footer = es

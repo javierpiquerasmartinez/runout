@@ -19,8 +19,8 @@ const NOT_IMPORTED: Exclude<DiscardReason, 'duplicate'>[] = [
 
 /**
  * What was not added, each apart: "1.910 duplicadas", "42 no reconocidas",
- * then every other reason by the import dialog's name for it. Those that did
- * not fit a full Library are said where it ended, not here.
+ * then every other reason by the import dialog's name for it. Those that
+ * were left unimported by a full Library are said where it ended, not here.
  */
 export function useNotAdded(): (bulkImport: Pick<BulkImport, 'duplicates' | 'notImported'>) => string[] {
   const { t, formatNumber } = useI18n()

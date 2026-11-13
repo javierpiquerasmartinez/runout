@@ -207,7 +207,10 @@ describe('Counting the Hands of stored files', () => {
   it('counts the Hands it recognises, and the runs of text that are none', async () => {
     const content = `${fixture('pokerstars-session.txt')}\n\nnot a hand`;
 
-    const counted = await countHands([text('session.txt', content)], 1000);
+    const counted = await countHands([text('session.txt', content)], {
+      hands: 1000,
+      characters: 1_000_000,
+    });
 
     expect(counted).toEqual({
       hands:
@@ -216,7 +219,7 @@ describe('Counting the Hands of stored files', () => {
           (d) => d.reason !== 'unrecognised-format',
         ).length,
       unrecognised: 1,
-      overLimit: false,
+      over: null,
     });
   });
 
@@ -234,10 +237,54 @@ describe('Counting the Hands of stored files', () => {
       })(),
     };
 
-    const counted = await countHands([many], 5);
+    const counted = await countHands([many], {
+      hands: 5,
+      characters: 1_000_000,
+    });
 
-    expect(counted.overLimit).toBe(true);
+    expect(counted.over).toBe('hands');
     expect(counted.hands).toBe(6);
     expect(pieces).toBeLessThan(10);
+  });
+
+  it('stops reading once the text passes the text limit, Hands or not', async () => {
+    let pieces = 0;
+    const endless: SourceFile = {
+      name: 'endless.txt',
+      bytes: (async function* () {
+        // A line with no end, as unpacking a zip bomb would give.
+        for (let index = 0; index < 1_000_000; index++) {
+          pieces++;
+          yield Buffer.alloc(1024, 'x');
+        }
+      })(),
+    };
+
+    const counted = await countHands([endless], {
+      hands: 1000,
+      characters: 10_000,
+    });
+
+    expect(counted.over).toBe('text');
+    expect(pieces).toBeLessThan(20);
+  });
+
+  it('counts the text a zip unpacks to, not its compressed size', async () => {
+    const hand = fixture('pokerstars-showdown.txt');
+    const unpacked = `${hand}\n\n`.repeat(200);
+    const zipped = zipSync({ 'hands.txt': strToU8(unpacked) });
+    expect(zipped.length).toBeLessThan(unpacked.length / 10);
+
+    const over = await countHands([file('hands.zip', zipped)], {
+      hands: 1000,
+      characters: unpacked.length / 2,
+    });
+    const within = await countHands([file('hands.zip', zipped)], {
+      hands: 1000,
+      characters: unpacked.length,
+    });
+
+    expect(over.over).toBe('text');
+    expect(within).toMatchObject({ hands: 200, over: null });
   });
 });

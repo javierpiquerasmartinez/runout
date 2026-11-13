@@ -179,7 +179,7 @@ describe('ImportsView', () => {
     expect(result).toBe('No hemos reconocido el formato de ninguna mano.')
   })
 
-  it('says the Library filled up, and how many Hands did not fit', () => {
+  it('says the Library filled up, and how many Hands were left unimported', () => {
     const table = renderImports([
       bulkImport({
         files: [{ name: 'pt4.zip', size: 1 }],
@@ -200,18 +200,20 @@ describe('ImportsView', () => {
     const [, status, hands, , result] = rowOf(table, 'pt4.zip')
     expect(status).toBe('Completada')
     expect(hands).toBe('87.600 manos')
-    expect(result).toBe('Biblioteca llena: 12.400 manos no cabían.')
-    expect(rowOf(table, 'one-more.txt')[4]).toBe('Biblioteca llena: 1 mano no cabía.')
+    expect(result).toBe('Biblioteca llena: 12.400 manos se quedaron sin importar.')
+    expect(rowOf(table, 'one-more.txt')[4]).toBe('Biblioteca llena: 1 mano se quedó sin importar.')
   })
 
   it('says why an import ended adding none of its Hands', () => {
     const table = renderImports([
       bulkImport({ files: [{ name: 'huge.zip', size: 1 }], total: null, processed: 0, imported: 0, duplicates: 0, notImported: {}, reason: 'too-many-hands' }),
       bulkImport({ files: [{ name: 'broken.zip', size: 1 }], total: null, processed: 0, imported: 0, duplicates: 0, notImported: {}, reason: 'unreadable-file' }),
+      bulkImport({ files: [{ name: 'bomb.zip', size: 1 }], total: null, processed: 0, imported: 0, duplicates: 0, notImported: {}, reason: 'too-much-text' }),
     ])
 
     expect(rowOf(table, 'huge.zip')[4]).toBe('Tiene más de 2 millones de manos: no se ha importado ninguna.')
     expect(rowOf(table, 'broken.zip')[4]).toBe('No se ha podido abrir uno de los archivos.')
+    expect(rowOf(table, 'bomb.zip')[4]).toBe('Los archivos tienen más de 5 GB de texto: no se ha importado ninguna mano.')
   })
 
   it('leaves out what did not happen from the result', () => {

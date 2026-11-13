@@ -18,7 +18,9 @@ import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
 import {
   BULK_IMPORT_LIMIT,
+  BULK_IMPORT_TEXT_LIMIT,
   DEFAULT_BULK_IMPORT_LIMIT,
+  DEFAULT_BULK_IMPORT_TEXT_LIMIT,
 } from './bulk-import-limit.js';
 import { AdministratorsEmail } from './administrators-email.js';
 import { ImportEngine } from './import-engine.js';
@@ -47,6 +49,10 @@ import { WakeController } from './wake.controller.js';
       useFactory: () => fileStoreFromEnv(process.env, true),
     },
     { provide: BULK_IMPORT_LIMIT, useValue: DEFAULT_BULK_IMPORT_LIMIT },
+    {
+      provide: BULK_IMPORT_TEXT_LIMIT,
+      useValue: DEFAULT_BULK_IMPORT_TEXT_LIMIT,
+    },
     { provide: LIBRARY_CAPACITY, useValue: DEFAULT_LIBRARY_CAPACITY },
     {
       provide: ADMINISTRATOR_EMAILS,

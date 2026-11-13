@@ -171,6 +171,15 @@ describe('ImportDialog, a large import', () => {
     expect(sent).toEqual([])
   })
 
+  it('refuses more than 100 files before uploading', async () => {
+    renderDialog()
+
+    await choose(sized('big.zip', 21 * MB), ...Array.from({ length: 100 }, (_, i) => sized(`${i}.zip`, 10)))
+    await userEvent.click(screen.getByRole('button', { name: 'At most 100 files per import; zip them into a .zip' }))
+
+    expect(sent).toEqual([])
+  })
+
   describe('while uploading', () => {
     let answer: Map<string, () => void>
 

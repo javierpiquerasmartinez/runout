@@ -11,6 +11,9 @@ import type { BulkImport } from './bulkImports'
 /** The most one Bulk Import may upload, all its files together. */
 export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3
 
+/** The most files one Bulk Import may take; more go in a .zip. */
+export const MAX_BULK_IMPORT_FILES = 100
+
 /** What a Bulk Import reads: Hand Histories as text, or zipped. */
 export function isImportableFile(name: string): boolean {
   return /\.(txt|zip)$/i.test(name)

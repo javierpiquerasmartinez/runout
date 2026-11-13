@@ -25,7 +25,11 @@ describe('A Bulk Import (e2e)', () => {
    * service takes any waiting import it finds, other files' included.
    */
   async function start(
-    options: { limit?: number; libraryCapacity?: number } = {},
+    options: {
+      limit?: number;
+      textLimit?: number;
+      libraryCapacity?: number;
+    } = {},
   ) {
     database = await freshDatabase();
     store = new MemoryFileStore();
@@ -34,6 +38,7 @@ describe('A Bulk Import (e2e)', () => {
       fileStore: store,
       databaseUrl: database.url,
       limit: options.limit,
+      textLimit: options.textLimit,
       libraryCapacity: options.libraryCapacity,
     });
     api = await startApp({
@@ -214,6 +219,37 @@ describe('A Bulk Import (e2e)', () => {
     });
     expect(await account.libraryTotal()).toBe(0);
     expect(store.files()).toEqual([]);
+  });
+
+  it('ends an import whose files hold more text than the text limit, adding none of its Hands', async () => {
+    const text = manyHands(20);
+    await start({ textLimit: text.length - 1 });
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+
+    await upload(account, 'too-much-text.txt', text);
+    await service!.settled();
+
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      reason: 'too-much-text',
+      imported: 0,
+    });
+    expect(await account.libraryTotal()).toBe(0);
+    expect(store.files()).toEqual([]);
+  });
+
+  it('takes an import of exactly the text limit', async () => {
+    const text = manyHands(20);
+    await start({ textLimit: text.length });
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+
+    await upload(account, 'just-enough.txt', text);
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(20);
   });
 
   it('takes an import of exactly the limit', async () => {
@@ -528,7 +564,7 @@ describe('A Bulk Import (e2e)', () => {
     expect(store.files()).toHaveLength(1);
   }, 30_000);
 
-  it('ends as a full Library once it reaches its capacity, counting the Hands that did not fit', async () => {
+  it('ends as a full Library once it reaches its capacity, counting the Hands left unimported', async () => {
     await start({ libraryCapacity: 1200 });
     const { token } = await newAccount(api.httpServer);
     const account = asAccount(token);

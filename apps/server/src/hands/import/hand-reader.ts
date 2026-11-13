@@ -68,36 +68,61 @@ export async function* readHands(
   }
 }
 
+/** The most a Bulk Import's files may hold: Hands, and characters of text once decoded and unpacked. */
+export interface CountLimits {
+  hands: number;
+  characters: number;
+}
+
 /**
  * How many Hands the files hold, read or not, and how many runs of text are
- * none; it stops reading once past `limit`.
+ * none. It stops reading once past either limit, and says which: past the
+ * text's, as the characters decode, so that a zip unpacking to far more text
+ * than its size stops there, not hours later.
  */
 export async function countHands(
   files: Iterable<SourceFile>,
-  limit: number,
-): Promise<{ hands: number; unrecognised: number; overLimit: boolean }> {
+  limits: CountLimits,
+): Promise<{
+  hands: number;
+  unrecognised: number;
+  over: 'hands' | 'text' | null;
+}> {
   let hands = 0;
   let unrecognised = 0;
   let inUnrecognised = false;
-  for await (const block of blocksOf(files)) {
-    if (!recogniseBlock(block)) {
-      if (!inUnrecognised) unrecognised++;
-      inUnrecognised = true;
-      continue;
+  try {
+    for await (const block of blocksOf(files, limits.characters)) {
+      if (!recogniseBlock(block)) {
+        if (!inUnrecognised) unrecognised++;
+        inUnrecognised = true;
+        continue;
+      }
+      inUnrecognised = false;
+      hands++;
+      if (hands > limits.hands) return { hands, unrecognised, over: 'hands' };
     }
-    inUnrecognised = false;
-    hands++;
-    if (hands > limit) return { hands, unrecognised, overLimit: true };
+  } catch (error) {
+    if (!(error instanceof TooMuchText)) throw error;
+    return { hands, unrecognised, over: 'text' };
   }
-  return { hands, unrecognised, overLimit: false };
+  return { hands, unrecognised, over: null };
 }
+
+/** The files' text went past the most characters they may hold. */
+class TooMuchText extends Error {}
 
 /**
  * Each run of non-blank lines in the files' texts, trimmed: one Hand, or a
  * piece of text that is none. Hands are separated by blank lines and have
- * none inside. One too long to be a Hand comes as the empty string.
+ * none inside. One too long to be a Hand comes as the empty string. Throws
+ * `TooMuchText` once the texts pass `maxCharacters`, all files together.
  */
-async function* blocksOf(files: Iterable<SourceFile>): AsyncGenerator<string> {
+async function* blocksOf(
+  files: Iterable<SourceFile>,
+  maxCharacters = Infinity,
+): AsyncGenerator<string> {
+  let characters = 0;
   let lines: string[] = [];
   let size = 0;
   let tooLong = false;
@@ -136,6 +161,8 @@ async function* blocksOf(files: Iterable<SourceFile>): AsyncGenerator<string> {
         yield* endBlock();
         continue;
       }
+      characters += piece.text.length;
+      if (characters > maxCharacters) throw new TooMuchText();
       let from = 0;
       for (;;) {
         const newline = piece.text.indexOf('\n', from);

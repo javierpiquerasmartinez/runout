@@ -33,7 +33,10 @@ import { UnreadableUpload } from '../hands/import/upload.js';
 import { addToLibrary, inLibrary } from '../library/library-entries.js';
 import { LIBRARY_CAPACITY } from '../library/library-limits.js';
 import { Storage } from '../storage/storage.js';
-import { BULK_IMPORT_LIMIT } from './bulk-import-limit.js';
+import {
+  BULK_IMPORT_LIMIT,
+  BULK_IMPORT_TEXT_LIMIT,
+} from './bulk-import-limit.js';
 import { AdministratorsEmail } from './administrators-email.js';
 import { ImporterEmail } from './importer-email.js';
 import { messageOf } from './message-of.js';
@@ -77,6 +80,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(FILE_STORE) private readonly store: FileStore,
     private readonly heroResults: HeroResults,
     @Inject(BULK_IMPORT_LIMIT) private readonly limit: number,
+    @Inject(BULK_IMPORT_TEXT_LIMIT) private readonly textLimit: number,
     @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
     private readonly importerEmail: ImporterEmail,
     private readonly administratorsEmail: AdministratorsEmail,
@@ -217,16 +221,23 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
 
   /**
    * The first pass: how many Hands the files hold, for progress, and the
-   * runs of text that are none. Past the limit, the import ends adding none.
+   * runs of text that are none. Past the limit of Hands, or of text, the
+   * import ends adding none.
    */
   private async count(record: BulkImport): Promise<void> {
     await this.db
       .update(bulkImports)
       .set({ status: 'counting' })
       .where(and(eq(bulkImports.id, record.id), advancing));
-    const counted = await countHands(this.filesOf(record), this.limit);
-    if (counted.overLimit) {
-      await this.end(record, 'too-many-hands');
+    const counted = await countHands(this.filesOf(record), {
+      hands: this.limit,
+      characters: this.textLimit,
+    });
+    if (counted.over) {
+      await this.end(
+        record,
+        counted.over === 'hands' ? 'too-many-hands' : 'too-much-text',
+      );
       return;
     }
     const notImported: Record<string, number> =

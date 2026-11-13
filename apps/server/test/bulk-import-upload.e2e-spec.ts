@@ -143,6 +143,35 @@ describe('Uploading a Bulk Import (e2e)', () => {
       expect(refused.body.reason).toBe('bulk-import-too-large');
       expect((await importer.list().expect(200)).body).toEqual([]);
     });
+
+    it('takes up to 100 files', async () => {
+      const importer = await signedIn();
+
+      await importer
+        .start(
+          Array.from({ length: 100 }, (_, i) => ({
+            name: `${i}.txt`,
+            size: 10,
+          })),
+        )
+        .expect(201);
+    });
+
+    it('refuses more than 100 files, saying the limit', async () => {
+      const importer = await signedIn();
+
+      const refused = await importer
+        .start(
+          Array.from({ length: 101 }, (_, i) => ({
+            name: `${i}.txt`,
+            size: 10,
+          })),
+        )
+        .expect(400);
+
+      expect(refused.body).toEqual({ reason: 'too-many-files', limit: 100 });
+      expect((await importer.list().expect(200)).body).toEqual([]);
+    });
   });
 
   describe('an interrupted upload', () => {
