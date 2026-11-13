@@ -29,6 +29,18 @@ projects:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Where the import service is, and the secret its wakes carry: both
+      # taken from the import service below, never typed in.
+      - key: IMPORT_SERVICE_ADDRESS
+        fromService:
+          name: runout-imports
+          type: pserv
+          property: hostport
+      - key: IMPORT_SERVICE_SECRET
+        fromService:
+          name: runout-imports
+          type: pserv
+          envVarKey: IMPORT_SERVICE_SECRET
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       # Runs after the build and before the new version starts. If a
@@ -38,4 +50,29 @@ projects:
       autoDeployTrigger: commit
       # No healthCheckPath: /api/health queries the database, and Render
       # calling it every few seconds would keep Neon from ever suspending.
+      rootDir: apps/server
+
+    # The import service: the same code from a second entry point, adding
+    # Bulk Imports to Libraries. A Private Service, not a Background Worker,
+    # because the API wakes it over the private network; it has no public
+    # address. Migrations run only in the API's pre-deploy.
+    - type: pserv
+      name: runout-imports
+      runtime: node
+      repo: https://github.com/javierpiquerasmartinez/runout
+      branch: stage
+      plan: 0.5c-512mb
+      envVars:
+      - key: DATABASE_URL
+        fromService:
+          name: runout
+          type: web
+          envVarKey: DATABASE_URL
+      # Generated once by Render, then kept.
+      - key: IMPORT_SERVICE_SECRET
+        generateValue: true
+      region: frankfurt
+      buildCommand: pnpm install --frozen-lockfile && pnpm run build
+      startCommand: pnpm run start:imports
+      autoDeployTrigger: commit
       rootDir: apps/server

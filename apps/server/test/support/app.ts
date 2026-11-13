@@ -13,6 +13,10 @@ import {
   AdministratorEmails,
 } from '../../src/identity/administrators.js';
 import { MAILER } from '../../src/mail/mailer.js';
+import {
+  IMPORT_SERVICE,
+  type ImportServiceAddress,
+} from '../../src/import-service/import-service-config.js';
 import { LIBRARY_CAPACITY } from '../../src/library/library-limits.js';
 import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
@@ -52,6 +56,8 @@ export interface StartAppOptions {
   administratorEmails?: string[];
   /** How many Hands a Library may hold; 10 million otherwise, as in production. */
   libraryCapacity?: number;
+  /** The import service it wakes, as `startImportService` gives it; none otherwise. */
+  importService?: ImportServiceAddress;
 }
 
 /**
@@ -87,7 +93,9 @@ export async function startApp(
     .overrideProvider(MAILER)
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)
-    .useValue(new AdministratorEmails(options.administratorEmails ?? []));
+    .useValue(new AdministratorEmails(options.administratorEmails ?? []))
+    .overrideProvider(IMPORT_SERVICE)
+    .useValue(options.importService ?? null);
   if (options.libraryCapacity !== undefined) {
     builder
       .overrideProvider(LIBRARY_CAPACITY)
