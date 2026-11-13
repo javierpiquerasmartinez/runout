@@ -3,6 +3,9 @@
  * sends them. Shapes mirror the server's (ADR 0001: no shared code).
  */
 
+/** How often the Library reads its Bulk Imports again while one is unfinished. */
+export const BULK_IMPORTS_POLL_MS = 5_000
+
 export type BulkImportStatus =
   | 'uploading'
   | 'waiting'
@@ -42,4 +45,9 @@ export function stageOf(status: BulkImportStatus): BulkImportStage {
     default:
       return status
   }
+}
+
+/** Whether it has ended, one way or another: it no longer changes. */
+export function isFinished(status: BulkImportStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled'
 }

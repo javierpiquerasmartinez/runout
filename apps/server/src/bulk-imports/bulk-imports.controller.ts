@@ -63,6 +63,18 @@ export class BulkImportsController {
     return this.bulkImports.complete(account, id, body.files);
   }
 
+  /** Stops one before its next batch; the Hands already imported stay. */
+  @Post(':id/cancel')
+  async cancel(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<BulkImportView> {
+    const account = await this.identities.authenticateAccount(
+      bearerToken(authorization),
+    );
+    return this.bulkImports.cancel(account, id);
+  }
+
   /** The Account's Bulk Imports, newest first. */
   @Get()
   @Header('Cache-Control', 'private, no-cache')
