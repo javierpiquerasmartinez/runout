@@ -389,7 +389,7 @@ describe('the Imports tab', () => {
             processed: 320_156,
             imported: 318_204,
             duplicates: 1_910,
-            notImported: { unrecognised: 42 },
+            notImported: { 'unrecognised-format': 42, 'too-many-seats': 2 },
             finishedAt: '2026-11-02T12:00:00Z',
           }),
         ].filter((each) => status !== 'failed' || each.status === 'failed')
@@ -436,7 +436,7 @@ describe('the Imports tab', () => {
     expect(rows[2].textContent).toMatch(/jugador7@example\.com.*Stalled.*No progress since/)
     expect(rows[3].textContent).toMatch(/Failed.*53100 after 3 attempts/)
     expect(rows[4].textContent).toMatch(/Paused.*Storage at its limit/)
-    expect(rows[6].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 discarded/)
+    expect(rows[6].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 not recognised · More than nine seats: 2/)
     expect(calls[0].search).toContain('status=all')
   })
 

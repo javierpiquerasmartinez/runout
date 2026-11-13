@@ -151,6 +151,16 @@ describe('ImportsView', () => {
     expect(rowOf(table, 'one.txt')[0]).toBe('one.txt, two.zip')
   })
 
+  it('names each reason Hands were not imported, with its own count', () => {
+    const table = renderImports([
+      bulkImport({ notImported: { 'unrecognised-format': 42, 'not-cash-holdem': 3, malformed: 1 } }),
+    ])
+
+    expect(rowOf(table, 'hm3-2024.zip')[4]).toBe(
+      "1910 duplicadas · 42 no reconocidas · No es una mano de hold'em cash: 3 · No se ha podido leer: 1",
+    )
+  })
+
   it('says when no Hand in the files was recognised', () => {
     const table = renderImports([
       bulkImport({

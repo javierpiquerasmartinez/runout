@@ -59,7 +59,7 @@ import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import type { LibraryStats } from './stats'
 import { StatsView } from './StatsView'
-import { BULK_IMPORTS_POLL_MS, isFinished, type BulkImport } from './bulkImports'
+import { BULK_IMPORTS_POLL_MS, isUnderway, type BulkImport } from './bulkImports'
 import { ImportsBanner, ImportsView } from './ImportsView'
 import { replayFilterSearch, replaySelectedSearch, replayServerQuery } from './replay'
 import './LibraryPage.css'
@@ -156,7 +156,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   }, [token, filter, revision, view])
 
   // The Account's Bulk Imports, whatever the filter: they are not Hands it narrows. Every view reads them, for the
-  // banner, and reads them again while one is unfinished, so its progress moves on its own. Not from a Room: there
+  // banner, and reads them again while one is underway, so its progress moves on its own. Not from a Room: there
   // the Library is only a list to pick Hands from.
   const [imports, setImports] = useState<{ state: 'loaded'; imports: BulkImport[] } | { state: 'failed'; reason: FailureReason } | null>(
     null,
@@ -171,7 +171,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
         .then((listed) => {
           if (cancelled) return
           setImports({ state: 'loaded', imports: listed })
-          if (listed.some((bulkImport) => !isFinished(bulkImport.status))) next = setTimeout(read, BULK_IMPORTS_POLL_MS)
+          if (listed.some((bulkImport) => isUnderway(bulkImport.status))) next = setTimeout(read, BULK_IMPORTS_POLL_MS)
         })
         .catch((error: unknown) => !cancelled && setImports({ state: 'failed', reason: reasonOf(error) }))
     void read()
@@ -180,8 +180,8 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       clearTimeout(next)
     }
   }, [token, revision, importsRevision, room])
-  const unfinishedImport =
-    imports?.state === 'loaded' ? imports.imports.find((bulkImport) => !isFinished(bulkImport.status)) : undefined
+  const underwayImport =
+    imports?.state === 'loaded' ? imports.imports.find((bulkImport) => isUnderway(bulkImport.status)) : undefined
   // Stopped before its next batch; what it imported stays. A refusal means it had ended meanwhile: reading again says how.
   const cancelImport = (id: string) =>
     api(`/library/bulk-imports/${encodeURIComponent(id)}/cancel`, { token, method: 'POST' })
@@ -355,7 +355,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
         </nav>
 
         <main className="library__main" data-view={view}>
-          {unfinishedImport && <ImportsBanner bulkImport={unfinishedImport} href={`${libraryViewPath('imports')}${search}`} />}
+          {underwayImport && <ImportsBanner bulkImport={underwayImport} href={`${libraryViewPath('imports')}${search}`} />}
           <div className="library__heading">
             <div className="library__intro">
               <h1 className="library__title ro-serif">{t(filter.markedOnly ? 'library.markedTitle' : 'library.all')}</h1>

@@ -3,6 +3,8 @@ import type { MouseEvent } from 'react'
 import { isPlainClick, navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { isFinished, stageOf, type BulkImport } from './bulkImports'
+import { ImportProgress, Wrapped } from './ImportParts'
+import { useMoment, useNotAdded } from './importWords'
 import './ImportsView.css'
 
 /**
@@ -40,13 +42,12 @@ export function ImportsView({ imports, onCancel }: { imports: BulkImport[]; onCa
 }
 
 function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel: (id: string) => void }) {
-  const { t, formatNumber, formatDate, formatTime } = useI18n()
+  const { t, formatNumber } = useI18n()
+  const moment = useMoment()
   const stage = stageOf(bulkImport.status)
   const finished = isFinished(bulkImport.status)
   // How far it got: while it runs, and where a failed one stopped.
   const showsProgress = (!finished || stage === 'failed') && bulkImport.total !== null
-  const startedAt = new Date(bulkImport.createdAt)
-  const today = startedAt.toDateString() === new Date().toDateString()
   return (
     <tr className="imports__row" data-stage={stage}>
       <td className="imports__file ro-mono">{bulkImport.files.map((file) => file.name).join(', ')}</td>
@@ -57,24 +58,7 @@ function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel:
       </td>
       <td className="imports__hands ro-mono">
         {showsProgress && bulkImport.total !== null ? (
-          <>
-            {t('library.imports.progress', {
-              processed: formatNumber(bulkImport.processed),
-              total: formatNumber(bulkImport.total),
-            })}
-            <span
-              className="imports__bar"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={bulkImport.total}
-              aria-valuenow={bulkImport.processed}
-            >
-              <span
-                className="imports__bar-fill"
-                style={{ width: `${bulkImport.total > 0 ? (100 * bulkImport.processed) / bulkImport.total : 0}%` }}
-              />
-            </span>
-          </>
+          <ImportProgress processed={bulkImport.processed} total={bulkImport.total} tone={stage === 'failed' ? 'alert' : 'brass'} />
         ) : finished ? (
           t(bulkImport.imported === 1 ? 'library.count.one' : 'library.count.other', {
             count: formatNumber(bulkImport.imported),
@@ -83,11 +67,7 @@ function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel:
           '—'
         )}
       </td>
-      <td className="imports__started">
-        {today
-          ? t('library.imports.today', { time: formatTime(startedAt, { hour: 'numeric', minute: '2-digit' }) })
-          : formatDate(startedAt, { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')}
-      </td>
+      <td className="imports__started ro-mono">{moment(new Date(bulkImport.createdAt))}</td>
       <td className="imports__result">{finished ? <Result bulkImport={bulkImport} /> : '—'}</td>
       <td className="imports__actions">
         {!finished && (
@@ -103,7 +83,7 @@ function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel:
 /** How it ended: what was not added, or why it ended short. */
 function Result({ bulkImport }: { bulkImport: BulkImport }) {
   const { t, formatNumber } = useI18n()
-  const notImported = Object.values(bulkImport.notImported).reduce((sum, count) => sum + count, 0)
+  const notAdded = useNotAdded()
   if (bulkImport.status === 'failed') return <>{t('library.imports.failed')}</>
   if (bulkImport.status === 'cancelled') return <>{t('library.imports.cancelled')}</>
   if (bulkImport.reason === 'library-full') {
@@ -117,47 +97,40 @@ function Result({ bulkImport }: { bulkImport: BulkImport }) {
     )
   }
   if (bulkImport.reason) return <>{t(`library.imports.reason.${bulkImport.reason}`)}</>
-  const parts = [
-    bulkImport.duplicates > 0 &&
-      t(bulkImport.duplicates === 1 ? 'library.imports.duplicates.one' : 'library.imports.duplicates.other', {
-        count: formatNumber(bulkImport.duplicates),
-      }),
-    notImported > 0 &&
-      t(notImported === 1 ? 'library.imports.notRecognised.one' : 'library.imports.notRecognised.other', {
-        count: formatNumber(notImported),
-      }),
-  ].filter(Boolean)
+  const parts = notAdded(bulkImport)
   return <>{parts.length > 0 ? parts.join(' · ') : '—'}</>
 }
 
 /**
- * Said in every Library view while an import is unfinished: how far it has
- * got, that the Results Graph and Stats may be missing Hands until it ends,
- * and the way to the Importaciones view.
+ * Said in every Library view while an import is underway: how far it has
+ * got, or that it is paused, that the Results Graph and Stats may be missing
+ * Hands until it ends, and the way to the Importaciones view.
  */
 export function ImportsBanner({ bulkImport, href }: { bulkImport: BulkImport; href: string }) {
   const { t, formatNumber } = useI18n()
-  const progress =
-    bulkImport.total === null
-      ? null
-      : t('library.imports.progress', { processed: formatNumber(bulkImport.processed), total: formatNumber(bulkImport.total) })
-  const [before, after] = (
-    progress === null
-      ? t('library.imports.banner.uncounted')
-      : t(bulkImport.status === 'paused' ? 'library.imports.banner.paused' : 'library.imports.banner', { progress: '\u0000' })
-  ).split('\u0000')
+  const paused = bulkImport.status === 'paused'
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!isPlainClick(event)) return
     event.preventDefault()
     navigate(href)
   }
   return (
-    <div className="imports-banner" role="status" aria-label={t('library.imports.banner.label')}>
+    <div
+      className="imports-banner"
+      role="status"
+      aria-label={t(paused ? 'library.imports.banner.label.paused' : 'library.imports.banner.label')}
+    >
       <span className="imports-banner__dot" aria-hidden="true" />
       <span className="imports-banner__text">
-        {before}
-        {progress !== null && <span className="ro-mono">{progress}</span>}
-        {after}
+        {bulkImport.total === null ? (
+          t(paused ? 'library.imports.banner.paused.uncounted' : 'library.imports.banner.uncounted')
+        ) : (
+          <Wrapped write={(progress) => t(paused ? 'library.imports.banner.paused' : 'library.imports.banner', { progress })}>
+            <span className="ro-mono">
+              {t('library.imports.progress', { processed: formatNumber(bulkImport.processed), total: formatNumber(bulkImport.total) })}
+            </span>
+          </Wrapped>
+        )}
       </span>
       <a className="imports-banner__link" href={href} onClick={open}>
         {t('library.imports.banner.see')}

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { isFinished, stageOf } from '../library/bulkImports'
+import { ImportProgress, Wrapped } from '../library/ImportParts'
+import { useMoment, useNotAdded } from '../library/importWords'
 import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
@@ -141,7 +143,8 @@ function ImportRow({
   onRetry: () => void
 }) {
   const { t, formatNumber, formatRelative } = useI18n()
-  const when = useWhen()
+  const moment = useMoment()
+  const notAdded = useNotAdded()
   const finished = isFinished(bulkImport.status)
   const stalled = bulkImport.stalled && !finished
   const stage = stageOf(bulkImport.status)
@@ -149,7 +152,7 @@ function ImportRow({
   // How far it got: while it runs, and where a failed one stopped.
   const showsProgress = (!finished || stage === 'failed') && bulkImport.total !== null
   const lastActivity = new Date(bulkImport.lastActivityAt)
-  const notImported = Object.values(bulkImport.notImported).reduce((sum, count) => sum + count, 0)
+  const notAddedParts = notAdded(bulkImport)
   return (
     <tr>
       <td>
@@ -161,58 +164,30 @@ function ImportRow({
       </td>
       <td className="admin-imports__hands">
         {showsProgress && bulkImport.total !== null ? (
-          <>
-            <div className="admin-imports__primary">
-              {t('library.imports.progress', {
-                processed: formatNumber(bulkImport.processed),
-                total: formatNumber(bulkImport.total),
-              })}
-            </div>
-            <span
-              className="admin-imports__bar"
-              data-tone={tone}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={bulkImport.total}
-              aria-valuenow={bulkImport.processed}
-            >
-              <span
-                className="admin-imports__bar-fill"
-                style={{ width: `${bulkImport.total > 0 ? (100 * bulkImport.processed) / bulkImport.total : 0}%` }}
-              />
-            </span>
-          </>
+          <ImportProgress
+            className="admin-imports__primary"
+            processed={bulkImport.processed}
+            total={bulkImport.total}
+            tone={tone === 'alert' || tone === 'brass' ? tone : 'muted'}
+          />
         ) : finished ? (
           <>
-            <div className="admin-imports__primary">
+            <div className="admin-imports__primary ro-mono">
               {t(bulkImport.imported === 1 ? 'library.count.one' : 'library.count.other', {
                 count: formatNumber(bulkImport.imported),
               })}
             </div>
-            {(bulkImport.duplicates > 0 || notImported > 0) && (
-              <div className="admin-imports__secondary">
-                {[
-                  bulkImport.duplicates > 0 &&
-                    t(bulkImport.duplicates === 1 ? 'library.imports.duplicates.one' : 'library.imports.duplicates.other', {
-                      count: formatNumber(bulkImport.duplicates),
-                    }),
-                  notImported > 0 &&
-                    t(notImported === 1 ? 'admin.imports.discarded.one' : 'admin.imports.discarded.other', {
-                      count: formatNumber(notImported),
-                    }),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-            )}
+            {notAddedParts.length > 0 && <div className="admin-imports__secondary">{notAddedParts.join(' · ')}</div>}
           </>
         ) : (
           '—'
         )}
       </td>
-      <td>{when(new Date(bulkImport.createdAt))}</td>
+      <td className="ro-mono">{moment(new Date(bulkImport.createdAt), { yesterday: true })}</td>
       {/* Still moving: how long ago. Ended or paused: when. */}
-      <td>{finished || stage === 'paused' ? when(lastActivity) : formatRelative(lastActivity)}</td>
+      <td className="ro-mono">
+        {finished || stage === 'paused' ? moment(lastActivity, { yesterday: true }) : formatRelative(lastActivity)}
+      </td>
       <td className="admin-imports__reason">
         <Reason bulkImport={bulkImport} stalled={stalled} />
       </td>
@@ -256,13 +231,10 @@ function Reason({ bulkImport, stalled }: { bulkImport: AdminBulkImport; stalled:
   if (bulkImport.status === 'paused') return <>{t('admin.imports.storageFull')}</>
   if (bulkImport.status === 'failed' && bulkImport.failureCode) {
     // The import service gives up on a batch only after its last attempt.
-    const [before, after] = t('admin.imports.failedAfter', { code: '\u0000' }).split('\u0000')
     return (
-      <>
-        {before}
+      <Wrapped write={(code) => t('admin.imports.failedAfter', { code })}>
         <span className="ro-mono">{bulkImport.failureCode}</span>
-        {after}
-      </>
+      </Wrapped>
     )
   }
   if (bulkImport.reason) return <span className="ro-mono">{bulkImport.reason}</span>
@@ -300,17 +272,4 @@ function StorageGauge({ used, threshold }: { used: number; threshold: number }) 
       </span>
     </div>
   )
-}
-
-/** "Hoy, 9:12", "Ayer, 22:05" or "2 nov 2026", as the board words a moment. */
-function useWhen(): (date: Date) => string {
-  const { t, formatDate, formatTime } = useI18n()
-  return (date) => {
-    const time = formatTime(date, { hour: 'numeric', minute: '2-digit' })
-    const today = new Date()
-    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
-    if (date.toDateString() === today.toDateString()) return t('library.imports.today', { time })
-    if (date.toDateString() === yesterday.toDateString()) return t('admin.imports.yesterday', { time })
-    return formatDate(date, { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')
-  }
 }

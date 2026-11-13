@@ -54,3 +54,11 @@ export function stageOf(status: BulkImportStatus): BulkImportStage {
 export function isFinished(status: BulkImportStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled'
 }
+
+/**
+ * Whether it is the import service's to add, now or once resumed: neither
+ * still uploading, which the import dialog follows, nor ended.
+ */
+export function isUnderway(status: BulkImportStatus): boolean {
+  return status !== 'uploading' && !isFinished(status)
+}

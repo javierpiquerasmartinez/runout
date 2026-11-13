@@ -1,0 +1,23 @@
+/* A Bulk Import's progress bar, in its status's tone: the Library's Importaciones view and the Administration's tab alike. */
+.import-progress {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+}
+
+.import-progress__fill {
+  display: block;
+  height: 100%;
+  background: var(--text-muted);
+}
+
+.import-progress[data-tone='brass'] .import-progress__fill {
+  background: var(--brass);
+}
+
+.import-progress[data-tone='alert'] .import-progress__fill {
+  background: var(--alert);
+}

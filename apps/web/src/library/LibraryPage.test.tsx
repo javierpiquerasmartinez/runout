@@ -1339,6 +1339,38 @@ describe('LibraryPage · Bulk Imports', () => {
     await waitFor(() => expect(banner()?.textContent).toContain('Import in progress. The graph and stats may be incomplete'))
   })
 
+  it('says an import is paused, counted or not yet', async () => {
+    const paused = () => screen.queryByRole('status', { name: 'Import paused' })
+    bulkImports = [runningImport({ status: 'paused', total: null, processed: 0 })]
+    renderLibrary()
+
+    await waitFor(() => expect(paused()?.textContent).toContain('Import paused. The graph and stats may be incomplete'))
+    expect(banner()).toBeNull()
+    cleanup()
+
+    bulkImports = [runningImport({ status: 'paused' })]
+    renderLibrary()
+
+    await waitFor(() => expect(paused()?.textContent).toContain('Import paused: 412,000 of 1,240,000 hands.'))
+  })
+
+  it('shows no banner, and does not keep asking, while an import is still uploading', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+    bulkImports = [runningImport({ status: 'uploading', total: null, processed: 0 })]
+    renderLibrary()
+    await screen.findByRole('table', { name: 'All hands' })
+    const asked = () => (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => url === '/api/library/bulk-imports').length
+    await waitFor(() => expect(asked()).toBe(1))
+
+    await act(() => vi.advanceTimersByTimeAsync(BULK_IMPORTS_POLL_MS * 3))
+
+    expect(banner()).toBeNull()
+    expect(asked()).toBe(1)
+  })
+
   it('shows no banner once every import has ended', async () => {
     bulkImports = [runningImport({ status: 'completed', finishedAt: '2026-11-02T12:00:00.000Z' })]
     renderLibrary()

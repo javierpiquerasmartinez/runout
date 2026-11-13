@@ -49,22 +49,6 @@
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-.imports__bar {
-  display: block;
-  height: 4px;
-  margin-top: 5px;
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: var(--color-rule-strong);
-}
-.imports__bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--brass);
-}
-.imports__row[data-stage='failed'] .imports__bar-fill {
-  background: var(--alert);
-}
 .imports__started {
   color: var(--text-primary);
 }
