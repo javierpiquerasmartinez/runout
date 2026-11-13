@@ -462,6 +462,7 @@ export const en: Messages = {
   'reason.library-full': 'Your library cannot hold more than 10 million hands.',
   'reason.invalid-bulk-import': 'That import is not valid.',
   'reason.bulk-import-not-found': 'That import does not exist or is no longer uploading.',
+  'reason.bulk-import-unfinished': 'You already have an import that has not finished. You can start another once it ends.',
   'reason.bulk-import-unavailable': 'Large imports are not available right now.',
   'room.queue.import.master': 'Import hands',
   'room.queue.import.guest': 'Import my hands',

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, notInArray, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -8,9 +8,13 @@ import {
   type BulkImportFile,
   type BulkImportStatus,
 } from '../database/schema.js';
+import { isUniqueViolation } from '../database/unique-violation.js';
 import { isUuid } from '../database/uuid.js';
 import { FILE_STORE, type FileStore } from '../file-store/file-store.js';
-import type { Identity } from '../identity/identity.service.js';
+import {
+  refuseImpersonation,
+  type Identity,
+} from '../identity/identity.service.js';
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { Rejected } from '../rejection/rejection.js';
 
@@ -41,14 +45,8 @@ interface ChosenFile {
 /** S3 and R2 number parts from 1 to 10,000. */
 const MAX_PART_NUMBER = 10_000;
 const MAX_FILES = 100;
-/** The statuses of an import that has not ended. */
-const UNFINISHED: BulkImportStatus[] = [
-  'uploading',
-  'waiting',
-  'counting',
-  'running',
-  'paused',
-];
+/** An import in one of these has ended; any other is unfinished. */
+const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
 /** How long an ended import stays listed. */
 const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -68,10 +66,18 @@ export class BulkImportsService {
     private readonly waker: ImportServiceWaker,
   ) {}
 
-  /** Records a Bulk Import of these files, `uploading`, and starts each file's upload. */
+  /**
+   * Records a Bulk Import of these files, `uploading`, and starts each file's
+   * upload. An Account has one unfinished at a time, so that each gets its
+   * share of the import service (`bulk-import-unfinished` otherwise).
+   * Refused during an Impersonation: it would launch hours of work, and
+   * emails, in the Account's name.
+   */
   async start(account: Identity, files: unknown): Promise<BulkImportView> {
+    refuseImpersonation(account);
     const store = this.requireStore();
     const chosen = validFiles(files);
+    await this.refuseUnfinished(account);
     const id = randomUUID();
     const stored: BulkImportFile[] = await Promise.all(
       chosen.map(async ({ name, size }, index) => {
@@ -79,17 +85,28 @@ export class BulkImportsService {
         return { name, size, key, uploadId: await store.startUpload(key) };
       }),
     );
-    const [row] = await this.db
-      .insert(bulkImports)
-      .values({
-        id,
-        identityId: account.id,
-        status: 'uploading',
-        files: stored,
-        createdAt: this.clock.now(),
-      })
-      .returning();
-    return view(row);
+    try {
+      const [row] = await this.db
+        .insert(bulkImports)
+        .values({
+          id,
+          identityId: account.id,
+          status: 'uploading',
+          files: stored,
+          createdAt: this.clock.now(),
+        })
+        .returning();
+      return view(row);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Another start of the same Account got in first: let these uploads go.
+      await Promise.all(
+        stored.map((file) =>
+          store.delete(file.key, file.uploadId).catch(() => undefined),
+        ),
+      );
+      throw new Rejected('bulk-import-unfinished');
+    }
   }
 
   /** A URL to upload each of these parts of one file to. */
@@ -171,7 +188,7 @@ export class BulkImportsService {
         and(
           eq(bulkImports.id, id),
           eq(bulkImports.identityId, account.id),
-          inArray(bulkImports.status, UNFINISHED),
+          notInArray(bulkImports.status, ENDED),
         ),
       )
       .returning();
@@ -192,6 +209,20 @@ export class BulkImportsService {
           ),
         );
     }
+  }
+
+  private async refuseUnfinished(account: Identity): Promise<void> {
+    const [unfinished] = await this.db
+      .select({ id: bulkImports.id })
+      .from(bulkImports)
+      .where(
+        and(
+          eq(bulkImports.identityId, account.id),
+          notInArray(bulkImports.status, ENDED),
+        ),
+      )
+      .limit(1);
+    if (unfinished) throw new Rejected('bulk-import-unfinished');
   }
 
   /** The Account's Bulk Import `id`, still uploading. */

@@ -241,11 +241,11 @@ describe('Following and cancelling a Bulk Import (e2e)', () => {
     await start();
     const one = asAccount((await newAccount(api.httpServer)).token);
     const other = asAccount((await newAccount(api.httpServer)).token);
+    const done = await one.upload('done.txt', manyHands(2));
+    await service!.settled();
     const started = await one
       .start([{ name: 'export.txt', size: 1000 }])
       .expect(201);
-    const done = await one.upload('done.txt', manyHands(2));
-    await service!.settled();
 
     await other.cancel(started.body.id).expect(404);
     await one.cancel(done).expect(404);
