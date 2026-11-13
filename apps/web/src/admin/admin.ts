@@ -126,6 +126,8 @@ export interface AdminBulkImport {
   reason: string | null
   /** Why it failed, when it did: a technical code, never a Hand's text. */
   failureCode: string | null
+  /** Failed, with its files still kept (7 days): Reintentar. */
+  retryable: boolean
   createdAt: string
   lastActivityAt: string
   finishedAt: string | null

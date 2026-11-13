@@ -63,6 +63,44 @@ export class EmailWriter {
     return bulkImportEnded(this.frontendUrl, input);
   }
 
+  /** To an Administrator, when a Bulk Import has failed. */
+  bulkImportFailed(input: {
+    to: string;
+    language: Language;
+    bulkImport: FailedBulkImport;
+  }): Email {
+    const { language, bulkImport } = input;
+    const number = new Intl.NumberFormat(INTL[language]);
+    const n = (count: number) => number.format(count);
+    const files = bulkImport.fileNames.join(', ');
+    const es = language === 'es';
+    return write(
+      input.to,
+      language,
+      es ? 'Una importación ha fallado' : 'An import has failed',
+      es
+        ? [
+            `La importación de ${files} de ${bulkImport.account} ha fallado tras ${n(bulkImport.processed)} de ${n(bulkImport.total ?? 0)} manos.`,
+            `Importadas: ${n(bulkImport.imported)}`,
+            `Motivo: ${bulkImport.failureCode}`,
+            'Sus archivos se conservan 7 días: hasta entonces puedes reintentarla desde Administración.',
+          ]
+        : [
+            `The import of ${files} by ${bulkImport.account} failed after ${n(bulkImport.processed)} of ${n(bulkImport.total ?? 0)} hands.`,
+            `Imported: ${n(bulkImport.imported)}`,
+            `Reason: ${bulkImport.failureCode}`,
+            'Its files are kept for 7 days: until then you can retry it from Administration.',
+          ],
+      es ? 'Ver importaciones' : 'See imports',
+      `${this.frontendUrl}/admin/imports`,
+      [
+        es
+          ? 'Te escribimos porque eres administrador de Runout.'
+          : 'You are receiving this because you are a Runout Administrator.',
+      ],
+    );
+  }
+
   /** To an Administrator, the once a Bulk Import stalls. */
   bulkImportStalled(input: {
     to: string;
@@ -120,6 +158,18 @@ export interface EndedBulkImport {
   duplicates: number;
   /** Hands not imported, per reason; `library-full` counts those that did not fit. */
   notImported: Record<string, number>;
+}
+
+/** A failed Bulk Import as Administrators are told it: never the text of a Hand. */
+export interface FailedBulkImport {
+  /** The Account, as Runout names it: its email, else its Display Name. */
+  account: string;
+  fileNames: string[];
+  total: number | null;
+  processed: number;
+  imported: number;
+  /** The technical code it failed with. */
+  failureCode: string;
 }
 
 /** The email to an Importer whose Bulk Import ended, in their language. */

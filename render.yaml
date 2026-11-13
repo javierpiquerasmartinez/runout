@@ -119,6 +119,12 @@ projects:
           name: runout
           type: web
           envVarKey: EMAIL_FROM
+      # Whom to email when a Bulk Import fails: the API's Administrators.
+      - key: ADMINISTRATOR_EMAILS
+        fromService:
+          name: runout
+          type: web
+          envVarKey: ADMINISTRATOR_EMAILS
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       startCommand: pnpm run start:imports

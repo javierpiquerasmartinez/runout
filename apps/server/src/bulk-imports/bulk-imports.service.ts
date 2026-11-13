@@ -5,7 +5,17 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { and, desc, eq, gt, isNull, lt, notInArray, or } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  isNull,
+  lt,
+  lte,
+  notInArray,
+  or,
+} from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -69,6 +79,8 @@ export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
 const IMPORTABLE_FILE = /\.(txt|zip)$/i;
 /** An import in one of these has ended; any other is unfinished. */
 export const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
+/** How long a failed import's files are kept for a retry. */
+export const FAILED_FILES_KEPT_MS = 7 * 24 * 60 * 60_000;
 /** How long an ended import stays listed. */
 const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -111,6 +123,14 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
         this.logger.error('Could not discard expired uploads', error);
       }
       try {
+        await this.deleteExpiredFailedFiles();
+      } catch (error) {
+        this.logger.error(
+          'Could not delete the files of failed imports',
+          error,
+        );
+      }
+      try {
         await this.stallCheck.run();
       } catch (error) {
         this.logger.error('Could not check for stalled Bulk Imports', error);
@@ -144,6 +164,36 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
         .delete(bulkImports)
         .where(
           and(eq(bulkImports.id, row.id), eq(bulkImports.status, 'uploading')),
+        );
+    }
+  }
+
+  /**
+   * Lets go of the files of imports failed 7 days ago or more, kept until
+   * then for a retry, and records it, so that they are no longer retried.
+   * A file the store could not let go of is tried again at the next check.
+   */
+  private async deleteExpiredFailedFiles(): Promise<void> {
+    const store = this.requireStore();
+    const now = this.clock.now();
+    const cutoff = new Date(now.getTime() - FAILED_FILES_KEPT_MS);
+    const expired = await this.db
+      .select()
+      .from(bulkImports)
+      .where(
+        and(
+          eq(bulkImports.status, 'failed'),
+          isNull(bulkImports.filesDeletedAt),
+          lte(bulkImports.finishedAt, cutoff),
+        ),
+      );
+    for (const row of expired) {
+      await Promise.all(row.files.map(({ key }) => store.delete(key)));
+      await this.db
+        .update(bulkImports)
+        .set({ filesDeletedAt: now })
+        .where(
+          and(eq(bulkImports.id, row.id), eq(bulkImports.status, 'failed')),
         );
     }
   }
@@ -301,6 +351,50 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
     await this.cancelWhere(id, null);
   }
 
+  /**
+   * Takes up any Account's failed import `id` again where it stopped, from
+   * the files kept for it, and wakes the import service. Only while those
+   * files are kept (`bulk-import-not-retryable` otherwise), and only while
+   * the Account has no other unfinished (`bulk-import-unfinished`).
+   */
+  async retryAsAdministrator(id: string): Promise<void> {
+    if (!isUuid(id)) throw new Rejected('bulk-import-not-found');
+    const [found] = await this.db
+      .select()
+      .from(bulkImports)
+      .where(eq(bulkImports.id, id));
+    if (!found) throw new Rejected('bulk-import-not-found');
+    if (!retryable(found, this.clock.now())) {
+      throw new Rejected('bulk-import-not-retryable');
+    }
+    try {
+      const [retried] = await this.db
+        .update(bulkImports)
+        .set({
+          // Counted already, it goes on adding; otherwise it counts again.
+          status: found.total === null ? 'waiting' : 'running',
+          failureCode: null,
+          finishedAt: null,
+          // Waiting for the service from now: not stalled before it has had its time.
+          stalled: false,
+          waitingSince: this.clock.now(),
+        })
+        .where(
+          and(
+            eq(bulkImports.id, id),
+            eq(bulkImports.status, 'failed'),
+            isNull(bulkImports.filesDeletedAt),
+          ),
+        )
+        .returning({ id: bulkImports.id });
+      if (!retried) throw new Rejected('bulk-import-not-retryable');
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      throw new Rejected('bulk-import-unfinished');
+    }
+    await this.waker.wake();
+  }
+
   /** Cancels `id`, if unfinished and, given `identityId`, that Account's. */
   private async cancelWhere(id: string, identityId: string | null) {
     if (!isUuid(id)) throw new Rejected('bulk-import-not-found');
@@ -371,6 +465,22 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
     if (!this.store) throw new Rejected('bulk-import-unavailable');
     return this.store;
   }
+}
+
+/**
+ * Whether a Bulk Import can be retried at `now`: failed, with its files still
+ * kept, which they are for 7 days.
+ */
+export function retryable(
+  row: typeof bulkImports.$inferSelect,
+  now: Date,
+): boolean {
+  return (
+    row.status === 'failed' &&
+    row.filesDeletedAt === null &&
+    row.finishedAt !== null &&
+    now.getTime() - row.finishedAt.getTime() < FAILED_FILES_KEPT_MS
+  );
 }
 
 function view(row: typeof bulkImports.$inferSelect): BulkImportView {

@@ -45,6 +45,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'unsupported-file': HttpStatus.BAD_REQUEST,
   'bulk-import-too-large': HttpStatus.PAYLOAD_TOO_LARGE,
   'bulk-import-unfinished': HttpStatus.CONFLICT,
+  'bulk-import-not-retryable': HttpStatus.CONFLICT,
   'preview-not-found': HttpStatus.NOT_FOUND,
   'author-not-in-room': HttpStatus.BAD_REQUEST,
   'invalid-queue-order': HttpStatus.BAD_REQUEST,
