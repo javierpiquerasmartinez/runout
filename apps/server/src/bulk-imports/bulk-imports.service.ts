@@ -5,7 +5,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { and, desc, eq, lt, notInArray } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, notInArray, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -65,6 +65,8 @@ export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
 const IMPORTABLE_FILE = /\.(txt|zip)$/i;
 /** An import in one of these has ended; any other is unfinished. */
 const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
+/** How long an ended import stays listed. */
+const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Bulk Imports, as the Importer starts and follows them from the API. The
@@ -251,14 +253,59 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
     return view(row);
   }
 
-  /** The Account's Bulk Imports, newest first. */
+  /** The Account's Bulk Imports, newest first: unfinished, or ended in the last 30 days. */
   async list(account: Identity): Promise<BulkImportView[]> {
+    const listedSince = new Date(this.clock.now().getTime() - LISTED_FOR_MS);
     const rows = await this.db
       .select()
       .from(bulkImports)
-      .where(eq(bulkImports.identityId, account.id))
+      .where(
+        and(
+          eq(bulkImports.identityId, account.id),
+          or(
+            isNull(bulkImports.finishedAt),
+            gt(bulkImports.finishedAt, listedSince),
+          ),
+        ),
+      )
       .orderBy(desc(bulkImports.createdAt));
     return rows.map(view);
+  }
+
+  /**
+   * Stops the Account's unfinished import `id` before its next batch. The
+   * Hands already imported stay; its files go.
+   */
+  async cancel(account: Identity, id: string): Promise<BulkImportView> {
+    if (!isUuid(id)) throw new Rejected('bulk-import-not-found');
+    const [row] = await this.db
+      .update(bulkImports)
+      .set({ status: 'cancelled', finishedAt: this.clock.now() })
+      .where(
+        and(
+          eq(bulkImports.id, id),
+          eq(bulkImports.identityId, account.id),
+          notInArray(bulkImports.status, ENDED),
+        ),
+      )
+      .returning();
+    if (!row) throw new Rejected('bulk-import-not-found');
+    await this.deleteFiles(row.files);
+    return view(row);
+  }
+
+  /** The files, or what was uploaded of them; one left behind is only a waste of space. */
+  private async deleteFiles(files: BulkImportFile[]): Promise<void> {
+    if (!this.store) return;
+    for (const file of files) {
+      await this.store
+        .delete(file.key, file.uploadId)
+        .catch((error: unknown) =>
+          this.logger.error(
+            `Could not delete ${file.key}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+    }
   }
 
   private async refuseUnfinished(account: Identity): Promise<void> {
