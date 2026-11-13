@@ -721,9 +721,16 @@ export const bulkImports = pgTable(
       .default({}),
     /**
      * Why it ended short of adding its Hands, when it did: `too-many-hands`
-     * past the limit, `unreadable-file` when a file is no text or zip.
+     * past the limit, `unreadable-file` when a file is no text or zip,
+     * `unrecognised-format` when nothing in the files is a Hand, and
+     * `library-full` when the Library reached its capacity.
      */
     reason: text('reason'),
+    /**
+     * Why it failed, when it did, for Administrators: a technical code, such
+     * as Postgres's SQLSTATE or Node's error code, never a Hand's text.
+     */
+    failureCode: text('failure_code'),
     /** When a batch last committed; null before the first. */
     lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

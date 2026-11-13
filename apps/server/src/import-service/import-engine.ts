@@ -3,11 +3,16 @@ import {
   Injectable,
   Logger,
   type OnApplicationBootstrap,
+  type OnModuleDestroy,
 } from '@nestjs/common';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
-import { DATABASE, type Database } from '../database/database.js';
-import { bulkImports } from '../database/schema.js';
+import {
+  DATABASE,
+  type Database,
+  type Transaction,
+} from '../database/database.js';
+import { bulkImports, identities, libraryEntries } from '../database/schema.js';
 import { FILE_STORE, type FileStore } from '../file-store/file-store.js';
 import type { Hand } from '../hands/hand.js';
 import { keyOf, withHistories } from '../hands/hand-store.js';
@@ -20,10 +25,14 @@ import {
 } from '../hands/import/hand-reader.js';
 import { UnreadableUpload } from '../hands/import/upload.js';
 import { addToLibrary, inLibrary } from '../library/library-entries.js';
+import { LIBRARY_CAPACITY } from '../library/library-limits.js';
 import { BULK_IMPORT_LIMIT } from './bulk-import-limit.js';
 
 /** The most Hands one batch goes through, in one transaction. */
 const BATCH_SIZE = 1_000;
+
+/** How many times a step is tried before its import is marked failed. */
+const ATTEMPTS = 3;
 
 type BulkImport = typeof bulkImports.$inferSelect;
 
@@ -48,11 +57,13 @@ interface OpenReader {
  * crash changes nothing.
  */
 @Injectable()
-export class ImportEngine implements OnApplicationBootstrap {
+export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(ImportEngine.name);
   private working: Promise<void> | null = null;
   /** Set when woken while working: look again before stopping. */
   private wokenAgain = false;
+  /** Set when the service is stopping: no batch is begun after the one in hand. */
+  private stopping = false;
   /** Each import's reader, left open between its batches. */
   private readonly readers = new Map<string, OpenReader>();
 
@@ -62,6 +73,7 @@ export class ImportEngine implements OnApplicationBootstrap {
     @Inject(FILE_STORE) private readonly store: FileStore,
     private readonly heroResults: HeroResults,
     @Inject(BULK_IMPORT_LIMIT) private readonly limit: number,
+    @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
   ) {}
 
   /** Imports left waiting or interrupted go on as soon as the service starts. */
@@ -69,6 +81,15 @@ export class ImportEngine implements OnApplicationBootstrap {
     this.workUntilNothingLeft().catch((error: unknown) =>
       this.logger.error(`The import engine stopped: ${messageOf(error)}`),
     );
+  }
+
+  /**
+   * Lets the batch in hand commit, and begins no other: what is left goes on
+   * when the service starts again, from the cursor the last batch committed.
+   */
+  async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
+    await this.settled();
   }
 
   /** Works until no Bulk Import is left to advance. Woken while working, it looks again before stopping. */
@@ -81,10 +102,10 @@ export class ImportEngine implements OnApplicationBootstrap {
       try {
         do {
           this.wokenAgain = false;
-          while (await this.advanceOne()) {
+          while (!this.stopping && (await this.advanceOne())) {
             // One step at a time, until none is left.
           }
-        } while (this.wokenAgain);
+        } while (this.wokenAgain && !this.stopping);
       } finally {
         this.working = null;
         await this.closeReaders();
@@ -110,14 +131,39 @@ export class ImportEngine implements OnApplicationBootstrap {
       )
       .limit(1);
     if (!next) return false;
-    try {
-      if (next.status === 'running') await this.addBatch(next);
-      else await this.count(next);
-    } catch (error) {
-      if (!(error instanceof UnreadableUpload)) throw error;
-      await this.end(next, 'unreadable-file');
+    for (let attempt = 1; ; attempt++) {
+      try {
+        if (next.status === 'running') await this.addBatch(next);
+        else await this.count(next);
+        return true;
+      } catch (error) {
+        if (error instanceof UnreadableUpload) {
+          await this.end(next, 'unreadable-file');
+          return true;
+        }
+        // Its transaction rolled back: read again from the cursor.
+        await this.closeReader(next.id).catch(() => undefined);
+        this.logger.warn(
+          `Bulk Import ${next.id} failed a step (attempt ${attempt} of ${ATTEMPTS}): ${failureCodeOf(error)}`,
+        );
+        // Stopping, what failed may be the service going away: it goes on at the next start.
+        if (this.stopping) return false;
+        if (attempt === ATTEMPTS) {
+          await this.fail(next, failureCodeOf(error));
+          return true;
+        }
+      }
     }
-    return true;
+  }
+
+  /** Ends an import that keeps failing: what it added stays, and its files are kept for a retry. */
+  private async fail(record: BulkImport, failureCode: string): Promise<void> {
+    const now = this.clock.now();
+    await this.db
+      .update(bulkImports)
+      .set({ status: 'failed', failureCode, finishedAt: now })
+      // Not one cancelled meanwhile.
+      .where(and(eq(bulkImports.id, record.id), active));
   }
 
   /**
@@ -134,16 +180,18 @@ export class ImportEngine implements OnApplicationBootstrap {
       await this.end(record, 'too-many-hands');
       return;
     }
+    const notImported: Record<string, number> =
+      counted.unrecognised > 0
+        ? { 'unrecognised-format': counted.unrecognised }
+        : {};
+    if (counted.hands === 0) {
+      // Nothing in the files is a Hand any format recognises.
+      await this.end(record, 'unrecognised-format', { total: 0, notImported });
+      return;
+    }
     await this.db
       .update(bulkImports)
-      .set({
-        status: 'running',
-        total: counted.hands,
-        notImported:
-          counted.unrecognised > 0
-            ? { 'unrecognised-format': counted.unrecognised }
-            : {},
-      })
+      .set({ status: 'running', total: counted.hands, notImported })
       // Cancelled while counting, it stays so.
       .where(and(eq(bulkImports.id, record.id), active));
   }
@@ -198,12 +246,19 @@ export class ImportEngine implements OnApplicationBootstrap {
         kept.push(hand);
         texts.push(text);
       }
+      // Past what fits in the Library, nothing more is added: neither these
+      // nor the Hands not yet gone through.
+      const room = await this.roomIn(tx, record.identityId);
+      const full = kept.length > room;
+      const notFit = full
+        ? kept.length - room + Math.max(0, (record.total ?? 0) - to)
+        : 0;
       const now = this.clock.now();
       const added = await addToLibrary(
         tx,
         this.heroResults,
         record.identityId,
-        withHistories(kept, texts),
+        withHistories(kept.slice(0, room), texts.slice(0, room)),
         now,
       );
       await tx
@@ -211,13 +266,20 @@ export class ImportEngine implements OnApplicationBootstrap {
         .set({
           processed: to,
           imported: sql`${bulkImports.imported} + ${added.length}`,
-          duplicates: sql`${bulkImports.duplicates} + ${batch.length - added.length}`,
-          notImported: plus(locked.notImported, discarded),
+          duplicates: sql`${bulkImports.duplicates} + ${batch.length - added.length - (full ? kept.length - room : 0)}`,
+          notImported: plus(
+            locked.notImported,
+            full ? { ...discarded, 'library-full': notFit } : discarded,
+          ),
           lastAdvancedAt: now,
-          ...(done ? { status: 'completed', finishedAt: now } : {}),
+          ...(full
+            ? { status: 'completed', reason: 'library-full', finishedAt: now }
+            : done
+              ? { status: 'completed', finishedAt: now }
+              : {}),
         })
         .where(eq(bulkImports.id, record.id));
-      return true;
+      return { full };
     });
 
     if (!committed) {
@@ -225,18 +287,41 @@ export class ImportEngine implements OnApplicationBootstrap {
       return;
     }
     reader.position = to;
-    if (done) {
+    if (done || committed.full) {
       await this.closeReader(record.id);
       await this.deleteFiles(record);
     }
   }
 
+  /**
+   * How many more Hands the Account's Library holds. Takes the Account's
+   * lock until the batch commits, as a small import does, so that the two
+   * cannot both fit at once.
+   */
+  private async roomIn(tx: Transaction, accountId: string): Promise<number> {
+    await tx
+      .select({ id: identities.id })
+      .from(identities)
+      .where(eq(identities.id, accountId))
+      .for('update');
+    const [{ held }] = await tx
+      .select({ held: count() })
+      .from(libraryEntries)
+      .where(eq(libraryEntries.identityId, accountId));
+    return Math.max(0, this.capacity - held);
+  }
+
   /** Ends an import short of adding its Hands, saying why, and lets its files go. */
-  private async end(record: BulkImport, reason: string): Promise<void> {
+  private async end(
+    record: BulkImport,
+    reason: string,
+    counts: Partial<Pick<BulkImport, 'total' | 'notImported'>> = {},
+  ): Promise<void> {
     const now = this.clock.now();
     await this.db
       .update(bulkImports)
       .set({
+        ...counts,
         status: 'completed',
         reason,
         finishedAt: now,
@@ -307,6 +392,17 @@ function plus(
     sum[reason] = (sum[reason] ?? 0) + count;
   }
   return sum;
+}
+
+/**
+ * A failure as Administrators are told it: Postgres's SQLSTATE or Node's
+ * error code when it has one, else the error's name. Never its message,
+ * which may quote a Hand.
+ */
+function failureCodeOf(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && code !== '') return code;
+  return error instanceof Error ? error.name : 'unknown';
 }
 
 function messageOf(error: unknown): string {

@@ -24,7 +24,9 @@ describe('A Bulk Import (e2e)', () => {
    * The API and the import service, on a database of their own: an import
    * service takes any waiting import it finds, other files' included.
    */
-  async function start(options: { limit?: number } = {}) {
+  async function start(
+    options: { limit?: number; libraryCapacity?: number } = {},
+  ) {
     database = await freshDatabase();
     store = new MemoryFileStore();
     service = await startImportService({
@@ -32,11 +34,13 @@ describe('A Bulk Import (e2e)', () => {
       fileStore: store,
       databaseUrl: database.url,
       limit: options.limit,
+      libraryCapacity: options.libraryCapacity,
     });
     api = await startApp({
       databaseUrl: database.url,
       importService: { address: service.address, secret: SECRET },
       fileStore: store,
+      libraryCapacity: options.libraryCapacity,
     });
   }
 
@@ -234,10 +238,12 @@ describe('A Bulk Import (e2e)', () => {
     const [listed] = (await account.list().expect(200)).body;
     expect(listed).toMatchObject({
       status: 'completed',
+      reason: 'unrecognised-format',
       total: 0,
       imported: 0,
       notImported: { 'unrecognised-format': 1 },
     });
+    expect(store.files()).toEqual([]);
   });
 
   it('ends an import whose zip is not one, saying why', async () => {
@@ -371,4 +377,179 @@ describe('A Bulk Import (e2e)', () => {
       await observer.end();
     }
   });
+
+  /** The import's record as stored, every column of it. */
+  async function storedRecord(id: string): Promise<Record<string, unknown>> {
+    const client = new pg.Client(database.url);
+    await client.connect();
+    try {
+      const { rows } = await client.query(
+        'select * from bulk_imports where id = $1',
+        [id],
+      );
+      return rows[0] as Record<string, unknown>;
+    } finally {
+      await client.end();
+    }
+  }
+
+  it('skips the Hands it cannot read, counting them per reason, and keeps none of their text', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const tenMax = freshHandHistory('pokerstars-ten-max.txt');
+
+    const id = await upload(
+      account,
+      'export.txt',
+      `${manyHands(10)}${freshHandHistory('ggpoker-discarded.txt')}\n\n\n${tenMax}`,
+    );
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(10);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      total: 13,
+      processed: 13,
+      imported: 10,
+      notImported: { 'not-cash-holdem': 2, 'too-many-seats': 1 },
+      reason: null,
+    });
+    const stored = JSON.stringify(await storedRecord(id));
+    expect(stored).not.toContain('Hand #');
+    expect(stored).not.toContain(/Hand #(\d+)/.exec(tenMax)![1]);
+  });
+
+  /** Where the `index`th Hand (from 0) starts in a text of `manyHands`, in bytes. */
+  function byteOfHand(text: string, index: number): number {
+    let at = -1;
+    for (let hand = 0; hand <= index; hand++) {
+      at = text.indexOf('PokerStars Hand #', at + 1);
+    }
+    return Buffer.byteLength(text.slice(0, at));
+  }
+
+  /** Waits until the Account's only import has gone through `processed` Hands. */
+  async function untilProcessed(
+    account: ReturnType<typeof asAccount>,
+    processed: number,
+  ): Promise<void> {
+    for (let tries = 0; tries < 200; tries++) {
+      const [listed] = (await account.list().expect(200)).body;
+      if (listed.processed >= processed) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`The import never got to ${processed} Hands`);
+  }
+
+  it('resumes an import interrupted by a restart, without duplicating a Hand', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const text = manyHands(2500);
+    // The first read counts; the second stops halfway into the second batch.
+    const release = store.pauseRead({
+      afterBytes: byteOfHand(text, 1500),
+      skip: 1,
+    });
+
+    await upload(account, 'export.txt', text);
+    await untilProcessed(account, 1000);
+    const stopping = service!.close();
+    release();
+    await stopping;
+    const [stopped] = (await account.list().expect(200)).body;
+    expect(stopped.status).toBe('running');
+    expect(stopped.processed).toBeLessThan(2500);
+
+    service = await startImportService({
+      secret: SECRET,
+      fileStore: store,
+      databaseUrl: database.url,
+    });
+    await service.settled();
+
+    expect(await account.libraryTotal()).toBe(2500);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      total: 2500,
+      processed: 2500,
+      imported: 2500,
+      duplicates: 0,
+    });
+  }, 30_000);
+
+  it('tries a failing batch again, and goes on once it works', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const text = manyHands(1500);
+    // Past the count, two reads in a row lose storage in the second batch.
+    store.failReads({ afterBytes: byteOfHand(text, 1200), times: 2, skip: 1 });
+
+    await upload(account, 'export.txt', text);
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(1500);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      imported: 1500,
+      duplicates: 0,
+    });
+  }, 30_000);
+
+  it('fails an import whose batch fails three times, keeping the Hands of the batches before', async () => {
+    await start();
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const text = manyHands(1500);
+    store.failReads({ afterBytes: byteOfHand(text, 1200), times: 3, skip: 1 });
+
+    const id = await upload(account, 'export.txt', text);
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(1000);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'failed',
+      total: 1500,
+      processed: 1000,
+      imported: 1000,
+      finishedAt: expect.any(String),
+    });
+    // What Administrators will be told: the technical failure, and no Hand.
+    expect(await storedRecord(id)).toMatchObject({
+      failure_code: 'ECONNRESET',
+    });
+    // Kept, to be retried.
+    expect(store.files()).toHaveLength(1);
+  }, 30_000);
+
+  it('ends as a full Library once it reaches its capacity, counting the Hands that did not fit', async () => {
+    await start({ libraryCapacity: 1200 });
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const session = freshHandHistory('pokerstars-session.txt');
+    await account.importSmall(session);
+    const before = await account.libraryTotal();
+
+    // Its first Hands are already there: duplicates take no room.
+    await upload(account, 'export.txt', `${session}\n\n${manyHands(1500)}`);
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(1200);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      reason: 'library-full',
+      imported: 1200 - before,
+      duplicates: before,
+      notImported: { 'library-full': 1500 - (1200 - before) },
+      finishedAt: expect.any(String),
+    });
+    expect(store.files()).toEqual([]);
+  }, 30_000);
 });
