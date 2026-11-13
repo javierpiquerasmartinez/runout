@@ -461,6 +461,7 @@ export const es = {
   'reason.library-full': 'Tu biblioteca no puede tener más de 10 millones de manos.',
   'reason.invalid-bulk-import': 'Esa importación no es válida.',
   'reason.bulk-import-not-found': 'Esa importación no existe o ya no se está subiendo.',
+  'reason.bulk-import-unfinished': 'Ya tienes una importación sin terminar. Podrás empezar otra cuando acabe.',
   'reason.bulk-import-unavailable': 'Ahora mismo no se pueden hacer importaciones grandes.',
   'reason.unsupported-file': 'Solo se pueden importar archivos .txt y .zip.',
   'reason.bulk-import-too-large': 'Los archivos suman más de 2,5 GB.',

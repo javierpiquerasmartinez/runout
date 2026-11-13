@@ -178,19 +178,19 @@ describe('Uploading a Bulk Import (e2e)', () => {
       expect((await importer.list().expect(200)).body).toHaveLength(1);
     });
 
-    it('starts afresh when the files chosen differ in name or size', async () => {
+    it('is not continued by files differing in name or size, which are a second import', async () => {
       const importer = await signedIn();
-      const first = await importer.start(files).expect(201);
+      await importer.start(files).expect(201);
 
       const renamed = await importer
         .start([{ name: 'other.txt', size: text.length }])
-        .expect(201);
+        .expect(409);
       const resized = await importer
         .start([{ name: 'export.txt', size: text.length + 1 }])
-        .expect(201);
+        .expect(409);
 
-      expect(renamed.body.id).not.toBe(first.body.id);
-      expect(resized.body.id).not.toBe(first.body.id);
+      expect(renamed.body.reason).toBe('bulk-import-unfinished');
+      expect(resized.body.reason).toBe('bulk-import-unfinished');
     });
 
     it('is not continued by another Account choosing the same files', async () => {
@@ -231,6 +231,7 @@ describe('Uploading a Bulk Import (e2e)', () => {
       expect((await importer.list().expect(200)).body).toEqual([]);
       expect(store.unfinishedUploads()).toEqual([]);
       await importer.uploadedParts(started.body.id, 0).expect(404);
+      await importer.start([{ name: 'other.txt', size: 10 }]).expect(201);
     });
 
     it('can still be continued within 24 hours', async () => {

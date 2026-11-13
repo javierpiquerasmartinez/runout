@@ -36,6 +36,7 @@ export type RejectionReason =
   | 'bulk-import-unavailable'
   | 'unsupported-file'
   | 'bulk-import-too-large'
+  | 'bulk-import-unfinished'
   | 'author-not-in-room'
   | 'invalid-queue-order'
   | 'entry-not-in-queue'

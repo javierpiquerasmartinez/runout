@@ -16,4 +16,5 @@ CREATE TABLE "bulk_imports" (
 --> statement-breakpoint
 ALTER TABLE "bulk_imports" ADD CONSTRAINT "bulk_imports_identity_id_identities_id_fk" FOREIGN KEY ("identity_id") REFERENCES "public"."identities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "bulk_imports_identity_id_idx" ON "bulk_imports" USING btree ("identity_id");--> statement-breakpoint
-CREATE INDEX "bulk_imports_status_idx" ON "bulk_imports" USING btree ("status");
+CREATE INDEX "bulk_imports_status_idx" ON "bulk_imports" USING btree ("status");--> statement-breakpoint
+CREATE UNIQUE INDEX "bulk_imports_one_unfinished_idx" ON "bulk_imports" USING btree ("identity_id") WHERE "bulk_imports"."status" not in ('completed', 'failed', 'cancelled');

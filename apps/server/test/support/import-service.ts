@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { inject } from 'vitest';
-import { CLOCK } from '../../src/clock/clock.js';
+import { CLOCK, type Clock } from '../../src/clock/clock.js';
 import { DATABASE_URL } from '../../src/database/database.js';
 import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
 import {
@@ -36,7 +36,7 @@ export interface StartImportServiceOptions {
   secret: string;
   /** Defaults to the Postgres started for this e2e run. */
   databaseUrl?: string;
-  clock?: TestClock;
+  clock?: Clock;
   /** Shared with the API that takes the uploads; an empty one otherwise. */
   fileStore?: FileStore;
   /** The most Hands one Bulk Import may hold; 2 million otherwise, as in production. */

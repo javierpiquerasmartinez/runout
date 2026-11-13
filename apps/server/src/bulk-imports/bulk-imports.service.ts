@@ -5,7 +5,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt, notInArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -14,13 +14,17 @@ import {
   type BulkImportFile,
   type BulkImportStatus,
 } from '../database/schema.js';
+import { isUniqueViolation } from '../database/unique-violation.js';
 import { isUuid } from '../database/uuid.js';
 import {
   FILE_STORE,
   type FileStore,
   type UploadedPart,
 } from '../file-store/file-store.js';
-import type { Identity } from '../identity/identity.service.js';
+import {
+  refuseImpersonation,
+  type Identity,
+} from '../identity/identity.service.js';
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { Rejected } from '../rejection/rejection.js';
 
@@ -59,6 +63,8 @@ const DISCARD_EVERY_MS = 60 * 60_000;
 export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
 /** What a Bulk Import reads: Hand Histories as text, or zipped. */
 const IMPORTABLE_FILE = /\.(txt|zip)$/i;
+/** An import in one of these has ended; any other is unfinished. */
+const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
 
 /**
  * Bulk Imports, as the Importer starts and follows them from the API. The
@@ -130,9 +136,14 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
   /**
    * Records a Bulk Import of these files, `uploading`, and starts each file's
    * upload. The same files chosen again, by name and size, give back the
-   * import still uploading them, so that the upload continues.
+   * import still uploading them, so that the upload continues. Otherwise an
+   * Account has one unfinished at a time, so that each gets its share of the
+   * import service (`bulk-import-unfinished` otherwise).
+   * Refused during an Impersonation: it would launch hours of work, and
+   * emails, in the Account's name.
    */
   async start(account: Identity, files: unknown): Promise<BulkImportView> {
+    refuseImpersonation(account);
     const store = this.requireStore();
     const chosen = validFiles(files);
     const interrupted = await this.db
@@ -147,6 +158,7 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
       .orderBy(desc(bulkImports.createdAt));
     const same = interrupted.find((row) => sameFiles(row.files, chosen));
     if (same) return view(same);
+    await this.refuseUnfinished(account);
     const id = randomUUID();
     const stored: BulkImportFile[] = await Promise.all(
       chosen.map(async ({ name, size }, index) => {
@@ -154,17 +166,28 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
         return { name, size, key, uploadId: await store.startUpload(key) };
       }),
     );
-    const [row] = await this.db
-      .insert(bulkImports)
-      .values({
-        id,
-        identityId: account.id,
-        status: 'uploading',
-        files: stored,
-        createdAt: this.clock.now(),
-      })
-      .returning();
-    return view(row);
+    try {
+      const [row] = await this.db
+        .insert(bulkImports)
+        .values({
+          id,
+          identityId: account.id,
+          status: 'uploading',
+          files: stored,
+          createdAt: this.clock.now(),
+        })
+        .returning();
+      return view(row);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Another start of the same Account got in first: let these uploads go.
+      await Promise.all(
+        stored.map((file) =>
+          store.delete(file.key, file.uploadId).catch(() => undefined),
+        ),
+      );
+      throw new Rejected('bulk-import-unfinished');
+    }
   }
 
   /** A URL to upload each of these parts of one file to. */
@@ -236,6 +259,20 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
       .where(eq(bulkImports.identityId, account.id))
       .orderBy(desc(bulkImports.createdAt));
     return rows.map(view);
+  }
+
+  private async refuseUnfinished(account: Identity): Promise<void> {
+    const [unfinished] = await this.db
+      .select({ id: bulkImports.id })
+      .from(bulkImports)
+      .where(
+        and(
+          eq(bulkImports.identityId, account.id),
+          notInArray(bulkImports.status, ENDED),
+        ),
+      )
+      .limit(1);
+    if (unfinished) throw new Rejected('bulk-import-unfinished');
   }
 
   /** The Account's Bulk Import `id`, still uploading. */
