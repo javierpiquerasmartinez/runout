@@ -5,6 +5,7 @@ import { bulkImports, identities, preferences } from '../database/schema.js';
 import { DEFAULT_PREFERENCES } from '../identity/identity.service.js';
 import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import { messageOf } from './message-of.js';
 
 /**
  * Tells an Importer that their Bulk Import ended, completed or failed. Not a
@@ -57,7 +58,7 @@ export class ImporterEmail {
       );
     } catch (error) {
       this.logger.error(
-        `Could not email the Importer of Bulk Import ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not email the Importer of Bulk Import ${id}: ${messageOf(error)}`,
       );
     }
   }

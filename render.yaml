@@ -1,7 +1,8 @@
 # Runout's backend on Render. Generated from the existing service in Render's
 # panel ("Generate Blueprint") on 2026-11-12, then extended. Secrets are
-# declared with `sync: false` and set in the panel, never here. See the
-# README's "Deploying" section for the steps done in the panel.
+# declared with `sync: false` and set in the panel, never here; the other
+# variables are generated, copied from another service, or written here. See
+# the README's "Deploying" section.
 version: "1"
 projects:
 - name: runout

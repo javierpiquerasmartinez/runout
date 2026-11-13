@@ -1,13 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import {
   bulkImports,
   identities,
+  type BulkImportReason,
   type BulkImportStatus,
 } from '../database/schema.js';
 import { CLOCK, type Clock } from '../clock/clock.js';
-import { ENDED, retryable } from '../bulk-imports/bulk-imports.service.js';
+import { retryable } from '../bulk-imports/bulk-imports.service.js';
+import { unfinished } from '../database/bulk-import-status.js';
 import { Storage } from '../storage/storage.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from './admin-query.js';
@@ -27,7 +29,7 @@ export interface AdminBulkImportView {
   duplicates: number;
   notImported: Record<string, number>;
   /** Why it ended short of adding its Hands, when it did. */
-  reason: string | null;
+  reason: BulkImportReason | null;
   /** Why it failed, when it did: a technical code, never a Hand's text. */
   failureCode: string | null;
   /** Failed, with its files still kept: it can be retried. */
@@ -71,12 +73,9 @@ export class BulkImportsAdminService {
     const { page, pageSize } = adminPage(query);
     const where = {
       all: undefined,
-      active: notInArray(bulkImports.status, ENDED),
+      active: unfinished,
       failed: inArray(bulkImports.status, ['failed']),
-      stalled: and(
-        eq(bulkImports.stalled, true),
-        notInArray(bulkImports.status, ENDED),
-      ),
+      stalled: and(eq(bulkImports.stalled, true), unfinished),
     }[filter];
     const [[{ total }], rows, used] = await Promise.all([
       this.db

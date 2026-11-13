@@ -1,28 +1,22 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, eq, lt, or, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
-import {
-  bulkImports,
-  identities,
-  preferences,
-  type BulkImportStatus,
-} from '../database/schema.js';
+import { advancing } from '../database/bulk-import-status.js';
+import { bulkImports, identities } from '../database/schema.js';
 import {
   ADMINISTRATOR_EMAILS,
   type AdministratorEmails,
 } from '../identity/administrators.js';
-import { DEFAULT_PREFERENCES } from '../identity/identity.service.js';
+import { administratorLanguages } from '../identity/administrator-languages.js';
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
 import { Storage } from '../storage/storage.js';
+import { messageOf } from '../import-service/message-of.js';
 
 /** How long an import may go without advance before it is stalled. */
 export const STALLED_AFTER_MS = 30 * 60_000;
-
-/** The imports the import service is to advance. Not a paused one, which waits on purpose. */
-const ADVANCING: BulkImportStatus[] = ['waiting', 'counting', 'running'];
 
 /**
  * A stopped import service cannot say so itself. At each of the API's hourly
@@ -52,7 +46,7 @@ export class StallCheck {
     const cutoff = new Date(this.clock.now().getTime() - STALLED_AFTER_MS);
     // Since it last advanced, or began waiting if that was later.
     const withoutAdvance = and(
-      inArray(bulkImports.status, ADVANCING),
+      advancing,
       lt(
         sql`greatest(${bulkImports.lastAdvancedAt}, ${bulkImports.waitingSince})`,
         cutoff,
@@ -105,25 +99,15 @@ export class StallCheck {
         .select({ email: identities.email })
         .from(identities)
         .where(eq(identities.id, bulkImport.identityId));
-      const administrators = this.administrators.all();
-      if (administrators.length === 0) return;
-      const languages = new Map(
-        (
-          await this.db
-            .select({
-              email: sql<string>`lower(${identities.email})`,
-              language: preferences.language,
-            })
-            .from(identities)
-            .innerJoin(preferences, eq(preferences.identityId, identities.id))
-            .where(inArray(sql`lower(${identities.email})`, administrators))
-        ).map(({ email, language }) => [email, language]),
+      const administrators = await administratorLanguages(
+        this.db,
+        this.administrators,
       );
-      for (const to of administrators) {
+      for (const { email: to, language } of administrators) {
         await this.mailer.send(
           this.emails.bulkImportStalled({
             to,
-            language: languages.get(to) ?? DEFAULT_PREFERENCES.language,
+            language,
             bulkImport: {
               account: importer?.email ?? bulkImport.identityId,
               fileNames: bulkImport.files.map((file) => file.name),
@@ -135,7 +119,7 @@ export class StallCheck {
       }
     } catch (error) {
       this.logger.error(
-        `Could not tell the Administrators that Bulk Import ${bulkImport.id} stalled: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not tell the Administrators that Bulk Import ${bulkImport.id} stalled: ${messageOf(error)}`,
       );
     }
   }

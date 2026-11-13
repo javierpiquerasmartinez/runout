@@ -16,7 +16,6 @@ import {
   lt,
   lte,
   ne,
-  notInArray,
   or,
 } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
@@ -25,8 +24,10 @@ import { DATABASE, type Database } from '../database/database.js';
 import {
   bulkImports,
   type BulkImportFile,
+  type BulkImportReason,
   type BulkImportStatus,
 } from '../database/schema.js';
+import { ENDED, unfinished } from '../database/bulk-import-status.js';
 import { isUniqueViolation } from '../database/unique-violation.js';
 import { isUuid } from '../database/uuid.js';
 import {
@@ -41,6 +42,7 @@ import {
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { Rejected } from '../rejection/rejection.js';
 import { StallCheck } from './stall-check.js';
+import { messageOf } from '../import-service/message-of.js';
 
 /** What the Importer sees of a Bulk Import. */
 export interface BulkImportView {
@@ -55,7 +57,7 @@ export interface BulkImportView {
   /** Hands not imported, per reason. */
   notImported: Record<string, number>;
   /** Why it ended short of adding its Hands, when it did. */
-  reason: string | null;
+  reason: BulkImportReason | null;
   createdAt: string;
   finishedAt: string | null;
 }
@@ -80,8 +82,6 @@ const CHECK_EVERY_MS = 60 * 60_000;
 export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
 /** What a Bulk Import reads: Hand Histories as text, or zipped. */
 const IMPORTABLE_FILE = /\.(txt|zip)$/i;
-/** An import in one of these has ended; any other is unfinished. */
-export const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
 /** How long a failed import's files are kept for a retry. */
 export const FAILED_FILES_KEPT_MS = 7 * 24 * 60 * 60_000;
 /** How long an ended import is kept, and listed, before it is deleted. */
@@ -437,7 +437,7 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
           identityId === null
             ? undefined
             : eq(bulkImports.identityId, identityId),
-          notInArray(bulkImports.status, ENDED),
+          unfinished,
         ),
       )
       .returning();
@@ -454,24 +454,19 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
         .delete(file.key, file.uploadId)
         .catch((error: unknown) =>
           this.logger.error(
-            `Could not delete ${file.key}: ${error instanceof Error ? error.message : String(error)}`,
+            `Could not delete ${file.key}: ${messageOf(error)}`,
           ),
         );
     }
   }
 
   private async refuseUnfinished(account: Identity): Promise<void> {
-    const [unfinished] = await this.db
+    const [found] = await this.db
       .select({ id: bulkImports.id })
       .from(bulkImports)
-      .where(
-        and(
-          eq(bulkImports.identityId, account.id),
-          notInArray(bulkImports.status, ENDED),
-        ),
-      )
+      .where(and(eq(bulkImports.identityId, account.id), unfinished))
       .limit(1);
-    if (unfinished) throw new Rejected('bulk-import-unfinished');
+    if (found) throw new Rejected('bulk-import-unfinished');
   }
 
   /** The Account's Bulk Import `id`, still uploading. */

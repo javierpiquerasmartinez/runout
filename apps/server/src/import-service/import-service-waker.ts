@@ -4,6 +4,7 @@ import {
   importServiceFromEnv,
   type ImportServiceAddress,
 } from './import-service-config.js';
+import { messageOf } from './message-of.js';
 
 /** How long the API waits for the import service to acknowledge. */
 const WAKE_TIMEOUT_MS = 5_000;
@@ -40,7 +41,7 @@ export class ImportServiceWaker {
       );
     } catch (error) {
       this.logger.error(
-        `The import service could not be woken: ${error instanceof Error ? error.message : String(error)}`,
+        `The import service could not be woken: ${messageOf(error)}`,
       );
     }
     return false;

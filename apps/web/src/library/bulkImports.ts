@@ -16,6 +16,9 @@ export type BulkImportStatus =
   | 'failed'
   | 'cancelled'
 
+/** Why a Bulk Import ended short of adding its Hands. */
+export type BulkImportReason = 'too-many-hands' | 'unreadable-file' | 'unrecognised-format' | 'library-full'
+
 export interface BulkImport {
   id: string
   status: BulkImportStatus
@@ -31,7 +34,7 @@ export interface BulkImport {
    * Why it ended short of adding its Hands, when it did. A full Library
    * counts the Hands that did not fit in `notImported['library-full']`.
    */
-  reason: 'too-many-hands' | 'unreadable-file' | 'unrecognised-format' | 'library-full' | null
+  reason: BulkImportReason | null
   createdAt: string
   finishedAt: string | null
 }

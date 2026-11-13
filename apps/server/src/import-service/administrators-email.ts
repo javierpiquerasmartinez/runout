@@ -1,14 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
-import { bulkImports, identities, preferences } from '../database/schema.js';
+import { bulkImports, identities } from '../database/schema.js';
+import { administratorLanguages } from '../identity/administrator-languages.js';
 import {
   ADMINISTRATOR_EMAILS,
   type AdministratorEmails,
 } from '../identity/administrators.js';
-import { DEFAULT_PREFERENCES } from '../identity/identity.service.js';
-import { EmailWriter, type Language } from '../mail/emails.js';
+import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import { messageOf } from './message-of.js';
 
 /**
  * Tells every Administrator that a Bulk Import failed: the Account, the
@@ -37,7 +38,10 @@ export class AdministratorsEmail {
     threshold: number;
   }): Promise<void> {
     try {
-      for (const { email, language } of await this.recipients()) {
+      for (const { email, language } of await administratorLanguages(
+        this.db,
+        this.administrators,
+      )) {
         await this.mailer
           .send(this.emails.bulkImportsPaused({ to: email, language, storage }))
           .catch((error: unknown) =>
@@ -53,30 +57,11 @@ export class AdministratorsEmail {
     }
   }
 
-  /** Every Administrator, with their Account's language or the default one. */
-  private async recipients(): Promise<{ email: string; language: Language }[]> {
-    const to = this.administrators.list();
-    if (to.length === 0) return [];
-    const languages = new Map(
-      (
-        await this.db
-          .select({ email: identities.email, language: preferences.language })
-          .from(identities)
-          .innerJoin(preferences, eq(preferences.identityId, identities.id))
-          .where(inArray(identities.email, to))
-      ).map(({ email, language }) => [email, language]),
-    );
-    return to.map((email) => ({
-      email,
-      language: languages.get(email) ?? DEFAULT_PREFERENCES.language,
-    }));
-  }
-
   /** Sends it for failed import `id`, as it now stands. A failed send is logged, never thrown. */
   async importFailed(id: string): Promise<void> {
-    const to = this.administrators.list();
-    if (to.length === 0) return;
     try {
+      const to = await administratorLanguages(this.db, this.administrators);
+      if (to.length === 0) return;
       const [failed] = await this.db
         .select({
           bulkImport: bulkImports,
@@ -88,21 +73,12 @@ export class AdministratorsEmail {
         .where(eq(bulkImports.id, id));
       if (failed?.bulkImport.status !== 'failed') return;
       const { bulkImport } = failed;
-      const languages = new Map(
-        (
-          await this.db
-            .select({ email: identities.email, language: preferences.language })
-            .from(identities)
-            .innerJoin(preferences, eq(preferences.identityId, identities.id))
-            .where(inArray(identities.email, to))
-        ).map(({ email, language }) => [email, language]),
-      );
-      for (const email of to) {
+      for (const { email, language } of to) {
         await this.mailer
           .send(
             this.emails.bulkImportFailed({
               to: email,
-              language: languages.get(email) ?? DEFAULT_PREFERENCES.language,
+              language,
               bulkImport: {
                 account: failed.email ?? failed.displayName ?? '—',
                 fileNames: bulkImport.files.map((file) => file.name),
@@ -125,8 +101,4 @@ export class AdministratorsEmail {
       );
     }
   }
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

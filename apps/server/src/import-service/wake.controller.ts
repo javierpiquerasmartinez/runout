@@ -11,6 +11,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { Rejected } from '../rejection/rejection.js';
 import { WAKE_SECRET } from './import-service-config.js';
 import { ImportEngine } from './import-engine.js';
+import { messageOf } from './message-of.js';
 
 /**
  * The import service's only route, reached by the API over the private
@@ -31,9 +32,7 @@ export class WakeController {
     if (!this.carriesSecret(authorization))
       throw new Rejected('unauthenticated');
     this.engine.workUntilNothingLeft().catch((error: unknown) => {
-      this.logger.error(
-        `The import engine stopped: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`The import engine stopped: ${messageOf(error)}`);
     });
   }
 

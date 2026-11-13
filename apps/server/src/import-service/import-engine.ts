@@ -5,14 +5,20 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
-import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import {
   DATABASE,
   type Database,
   type Transaction,
 } from '../database/database.js';
-import { bulkImports, identities, libraryEntries } from '../database/schema.js';
+import { advancing } from '../database/bulk-import-status.js';
+import {
+  bulkImports,
+  identities,
+  libraryEntries,
+  type BulkImportReason,
+} from '../database/schema.js';
 import { FILE_STORE, type FileStore } from '../file-store/file-store.js';
 import type { Hand } from '../hands/hand.js';
 import { keyOf, withHistories } from '../hands/hand-store.js';
@@ -30,6 +36,7 @@ import { Storage } from '../storage/storage.js';
 import { BULK_IMPORT_LIMIT } from './bulk-import-limit.js';
 import { AdministratorsEmail } from './administrators-email.js';
 import { ImporterEmail } from './importer-email.js';
+import { messageOf } from './message-of.js';
 
 /** The most Hands one batch goes through, in one transaction. */
 const BATCH_SIZE = 1_000;
@@ -38,12 +45,6 @@ const BATCH_SIZE = 1_000;
 const ATTEMPTS = 3;
 
 type BulkImport = typeof bulkImports.$inferSelect;
-
-/**
- * An import the engine is to advance. Every write the engine makes outside a
- * batch asks for it too, so that one cancelled meanwhile stays cancelled.
- */
-const active = inArray(bulkImports.status, ['waiting', 'counting', 'running']);
 
 /** The Hands of an import being read, and how many of them have been gone through. */
 interface OpenReader {
@@ -130,7 +131,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     const [next] = await this.db
       .select()
       .from(bulkImports)
-      .where(active)
+      .where(advancing)
       .orderBy(
         sql`${bulkImports.lastAdvancedAt} asc nulls first`,
         asc(bulkImports.createdAt),
@@ -183,7 +184,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       const pausing = await tx
         .update(bulkImports)
         .set({ status: 'paused', stalled: false })
-        .where(active)
+        .where(advancing)
         .returning({ id: bulkImports.id });
       return already ? 0 : pausing.length;
     });
@@ -207,7 +208,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       .update(bulkImports)
       .set({ status: 'failed', failureCode, finishedAt: now })
       // Not one cancelled meanwhile.
-      .where(and(eq(bulkImports.id, record.id), active))
+      .where(and(eq(bulkImports.id, record.id), advancing))
       .returning({ id: bulkImports.id });
     if (!failed) return;
     await this.importerEmail.send(record.id);
@@ -222,7 +223,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     await this.db
       .update(bulkImports)
       .set({ status: 'counting' })
-      .where(and(eq(bulkImports.id, record.id), active));
+      .where(and(eq(bulkImports.id, record.id), advancing));
     const counted = await countHands(this.filesOf(record), this.limit);
     if (counted.overLimit) {
       await this.end(record, 'too-many-hands');
@@ -241,7 +242,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       .update(bulkImports)
       .set({ status: 'running', total: counted.hands, notImported })
       // Cancelled while counting, it stays so.
-      .where(and(eq(bulkImports.id, record.id), active));
+      .where(and(eq(bulkImports.id, record.id), advancing));
   }
 
   /** Adds the next batch of Hands, with the record's counters, in one transaction. */
@@ -296,17 +297,17 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       }
       // Past what fits in the Library, nothing more is added: neither these
       // nor the Hands not yet gone through.
-      const room = await this.roomIn(tx, record.identityId);
-      const full = kept.length > room;
+      const spaceLeft = await this.spaceLeftIn(tx, record.identityId);
+      const full = kept.length > spaceLeft;
       const notFit = full
-        ? kept.length - room + Math.max(0, (record.total ?? 0) - to)
+        ? kept.length - spaceLeft + Math.max(0, (record.total ?? 0) - to)
         : 0;
       const now = this.clock.now();
       const added = await addToLibrary(
         tx,
         this.heroResults,
         record.identityId,
-        withHistories(kept.slice(0, room), texts.slice(0, room)),
+        withHistories(kept.slice(0, spaceLeft), texts.slice(0, spaceLeft)),
         now,
       );
       await tx
@@ -314,7 +315,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
         .set({
           processed: to,
           imported: sql`${bulkImports.imported} + ${added.length}`,
-          duplicates: sql`${bulkImports.duplicates} + ${batch.length - added.length - (full ? kept.length - room : 0)}`,
+          duplicates: sql`${bulkImports.duplicates} + ${batch.length - added.length - (full ? kept.length - spaceLeft : 0)}`,
           notImported: plus(
             locked.notImported,
             full ? { ...discarded, 'library-full': notFit } : discarded,
@@ -349,7 +350,10 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
    * lock until the batch commits, as a small import does, so that the two
    * cannot both fit at once.
    */
-  private async roomIn(tx: Transaction, accountId: string): Promise<number> {
+  private async spaceLeftIn(
+    tx: Transaction,
+    accountId: string,
+  ): Promise<number> {
     await tx
       .select({ id: identities.id })
       .from(identities)
@@ -365,7 +369,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
   /** Ends an import short of adding its Hands, saying why, and lets its files go. */
   private async end(
     record: BulkImport,
-    reason: string,
+    reason: BulkImportReason,
     counts: Partial<Pick<BulkImport, 'total' | 'notImported'>> = {},
   ): Promise<void> {
     const now = this.clock.now();
@@ -379,7 +383,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
         lastAdvancedAt: now,
         stalled: false,
       })
-      .where(and(eq(bulkImports.id, record.id), active))
+      .where(and(eq(bulkImports.id, record.id), advancing))
       .returning({ id: bulkImports.id });
     await this.closeReader(record.id);
     await this.deleteFiles(record);
@@ -452,8 +456,4 @@ function failureCodeOf(error: unknown): string {
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code === 'string' && code !== '') return code;
   return error instanceof Error ? error.name : 'unknown';
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

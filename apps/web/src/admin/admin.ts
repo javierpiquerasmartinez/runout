@@ -1,4 +1,4 @@
-import type { BulkImportStatus } from '../library/bulkImports'
+import type { BulkImportReason, BulkImportStatus } from '../library/bulkImports'
 
 /** The Administrator panel (ADR 0008): only routed for Administrators, a path like any other for everyone else. */
 export const adminPath = '/admin'
@@ -123,7 +123,7 @@ export interface AdminBulkImport {
   duplicates: number
   notImported: Record<string, number>
   /** Why it ended short of adding its Hands, as the server words it. */
-  reason: string | null
+  reason: BulkImportReason | null
   /** Why it failed, when it did: a technical code, never a Hand's text. */
   failureCode: string | null
   /** Failed, with its files still kept (7 days): Reintentar. */

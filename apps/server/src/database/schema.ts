@@ -684,6 +684,15 @@ export const BULK_IMPORT_STATUSES = [
 ] as const;
 export type BulkImportStatus = (typeof BULK_IMPORT_STATUSES)[number];
 
+/** Why a Bulk Import ended short of adding its Hands. */
+export const BULK_IMPORT_REASONS = [
+  'too-many-hands',
+  'unreadable-file',
+  'unrecognised-format',
+  'library-full',
+] as const;
+export type BulkImportReason = (typeof BULK_IMPORT_REASONS)[number];
+
 /** One file of a Bulk Import, as stored while it is imported. */
 export interface BulkImportFile {
   name: string;
@@ -725,7 +734,7 @@ export const bulkImports = pgTable(
      * `unrecognised-format` when nothing in the files is a Hand, and
      * `library-full` when the Library reached its capacity.
      */
-    reason: text('reason'),
+    reason: text('reason').$type<BulkImportReason>(),
     /**
      * Why it failed, when it did, for Administrators: a technical code, such
      * as Postgres's SQLSTATE or Node's error code, never a Hand's text.
