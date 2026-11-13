@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
@@ -41,6 +41,16 @@ interface ChosenFile {
 /** S3 and R2 number parts from 1 to 10,000. */
 const MAX_PART_NUMBER = 10_000;
 const MAX_FILES = 100;
+/** The statuses of an import that has not ended. */
+const UNFINISHED: BulkImportStatus[] = [
+  'uploading',
+  'waiting',
+  'counting',
+  'running',
+  'paused',
+];
+/** How long an ended import stays listed. */
+const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Bulk Imports, as the Importer starts and follows them from the API. The
@@ -49,6 +59,8 @@ const MAX_FILES = 100;
  */
 @Injectable()
 export class BulkImportsService {
+  private readonly logger = new Logger(BulkImportsService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -127,14 +139,59 @@ export class BulkImportsService {
     return view(row);
   }
 
-  /** The Account's Bulk Imports, newest first. */
+  /** The Account's Bulk Imports, newest first: unfinished, or ended in the last 30 days. */
   async list(account: Identity): Promise<BulkImportView[]> {
+    const listedSince = new Date(this.clock.now().getTime() - LISTED_FOR_MS);
     const rows = await this.db
       .select()
       .from(bulkImports)
-      .where(eq(bulkImports.identityId, account.id))
+      .where(
+        and(
+          eq(bulkImports.identityId, account.id),
+          or(
+            isNull(bulkImports.finishedAt),
+            gt(bulkImports.finishedAt, listedSince),
+          ),
+        ),
+      )
       .orderBy(desc(bulkImports.createdAt));
     return rows.map(view);
+  }
+
+  /**
+   * Stops the Account's unfinished import `id` before its next batch. The
+   * Hands already imported stay; its files go.
+   */
+  async cancel(account: Identity, id: string): Promise<BulkImportView> {
+    if (!isUuid(id)) throw new Rejected('bulk-import-not-found');
+    const [row] = await this.db
+      .update(bulkImports)
+      .set({ status: 'cancelled', finishedAt: this.clock.now() })
+      .where(
+        and(
+          eq(bulkImports.id, id),
+          eq(bulkImports.identityId, account.id),
+          inArray(bulkImports.status, UNFINISHED),
+        ),
+      )
+      .returning();
+    if (!row) throw new Rejected('bulk-import-not-found');
+    await this.deleteFiles(row.files);
+    return view(row);
+  }
+
+  /** The files, or what was uploaded of them; one left behind is only a waste of space. */
+  private async deleteFiles(files: BulkImportFile[]): Promise<void> {
+    if (!this.store) return;
+    for (const file of files) {
+      await this.store
+        .delete(file.key, file.uploadId)
+        .catch((error: unknown) =>
+          this.logger.error(
+            `Could not delete ${file.key}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+    }
   }
 
   /** The Account's Bulk Import `id`, still uploading. */
