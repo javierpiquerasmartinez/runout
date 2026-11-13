@@ -63,6 +63,15 @@ export class EmailWriter {
     return bulkImportEnded(this.frontendUrl, input);
   }
 
+  /** To an Administrator, the once a Bulk Import stalls. */
+  bulkImportStalled(input: {
+    to: string;
+    language: Language;
+    bulkImport: StalledBulkImport;
+  }): Email {
+    return bulkImportStalled(this.frontendUrl, input);
+  }
+
   passwordReset(input: {
     to: string;
     language: Language;
@@ -181,6 +190,51 @@ function bulkImportEnded(
     [lead, ...(reason ? [reason] : []), ...counts],
     es ? 'Ver importaciones' : 'See imports',
     `${frontendUrl}/library/imports`,
+    [footer],
+  );
+}
+
+/** A Bulk Import without advance, as Administrators are told it. */
+export interface StalledBulkImport {
+  /** Its Account's email, or its id when it has none. */
+  account: string;
+  fileNames: string[];
+  /** Null while its files are not counted yet. */
+  total: number | null;
+  processed: number;
+}
+
+/** The email to an Administrator about a Bulk Import that stalled, in their language. */
+function bulkImportStalled(
+  frontendUrl: string,
+  input: { to: string; language: Language; bulkImport: StalledBulkImport },
+): Email {
+  const { language, bulkImport } = input;
+  const number = new Intl.NumberFormat(INTL[language]);
+  const n = (count: number) => number.format(count);
+  const files = bulkImport.fileNames.join(', ');
+  const es = language === 'es';
+  const lead = es
+    ? `La importación de ${files} de ${bulkImport.account} lleva más de 30 minutos sin avanzar.`
+    : `The import of ${files} by ${bulkImport.account} has not advanced for over 30 minutes.`;
+  const where =
+    bulkImport.total === null
+      ? es
+        ? 'Aún no ha empezado a añadir manos.'
+        : 'It has not started adding hands yet.'
+      : es
+        ? `Va por ${n(bulkImport.processed)} de ${n(bulkImport.total)} manos.`
+        : `It is at ${n(bulkImport.processed)} of ${n(bulkImport.total)} hands.`;
+  const footer = es
+    ? 'Te escribimos porque eres administrador de Runout. No volveremos a avisarte de esta importación salvo que avance y se vuelva a atascar.'
+    : 'You are receiving this because you are a Runout Administrator. We will not tell you about this import again unless it advances and stalls again.';
+  return write(
+    input.to,
+    language,
+    es ? 'Una importación está atascada' : 'An import has stalled',
+    [lead, where],
+    es ? 'Ver importaciones' : 'See imports',
+    `${frontendUrl}/admin/imports`,
     [footer],
   );
 }

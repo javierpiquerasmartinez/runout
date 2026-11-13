@@ -276,6 +276,8 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
             full ? { ...discarded, 'library-full': notFit } : discarded,
           ),
           lastAdvancedAt: now,
+          // An advance: no longer stalled, and a later stall is told again.
+          stalled: false,
           ...(full
             ? { status: 'completed', reason: 'library-full', finishedAt: now }
             : done
@@ -331,6 +333,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
         reason,
         finishedAt: now,
         lastAdvancedAt: now,
+        stalled: false,
       })
       .where(and(eq(bulkImports.id, record.id), active))
       .returning({ id: bulkImports.id });

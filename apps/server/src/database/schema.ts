@@ -738,6 +738,11 @@ export const bulkImports = pgTable(
     stalled: boolean('stalled').notNull().default(false),
     /** When a batch last committed; null before the first. */
     lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
+    /**
+     * When it last began waiting for the import service, as its upload
+     * completed: without advance since then, it may be stalled.
+     */
+    waitingSince: timestamp('waiting_since', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
