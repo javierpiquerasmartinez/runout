@@ -6,6 +6,8 @@ export type Language = 'es' | 'en';
 
 const INTL: Record<Language, string> = { es: 'es-ES', en: 'en-GB' };
 
+const MB = 1024 * 1024;
+
 /** The emails Runout sends to people, each in Spanish and English, links built from the web's URL. */
 @Injectable()
 export class EmailWriter {
@@ -108,6 +110,46 @@ export class EmailWriter {
     bulkImport: StalledBulkImport;
   }): Email {
     return bulkImportStalled(this.frontendUrl, input);
+  }
+
+  /** To an Administrator, when the database reaches its threshold and Bulk Imports pause. */
+  bulkImportsPaused(input: {
+    to: string;
+    language: Language;
+    storage: { paused: number; used: number; threshold: number };
+  }): Email {
+    const { language, storage } = input;
+    const number = new Intl.NumberFormat(INTL[language]);
+    const mb = (bytes: number) => `${number.format(Math.round(bytes / MB))} MB`;
+    const es = language === 'es';
+    const imports = es
+      ? storage.paused === 1
+        ? '1 importación'
+        : `${number.format(storage.paused)} importaciones`
+      : storage.paused === 1
+        ? '1 import'
+        : `${number.format(storage.paused)} imports`;
+    return write(
+      input.to,
+      language,
+      es ? 'Las importaciones están en pausa' : 'Imports are paused',
+      es
+        ? [
+            `La base de datos ocupa ${mb(storage.used)} de ${mb(storage.threshold)}, su límite configurado. ${imports} ${storage.paused === 1 ? 'se ha puesto' : 'se han puesto'} en pausa, y las que empiecen ahora también lo harán. Las importaciones pequeñas siguen funcionando.`,
+            'Se reanudan solas en la comprobación de cada hora en cuanto la base de datos esté por debajo del límite: al liberar espacio, o al subir STORAGE_THRESHOLD_MB tras ampliar el plan.',
+          ]
+        : [
+            `The database takes ${mb(storage.used)} of ${mb(storage.threshold)}, its configured limit. ${imports} ${storage.paused === 1 ? 'has' : 'have'} been paused, and any started now will be too. Small imports still work.`,
+            'They resume by themselves at the hourly check once the database is below the limit: by freeing space, or by raising STORAGE_THRESHOLD_MB after upgrading the plan.',
+          ],
+      es ? 'Ver importaciones' : 'See imports',
+      `${this.frontendUrl}/admin/imports`,
+      [
+        es
+          ? 'Te escribimos porque eres administrador de Runout. No volveremos a avisarte hasta que se reanuden y se vuelva a llegar al límite.'
+          : 'You are receiving this because you are a Runout Administrator. We will not tell you again until they resume and the limit is reached again.',
+      ],
+    );
   }
 
   passwordReset(input: {

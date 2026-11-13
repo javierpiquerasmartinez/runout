@@ -19,6 +19,7 @@ import {
 } from '../../src/import-service/import-service-config.js';
 import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
 import { LIBRARY_CAPACITY } from '../../src/library/library-limits.js';
+import { STORAGE_THRESHOLD } from '../../src/storage/storage.js';
 import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
 import { FakeInbox } from './inbox.js';
@@ -61,6 +62,8 @@ export interface StartAppOptions {
   importService?: ImportServiceAddress;
   /** Where Bulk Imports' files go, shared with the import service; none otherwise. */
   fileStore?: FileStore;
+  /** The database size, in bytes, at which Bulk Imports pause; `STORAGE_THRESHOLD_MB` otherwise. */
+  storageThreshold?: number;
 }
 
 /**
@@ -105,6 +108,11 @@ export async function startApp(
     builder
       .overrideProvider(LIBRARY_CAPACITY)
       .useValue(options.libraryCapacity);
+  }
+  if (options.storageThreshold !== undefined) {
+    builder
+      .overrideProvider(STORAGE_THRESHOLD)
+      .useValue(options.storageThreshold);
   }
   if (databaseUrl === inject('databaseUrl')) {
     builder.overrideProvider(PlaybackService).useClass(SharedDatabasePlayback);

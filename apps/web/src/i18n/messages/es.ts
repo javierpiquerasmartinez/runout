@@ -1374,6 +1374,8 @@ export const es = {
   'admin.imports.discarded.one': '{count} descartada',
   'admin.imports.discarded.other': '{count} descartadas',
   'admin.imports.noProgressSince': 'Sin avance desde las {time}',
+  'admin.imports.storage': 'Base de datos',
+  'admin.imports.storageOf': '{used} MB de {threshold} MB',
   'admin.imports.storageFull': 'Almacenamiento al límite',
   'admin.imports.failedAfter': '{code} tras 3 intentos',
   'admin.imports.cancel': 'Cancelar',

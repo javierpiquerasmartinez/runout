@@ -13,6 +13,7 @@ import {
   administratorEmailsFromEnv,
 } from '../identity/administrators.js';
 import { MailModule } from '../mail/mail.module.js';
+import { StorageModule } from '../storage/storage.js';
 import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
 import {
@@ -30,7 +31,13 @@ import { WakeController } from './wake.controller.js';
  * wake.
  */
 @Module({
-  imports: [ClockModule, DatabaseModule, HeroResultsModule, MailModule],
+  imports: [
+    ClockModule,
+    DatabaseModule,
+    HeroResultsModule,
+    MailModule,
+    StorageModule,
+  ],
   controllers: [WakeController],
   providers: [
     { provide: WAKE_SECRET, useFactory: () => wakeSecretFromEnv(process.env) },

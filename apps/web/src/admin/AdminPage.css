@@ -260,6 +260,40 @@
   background: var(--alert);
 }
 
+/* The database's size against the storage guard's threshold, at the toolbar's end. */
+.admin-storage {
+  width: 280px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.admin-storage__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.admin-storage__bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+}
+
+.admin-storage__fill {
+  display: block;
+  height: 100%;
+  background: var(--sync);
+}
+
+.admin-storage__bar[data-reached] .admin-storage__fill {
+  background: var(--alert);
+}
+
 .admin-imports__actions {
   text-align: right;
 }

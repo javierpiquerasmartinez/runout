@@ -169,6 +169,10 @@ describe('The Importaciones tab (e2e)', () => {
       total: 2,
       page: 1,
       pageSize: 50,
+      storage: {
+        used: expect.any(Number) as number,
+        threshold: 800 * 1024 * 1024,
+      },
       imports: [
         {
           id: uploading,

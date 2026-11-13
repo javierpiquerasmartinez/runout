@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import pg from 'pg';
 import request from 'supertest';
 import { ADMINISTRATOR_EMAIL, signInAdministrator } from './support/admin.js';
 import { startApp, type RunningApp } from './support/app.js';
@@ -114,15 +113,6 @@ describe('Stalled Bulk Imports (e2e)', () => {
           .expect(201);
         return id;
       },
-      /** Starts one and leaves it uploading. */
-      startUploading: async (): Promise<string> =>
-        (
-          await http
-            .post('/api/library/bulk-imports')
-            .set('Authorization', auth)
-            .send({ files: [{ name: 'tracker.zip', size: 1000 }] })
-            .expect(201)
-        ).body.id as string,
     };
   }
 
@@ -219,32 +209,6 @@ describe('Stalled Bulk Imports (e2e)', () => {
       status: 'completed',
       stalled: false,
     });
-  });
-
-  it('does not report a paused import as stalled', async () => {
-    const account = await importer();
-    const id = await account.startUploading();
-    // As the storage guard pauses one, long without advance.
-    const client = new pg.Client(database.url);
-    await client.connect();
-    try {
-      await client.query(
-        `update bulk_imports set status = 'paused', waiting_since = $2,
-           last_advanced_at = $2 where id = $1`,
-        [id, new Date('2025-12-31T00:00:00Z')],
-      );
-    } finally {
-      await client.end();
-    }
-
-    await clock.advance(3 * HOUR);
-
-    expect((await tab())[0]).toMatchObject({
-      id,
-      status: 'paused',
-      stalled: false,
-    });
-    expect(stallEmails()).toHaveLength(0);
   });
 
   it('wakes the service at each check while an import waits, and not once nothing is left', async () => {

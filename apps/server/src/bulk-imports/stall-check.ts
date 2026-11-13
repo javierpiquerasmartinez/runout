@@ -16,6 +16,7 @@ import { DEFAULT_PREFERENCES } from '../identity/identity.service.js';
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import { Storage } from '../storage/storage.js';
 
 /** How long an import may go without advance before it is stalled. */
 export const STALLED_AFTER_MS = 30 * 60_000;
@@ -28,6 +29,8 @@ const ADVANCING: BulkImportStatus[] = ['waiting', 'counting', 'running'];
  * checks, this wakes it when an import waits or has not advanced for 30
  * minutes, and flags each without advance stalled, telling the
  * Administrators once. The import service's next advance clears the flag.
+ * It also resumes the imports the storage guard paused, once the database
+ * is below its threshold again.
  */
 @Injectable()
 export class StallCheck {
@@ -41,9 +44,11 @@ export class StallCheck {
     private readonly administrators: AdministratorEmails,
     private readonly emails: EmailWriter,
     private readonly waker: ImportServiceWaker,
+    private readonly storage: Storage,
   ) {}
 
   async run(): Promise<void> {
+    const resumed = await this.resumePaused();
     const cutoff = new Date(this.clock.now().getTime() - STALLED_AFTER_MS);
     // Since it last advanced, or began waiting if that was later.
     const withoutAdvance = and(
@@ -58,7 +63,7 @@ export class StallCheck {
       .from(bulkImports)
       .where(or(eq(bulkImports.status, 'waiting'), withoutAdvance))
       .limit(1);
-    if (!due) return;
+    if (!due && !resumed) return;
     await this.waker.wake();
     // Only those not flagged yet: each is told once per stall.
     const stalled = await this.db
@@ -67,6 +72,30 @@ export class StallCheck {
       .where(and(withoutAdvance, eq(bulkImports.stalled, false)))
       .returning();
     for (const bulkImport of stalled) await this.tell(bulkImport);
+  }
+
+  /**
+   * The storage guard paused imports at the threshold. Below it again, as
+   * after space is freed or the threshold raised, they go on where they
+   * were: counted ones from their cursor, the others counted first. Waiting
+   * from now, so none is taken as stalled. True when any resumed.
+   */
+  private async resumePaused(): Promise<boolean> {
+    const [paused] = await this.db
+      .select({ id: bulkImports.id })
+      .from(bulkImports)
+      .where(eq(bulkImports.status, 'paused'))
+      .limit(1);
+    if (!paused || (await this.storage.reached())) return false;
+    const resumed = await this.db
+      .update(bulkImports)
+      .set({
+        status: sql`case when ${bulkImports.total} is null then 'waiting' else 'running' end`,
+        waitingSince: this.clock.now(),
+      })
+      .where(eq(bulkImports.status, 'paused'))
+      .returning({ id: bulkImports.id });
+    return resumed.length > 0;
   }
 
   /** Emails every Administrator about this import. A failed send is logged, never thrown. */

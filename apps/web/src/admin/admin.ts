@@ -142,6 +142,8 @@ export interface BulkImportsPage {
   page: number
   pageSize: number
   imports: AdminBulkImport[]
+  /** The database's size against the threshold at which Bulk Imports pause, in bytes. */
+  storage: { used: number; threshold: number }
 }
 
 /** Someone as the panel names them: their Display Name, else their email. */
