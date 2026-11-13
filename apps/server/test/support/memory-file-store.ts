@@ -149,6 +149,11 @@ export class MemoryFileStore implements FileStore {
     return Promise.resolve();
   }
 
+  /** The keys of the uploads started and not yet completed or aborted. */
+  unfinishedUploads(): string[] {
+    return [...this.uploads.values()].map(({ key }) => key);
+  }
+
   /** The keys of the files it holds, uploads not completed left out. */
   files(): string[] {
     return [...this.stored.keys()];

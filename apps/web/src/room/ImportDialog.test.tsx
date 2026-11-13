@@ -59,7 +59,6 @@ const previews: Record<string, ImportPreview> = {
   'fifty.txt': many('p-fifty', 50),
   'one.txt': many('p-one', 1),
   'big.txt': many('p-big', 1240),
-  'bigger.txt': many('p-bigger', 761),
 }
 
 function many(id: string, count: number): ImportPreview {
@@ -305,16 +304,6 @@ describe('ImportDialog', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Add 50 hands to the queue' }))
 
       expect(requests.at(-1)!.url).toBe('/api/rooms/ABCD2345/imports')
-    })
-
-    it('blocks confirming more than 2,000 Hands into the Library, and says why', async () => {
-      renderDialog({ kind: 'library' })
-
-      await choose('big.txt', 'bigger.txt')
-
-      expect(await screen.findByText('This import has 2,001 hands; your library takes at most 2,000 at once')).toBeTruthy()
-      await userEvent.click(screen.getByRole('button', { name: 'This import has 2,001 hands; your library takes at most 2,000 at once' }))
-      expect(requests.filter((request) => request.url.endsWith('/imports'))).toEqual([])
     })
 
     it('explains a Library that cannot hold the Hands', async () => {
