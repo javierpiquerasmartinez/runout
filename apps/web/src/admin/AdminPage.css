@@ -211,3 +211,55 @@
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+/* The Imports tab: a main line over a secondary one, and a progress bar in its status's tone. */
+.admin-imports__primary {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.admin-imports__secondary,
+.admin-imports__reason {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+
+.admin-imports__secondary {
+  white-space: nowrap;
+}
+
+.admin-imports__hands {
+  width: 210px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-imports__bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+}
+
+.admin-imports__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--text-muted);
+}
+
+.admin-imports__bar[data-tone='brass'] .admin-imports__bar-fill {
+  background: var(--brass);
+}
+
+.admin-imports__bar[data-tone='alert'] .admin-imports__bar-fill {
+  background: var(--alert);
+}
+
+.admin-imports__actions {
+  text-align: right;
+}
