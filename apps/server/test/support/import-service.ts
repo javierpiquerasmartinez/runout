@@ -10,6 +10,10 @@ import {
   BULK_IMPORT_LIMIT,
   DEFAULT_BULK_IMPORT_LIMIT,
 } from '../../src/import-service/bulk-import-limit.js';
+import {
+  DEFAULT_LIBRARY_CAPACITY,
+  LIBRARY_CAPACITY,
+} from '../../src/library/library-limits.js';
 import { WAKE_SECRET } from '../../src/import-service/import-service-config.js';
 import { ImportEngine } from '../../src/import-service/import-engine.js';
 import {
@@ -41,6 +45,8 @@ export interface StartImportServiceOptions {
   fileStore?: FileStore;
   /** The most Hands one Bulk Import may hold; 2 million otherwise, as in production. */
   limit?: number;
+  /** The most Hands a Library may hold; 10 million otherwise, as in production. */
+  libraryCapacity?: number;
 }
 
 /** Boots the import service in-process on a random port, wired like production. */
@@ -60,6 +66,8 @@ export async function startImportService(
     .useValue(options.fileStore ?? new MemoryFileStore())
     .overrideProvider(BULK_IMPORT_LIMIT)
     .useValue(options.limit ?? DEFAULT_BULK_IMPORT_LIMIT)
+    .overrideProvider(LIBRARY_CAPACITY)
+    .useValue(options.libraryCapacity ?? DEFAULT_LIBRARY_CAPACITY)
     .compile();
 
   const app = moduleRef.createNestApplication();
@@ -86,7 +94,7 @@ export async function startImportService(
     close: async () => {
       if (closed) return;
       closed = true;
-      await engine.settled();
+      // As a restart would: the batch in hand commits, and no other begins.
       await app.close();
     },
   };

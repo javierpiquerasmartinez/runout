@@ -1,5 +1,5 @@
 {
-  "id": "e2f0f68b-3919-4420-8a95-dde2dcc15f30",
+  "id": "5784bf00-9d83-47f6-91fa-a7d0bbe1e30e",
   "prevId": "6cf66ef8-f448-4751-a0ad-2f9f3ad13ac3",
   "version": "7",
   "dialect": "postgresql",
@@ -69,6 +69,12 @@
         },
         "reason": {
           "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_code": {
+          "name": "failure_code",
           "type": "text",
           "primaryKey": false,
           "notNull": false

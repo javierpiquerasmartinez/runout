@@ -24,8 +24,11 @@ export interface BulkImport {
   duplicates: number
   /** Hands not imported, per reason. */
   notImported: Record<string, number>
-  /** Why it ended short of adding its Hands, when it did. */
-  reason: 'too-many-hands' | 'unreadable-file' | null
+  /**
+   * Why it ended short of adding its Hands, when it did. A full Library
+   * counts the Hands that did not fit in `notImported['library-full']`.
+   */
+  reason: 'too-many-hands' | 'unreadable-file' | 'unrecognised-format' | 'library-full' | null
   createdAt: string
   finishedAt: string | null
 }
