@@ -13,6 +13,7 @@ CREATE TABLE "bulk_imports" (
 	"stalled" boolean DEFAULT false NOT NULL,
 	"files_deleted_at" timestamp with time zone,
 	"last_advanced_at" timestamp with time zone,
+	"waiting_since" timestamp with time zone,
 	"created_at" timestamp with time zone NOT NULL,
 	"finished_at" timestamp with time zone
 );

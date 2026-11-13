@@ -4,11 +4,12 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { ImportServiceWakerModule } from '../import-service/import-service-waker.js';
 import { BulkImportsController } from './bulk-imports.controller.js';
 import { BulkImportsService } from './bulk-imports.service.js';
+import { StallCheck } from './stall-check.js';
 
 @Module({
   imports: [FileStoreModule, IdentityModule, ImportServiceWakerModule],
   controllers: [BulkImportsController],
-  providers: [BulkImportsService],
+  providers: [BulkImportsService, StallCheck],
   exports: [BulkImportsService],
 })
 export class BulkImportsModule {}

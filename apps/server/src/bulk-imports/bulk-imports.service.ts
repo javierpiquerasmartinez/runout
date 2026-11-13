@@ -37,6 +37,7 @@ import {
 } from '../identity/identity.service.js';
 import { ImportServiceWaker } from '../import-service/import-service-waker.js';
 import { Rejected } from '../rejection/rejection.js';
+import { StallCheck } from './stall-check.js';
 
 /** What the Importer sees of a Bulk Import. */
 export interface BulkImportView {
@@ -67,8 +68,11 @@ const MAX_PART_NUMBER = 10_000;
 const MAX_FILES = 100;
 /** How long an upload may go uncompleted before it is discarded. */
 export const UPLOAD_EXPIRES_MS = 24 * 60 * 60_000;
-/** How often uploads are checked, so one expired goes within this much. */
-const DISCARD_EVERY_MS = 60 * 60_000;
+/**
+ * How often the API checks Bulk Imports: an expired upload goes, and a
+ * stalled import is found, within this much.
+ */
+const CHECK_EVERY_MS = 60 * 60_000;
 /** The most one Bulk Import may upload, all its files together. */
 export const MAX_BULK_IMPORT_BYTES = 2.5 * 1024 ** 3;
 /** What a Bulk Import reads: Hand Histories as text, or zipped. */
@@ -88,27 +92,31 @@ const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 @Injectable()
 export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BulkImportsService.name);
-  private cancelDiscard: (() => void) | null = null;
+  private cancelCheck: (() => void) | null = null;
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(FILE_STORE) private readonly store: FileStore | null,
     private readonly waker: ImportServiceWaker,
+    private readonly stallCheck: StallCheck,
   ) {}
 
-  /** Discards expired uploads now, then once an hour. Without a store there are none. */
+  /**
+   * Checks Bulk Imports now, then once an hour: discards expired uploads and
+   * finds the stalled. Without a store there are none.
+   */
   onModuleInit(): void {
-    if (this.store) this.discardEvery(0);
+    if (this.store) this.checkEvery(0);
   }
 
   onModuleDestroy(): void {
-    this.cancelDiscard?.();
-    this.cancelDiscard = null;
+    this.cancelCheck?.();
+    this.cancelCheck = null;
   }
 
-  private discardEvery(delayMs: number): void {
-    this.cancelDiscard = this.clock.schedule(delayMs, async () => {
+  private checkEvery(delayMs: number): void {
+    this.cancelCheck = this.clock.schedule(delayMs, async () => {
       try {
         await this.discardExpiredUploads();
       } catch (error) {
@@ -122,7 +130,12 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
           error,
         );
       }
-      if (this.cancelDiscard) this.discardEvery(DISCARD_EVERY_MS);
+      try {
+        await this.stallCheck.run();
+      } catch (error) {
+        this.logger.error('Could not check for stalled Bulk Imports', error);
+      }
+      if (this.cancelCheck) this.checkEvery(CHECK_EVERY_MS);
     });
   }
 
@@ -295,7 +308,7 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
     }
     const [row] = await this.db
       .update(bulkImports)
-      .set({ status: 'waiting' })
+      .set({ status: 'waiting', waitingSince: this.clock.now() })
       .where(and(eq(bulkImports.id, id), eq(bulkImports.status, 'uploading')))
       .returning();
     if (!row) throw new Rejected('bulk-import-not-found');
@@ -362,7 +375,9 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
           status: found.total === null ? 'waiting' : 'running',
           failureCode: null,
           finishedAt: null,
+          // Waiting for the service from now: not stalled before it has had its time.
           stalled: false,
+          waitingSince: this.clock.now(),
         })
         .where(
           and(

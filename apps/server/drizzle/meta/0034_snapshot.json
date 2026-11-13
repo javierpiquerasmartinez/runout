@@ -1,5 +1,5 @@
 {
-  "id": "7c4d5ee7-103a-4db4-9b6a-fffe8b7d160b",
+  "id": "da2769d4-ee49-4bc9-9bd3-4619c04ef9a0",
   "prevId": "6cf66ef8-f448-4751-a0ad-2f9f3ad13ac3",
   "version": "7",
   "dialect": "postgresql",
@@ -94,6 +94,12 @@
         },
         "last_advanced_at": {
           "name": "last_advanced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "waiting_since": {
+          "name": "waiting_since",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

@@ -1,3 +1,4 @@
+import pg from 'pg';
 import request from 'supertest';
 import { ADMINISTRATOR_EMAIL, signInAdministrator } from './support/admin.js';
 import { startApp, type RunningApp } from './support/app.js';
@@ -13,7 +14,8 @@ import { MemoryFileStore } from './support/memory-file-store.js';
 import { TestClock } from './support/test-clock.js';
 
 const SECRET = 'a-shared-secret-for-tests';
-const HOUR = 60 * 60_000;
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const SECOND_ADMINISTRATOR = 'second-admin@runout.test';
 
@@ -231,6 +233,37 @@ describe('Failed Bulk Imports, for Administrators (e2e)', () => {
     expect((await retry(id).expect(409)).body.reason).toBe(
       'bulk-import-unfinished',
     );
+  }, 30_000);
+
+  it('counts a retried import’s wait from the retry: the next hourly check does not take it for stalled', async () => {
+    const { id } = await failedImport();
+    // Failed long ago, and flagged stalled before it failed.
+    await clock.advance(2 * HOUR + 50 * MINUTE);
+    const client = new pg.Client(database.url);
+    await client.connect();
+    try {
+      await client.query(
+        'update bulk_imports set stalled = true where id = $1',
+        [id],
+      );
+    } finally {
+      await client.end();
+    }
+    // Stopped, the service leaves it waiting where the retry put it.
+    await service!.close();
+
+    await retry(id).expect(204);
+    const [retried] = (await tab().expect(200)).body.imports;
+    expect(retried).toMatchObject({ status: 'running', stalled: false });
+    await clock.advance(10 * MINUTE);
+
+    const [checked] = (await tab().expect(200)).body.imports;
+    expect(checked).toMatchObject({ status: 'running', stalled: false });
+    const stallEmails = [
+      ...api.inbox.to(ADMINISTRATOR_EMAIL),
+      ...api.inbox.to(SECOND_ADMINISTRATOR),
+    ];
+    expect(stallEmails).toEqual([]);
   }, 30_000);
 
   it('emails no Administrator when an import succeeds', async () => {
