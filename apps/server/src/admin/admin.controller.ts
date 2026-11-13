@@ -134,4 +134,11 @@ export class AdminController {
   async cancelBulkImport(@Param('id') id: string): Promise<void> {
     await this.bulkImports.cancelAsAdministrator(id);
   }
+
+  /** Takes up a failed Bulk Import again where it stopped, while its files are kept. */
+  @Post('bulk-imports/:id/retry')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async retryBulkImport(@Param('id') id: string): Promise<void> {
+    await this.bulkImports.retryAsAdministrator(id);
+  }
 }

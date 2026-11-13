@@ -15,7 +15,8 @@ type Tone = 'brass' | 'sync' | 'muted' | 'alert'
 /**
  * The Importaciones tab: every Account's Bulk Imports, newest first, with
  * the failed and stalled ones a filter away. One not yet ended can be
- * cancelled, as its Importer would. The text of Hands is never here.
+ * cancelled, as its Importer would; one failed retried while its files are
+ * kept. The text of Hands is never here.
  */
 export function ImportsTab() {
   const { t } = useI18n()
@@ -36,6 +37,15 @@ export function ImportsTab() {
       .catch((error: unknown) => setFailure(reasonOf(error)))
   }, [admin, filter, pageNumber])
   useEffect(reload, [reload])
+
+  async function retry(bulkImport: AdminBulkImport) {
+    try {
+      await admin(`/bulk-imports/${encodeURIComponent(bulkImport.id)}/retry`, { method: 'POST' })
+      reload()
+    } catch (error) {
+      setFailure(reasonOf(error))
+    }
+  }
 
   async function cancel(bulkImport: AdminBulkImport) {
     setCancelling(null)
@@ -85,7 +95,12 @@ export function ImportsTab() {
               </thead>
               <tbody>
                 {page.imports.map((bulkImport) => (
-                  <ImportRow key={bulkImport.id} bulkImport={bulkImport} onCancel={() => setCancelling(bulkImport)} />
+                  <ImportRow
+                    key={bulkImport.id}
+                    bulkImport={bulkImport}
+                    onCancel={() => setCancelling(bulkImport)}
+                    onRetry={() => void retry(bulkImport)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -115,7 +130,15 @@ export function ImportsTab() {
   )
 }
 
-function ImportRow({ bulkImport, onCancel }: { bulkImport: AdminBulkImport; onCancel: () => void }) {
+function ImportRow({
+  bulkImport,
+  onCancel,
+  onRetry,
+}: {
+  bulkImport: AdminBulkImport
+  onCancel: () => void
+  onRetry: () => void
+}) {
   const { t, formatNumber, formatRelative } = useI18n()
   const when = useWhen()
   const finished = isFinished(bulkImport.status)
@@ -196,6 +219,11 @@ function ImportRow({ bulkImport, onCancel }: { bulkImport: AdminBulkImport; onCa
         {!finished && (
           <Button size="compact" variant="ghost" onClick={onCancel}>
             {t('admin.imports.cancel')}
+          </Button>
+        )}
+        {bulkImport.retryable && (
+          <Button size="compact" variant="ghost" className="admin-imports__retry" onClick={onRetry}>
+            {t('admin.imports.retry')}
           </Button>
         )}
       </td>

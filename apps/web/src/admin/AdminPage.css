@@ -263,3 +263,8 @@
 .admin-imports__actions {
   text-align: right;
 }
+
+/* Reintentar, in brass: the one action that brings an import back. */
+.admin-imports__actions .admin-imports__retry {
+  color: var(--brass-ink);
+}

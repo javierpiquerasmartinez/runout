@@ -11,6 +11,7 @@ CREATE TABLE "bulk_imports" (
 	"reason" text,
 	"failure_code" text,
 	"stalled" boolean DEFAULT false NOT NULL,
+	"files_deleted_at" timestamp with time zone,
 	"last_advanced_at" timestamp with time zone,
 	"created_at" timestamp with time zone NOT NULL,
 	"finished_at" timestamp with time zone

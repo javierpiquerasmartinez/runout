@@ -736,6 +736,11 @@ export const bulkImports = pgTable(
      * Atascada; the Importer still sees it in progress.
      */
     stalled: boolean('stalled').notNull().default(false),
+    /**
+     * When the files of a failed import were let go, 7 days after it failed:
+     * from then on it can no longer be retried.
+     */
+    filesDeletedAt: timestamp('files_deleted_at', { withTimezone: true }),
     /** When a batch last committed; null before the first. */
     lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

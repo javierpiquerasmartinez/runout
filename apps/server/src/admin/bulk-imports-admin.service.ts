@@ -6,7 +6,8 @@ import {
   identities,
   type BulkImportStatus,
 } from '../database/schema.js';
-import { ENDED } from '../bulk-imports/bulk-imports.service.js';
+import { CLOCK, type Clock } from '../clock/clock.js';
+import { ENDED, retryable } from '../bulk-imports/bulk-imports.service.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from './admin-query.js';
 import { person } from './accounts.service.js';
@@ -28,6 +29,8 @@ export interface AdminBulkImportView {
   reason: string | null;
   /** Why it failed, when it did: a technical code, never a Hand's text. */
   failureCode: string | null;
+  /** Failed, with its files still kept: it can be retried. */
+  retryable: boolean;
   createdAt: string;
   /** When it last moved: ended, advanced, or started. */
   lastActivityAt: string;
@@ -45,7 +48,10 @@ export const BULK_IMPORT_FILTERS = [
 /** The Importaciones tab: every Account's Bulk Imports, newest first. */
 @Injectable()
 export class BulkImportsAdminService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
 
   async list(query: {
     status?: unknown;
@@ -82,6 +88,7 @@ export class BulkImportsAdminService {
         .limit(pageSize)
         .offset((page - 1) * pageSize),
     ]);
+    const now = this.clock.now();
     return {
       total,
       page,
@@ -99,6 +106,7 @@ export class BulkImportsAdminService {
         notImported: record.notImported,
         reason: record.reason,
         failureCode: record.failureCode,
+        retryable: retryable(record, now),
         createdAt: record.createdAt.toISOString(),
         lastActivityAt: (
           record.finishedAt ??

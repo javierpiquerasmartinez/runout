@@ -20,6 +20,10 @@ import {
   configureImportService,
   ImportServiceModule,
 } from '../../src/import-service/import-service.module.js';
+import {
+  ADMINISTRATOR_EMAILS,
+  AdministratorEmails,
+} from '../../src/identity/administrators.js';
 import { MAILER } from '../../src/mail/mailer.js';
 import { FakeInbox } from './inbox.js';
 import { MemoryFileStore } from './memory-file-store.js';
@@ -53,6 +57,8 @@ export interface StartImportServiceOptions {
   libraryCapacity?: number;
   /** Where its emails go; a fresh one otherwise. */
   inbox?: FakeInbox;
+  /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
+  administratorEmails?: string[];
 }
 
 /** Boots the import service in-process on a random port, wired like production. */
@@ -77,6 +83,8 @@ export async function startImportService(
     .useValue(options.libraryCapacity ?? DEFAULT_LIBRARY_CAPACITY)
     .overrideProvider(MAILER)
     .useValue(inbox)
+    .overrideProvider(ADMINISTRATOR_EMAILS)
+    .useValue(new AdministratorEmails(options.administratorEmails ?? []))
     .compile();
 
   const app = moduleRef.createNestApplication();

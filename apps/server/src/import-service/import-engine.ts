@@ -27,6 +27,7 @@ import { UnreadableUpload } from '../hands/import/upload.js';
 import { addToLibrary, inLibrary } from '../library/library-entries.js';
 import { LIBRARY_CAPACITY } from '../library/library-limits.js';
 import { BULK_IMPORT_LIMIT } from './bulk-import-limit.js';
+import { AdministratorsEmail } from './administrators-email.js';
 import { ImporterEmail } from './importer-email.js';
 
 /** The most Hands one batch goes through, in one transaction. */
@@ -76,6 +77,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(BULK_IMPORT_LIMIT) private readonly limit: number,
     @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
     private readonly importerEmail: ImporterEmail,
+    private readonly administratorsEmail: AdministratorsEmail,
   ) {}
 
   /** Imports left waiting or interrupted go on as soon as the service starts. */
@@ -158,7 +160,10 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** Ends an import that keeps failing: what it added stays, and its files are kept for a retry. */
+  /**
+   * Ends an import that keeps failing: what it added stays, its files are
+   * kept for a retry, and its Importer and the Administrators are told.
+   */
   private async fail(record: BulkImport, failureCode: string): Promise<void> {
     const now = this.clock.now();
     const [failed] = await this.db
@@ -167,7 +172,9 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       // Not one cancelled meanwhile.
       .where(and(eq(bulkImports.id, record.id), active))
       .returning({ id: bulkImports.id });
-    if (failed) await this.importerEmail.send(record.id);
+    if (!failed) return;
+    await this.importerEmail.send(record.id);
+    await this.administratorsEmail.importFailed(record.id);
   }
 
   /**

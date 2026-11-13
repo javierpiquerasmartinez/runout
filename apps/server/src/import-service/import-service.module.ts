@@ -8,6 +8,10 @@ import {
   DEFAULT_LIBRARY_CAPACITY,
   LIBRARY_CAPACITY,
 } from '../library/library-limits.js';
+import {
+  ADMINISTRATOR_EMAILS,
+  administratorEmailsFromEnv,
+} from '../identity/administrators.js';
 import { MailModule } from '../mail/mail.module.js';
 import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
@@ -15,6 +19,7 @@ import {
   BULK_IMPORT_LIMIT,
   DEFAULT_BULK_IMPORT_LIMIT,
 } from './bulk-import-limit.js';
+import { AdministratorsEmail } from './administrators-email.js';
 import { ImportEngine } from './import-engine.js';
 import { ImporterEmail } from './importer-email.js';
 import { WakeController } from './wake.controller.js';
@@ -36,8 +41,13 @@ import { WakeController } from './wake.controller.js';
     },
     { provide: BULK_IMPORT_LIMIT, useValue: DEFAULT_BULK_IMPORT_LIMIT },
     { provide: LIBRARY_CAPACITY, useValue: DEFAULT_LIBRARY_CAPACITY },
+    {
+      provide: ADMINISTRATOR_EMAILS,
+      useFactory: () => administratorEmailsFromEnv(process.env),
+    },
     ImportEngine,
     ImporterEmail,
+    AdministratorsEmail,
   ],
 })
 export class ImportServiceModule {}

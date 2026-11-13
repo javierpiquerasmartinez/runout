@@ -1,5 +1,5 @@
 {
-  "id": "f31ec8b2-ed73-412c-bce3-b52420e995f6",
+  "id": "7c4d5ee7-103a-4db4-9b6a-fffe8b7d160b",
   "prevId": "6cf66ef8-f448-4751-a0ad-2f9f3ad13ac3",
   "version": "7",
   "dialect": "postgresql",
@@ -85,6 +85,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "files_deleted_at": {
+          "name": "files_deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "last_advanced_at": {
           "name": "last_advanced_at",
