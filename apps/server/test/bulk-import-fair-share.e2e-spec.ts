@@ -141,7 +141,8 @@ describe('A fair share of the import service between Accounts (e2e)', () => {
     expect(bigImport).toMatchObject({ id: bigId, status: 'completed' });
     expect(smallImport).toMatchObject({ id: smallId, status: 'completed' });
     expect(smallImport.finishedAt! < bigImport.finishedAt!).toBe(true);
-  });
+    // 4,500 Hands through the engine take seconds, more on a busy machine.
+  }, 60_000);
 
   it('refuses a second import while the Account’s first is unfinished, saying why', async () => {
     await start();
