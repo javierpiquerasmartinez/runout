@@ -391,16 +391,11 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     const open = this.readers.get(record.id);
     if (open?.position === record.processed) return open;
     await this.closeReader(record.id);
-    const reader: OpenReader = {
-      hands: readHands(this.filesOf(record)),
-      position: 0,
-    };
     // Where it had got to: past every Hand already gone through.
-    while (reader.position < record.processed) {
-      const next = await reader.hands.next();
-      if (next.done) break;
-      if (next.value.kind !== 'unrecognised') reader.position++;
-    }
+    const reader: OpenReader = {
+      hands: readHands(this.filesOf(record), { after: record.processed }),
+      position: record.processed,
+    };
     this.readers.set(record.id, reader);
     return reader;
   }

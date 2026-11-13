@@ -176,6 +176,26 @@ describe('Reading the Hands of stored files as a stream', () => {
     );
   });
 
+  it('resumes after the Hands already gone through, reporting nothing before them', async () => {
+    const content = `${fixture('ggpoker-discarded.txt')}\n\nnot a hand\n\n${fixture('pokerstars-session.txt')}`;
+    const whole = (await all([text('mixed.txt', content)])).filter(
+      (item) => item.kind !== 'unrecognised',
+    );
+    const after = 3;
+
+    const resumed: HandRead[] = [];
+    for await (const item of readHands([text('mixed.txt', content)], {
+      after,
+    })) {
+      resumed.push(item);
+    }
+
+    expect(resumed.filter((item) => item.kind !== 'unrecognised')).toEqual(
+      whole.slice(after),
+    );
+    expect(resumed[0]).toEqual(whole[after]);
+  });
+
   it('refuses a file that is not a zip though named like one', async () => {
     await expect(
       all([text('broken.zip', 'PK\u0003\u0004 not really')]),

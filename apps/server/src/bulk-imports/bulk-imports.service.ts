@@ -10,9 +10,12 @@ import {
   desc,
   eq,
   gt,
+  inArray,
+  isNotNull,
   isNull,
   lt,
   lte,
+  ne,
   notInArray,
   or,
 } from 'drizzle-orm';
@@ -81,8 +84,8 @@ const IMPORTABLE_FILE = /\.(txt|zip)$/i;
 export const ENDED: BulkImportStatus[] = ['completed', 'failed', 'cancelled'];
 /** How long a failed import's files are kept for a retry. */
 export const FAILED_FILES_KEPT_MS = 7 * 24 * 60 * 60_000;
-/** How long an ended import stays listed. */
-const LISTED_FOR_MS = 30 * 24 * 60 * 60 * 1000;
+/** How long an ended import is kept, and listed, before it is deleted. */
+const ENDED_KEPT_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Bulk Imports, as the Importer starts and follows them from the API. The
@@ -103,8 +106,9 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   /**
-   * Checks Bulk Imports now, then once an hour: discards expired uploads and
-   * finds the stalled. Without a store there are none.
+   * Checks Bulk Imports now, then once an hour: discards expired uploads,
+   * deletes the ended ones kept their 30 days, and finds the stalled.
+   * Without a store there are none.
    */
   onModuleInit(): void {
     if (this.store) this.checkEvery(0);
@@ -129,6 +133,11 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
           'Could not delete the files of failed imports',
           error,
         );
+      }
+      try {
+        await this.deleteExpiredEnded();
+      } catch (error) {
+        this.logger.error('Could not delete the ended Bulk Imports', error);
       }
       try {
         await this.stallCheck.run();
@@ -196,6 +205,27 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
           and(eq(bulkImports.id, row.id), eq(bulkImports.status, 'failed')),
         );
     }
+  }
+
+  /**
+   * Deletes the imports ended 30 days ago or more, no longer listed. Not a
+   * failed one whose files the store has not let go of yet: it goes once
+   * they have.
+   */
+  private async deleteExpiredEnded(): Promise<void> {
+    const cutoff = new Date(this.clock.now().getTime() - ENDED_KEPT_MS);
+    await this.db
+      .delete(bulkImports)
+      .where(
+        and(
+          inArray(bulkImports.status, ENDED),
+          lte(bulkImports.finishedAt, cutoff),
+          or(
+            ne(bulkImports.status, 'failed'),
+            isNotNull(bulkImports.filesDeletedAt),
+          ),
+        ),
+      );
   }
 
   /**
@@ -318,7 +348,7 @@ export class BulkImportsService implements OnModuleInit, OnModuleDestroy {
 
   /** The Account's Bulk Imports, newest first: unfinished, or ended in the last 30 days. */
   async list(account: Identity): Promise<BulkImportView[]> {
-    const listedSince = new Date(this.clock.now().getTime() - LISTED_FOR_MS);
+    const listedSince = new Date(this.clock.now().getTime() - ENDED_KEPT_MS);
     const rows = await this.db
       .select()
       .from(bulkImports)

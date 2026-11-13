@@ -35,13 +35,24 @@ const ZIP_PIECE_BYTES = 16 * 1024;
 /** The texts of the files, as they decode: a text's pieces, then its end. */
 type TextPiece = { text: string } | { end: true };
 
-/** Every Hand in the files, in order, read as the bytes come. */
+/**
+ * Every Hand in the files, in order, read as the bytes come. Given `after`,
+ * it resumes past that many Hands, read or not, as a cursor counts them:
+ * those it only recognises, as `countHands` does, and reports nothing
+ * before them.
+ */
 export async function* readHands(
   files: Iterable<SourceFile>,
+  { after = 0 }: { after?: number } = {},
 ): AsyncGenerator<HandRead> {
+  let skipped = 0;
   let inUnrecognised = false;
   for await (const block of blocksOf(files)) {
     const format = recogniseBlock(block);
+    if (skipped < after) {
+      if (format) skipped++;
+      continue;
+    }
     if (!format) {
       if (!inUnrecognised) yield { kind: 'unrecognised' };
       inUnrecognised = true;

@@ -4,7 +4,7 @@ import { ADMINISTRATOR_EMAIL, signInAdministrator } from './support/admin.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { freshDatabase } from './support/fresh-database.js';
 import { newAccount } from './support/google.js';
-import { manyHands } from './support/hand-histories.js';
+import { freshHandHistory, manyHands } from './support/hand-histories.js';
 import { HeldFileStore, startOfHand } from './support/held-file-store.js';
 import {
   startImportService,
@@ -98,13 +98,15 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
     };
   }
 
-  it('tells the Importer how many Hands were imported, were duplicates and could not be read', async () => {
+  it('tells the Importer how many Hands were imported, were duplicates and were not, per reason', async () => {
     await start();
     const account = await importer();
     const session = manyHands(5);
     await account.importSmall(session);
 
-    await account.upload(`${session}${manyHands(1500)}not a hand at all\n\n\n`);
+    await account.upload(
+      `${session}${manyHands(1500)}not a hand at all\n\n\n${freshHandHistory('ggpoker-discarded.txt')}\n\n\n${freshHandHistory('pokerstars-ten-max.txt')}`,
+    );
     await service!.settled();
 
     const sent = service!.inbox.to(account.email);
@@ -114,6 +116,8 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
     expect(email.text).toContain('Importadas: 1500');
     expect(email.text).toContain('Duplicadas: 5');
     expect(email.text).toContain('No reconocidas: 1');
+    expect(email.text).toContain("No es una mano de hold'em cash: 2");
+    expect(email.text).toContain('Más de nueve asientos: 1');
     expect(email.text).toContain('http://localhost:5173/library/imports');
     expect(email.html).toContain('Importadas: 1500');
   });

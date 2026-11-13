@@ -214,6 +214,26 @@ export interface FailedBulkImport {
   failureCode: string;
 }
 
+/** Why a Hand was not imported, as the import dialog names it; unrecognised ones as the board does. */
+const NOT_IMPORTED: Record<Language, Record<string, string>> = {
+  es: {
+    'unrecognised-format': 'No reconocidas',
+    'not-cash-holdem': "No es una mano de hold'em cash",
+    'too-many-seats': 'Más de nueve asientos',
+    'no-hero': 'No indica el jugador héroe',
+    malformed: 'No se ha podido leer',
+    'run-it-twice': 'Board repartido más de una vez',
+  },
+  en: {
+    'unrecognised-format': 'Not recognised',
+    'not-cash-holdem': "Not a cash hold'em hand",
+    'too-many-seats': 'More than nine seats',
+    'no-hero': "Doesn't say who the hero is",
+    malformed: "Couldn't be read",
+    'run-it-twice': 'Board run more than once',
+  },
+};
+
 /** The email to an Importer whose Bulk Import ended, in their language. */
 function bulkImportEnded(
   frontendUrl: string,
@@ -223,9 +243,6 @@ function bulkImportEnded(
   const number = new Intl.NumberFormat(INTL[language]);
   const n = (count: number) => number.format(count);
   const notFit = bulkImport.notImported['library-full'] ?? 0;
-  const notRecognised = Object.entries(bulkImport.notImported)
-    .filter(([reason]) => reason !== 'library-full')
-    .reduce((sum, [, count]) => sum + count, 0);
   const files = bulkImport.fileNames.join(', ');
   const failed = bulkImport.status === 'failed';
   const es = language === 'es';
@@ -244,17 +261,25 @@ function bulkImportEnded(
     : es
       ? `Ha terminado la importación de ${files}.`
       : `The import of ${files} has finished.`;
-  const counts = es
-    ? [
-        `Importadas: ${n(bulkImport.imported)}`,
-        `Duplicadas: ${n(bulkImport.duplicates)}`,
-        `No reconocidas: ${n(notRecognised)}`,
-      ]
-    : [
-        `Imported: ${n(bulkImport.imported)}`,
-        `Duplicates: ${n(bulkImport.duplicates)}`,
-        `Not recognised: ${n(notRecognised)}`,
-      ];
+  // Each reason a Hand was not imported, but the full Library's, said apart.
+  const notImported = Object.entries(bulkImport.notImported)
+    .filter(([reason, count]) => reason !== 'library-full' && count > 0)
+    .map(
+      ([reason, count]) =>
+        `${NOT_IMPORTED[language][reason] ?? reason}: ${n(count)}`,
+    );
+  const counts = [
+    ...(es
+      ? [
+          `Importadas: ${n(bulkImport.imported)}`,
+          `Duplicadas: ${n(bulkImport.duplicates)}`,
+        ]
+      : [
+          `Imported: ${n(bulkImport.imported)}`,
+          `Duplicates: ${n(bulkImport.duplicates)}`,
+        ]),
+    ...notImported,
+  ];
   const why: Record<string, string> = es
     ? {
         'too-many-hands':

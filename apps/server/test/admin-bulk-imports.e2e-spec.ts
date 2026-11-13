@@ -14,6 +14,8 @@ import { TestClock } from './support/test-clock.js';
 
 const SECRET = 'a-shared-secret-for-tests';
 const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 describe('The Importaciones tab (e2e)', () => {
   let store: MemoryFileStore;
@@ -307,6 +309,31 @@ describe('The Importaciones tab (e2e)', () => {
     expect(ended.body.reason).toBe('bulk-import-not-found');
     await cancel('not-an-id').expect(404);
     expect((await ana.list())[0].status).toBe('completed');
+  });
+
+  it('keeps an ended import 30 days after it ended, then the hourly check deletes it', async () => {
+    const ana = await importer('ana@example.com');
+    const completed = await ana.upload('done.txt', manyHands(2));
+    await service!.settled();
+    await clock.advance(DAY);
+    const cancelled = await ana.startUploading('dropped.zip');
+    await request(api.httpServer)
+      .post(`/api/library/bulk-imports/${cancelled}/cancel`)
+      .set('Authorization', `Bearer ${ana.token}`)
+      .expect(201);
+    const listed = async () =>
+      ((await tab().expect(200)).body.imports as { id: string }[])
+        .map(({ id }) => id)
+        .sort();
+
+    await clock.advance(30 * DAY - DAY - HOUR);
+    expect(await listed()).toEqual([cancelled, completed].sort());
+
+    await clock.advance(2 * HOUR);
+    expect(await listed()).toEqual([cancelled]);
+
+    await clock.advance(DAY);
+    expect(await listed()).toEqual([]);
   });
 
   it('is there for Administrators only: anyone else is answered not-found', async () => {
