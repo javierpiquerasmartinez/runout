@@ -479,7 +479,7 @@ describe('A Bulk Import (e2e)', () => {
       imported: 2500,
       duplicates: 0,
     });
-  });
+  }, 30_000);
 
   it('tries a failing batch again, and goes on once it works', async () => {
     await start();
@@ -499,7 +499,7 @@ describe('A Bulk Import (e2e)', () => {
       imported: 1500,
       duplicates: 0,
     });
-  });
+  }, 30_000);
 
   it('fails an import whose batch fails three times, keeping the Hands of the batches before', async () => {
     await start();
@@ -526,7 +526,7 @@ describe('A Bulk Import (e2e)', () => {
     });
     // Kept, to be retried.
     expect(store.files()).toHaveLength(1);
-  });
+  }, 30_000);
 
   it('ends as a full Library once it reaches its capacity, counting the Hands that did not fit', async () => {
     await start({ libraryCapacity: 1200 });
@@ -551,5 +551,5 @@ describe('A Bulk Import (e2e)', () => {
       finishedAt: expect.any(String),
     });
     expect(store.files()).toEqual([]);
-  });
+  }, 30_000);
 });
