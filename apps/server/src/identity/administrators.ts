@@ -16,6 +16,11 @@ export class AdministratorEmails {
   includes(email: string | null): boolean {
     return email !== null && this.emails.has(email.toLowerCase());
   }
+
+  /** Every Administrator's email, as configured, in lower case. */
+  all(): string[] {
+    return [...this.emails];
+  }
 }
 
 export const ADMINISTRATOR_EMAILS = Symbol('ADMINISTRATOR_EMAILS');

@@ -29,7 +29,7 @@ export interface AdminBulkImportView {
   /** Why it failed, when it did: a technical code, never a Hand's text. */
   failureCode: string | null;
   createdAt: string;
-  /** When it last moved: ended, advanced, or started. */
+  /** When it last moved: ended, advanced, began waiting, or started. */
   lastActivityAt: string;
   finishedAt: string | null;
 }
@@ -102,11 +102,16 @@ export class BulkImportsAdminService {
         createdAt: record.createdAt.toISOString(),
         lastActivityAt: (
           record.finishedAt ??
-          record.lastAdvancedAt ??
+          latest(record.lastAdvancedAt, record.waitingSince) ??
           record.createdAt
         ).toISOString(),
         finishedAt: record.finishedAt?.toISOString() ?? null,
       })),
     };
   }
+}
+
+function latest(a: Date | null, b: Date | null): Date | null {
+  if (!a || !b) return a ?? b;
+  return a > b ? a : b;
 }

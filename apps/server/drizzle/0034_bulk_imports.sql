@@ -12,6 +12,7 @@ CREATE TABLE "bulk_imports" (
 	"failure_code" text,
 	"stalled" boolean DEFAULT false NOT NULL,
 	"last_advanced_at" timestamp with time zone,
+	"waiting_since" timestamp with time zone,
 	"created_at" timestamp with time zone NOT NULL,
 	"finished_at" timestamp with time zone
 );

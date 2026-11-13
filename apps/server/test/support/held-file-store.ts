@@ -12,11 +12,12 @@ interface Hold {
  * Reads take the holds in turn; a read with none left goes straight through.
  */
 export class HeldFileStore extends MemoryFileStore {
-  private readonly holds: (Hold | null)[] = [];
+  /** Each read's holds, in the order of the file. */
+  private readonly holds: Hold[][] = [];
 
   /** The next read not yet spoken for goes straight through. */
   letReadThrough(): void {
-    this.holds.push(null);
+    this.holds.push([]);
   }
 
   /**
@@ -24,22 +25,36 @@ export class HeldFileStore extends MemoryFileStore {
    * until `release`; `held` resolves once it is held there.
    */
   holdRead(atByte: number): { held: Promise<void>; release: () => void } {
-    let release!: () => void;
-    let reached!: () => void;
-    const released = new Promise<void>((resolve) => (release = resolve));
-    const held = new Promise<void>((resolve) => (reached = resolve));
-    this.holds.push({ atByte, reached, released });
-    return { held, release };
+    return this.holdReadAt(atByte)[0];
+  }
+
+  /**
+   * Holds the next read not yet spoken for before each of these bytes, in
+   * turn, each until its own `release`.
+   */
+  holdReadAt(
+    ...atBytes: number[]
+  ): { held: Promise<void>; release: () => void }[] {
+    const holds = atBytes.map((atByte) => {
+      let release!: () => void;
+      let reached!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      const held = new Promise<void>((resolve) => (reached = resolve));
+      return { hold: { atByte, reached, released }, held, release };
+    });
+    this.holds.push(holds.map(({ hold }) => hold));
+    return holds.map(({ held, release }) => ({ held, release }));
   }
 
   override async *read(key: string): AsyncIterable<Uint8Array> {
-    const hold = this.holds.shift() ?? null;
+    const holds = this.holds.shift() ?? [];
     let position = 0;
     for await (const chunk of super.read(key)) {
       // In small pieces, so that a hold lands close to where it is asked.
       for (let start = 0; start < chunk.length; start += 4096) {
         const piece = chunk.subarray(start, start + 4096);
-        if (hold && position + piece.length > hold.atByte) {
+        while (holds[0] && position + piece.length > holds[0].atByte) {
+          const hold = holds.shift()!;
           hold.reached();
           await hold.released;
         }
