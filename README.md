@@ -78,6 +78,7 @@ The web is on Vercel and the API on Render, the API declared in the Blueprint [`
 
 - **Migrations.** Render runs `pnpm run db:migrate` as the pre-deploy command, after the build and before the new version starts. If a migration fails the deploy fails, and the version already running keeps serving.
 - **Secrets.** The Blueprint names every environment variable with `sync: false` and no value; the values live only in Render's panel. Render asks for them when a Blueprint is first created and ignores them on later syncs, so a new secret is added to the service by hand in the panel, as well as to `render.yaml`.
+- **How it was set up.** On 2026-11-13, in Render's panel: Blueprints → New Blueprint Instance, the `runout` repository, branch `stage`, the default `render.yaml`, keeping "Associate existing services". Render took on the existing `runout` service by its name, so its URL and its environment variables stayed as they were. Doing it again, for a new environment, would ask for every `sync: false` value.
 - **Changing the service.** Edit `render.yaml` and merge it: the Blueprint syncs it to the service. A setting changed only in the panel is overwritten on the next sync, and one the file leaves out falls back to Render's default.
 
 ## Tests
