@@ -27,6 +27,7 @@ import { UnreadableUpload } from '../hands/import/upload.js';
 import { addToLibrary, inLibrary } from '../library/library-entries.js';
 import { LIBRARY_CAPACITY } from '../library/library-limits.js';
 import { BULK_IMPORT_LIMIT } from './bulk-import-limit.js';
+import { ImporterEmail } from './importer-email.js';
 
 /** The most Hands one batch goes through, in one transaction. */
 const BATCH_SIZE = 1_000;
@@ -74,6 +75,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly heroResults: HeroResults,
     @Inject(BULK_IMPORT_LIMIT) private readonly limit: number,
     @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
+    private readonly importerEmail: ImporterEmail,
   ) {}
 
   /** Imports left waiting or interrupted go on as soon as the service starts. */
@@ -159,11 +161,13 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
   /** Ends an import that keeps failing: what it added stays, and its files are kept for a retry. */
   private async fail(record: BulkImport, failureCode: string): Promise<void> {
     const now = this.clock.now();
-    await this.db
+    const [failed] = await this.db
       .update(bulkImports)
       .set({ status: 'failed', failureCode, finishedAt: now })
       // Not one cancelled meanwhile.
-      .where(and(eq(bulkImports.id, record.id), active));
+      .where(and(eq(bulkImports.id, record.id), active))
+      .returning({ id: bulkImports.id });
+    if (failed) await this.importerEmail.send(record.id);
   }
 
   /**
@@ -290,6 +294,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     if (done || committed.full) {
       await this.closeReader(record.id);
       await this.deleteFiles(record);
+      await this.importerEmail.send(record.id);
     }
   }
 
@@ -318,7 +323,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     counts: Partial<Pick<BulkImport, 'total' | 'notImported'>> = {},
   ): Promise<void> {
     const now = this.clock.now();
-    await this.db
+    const [ended] = await this.db
       .update(bulkImports)
       .set({
         ...counts,
@@ -327,9 +332,11 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
         finishedAt: now,
         lastAdvancedAt: now,
       })
-      .where(and(eq(bulkImports.id, record.id), active));
+      .where(and(eq(bulkImports.id, record.id), active))
+      .returning({ id: bulkImports.id });
     await this.closeReader(record.id);
     await this.deleteFiles(record);
+    if (ended) await this.importerEmail.send(record.id);
   }
 
   /** The import's reader, where its last batch left it; opened again after a restart. */

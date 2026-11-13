@@ -8,6 +8,7 @@ import {
   DEFAULT_LIBRARY_CAPACITY,
   LIBRARY_CAPACITY,
 } from '../library/library-limits.js';
+import { MailModule } from '../mail/mail.module.js';
 import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
 import {
@@ -15,6 +16,7 @@ import {
   DEFAULT_BULK_IMPORT_LIMIT,
 } from './bulk-import-limit.js';
 import { ImportEngine } from './import-engine.js';
+import { ImporterEmail } from './importer-email.js';
 import { WakeController } from './wake.controller.js';
 
 /**
@@ -23,7 +25,7 @@ import { WakeController } from './wake.controller.js';
  * wake.
  */
 @Module({
-  imports: [ClockModule, DatabaseModule, HeroResultsModule],
+  imports: [ClockModule, DatabaseModule, HeroResultsModule, MailModule],
   controllers: [WakeController],
   providers: [
     { provide: WAKE_SECRET, useFactory: () => wakeSecretFromEnv(process.env) },
@@ -35,6 +37,7 @@ import { WakeController } from './wake.controller.js';
     { provide: BULK_IMPORT_LIMIT, useValue: DEFAULT_BULK_IMPORT_LIMIT },
     { provide: LIBRARY_CAPACITY, useValue: DEFAULT_LIBRARY_CAPACITY },
     ImportEngine,
+    ImporterEmail,
   ],
 })
 export class ImportServiceModule {}
