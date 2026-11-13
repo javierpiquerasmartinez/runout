@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -56,12 +56,23 @@ const previews: Record<string, ImportPreview> = {
     discarded: [],
   },
   'forum.txt': { id: 'p-forum', format: null, tried: ['pokerstars'], hands: [], discarded: [] },
+  'fifty.txt': many('p-fifty', 50),
+  'one.txt': many('p-one', 1),
+  'big.txt': many('p-big', 1240),
 }
+
+function many(id: string, count: number): ImportPreview {
+  return { id, format: 'pokerstars', tried: ['pokerstars'], hands: Array.from({ length: count }, () => hand([])), discarded: [] }
+}
+
+/** What the server answers a confirm with; a pending one leaves the dialog confirming. */
+let confirmed: () => Promise<Response>
 
 let requests: { url: string; body: FormData | string }[]
 
 beforeEach(() => {
   requests = []
+  confirmed = async () => Response.json({ imported: 3 }, { status: 201 })
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {
@@ -74,7 +85,7 @@ beforeEach(() => {
         const file = (init.body as FormData).get('file') as File
         return Response.json(previews[file.name], { status: 201 })
       }
-      return Response.json({ imported: 3 }, { status: 201 })
+      return confirmed()
     }),
   )
 })
@@ -274,4 +285,129 @@ describe('ImportDialog', () => {
       expect(screen.queryByText('Hero detected')).toBeNull()
     })
   })
+
+  describe('how many Hands one import takes', () => {
+    it('blocks confirming more than 50 Hands into a Room, and says why', async () => {
+      renderDialog()
+
+      await choose('fifty.txt', 'one.txt')
+
+      expect(await screen.findByText('This import has 51 hands; a room takes at most 50')).toBeTruthy()
+      await userEvent.click(screen.getByRole('button', { name: 'This import has 51 hands; a room takes at most 50' }))
+      expect(requests.filter((request) => request.url.endsWith('/imports'))).toEqual([])
+    })
+
+    it('confirms 50 Hands into a Room', async () => {
+      renderDialog()
+
+      await choose('fifty.txt')
+      await userEvent.click(await screen.findByRole('button', { name: 'Add 50 hands to the queue' }))
+
+      expect(requests.at(-1)!.url).toBe('/api/rooms/ABCD2345/imports')
+    })
+
+    it('explains a Library that cannot hold the Hands', async () => {
+      confirmed = async () => Response.json({ reason: 'library-full', hands: 3, held: 9_999_999, limit: 10_000_000 }, { status: 409 })
+      renderDialog({ kind: 'library' })
+
+      await choose('mine.txt')
+      await userEvent.click(await screen.findByRole('button', { name: 'Add 1 hand to your library' }))
+
+      expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Your library cannot hold more than 10 million hands.')
+    })
+  })
+
+  describe('while Hands are being saved', () => {
+    let finish: (response: Response) => void
+
+    beforeEach(() => {
+      confirmed = () => new Promise((resolve) => (finish = resolve))
+    })
+
+    async function startConfirming() {
+      const rendered = renderDialog({ kind: 'library' })
+      await choose('big.txt')
+      await userEvent.click(await screen.findByRole('button', { name: 'Add 1240 hands to your library' }))
+      return rendered
+    }
+
+    it('says how many Hands it is importing', async () => {
+      await startConfirming()
+
+      expect(screen.getByText('Importing 1,240 hands…')).toBeTruthy()
+    })
+
+    it('says so of a single Hand too', async () => {
+      confirmed = () => new Promise(() => {})
+      renderDialog({ kind: 'library' })
+      await choose('one.txt')
+      await userEvent.click(await screen.findByRole('button', { name: 'Add 1 hand to your library' }))
+
+      expect(screen.getByText('Importing 1 hand…')).toBeTruthy()
+    })
+
+    it('opens again if the browser closes it anyway', async () => {
+      const { onClose } = await startConfirming()
+      const dialog = screen.getByRole('dialog') as HTMLDialogElement
+
+      dialog.close()
+
+      await waitFor(() => expect(dialog.open).toBe(true))
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('cannot be closed from its buttons or Escape', async () => {
+      const { onClose } = await startConfirming()
+
+      await userEvent.click(screen.getByRole('button', { name: /^Close/ }))
+      await userEvent.click(screen.getByRole('button', { name: /^Cancel/ }))
+      pressEscape()
+
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('warns before leaving the page, and only then', async () => {
+      await startConfirming()
+
+      expect(leaving().defaultPrevented).toBe(true)
+
+      finish(Response.json({ reason: 'network' }, { status: 503 }))
+      expect(await screen.findByRole('alert')).toBeTruthy()
+      expect(leaving().defaultPrevented).toBe(false)
+    })
+
+    it('closes again once confirming fails', async () => {
+      const { onClose } = await startConfirming()
+
+      finish(Response.json({ reason: 'preview-not-found' }, { status: 404 }))
+      await screen.findByRole('alert')
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('closes as before while files are read or previewed', async () => {
+      const { onClose } = renderDialog({ kind: 'library' })
+      expect(leaving().defaultPrevented).toBe(false)
+
+      await choose('big.txt')
+      await screen.findByText('PokerStars · 1240 hands')
+      expect(leaving().defaultPrevented).toBe(false)
+      pressEscape()
+
+      expect(onClose).toHaveBeenCalled()
+    })
+  })
 })
+
+/** Escape on a modal dialog, which the browser turns into its `cancel` event (jsdom does not). */
+function pressEscape() {
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+}
+
+/** Asks to leave the page, as closing or reloading the tab does. */
+function leaving(): Event {
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  return event
+}

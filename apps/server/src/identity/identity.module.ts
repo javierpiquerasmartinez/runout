@@ -37,6 +37,6 @@ import {
     IdentityService,
     InvitationsService,
   ],
-  exports: [IdentityService, InvitationsService],
+  exports: [IdentityService, InvitationsService, ADMINISTRATOR_EMAILS],
 })
 export class IdentityModule {}

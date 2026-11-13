@@ -7,6 +7,7 @@ import { GoalsModule } from './goals/goals.module.js';
 import { HandsModule } from './hands/hands.module.js';
 import { HealthController } from './health/health.controller.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { BulkImportsModule } from './bulk-imports/bulk-imports.module.js';
 import { ImportsModule } from './imports/imports.module.js';
 import { LabModule } from './lab/lab.module.js';
 import { LibraryModule } from './library/library.module.js';
@@ -26,6 +27,7 @@ import { RoomsModule } from './rooms/rooms.module.js';
     CalendarModule,
     GoalsModule,
     ImportsModule,
+    BulkImportsModule,
     HandsModule,
     AdminModule,
   ],

@@ -34,6 +34,7 @@ import { importHandHistory, type Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
 import { handSelection } from '../library/library-hand.js';
+import { HeroResults } from '../hands/hero-results.js';
 import { Rejected } from '../rejection/rejection.js';
 import { RoomsService, type Room } from './rooms.service.js';
 import { requireUndoable } from './undo-window.js';
@@ -79,12 +80,20 @@ export interface Pasted {
   discarded: Discarded[];
 }
 
+/**
+ * The most Hands one import may add to a Room's Queue, so that it stays
+ * something a group can review. Adding Hands of a Library is apart: up to
+ * 200 at once (see `handSelection`).
+ */
+export const ROOM_IMPORT_LIMIT = 50;
+
 /** A Room's Queue: the Hands it is going to review, in order. */
 @Injectable()
 export class QueueService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly heroResults: HeroResults,
     private readonly rooms: RoomsService,
   ) {}
 
@@ -269,7 +278,8 @@ export class QueueService {
    * read from, and appends a Queue Entry for each Hand that isn't in the
    * Queue, under the Author chosen for it, inside the caller's transaction.
    * A Hand already in the Queue without its text gets it. Returns the new
-   * Queue Entries, in Queue order.
+   * Queue Entries, in Queue order. Refuses with `too-many-hands` above
+   * `ROOM_IMPORT_LIMIT` Hands to queue: duplicates do not count.
    */
   async append(
     tx: Transaction,
@@ -291,11 +301,18 @@ export class QueueService {
       [],
       tx,
     );
+    if (queued.length > ROOM_IMPORT_LIMIT) {
+      throw new Rejected('too-many-hands', {
+        hands: queued.length,
+        limit: ROOM_IMPORT_LIMIT,
+      });
+    }
     await fillHistoriesAndReread(tx, inQueue, handsRead);
     if (queued.length === 0) return [];
 
     const handIds = await storeHands(
       tx,
+      this.heroResults,
       importer.id,
       { hands: queued.map(({ hand }) => hand), histories },
       now,

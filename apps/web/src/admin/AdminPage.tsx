@@ -3,12 +3,13 @@ import { useI18n } from '../i18n'
 import { followLink } from '../routing'
 import { AccountsTab } from './AccountsTab'
 import { ADMIN_TABS, adminTabPath, type AdminTab } from './admin'
+import { ImportsTab } from './ImportsTab'
 import { InvitationsTab } from './InvitationsTab'
 import { RoomsTab } from './RoomsTab'
 import './AdminPage.css'
 
 /**
- * The Administrator panel: Invitations, Accounts and Rooms, each tab a route.
+ * The Administrator panel: Invitations, Accounts, Rooms and Bulk Imports, each tab a route.
  * Built from the design system's tables, buttons, badges and dialogs; the
  * design canvas's "Administración" boards are captures of this page.
  */
@@ -35,6 +36,7 @@ export function AdminPage({ tab }: { tab: AdminTab }) {
         {tab === 'invitations' && <InvitationsTab />}
         {tab === 'accounts' && <AccountsTab />}
         {tab === 'rooms' && <RoomsTab />}
+        {tab === 'imports' && <ImportsTab />}
       </main>
     </div>
   )

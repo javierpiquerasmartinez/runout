@@ -2,7 +2,8 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
 import { handStats, hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
-import { heroResult } from './replay/hero-result.js';
+import type { HeroResults } from './hero-results.js';
+import { heroOutcome, type HeroResult } from './replay/hero-result.js';
 import { heroStats, STAT_KEYS } from './replay/hero-stats.js';
 import { finalPot } from './replay/overview.js';
 
@@ -51,6 +52,23 @@ function rowKey(row: KeyRow): string {
   return handKey(row.site, row.siteHandId, row.heroScreenName, row.heroSeat);
 }
 
+/**
+ * Postgres takes at most 65,535 bind parameters in one statement. Every
+ * write of many rows goes in chunks of this many parameters at most, well
+ * under it, whatever the number of rows.
+ */
+const PARAMETERS_PER_WRITE = 20_000;
+
+/** `rows` in chunks of at most `PARAMETERS_PER_WRITE` parameters, `perRow` each. */
+export function inChunks<T>(rows: readonly T[], perRow: number): T[][] {
+  const size = Math.max(1, Math.floor(PARAMETERS_PER_WRITE / perRow));
+  const chunks: T[][] = [];
+  for (let start = 0; start < rows.length; start += size) {
+    chunks.push(rows.slice(start, start + size));
+  }
+  return chunks;
+}
+
 /** Hands read from Hand History text, with the Hand History each was read from, by key. */
 export interface HandsRead {
   hands: Hand[];
@@ -80,17 +98,16 @@ export async function storedIds(
   db: Database | Transaction,
   read: Hand[],
 ): Promise<Map<string, string>> {
-  if (read.length === 0) return new Map();
-  const rows = await db
-    .select(keyColumns)
-    .from(hands)
-    .where(
-      inArray(
-        hands.siteHandId,
-        read.map((hand) => hand.siteHandId),
-      ),
-    );
-  return new Map(rows.map((row) => [rowKey(row), row.id]));
+  const ids = new Map<string, string>();
+  const siteHandIds = [...new Set(read.map((hand) => hand.siteHandId))];
+  for (const chunk of inChunks(siteHandIds, 1)) {
+    const rows = await db
+      .select(keyColumns)
+      .from(hands)
+      .where(inArray(hands.siteHandId, chunk));
+    for (const row of rows) ids.set(rowKey(row), row.id);
+  }
+  return ids;
 }
 
 /**
@@ -112,32 +129,34 @@ export async function fillHistoriesAndReread(
   const toFill = [...ids].filter(
     ([key]) => histories.has(key) && byKey.has(key),
   );
-  const rows = toFill.map(([key, id]) => {
-    const hand = byKey.get(key)!;
-    return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
-        ${hand.rake}::integer, ${heroResult(hand).rakeGenerated}::integer)`;
-  });
-  if (rows.length === 0) return;
+  if (toFill.length === 0) return;
   const filled = sql`filled`;
   const keyById = new Map(toFill.map(([key, id]) => [id, key]));
   await db.transaction(async (tx) => {
-    const reread = await tx
-      .update(hands)
-      .set({
-        handHistory: sql`${filled}.text`,
-        content: sql`${filled}.content`,
-        rake: sql`${filled}.rake`,
-        heroRakeGenerated: sql`${filled}.rake_generated`,
-      })
-      .from(
-        sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
-      )
-      .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)))
-      .returning({ id: hands.id });
-    await replaceStats(
-      tx,
-      reread.map(({ id }) => ({ id, hand: byKey.get(keyById.get(id)!)! })),
-    );
+    for (const chunk of inChunks(toFill, 5)) {
+      const rows = chunk.map(([key, id]) => {
+        const hand = byKey.get(key)!;
+        return sql`(${id}::uuid, ${histories.get(key)!}, ${JSON.stringify(hand)}::jsonb,
+          ${hand.rake}::integer, ${heroOutcome(hand).rakeGenerated}::integer)`;
+      });
+      const reread = await tx
+        .update(hands)
+        .set({
+          handHistory: sql`${filled}.text`,
+          content: sql`${filled}.content`,
+          rake: sql`${filled}.rake`,
+          heroRakeGenerated: sql`${filled}.rake_generated`,
+        })
+        .from(
+          sql`(values ${sql.join(rows, sql`, `)}) as ${filled} (id, text, content, rake, rake_generated)`,
+        )
+        .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)))
+        .returning({ id: hands.id });
+      await replaceStats(
+        tx,
+        reread.map(({ id }) => ({ id, hand: byKey.get(keyById.get(id)!)! })),
+      );
+    }
   });
 }
 
@@ -145,10 +164,12 @@ export async function fillHistoriesAndReread(
  * Stores the Hands that aren't stored yet, with `importerId` as their
  * Importer and the Hand History each was read from as their text, and
  * returns every Hand's id, in order. A Hand already stored without its text
- * gets it (see `fillHistoriesAndReread`).
+ * gets it (see `fillHistoriesAndReread`). Each new Hand's All-in EV is
+ * worked out in `heroResults`' threads.
  */
 export async function storeHands(
   tx: Transaction,
+  heroResults: HeroResults,
   importerId: string,
   handsRead: HandsRead,
   now: Date,
@@ -157,38 +178,20 @@ export async function storeHands(
   if (read.length === 0) return [];
   const ids = await storedIds(tx, read);
   await fillHistoriesAndReread(tx, ids, handsRead);
-  const toStore = read.filter((hand) => !ids.has(keyOf(hand)));
-  if (toStore.length > 0) {
+  const toStore = new Map<string, Hand>();
+  for (const hand of read) {
+    if (!ids.has(keyOf(hand))) toStore.set(keyOf(hand), hand);
+  }
+  for (const chunk of inChunks([...toStore.values()], HAND_COLUMNS)) {
+    const results = await heroResults.of(chunk);
     // Another import may have stored one of them a moment ago; the
     // uniqueness constraint turns it away and it is read back below.
     const stored = await tx
       .insert(hands)
       .values(
-        toStore.map((hand) => {
-          const { result, allInEv, reachedShowdown, rakeGenerated } =
-            heroResult(hand);
-          return {
-            site: hand.site,
-            siteHandId: hand.siteHandId,
-            heroScreenName: hand.hero.screenName,
-            heroSeat: heroSeat(hand),
-            importerId,
-            sourceFormat: hand.sourceFormat,
-            playedAt: new Date(hand.playedAt),
-            smallBlind: hand.stake.smallBlind,
-            bigBlind: hand.stake.bigBlind,
-            currency: hand.stake.currency,
-            heroResult: result,
-            heroAllInEv: allInEv,
-            heroReachedShowdown: reachedShowdown,
-            finalPot: finalPot(hand),
-            rake: hand.rake,
-            heroRakeGenerated: rakeGenerated,
-            content: hand,
-            handHistory: histories.get(keyOf(hand)) ?? null,
-            importedAt: now,
-          };
-        }),
+        chunk.map((hand, index) =>
+          handRow(hand, results[index], importerId, histories, now),
+        ),
       )
       .onConflictDoNothing({
         target: [
@@ -202,17 +205,48 @@ export async function storeHands(
     for (const row of stored) ids.set(rowKey(row), row.id);
     await replaceStats(
       tx,
-      stored.map((row) => ({
-        id: row.id,
-        hand: toStore.find((hand) => keyOf(hand) === rowKey(row))!,
-      })),
+      stored.map((row) => ({ id: row.id, hand: toStore.get(rowKey(row))! })),
     );
-    const missing = toStore.filter((hand) => !ids.has(keyOf(hand)));
-    if (missing.length > 0) {
-      for (const [key, id] of await storedIds(tx, missing)) ids.set(key, id);
-    }
+  }
+  const missing = [...toStore.values()].filter((hand) => !ids.has(keyOf(hand)));
+  if (missing.length > 0) {
+    for (const [key, id] of await storedIds(tx, missing)) ids.set(key, id);
   }
   return read.map((hand) => ids.get(keyOf(hand))!);
+}
+
+/** The parameters one Hand takes to store: the columns `handRow` sets. */
+const HAND_COLUMNS = 19;
+
+/** The row that stores `hand`, with its Hero's Result and what the Library sorts and filters by. */
+function handRow(
+  hand: Hand,
+  { result, allInEv, reachedShowdown, rakeGenerated }: HeroResult,
+  importerId: string,
+  histories: ReadonlyMap<string, string>,
+  now: Date,
+): typeof hands.$inferInsert {
+  return {
+    site: hand.site,
+    siteHandId: hand.siteHandId,
+    heroScreenName: hand.hero.screenName,
+    heroSeat: heroSeat(hand),
+    importerId,
+    sourceFormat: hand.sourceFormat,
+    playedAt: new Date(hand.playedAt),
+    smallBlind: hand.stake.smallBlind,
+    bigBlind: hand.stake.bigBlind,
+    currency: hand.stake.currency,
+    heroResult: result,
+    heroAllInEv: allInEv,
+    heroReachedShowdown: reachedShowdown,
+    finalPot: finalPot(hand),
+    rake: hand.rake,
+    heroRakeGenerated: rakeGenerated,
+    content: hand,
+    handHistory: histories.get(keyOf(hand)) ?? null,
+    importedAt: now,
+  };
 }
 
 /**
@@ -225,17 +259,21 @@ export async function replaceStats(
   stored: { id: string; hand: Hand }[],
 ): Promise<void> {
   if (stored.length === 0) return;
-  await db.delete(handStats).where(
-    inArray(
-      handStats.handId,
-      stored.map(({ id }) => id),
-    ),
-  );
+  for (const chunk of inChunks(stored, 1)) {
+    await db.delete(handStats).where(
+      inArray(
+        handStats.handId,
+        chunk.map(({ id }) => id),
+      ),
+    );
+  }
   const rows = stored.flatMap(({ id, hand }) => {
     const stats = heroStats(hand);
     return STAT_KEYS.filter((stat) => stats[stat].opportunities > 0).map(
       (stat) => ({ handId: id, stat, ...stats[stat] }),
     );
   });
-  if (rows.length > 0) await db.insert(handStats).values(rows);
+  for (const chunk of inChunks(rows, 4)) {
+    await db.insert(handStats).values(chunk);
+  }
 }

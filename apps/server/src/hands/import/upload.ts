@@ -14,7 +14,7 @@ export class UnreadableUpload extends Error {
  */
 const MAX_TEXT_BYTES = 256 * 1024 * 1024;
 
-const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];
+export const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];
 
 /**
  * The Hand History text in an uploaded file: a .txt file as is, or every
@@ -55,7 +55,7 @@ export function readUpload(
 }
 
 /** .txt files, leaving out the copies macOS adds to the zips it makes. */
-function isHandHistoryEntry(path: string): boolean {
+export function isHandHistoryEntry(path: string): boolean {
   return (
     /\.txt$/i.test(path) &&
     !path.startsWith('__MACOSX/') &&

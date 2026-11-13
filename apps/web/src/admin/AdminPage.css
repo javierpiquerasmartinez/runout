@@ -211,3 +211,69 @@
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+/* The Imports tab: a main line over a secondary one. */
+.admin-imports__primary {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.admin-imports__secondary,
+.admin-imports__reason {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+
+.admin-imports__secondary {
+  white-space: nowrap;
+}
+
+.admin-imports__hands {
+  width: 210px;
+}
+
+/* The database's size against the storage guard's threshold, at the toolbar's end. */
+.admin-storage {
+  width: 280px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.admin-storage__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.admin-storage__bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+}
+
+.admin-storage__fill {
+  display: block;
+  height: 100%;
+  background: var(--sync);
+}
+
+.admin-storage__bar[data-reached] .admin-storage__fill {
+  background: var(--alert);
+}
+
+.admin-imports__actions {
+  text-align: right;
+}
+
+/* Reintentar, in brass: the one action that brings an import back. */
+.admin-imports__actions .admin-imports__retry {
+  color: var(--brass-ink);
+}

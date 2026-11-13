@@ -42,3 +42,23 @@ export function oneHand(name: string, siteHandId: string): string {
   if (!hand) throw new Error(`No Hand ${siteHandId} in ${name}`);
   return hand;
 }
+
+/**
+ * `count` Hands of PokerStars, none of them imported before: the Hands of a
+ * PokerStars fixture, over and over, each time with hand IDs of their own.
+ */
+export function manyHands(
+  count: number,
+  name: string = 'pokerstars-session.txt',
+): string {
+  const hands: string[] = [];
+  while (hands.length < count) {
+    hands.push(
+      ...freshHandHistory(name)
+        .split(/(?=^PokerStars Hand #)/m)
+        .filter((hand) => hand.startsWith('PokerStars Hand #'))
+        .map((hand) => `${hand.trim()}\n\n\n`),
+    );
+  }
+  return hands.slice(0, count).join('');
+}

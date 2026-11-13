@@ -59,6 +59,8 @@ import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import type { LibraryStats } from './stats'
 import { StatsView } from './StatsView'
+import { BULK_IMPORTS_POLL_MS, isUnderway, type BulkImport } from './bulkImports'
+import { ImportsBanner, ImportsView } from './ImportsView'
 import { replayFilterSearch, replaySelectedSearch, replayServerQuery } from './replay'
 import './LibraryPage.css'
 
@@ -152,6 +154,39 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       cancelled = true
     }
   }, [token, filter, revision, view])
+
+  // The Account's Bulk Imports, whatever the filter: they are not Hands it narrows. Every view reads them, for the
+  // banner, and reads them again while one is underway, so its progress moves on its own. Not from a Room: there
+  // the Library is only a list to pick Hands from.
+  const [imports, setImports] = useState<{ state: 'loaded'; imports: BulkImport[] } | { state: 'failed'; reason: FailureReason } | null>(
+    null,
+  )
+  const [importsRevision, setImportsRevision] = useState(0)
+  useEffect(() => {
+    if (room) return
+    let cancelled = false
+    let next: ReturnType<typeof setTimeout> | undefined
+    const read = () =>
+      api<BulkImport[]>('/library/bulk-imports', { token })
+        .then((listed) => {
+          if (cancelled) return
+          setImports({ state: 'loaded', imports: listed })
+          if (listed.some((bulkImport) => isUnderway(bulkImport.status))) next = setTimeout(read, BULK_IMPORTS_POLL_MS)
+        })
+        .catch((error: unknown) => !cancelled && setImports({ state: 'failed', reason: reasonOf(error) }))
+    void read()
+    return () => {
+      cancelled = true
+      clearTimeout(next)
+    }
+  }, [token, revision, importsRevision, room])
+  const underwayImport =
+    imports?.state === 'loaded' ? imports.imports.find((bulkImport) => isUnderway(bulkImport.status)) : undefined
+  // Stopped before its next batch; what it imported stays. A refusal means it had ended meanwhile: reading again says how.
+  const cancelImport = (id: string) =>
+    api(`/library/bulk-imports/${encodeURIComponent(id)}/cancel`, { token, method: 'POST' })
+      .catch(() => undefined)
+      .finally(() => setImportsRevision((n) => n + 1))
 
   const page = load?.state === 'loaded' ? load.page : null
   // Back from a Hand, the list lands as far down as it was left, once its Hands are there again.
@@ -320,6 +355,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
         </nav>
 
         <main className="library__main" data-view={view}>
+          {underwayImport && <ImportsBanner bulkImport={underwayImport} href={`${libraryViewPath('imports')}${search}`} />}
           <div className="library__heading">
             <div className="library__intro">
               <h1 className="library__title ro-serif">{t(filter.markedOnly ? 'library.markedTitle' : 'library.all')}</h1>
@@ -382,7 +418,9 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               {t(`reason.${load.reason}`)}
             </p>
           )}
-          {page && page.counts.all > 0 && <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />}
+          {page && page.counts.all > 0 && view !== 'imports' && (
+            <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />
+          )}
           {!room && (
             <SegmentedControl
               label={t('library.view')}
@@ -390,6 +428,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
                 { value: 'list', label: t('library.view.hands') },
                 { value: 'graph', label: t('library.view.graph') },
                 { value: 'stats', label: t('library.view.stats') },
+                { value: 'imports', label: t('library.view.imports') },
               ]}
               value={view}
               onChange={showView}
@@ -411,7 +450,13 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
           {view === 'stats' && page && page.total > 0 && stats?.state === 'loaded' && stats.stats.hands > 0 && (
             <StatsView stats={stats.stats} statHref={statHref} />
           )}
-          {page && page.total === 0 && page.counts.all > 0 && (
+          {view === 'imports' && imports?.state === 'failed' && (
+            <p className="library__failure" role="alert">
+              {t(`reason.${imports.reason}`)}
+            </p>
+          )}
+          {view === 'imports' && imports?.state === 'loaded' && <ImportsView imports={imports.imports} onCancel={cancelImport} />}
+          {view !== 'imports' && page && page.total === 0 && page.counts.all > 0 && (
             <div className="library__empty">
               <p>{noMatches.message}</p>
               <div className="library__empty-actions">
@@ -425,7 +470,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               </div>
             </div>
           )}
-          {page && page.counts.all === 0 && (
+          {view !== 'imports' && page && page.counts.all === 0 && (
             <div className="library__empty">
               <p>{t('library.empty')}</p>
               <Button variant="primary" onClick={openImport}>

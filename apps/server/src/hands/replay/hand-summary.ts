@@ -1,5 +1,5 @@
 import type { Hand, PokerSite, Stake, Street } from '../hand.js';
-import { heroResult } from './hero-result.js';
+import { heroOutcome } from './hero-result.js';
 import { positions } from './positions.js';
 import { BOARD_SIZE, timeline } from './timeline.js';
 
@@ -148,7 +148,7 @@ export function handSummary(
       ? `Showdown: ${[...(shown.length > 0 ? [shown.join(', ')] : []), winners + rake].join(' · ')}`
       : winners + rake,
   );
-  lines.push(`${words.result}: ${bb(heroResult(hand).result, true)}`);
+  lines.push(`${words.result}: ${bb(heroOutcome(hand).result, true)}`);
   return lines.join('\n');
 }
 

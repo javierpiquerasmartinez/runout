@@ -1,7 +1,8 @@
 # Runout's backend on Render. Generated from the existing service in Render's
 # panel ("Generate Blueprint") on 2026-11-12, then extended. Secrets are
-# declared with `sync: false` and set in the panel, never here. See the
-# README's "Deploying" section for the steps done in the panel.
+# declared with `sync: false` and set in the panel, never here; the other
+# variables are generated, copied from another service, or written here. See
+# the README's "Deploying" section.
 version: "1"
 projects:
 - name: runout
@@ -29,6 +30,31 @@ projects:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Where the import service is, and the secret its wakes carry: both
+      # taken from the import service below, never typed in.
+      - key: IMPORT_SERVICE_ADDRESS
+        fromService:
+          name: runout-imports
+          type: pserv
+          property: hostport
+      - key: IMPORT_SERVICE_SECRET
+        fromService:
+          name: runout-imports
+          type: pserv
+          envVarKey: IMPORT_SERVICE_SECRET
+      # The R2 bucket Bulk Imports' files are uploaded to.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      # The database size, in MB, at which Bulk Imports pause: 800 on Neon's
+      # Free plan. Raise it after upgrading.
+      - key: STORAGE_THRESHOLD_MB
+        value: "800"
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       # Runs after the build and before the new version starts. If a
@@ -38,4 +64,80 @@ projects:
       autoDeployTrigger: commit
       # No healthCheckPath: /api/health queries the database, and Render
       # calling it every few seconds would keep Neon from ever suspending.
+      rootDir: apps/server
+
+    # The import service: the same code from a second entry point, adding
+    # Bulk Imports to Libraries. A Private Service, not a Background Worker,
+    # because the API wakes it over the private network; it has no public
+    # address. Migrations run only in the API's pre-deploy.
+    - type: pserv
+      name: runout-imports
+      runtime: node
+      repo: https://github.com/javierpiquerasmartinez/runout
+      branch: stage
+      plan: 0.5c-512mb
+      envVars:
+      - key: DATABASE_URL
+        fromService:
+          name: runout
+          type: web
+          envVarKey: DATABASE_URL
+      # Generated once by Render, then kept.
+      - key: IMPORT_SERVICE_SECRET
+        generateValue: true
+      # The same bucket as the API's, set there once.
+      - key: R2_ACCOUNT_ID
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_ACCOUNT_ID
+      - key: R2_ACCESS_KEY_ID
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_ACCESS_KEY_ID
+      - key: R2_SECRET_ACCESS_KEY
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_SECRET_ACCESS_KEY
+      - key: R2_BUCKET
+        fromService:
+          name: runout
+          type: web
+          envVarKey: R2_BUCKET
+      # The API's, so that both pause and resume at the same size.
+      - key: STORAGE_THRESHOLD_MB
+        fromService:
+          name: runout
+          type: web
+          envVarKey: STORAGE_THRESHOLD_MB
+      # The email to the Importer when a Bulk Import ends: the API's Resend
+      # settings, and the web's origin its link leads to. FRONTEND_URL also
+      # marks the service as production, which then requires Resend.
+      - key: FRONTEND_URL
+        fromService:
+          name: runout
+          type: web
+          envVarKey: FRONTEND_URL
+      - key: RESEND_API_KEY
+        fromService:
+          name: runout
+          type: web
+          envVarKey: RESEND_API_KEY
+      - key: EMAIL_FROM
+        fromService:
+          name: runout
+          type: web
+          envVarKey: EMAIL_FROM
+      # Whom to email when a Bulk Import fails: the API's Administrators.
+      - key: ADMINISTRATOR_EMAILS
+        fromService:
+          name: runout
+          type: web
+          envVarKey: ADMINISTRATOR_EMAILS
+      region: frankfurt
+      buildCommand: pnpm install --frozen-lockfile && pnpm run build
+      startCommand: pnpm run start:imports
+      autoDeployTrigger: commit
       rootDir: apps/server

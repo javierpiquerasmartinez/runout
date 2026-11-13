@@ -13,6 +13,13 @@ import {
   AdministratorEmails,
 } from '../../src/identity/administrators.js';
 import { MAILER } from '../../src/mail/mailer.js';
+import {
+  IMPORT_SERVICE,
+  type ImportServiceAddress,
+} from '../../src/import-service/import-service-config.js';
+import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
+import { LIBRARY_CAPACITY } from '../../src/library/library-limits.js';
+import { STORAGE_THRESHOLD } from '../../src/storage/storage.js';
 import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
 import { FakeInbox } from './inbox.js';
@@ -49,6 +56,14 @@ export interface StartAppOptions {
   ownDatabase?: boolean;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
   administratorEmails?: string[];
+  /** How many Hands a Library may hold; 10 million otherwise, as in production. */
+  libraryCapacity?: number;
+  /** The import service it wakes, as `startImportService` gives it; none otherwise. */
+  importService?: ImportServiceAddress;
+  /** Where Bulk Imports' files go, shared with the import service; none otherwise. */
+  fileStore?: FileStore;
+  /** The database size, in bytes, at which Bulk Imports pause; `STORAGE_THRESHOLD_MB` otherwise. */
+  storageThreshold?: number;
 }
 
 /**
@@ -84,7 +99,21 @@ export async function startApp(
     .overrideProvider(MAILER)
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)
-    .useValue(new AdministratorEmails(options.administratorEmails ?? []));
+    .useValue(new AdministratorEmails(options.administratorEmails ?? []))
+    .overrideProvider(IMPORT_SERVICE)
+    .useValue(options.importService ?? null)
+    .overrideProvider(FILE_STORE)
+    .useValue(options.fileStore ?? null);
+  if (options.libraryCapacity !== undefined) {
+    builder
+      .overrideProvider(LIBRARY_CAPACITY)
+      .useValue(options.libraryCapacity);
+  }
+  if (options.storageThreshold !== undefined) {
+    builder
+      .overrideProvider(STORAGE_THRESHOLD)
+      .useValue(options.storageThreshold);
+  }
   if (databaseUrl === inject('databaseUrl')) {
     builder.overrideProvider(PlaybackService).useClass(SharedDatabasePlayback);
   }
@@ -96,6 +125,7 @@ export async function startApp(
 
   const httpServer = app.getHttpServer() as Server;
   const { port } = httpServer.address() as AddressInfo;
+  let closed = false;
   return {
     app,
     httpServer,
@@ -104,6 +134,8 @@ export async function startApp(
     databaseUrl,
     inbox,
     close: async () => {
+      if (closed) return;
+      closed = true;
       await app.close();
       await own?.drop();
     },

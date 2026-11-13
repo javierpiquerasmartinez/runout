@@ -12,6 +12,11 @@ export class AdministratorEmails {
     );
   }
 
+  /** Every Administrator's email, lowercased: whom to tell of a problem. */
+  list(): string[] {
+    return [...this.emails];
+  }
+
   /** Whether the Account with this email is an Administrator, ignoring case. */
   includes(email: string | null): boolean {
     return email !== null && this.emails.has(email.toLowerCase());

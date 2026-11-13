@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -10,6 +10,7 @@ import { libraryOpenedFrom, type LibraryHand, type LibraryPage as Page } from '.
 import { LibraryPage } from './LibraryPage'
 import type { Results } from './results'
 import { STAT_KEYS, type LibraryStats } from './stats'
+import { BULK_IMPORTS_POLL_MS, type BulkImport } from './bulkImports'
 
 const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryHand => ({
   id,
@@ -76,8 +77,29 @@ let copyRequests: string[]
 let addRequests: string[]
 /** What the server answers adding to a Room with, unless the test says otherwise. */
 let addReply: () => Response
+/** The Account's Bulk Imports, as the server lists them. */
+let bulkImports: BulkImport[]
+/** Changes to Bulk Imports, as `POST /api/library/bulk-imports/b1/cancel`. */
+let bulkImportRequests: string[]
+
+const runningImport = (overrides: Partial<BulkImport> = {}): BulkImport => ({
+  id: 'b1',
+  status: 'running',
+  files: [{ name: 'pt4-export.zip', size: 1000 }],
+  total: 1240000,
+  processed: 412000,
+  imported: 400000,
+  duplicates: 12000,
+  notImported: {},
+  reason: null,
+  createdAt: '2026-11-02T10:00:00.000Z',
+  finishedAt: null,
+  ...overrides,
+})
 
 beforeEach(() => {
+  bulkImports = [runningImport()]
+  bulkImportRequests = []
   requests = []
   resultsRequests = []
   statsRequests = []
@@ -137,6 +159,17 @@ beforeEach(() => {
       if (method === 'DELETE' && url === '/api/library/hands') {
         removeRequests.push(`${method} ${url} ${String(init?.body)}`)
         return removeReply()
+      }
+      if (url.startsWith('/api/library/bulk-imports')) {
+        if (method === 'POST') {
+          bulkImportRequests.push(`${method} ${url}`)
+          const id = url.split('/').at(-2)
+          bulkImports = bulkImports.map((bulkImport) =>
+            bulkImport.id === id ? { ...bulkImport, status: 'cancelled', finishedAt: '2026-11-02T11:00:00.000Z' } : bulkImport,
+          )
+          return Response.json(bulkImports.find((bulkImport) => bulkImport.id === id), { status: 201 })
+        }
+        return Response.json(bulkImports)
       }
       if (method !== 'GET') {
         markRequests.push(`${method} ${url}`)
@@ -329,6 +362,20 @@ describe('LibraryPage', () => {
       expect(window.location.pathname).toBe('/library')
       expect(await screen.findByRole('table', { name: 'All hands' })).toBeTruthy()
       expect(screen.queryByRole('region', { name: 'Results' })).toBeNull()
+    })
+
+    it('switches to the Imports at /library/imports, leaving the filters out', async () => {
+      renderLibrary()
+      const view = await screen.findByRole('radiogroup', { name: 'View' })
+      await screen.findByRole('table', { name: 'All hands' })
+
+      await userEvent.click(within(view).getByRole('radio', { name: 'Imports' }))
+
+      expect(window.location.pathname).toBe('/library/imports')
+      const shown = await screen.findByRole('table', { name: 'Imports' })
+      expect(within(shown).getByRole('row', { name: /pt4-export\.zip/ }).textContent).toContain('412,000 of 1,240,000')
+      expect(screen.queryByRole('table', { name: 'All hands' })).toBeNull()
+      expect(screen.queryByRole('group', { name: 'Filters' })).toBeNull()
     })
 
     it('switches to the Stats at /library/stats', async () => {
@@ -1261,6 +1308,117 @@ describe('LibraryPage', () => {
       expect(screen.queryByRole('button', { name: /to the room/ })).toBeNull()
       expect(screen.queryByRole('link', { name: /Back to/ })).toBeNull()
     })
+  })
+})
+
+describe('LibraryPage · Bulk Imports', () => {
+  const banner = () => screen.queryByRole('status', { name: 'Import in progress' })
+
+  it('says in every view that an import is running, that the graph and stats may be incomplete, and leads to the Imports', async () => {
+    for (const path of ['/library?period=all', '/library/graph?period=all', '/library/stats?period=all']) {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, path)
+      await waitFor(() => expect(banner()).toBeTruthy())
+      expect(banner()!.textContent).toContain(
+        'Import in progress: 412,000 of 1,240,000 hands. The graph and stats may be incomplete until it ends.',
+      )
+      cleanup()
+    }
+
+    renderLibrary()
+    const shown = await screen.findByRole('status', { name: 'Import in progress' })
+    await userEvent.click(within(shown).getByRole('link', { name: 'See imports' }))
+
+    expect(window.location.pathname).toBe('/library/imports')
+    expect(await screen.findByRole('table', { name: 'Imports' })).toBeTruthy()
+  })
+
+  it('says so before the files are counted too', async () => {
+    bulkImports = [runningImport({ status: 'waiting', total: null, processed: 0 })]
+    renderLibrary()
+
+    await waitFor(() => expect(banner()?.textContent).toContain('Import in progress. The graph and stats may be incomplete'))
+  })
+
+  it('says an import is paused, counted or not yet', async () => {
+    const paused = () => screen.queryByRole('status', { name: 'Import paused' })
+    bulkImports = [runningImport({ status: 'paused', total: null, processed: 0 })]
+    renderLibrary()
+
+    await waitFor(() => expect(paused()?.textContent).toContain('Import paused. The graph and stats may be incomplete'))
+    expect(banner()).toBeNull()
+    cleanup()
+
+    bulkImports = [runningImport({ status: 'paused' })]
+    renderLibrary()
+
+    await waitFor(() => expect(paused()?.textContent).toContain('Import paused: 412,000 of 1,240,000 hands.'))
+  })
+
+  it('shows no banner, and does not keep asking, while an import is still uploading', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+    bulkImports = [runningImport({ status: 'uploading', total: null, processed: 0 })]
+    renderLibrary()
+    await screen.findByRole('table', { name: 'All hands' })
+    const asked = () => (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => url === '/api/library/bulk-imports').length
+    await waitFor(() => expect(asked()).toBe(1))
+
+    await act(() => vi.advanceTimersByTimeAsync(BULK_IMPORTS_POLL_MS * 3))
+
+    expect(banner()).toBeNull()
+    expect(asked()).toBe(1)
+  })
+
+  it('shows no banner once every import has ended', async () => {
+    bulkImports = [runningImport({ status: 'completed', finishedAt: '2026-11-02T12:00:00.000Z' })]
+    renderLibrary()
+    await screen.findByRole('table', { name: 'All hands' })
+
+    expect(banner()).toBeNull()
+  })
+
+  it('follows an import’s progress without reloading, and stops asking once it has ended', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+    renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/imports?period=all')
+    const table = await screen.findByRole('table', { name: 'Imports' })
+    expect(within(table).getByRole('row', { name: /pt4-export/ }).textContent).toContain('412,000 of 1,240,000')
+
+    bulkImports = [runningImport({ processed: 413000 })]
+    await act(() => vi.advanceTimersByTimeAsync(BULK_IMPORTS_POLL_MS))
+    await waitFor(() => expect(within(table).getByRole('row', { name: /pt4-export/ }).textContent).toContain('413,000 of 1,240,000'))
+    expect(banner()!.textContent).toContain('413,000 of 1,240,000')
+
+    bulkImports = [runningImport({ status: 'completed', processed: 1240000, imported: 1240000, finishedAt: '2026-11-02T12:00:00.000Z' })]
+    await act(() => vi.advanceTimersByTimeAsync(BULK_IMPORTS_POLL_MS))
+    await waitFor(() => expect(banner()).toBeNull())
+    expect(within(table).getByRole('row', { name: /pt4-export/ }).textContent).toContain('Completed')
+    const asked = (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => url === '/api/library/bulk-imports').length
+
+    await act(() => vi.advanceTimersByTimeAsync(BULK_IMPORTS_POLL_MS * 3))
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) => url === '/api/library/bulk-imports').length).toBe(asked)
+  })
+
+  it('cancels an import, which then shows as cancelled', async () => {
+    renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/imports?period=all')
+    const table = await screen.findByRole('table', { name: 'Imports' })
+
+    await userEvent.click(within(table).getByRole('button', { name: 'Cancel' }))
+
+    expect(bulkImportRequests).toEqual(['POST /api/library/bulk-imports/b1/cancel'])
+    await waitFor(() => expect(within(table).getByRole('row', { name: /pt4-export/ }).textContent).toContain('Cancelled by you'))
+    expect(banner()).toBeNull()
+  })
+
+  it('shows no banner in the Library opened from a Room', async () => {
+    renderLibrary(DEFAULT_PREFERENCES, { code: 'RNT4K9PX', name: 'Martes' })
+    await screen.findByRole('table', { name: 'All hands' })
+
+    expect(banner()).toBeNull()
   })
 })
 

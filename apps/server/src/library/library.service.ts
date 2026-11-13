@@ -8,23 +8,22 @@ import {
 } from '../database/database.js';
 import {
   hands,
+  identities,
   libraryEntries,
   marks,
   tagLinks,
   tags,
 } from '../database/schema.js';
 import type { Hand, PokerSite, Stake } from '../hands/hand.js';
-import {
-  keyOf,
-  storedIds,
-  storeHands,
-  type HandsRead,
-} from '../hands/hand-store.js';
+import { keyOf, type HandsRead } from '../hands/hand-store.js';
 import type { Discarded } from '../hands/import/import.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
+import { HeroResults } from '../hands/hero-results.js';
 import { Rejected } from '../rejection/rejection.js';
+import { addToLibrary, inLibrary } from './library-entries.js';
 import { handSelection, requireInLibrary } from './library-hand.js';
+import { LIBRARY_CAPACITY, LIBRARY_IMPORT_LIMIT } from './library-limits.js';
 import { boundedInt } from './query.js';
 import { TagsService, type Tag } from './tags.service.js';
 import {
@@ -100,7 +99,9 @@ export class LibraryService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly heroResults: HeroResults,
     private readonly tagsService: TagsService,
+    @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
   ) {}
 
   /**
@@ -133,7 +134,9 @@ export class LibraryService {
    * Adds the Hands to the Library inside the caller's transaction, storing
    * those nobody has imported before with the Hand History each was read
    * from. Returns the ids of the Hands added: one added since it was
-   * previewed is skipped.
+   * previewed is skipped. Refuses with `too-many-hands` above
+   * `LIBRARY_IMPORT_LIMIT` Hands to add, and with `library-full` when they
+   * would take the Library past its capacity.
    */
   async add(
     tx: Transaction,
@@ -142,25 +145,48 @@ export class LibraryService {
   ): Promise<string[]> {
     const { kept } = await this.planImport(account, read, [], tx);
     if (kept.length === 0) return [];
-    const now = this.clock.now();
-    const handIds = await storeHands(
+    if (kept.length > LIBRARY_IMPORT_LIMIT) {
+      throw new Rejected('too-many-hands', {
+        hands: kept.length,
+        limit: LIBRARY_IMPORT_LIMIT,
+      });
+    }
+    await this.requireRoomFor(tx, account, kept.length);
+    return addToLibrary(
       tx,
+      this.heroResults,
       account.id,
       { hands: kept, histories },
-      now,
+      this.clock.now(),
     );
-    const added = await tx
-      .insert(libraryEntries)
-      .values(
-        handIds.map((handId) => ({
-          identityId: account.id,
-          handId,
-          addedAt: now,
-        })),
-      )
-      .onConflictDoNothing()
-      .returning({ handId: libraryEntries.handId });
-    return added.map((row) => row.handId);
+  }
+
+  /**
+   * Refuses with `library-full` when `adding` more Hands would take the
+   * Library past its capacity. Holds the Account's lock until the caller's
+   * transaction ends, so that two imports at once cannot both fit.
+   */
+  private async requireRoomFor(
+    tx: Transaction,
+    account: Identity,
+    adding: number,
+  ): Promise<void> {
+    await tx
+      .select({ id: identities.id })
+      .from(identities)
+      .where(eq(identities.id, account.id))
+      .for('update');
+    const [{ held }] = await tx
+      .select({ held: count() })
+      .from(libraryEntries)
+      .where(eq(libraryEntries.identityId, account.id));
+    if (held + adding > this.capacity) {
+      throw new Rejected('library-full', {
+        hands: adding,
+        held,
+        limit: this.capacity,
+      });
+    }
   }
 
   /**
@@ -350,19 +376,7 @@ export class LibraryService {
     read: Hand[],
     db: Database | Transaction = this.db,
   ): Promise<Map<string, string>> {
-    const stored = await storedIds(db, read);
-    if (stored.size === 0) return new Map();
-    const rows = await db
-      .select({ handId: libraryEntries.handId })
-      .from(libraryEntries)
-      .where(
-        and(
-          eq(libraryEntries.identityId, account.id),
-          inArray(libraryEntries.handId, [...stored.values()]),
-        ),
-      );
-    const held = new Set(rows.map((row) => row.handId));
-    return new Map([...stored].filter(([, id]) => held.has(id)));
+    return inLibrary(db, account.id, read);
   }
 }
 

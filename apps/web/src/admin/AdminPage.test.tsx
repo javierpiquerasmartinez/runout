@@ -26,6 +26,7 @@ function invitation(id: string, email: string, status: string, extra: object = {
   }
 }
 
+const MB = 1024 * 1024
 const counts = { libraryHands: 0, imports: 0, ranges: 0, libraryTags: 0, labTags: 0, notes: 0, roomsCreated: 0, roomsJoined: 0 }
 
 function account(id: string, email: string, extra: object = {}) {
@@ -337,5 +338,161 @@ describe('the Rooms tab', () => {
     await waitFor(() => expect(within(screen.getAllByRole('row')[2]).getByText('Free review')).toBeTruthy())
     expect(calls.some((call) => call.path === '/admin/rooms/EFGH6789/end-live')).toBe(true)
     expect(within(screen.getAllByRole('row')[2]).queryByRole('button', { name: 'End live' })).toBeNull()
+  })
+})
+
+describe('the Imports tab', () => {
+  let calls: ApiCall[]
+  let firstStatus: string
+  let thirdStatus: string
+
+  const bulkImport = (id: string, email: string, file: string, status: string, extra: object = {}) => ({
+    id,
+    account: { id: `account-${id}`, displayName: null, email },
+    status,
+    stalled: false,
+    files: [{ name: file, size: 1000 }],
+    total: 1_240_000,
+    processed: 412_000,
+    imported: 400_000,
+    duplicates: 12_000,
+    notImported: {},
+    reason: null,
+    failureCode: null,
+    retryable: false,
+    createdAt: '2026-11-02T09:12:00Z',
+    lastActivityAt: '2026-11-02T10:00:00Z',
+    finishedAt: null,
+    ...extra,
+  })
+
+  beforeEach(() => {
+    firstStatus = 'running'
+    thirdStatus = 'failed'
+    calls = fakeApi({
+      'GET /admin/bulk-imports': (call) => {
+        const status = new URLSearchParams(call.search).get('status')
+        const imports = [
+          bulkImport('1', 'jugador3@example.com', 'pt4-2019-2026.zip', firstStatus),
+          bulkImport('2', 'jugador7@example.com', 'hm3-2024.zip', 'running', { stalled: true }),
+          bulkImport('3', 'jugador2@example.com', 'sesiones-2023.zip', thirdStatus, {
+            ...(thirdStatus === 'failed' && { failureCode: '53100', retryable: true }),
+            finishedAt: thirdStatus === 'failed' ? '2026-11-02T11:00:00Z' : null,
+          }),
+          bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused'),
+          bulkImport('6', 'jugador4@example.com', 'antiguo.zip', 'failed', {
+            failureCode: 'ECONNRESET',
+            finishedAt: '2026-10-20T11:00:00Z',
+          }),
+          bulkImport('5', 'jugador1@example.com', 'pt4-export.zip', 'completed', {
+            total: 320_156,
+            processed: 320_156,
+            imported: 318_204,
+            duplicates: 1_910,
+            notImported: { 'unrecognised-format': 42, 'too-many-seats': 2 },
+            finishedAt: '2026-11-02T12:00:00Z',
+          }),
+        ].filter((each) => status !== 'failed' || each.status === 'failed')
+        return Response.json({
+          total: imports.length,
+          page: 1,
+          pageSize: 50,
+          imports,
+          storage: { used: 412 * MB, threshold: 800 * MB },
+        })
+      },
+      'POST /admin/bulk-imports/1/cancel': () => {
+        firstStatus = 'cancelled'
+        return new Response(null, { status: 204 })
+      },
+      'POST /admin/bulk-imports/3/retry': () => {
+        thirdStatus = 'running'
+        return new Response(null, { status: 204 })
+      },
+    })
+  })
+
+  it('has its tab beside Invitations, Accounts and Rooms', async () => {
+    renderTab('imports')
+
+    const nav = screen.getByRole('navigation', { name: 'Administration sections' })
+    expect(within(nav).getAllByRole('link').map((tab) => [tab.textContent, tab.getAttribute('href')])).toEqual([
+      ['Invitations', '/admin/invitations'],
+      ['Accounts', '/admin/accounts'],
+      ['Rooms', '/admin/rooms'],
+      ['Imports', '/admin/imports'],
+    ])
+    expect(within(nav).getByRole('link', { name: 'Imports' }).getAttribute('aria-current')).toBe('page')
+    await screen.findAllByRole('row')
+  })
+
+  it('lists every Account’s imports with Account and files, status, Hands, start, last activity and reason', async () => {
+    renderTab('imports')
+
+    const rows = await screen.findAllByRole('row')
+    expect(rows).toHaveLength(7)
+    expect(rows[0].textContent).toMatch(/Account and file.*Status.*Hands.*Started.*Last activity.*Reason/)
+    expect(rows[1].textContent).toMatch(/jugador3@example\.com.*pt4-2019-2026\.zip.*In progress.*412,000 of 1,240,000/)
+    expect(rows[2].textContent).toMatch(/jugador7@example\.com.*Stalled.*No progress since/)
+    expect(rows[3].textContent).toMatch(/Failed.*53100 after 3 attempts/)
+    expect(rows[4].textContent).toMatch(/Paused.*Storage at its limit/)
+    expect(rows[6].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 not recognised · More than nine seats: 2/)
+    expect(calls[0].search).toContain('status=all')
+  })
+
+  it('shows the database size against the threshold at which imports pause', async () => {
+    renderTab('imports')
+
+    const gauge = await screen.findByRole('meter', { name: 'Database' })
+    expect(gauge.getAttribute('aria-valuenow')).toBe(String(412 * MB))
+    expect(gauge.getAttribute('aria-valuemax')).toBe(String(800 * MB))
+    expect(screen.getByText('412 MB of 800 MB')).toBeTruthy()
+  })
+
+  it('filters by status', async () => {
+    renderTab('imports')
+    await screen.findAllByRole('row')
+
+    for (const name of ['All', 'In progress', 'Failed', 'Stalled']) {
+      expect(screen.getByRole('radio', { name })).toBeTruthy()
+    }
+    await userEvent.click(screen.getByRole('radio', { name: 'Failed' }))
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3))
+    expect(calls.at(-1)?.search).toContain('status=failed')
+  })
+
+  it('cancels an unfinished import after a confirmation, and offers it on no ended one', async () => {
+    renderTab('imports')
+    const rows = await screen.findAllByRole('row')
+    expect(within(rows[3]).queryByRole('button', { name: 'Cancel' })).toBeNull()
+    expect(within(rows[6]).queryByRole('button', { name: 'Cancel' })).toBeNull()
+    expect(within(rows[2]).getByRole('button', { name: 'Cancel' })).toBeTruthy()
+
+    await userEvent.click(within(rows[1]).getByRole('button', { name: 'Cancel' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/jugador3@example\.com/)).toBeTruthy()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel import' }))
+
+    await waitFor(() => expect(within(screen.getAllByRole('row')[1]).getByText('Cancelled')).toBeTruthy())
+    expect(calls.some((call) => call.path === '/admin/bulk-imports/1/cancel')).toBe(true)
+    expect(within(screen.getAllByRole('row')[1]).queryByRole('button', { name: 'Cancel' })).toBeNull()
+  })
+
+  it('retries a failed import whose files are still kept, and offers it on no other', async () => {
+    renderTab('imports')
+    const rows = await screen.findAllByRole('row')
+    for (const row of [rows[1], rows[2], rows[4], rows[6]]) {
+      expect(within(row).queryByRole('button', { name: 'Retry' })).toBeNull()
+    }
+    // Failed over 7 days ago: its files are gone.
+    expect(rows[5].textContent).toMatch(/Failed.*ECONNRESET after 3 attempts/)
+    expect(within(rows[5]).queryByRole('button', { name: 'Retry' })).toBeNull()
+
+    await userEvent.click(within(rows[3]).getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(within(screen.getAllByRole('row')[3]).getByText('In progress')).toBeTruthy())
+    expect(calls.some((call) => call.path === '/admin/bulk-imports/3/retry' && call.method === 'POST')).toBe(true)
+    expect(within(screen.getAllByRole('row')[3]).queryByRole('button', { name: 'Retry' })).toBeNull()
   })
 })

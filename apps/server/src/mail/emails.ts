@@ -6,7 +6,9 @@ export type Language = 'es' | 'en';
 
 const INTL: Record<Language, string> = { es: 'es-ES', en: 'en-GB' };
 
-/** The two emails Runout sends, each in Spanish and English, links built from the web's URL. */
+const MB = 1024 * 1024;
+
+/** The emails Runout sends to people, each in Spanish and English, links built from the web's URL. */
 @Injectable()
 export class EmailWriter {
   constructor(@Inject(FRONTEND_URL) private readonly frontendUrl: string) {}
@@ -54,6 +56,102 @@ export class EmailWriter {
     );
   }
 
+  /** To the Importer of a Bulk Import that completed or failed. */
+  bulkImportEnded(input: {
+    to: string;
+    language: Language;
+    bulkImport: EndedBulkImport;
+  }): Email {
+    return bulkImportEnded(this.frontendUrl, input);
+  }
+
+  /** To an Administrator, when a Bulk Import has failed. */
+  bulkImportFailed(input: {
+    to: string;
+    language: Language;
+    bulkImport: FailedBulkImport;
+  }): Email {
+    const { language, bulkImport } = input;
+    const number = new Intl.NumberFormat(INTL[language]);
+    const n = (count: number) => number.format(count);
+    const files = bulkImport.fileNames.join(', ');
+    const es = language === 'es';
+    return write(
+      input.to,
+      language,
+      es ? 'Una importación ha fallado' : 'An import has failed',
+      es
+        ? [
+            `La importación de ${files} de ${bulkImport.account} ha fallado tras ${n(bulkImport.processed)} de ${n(bulkImport.total ?? 0)} manos.`,
+            `Importadas: ${n(bulkImport.imported)}`,
+            `Motivo: ${bulkImport.failureCode}`,
+            'Sus archivos se conservan 7 días: hasta entonces puedes reintentarla desde Administración.',
+          ]
+        : [
+            `The import of ${files} by ${bulkImport.account} failed after ${n(bulkImport.processed)} of ${n(bulkImport.total ?? 0)} hands.`,
+            `Imported: ${n(bulkImport.imported)}`,
+            `Reason: ${bulkImport.failureCode}`,
+            'Its files are kept for 7 days: until then you can retry it from Administration.',
+          ],
+      es ? 'Ver importaciones' : 'See imports',
+      `${this.frontendUrl}/admin/imports`,
+      [
+        es
+          ? 'Te escribimos porque eres administrador de Runout.'
+          : 'You are receiving this because you are a Runout Administrator.',
+      ],
+    );
+  }
+
+  /** To an Administrator, the once a Bulk Import stalls. */
+  bulkImportStalled(input: {
+    to: string;
+    language: Language;
+    bulkImport: StalledBulkImport;
+  }): Email {
+    return bulkImportStalled(this.frontendUrl, input);
+  }
+
+  /** To an Administrator, when the database reaches its threshold and Bulk Imports pause. */
+  bulkImportsPaused(input: {
+    to: string;
+    language: Language;
+    storage: { paused: number; used: number; threshold: number };
+  }): Email {
+    const { language, storage } = input;
+    const number = new Intl.NumberFormat(INTL[language]);
+    const mb = (bytes: number) => `${number.format(Math.round(bytes / MB))} MB`;
+    const es = language === 'es';
+    const imports = es
+      ? storage.paused === 1
+        ? '1 importación'
+        : `${number.format(storage.paused)} importaciones`
+      : storage.paused === 1
+        ? '1 import'
+        : `${number.format(storage.paused)} imports`;
+    return write(
+      input.to,
+      language,
+      es ? 'Las importaciones están en pausa' : 'Imports are paused',
+      es
+        ? [
+            `La base de datos ocupa ${mb(storage.used)} de ${mb(storage.threshold)}, su límite configurado. ${imports} ${storage.paused === 1 ? 'se ha puesto' : 'se han puesto'} en pausa, y las que empiecen ahora también lo harán. Las importaciones pequeñas siguen funcionando.`,
+            'Se reanudan solas en la comprobación de cada hora en cuanto la base de datos esté por debajo del límite: al liberar espacio, o al subir STORAGE_THRESHOLD_MB tras ampliar el plan.',
+          ]
+        : [
+            `The database takes ${mb(storage.used)} of ${mb(storage.threshold)}, its configured limit. ${imports} ${storage.paused === 1 ? 'has' : 'have'} been paused, and any started now will be too. Small imports still work.`,
+            'They resume by themselves at the hourly check once the database is below the limit: by freeing space, or by raising STORAGE_THRESHOLD_MB after upgrading the plan.',
+          ],
+      es ? 'Ver importaciones' : 'See imports',
+      `${this.frontendUrl}/admin/imports`,
+      [
+        es
+          ? 'Te escribimos porque eres administrador de Runout. No volveremos a avisarte hasta que se reanuden y se vuelva a llegar al límite.'
+          : 'You are receiving this because you are a Runout Administrator. We will not tell you again until they resume and the limit is reached again.',
+      ],
+    );
+  }
+
   passwordReset(input: {
     to: string;
     language: Language;
@@ -88,6 +186,178 @@ export class EmailWriter {
       [copy.expiry, copy.ignore],
     );
   }
+}
+
+/** A Bulk Import as it ended, as its Importer is told it. */
+export interface EndedBulkImport {
+  status: 'completed' | 'failed';
+  /** Why it ended short of adding its Hands, when it did. */
+  reason: string | null;
+  fileNames: string[];
+  total: number | null;
+  processed: number;
+  imported: number;
+  duplicates: number;
+  /** Hands not imported, per reason; `library-full` counts those left unimported when the Library filled up, read or not. */
+  notImported: Record<string, number>;
+}
+
+/** A failed Bulk Import as Administrators are told it: never the text of a Hand. */
+export interface FailedBulkImport {
+  /** The Account, as Runout names it: its email, else its Display Name. */
+  account: string;
+  fileNames: string[];
+  total: number | null;
+  processed: number;
+  imported: number;
+  /** The technical code it failed with. */
+  failureCode: string;
+}
+
+/** Why a Hand was not imported, as the import dialog names it; unrecognised ones as the board does. */
+const NOT_IMPORTED: Record<Language, Record<string, string>> = {
+  es: {
+    'unrecognised-format': 'No reconocidas',
+    'not-cash-holdem': "No es una mano de hold'em cash",
+    'too-many-seats': 'Más de nueve asientos',
+    'no-hero': 'No indica el jugador héroe',
+    malformed: 'No se ha podido leer',
+    'run-it-twice': 'Board repartido más de una vez',
+  },
+  en: {
+    'unrecognised-format': 'Not recognised',
+    'not-cash-holdem': "Not a cash hold'em hand",
+    'too-many-seats': 'More than nine seats',
+    'no-hero': "Doesn't say who the hero is",
+    malformed: "Couldn't be read",
+    'run-it-twice': 'Board run more than once',
+  },
+};
+
+/** The email to an Importer whose Bulk Import ended, in their language. */
+function bulkImportEnded(
+  frontendUrl: string,
+  input: { to: string; language: Language; bulkImport: EndedBulkImport },
+): Email {
+  const { language, bulkImport } = input;
+  const number = new Intl.NumberFormat(INTL[language]);
+  const n = (count: number) => number.format(count);
+  const leftOut = bulkImport.notImported['library-full'] ?? 0;
+  const files = bulkImport.fileNames.join(', ');
+  const failed = bulkImport.status === 'failed';
+  const es = language === 'es';
+
+  const subject = failed
+    ? es
+      ? 'Tu importación se ha interrumpido'
+      : 'Your import was interrupted'
+    : es
+      ? 'Tu importación ha terminado'
+      : 'Your import has finished';
+  const lead = failed
+    ? es
+      ? `La importación de ${files} se interrumpió tras ${n(bulkImport.processed)} de ${n(bulkImport.total ?? 0)} manos. Las ${n(bulkImport.imported)} manos importadas se conservan en tu biblioteca; el resto no se ha importado.`
+      : `The import of ${files} was interrupted after ${n(bulkImport.processed)} of ${n(bulkImport.total ?? 0)} hands. The ${n(bulkImport.imported)} hands imported are kept in your Library; the rest were not imported.`
+    : es
+      ? `Ha terminado la importación de ${files}.`
+      : `The import of ${files} has finished.`;
+  // Each reason a Hand was not imported, but the full Library's, said apart.
+  const notImported = Object.entries(bulkImport.notImported)
+    .filter(([reason, count]) => reason !== 'library-full' && count > 0)
+    .map(
+      ([reason, count]) =>
+        `${NOT_IMPORTED[language][reason] ?? reason}: ${n(count)}`,
+    );
+  const counts = [
+    ...(es
+      ? [
+          `Importadas: ${n(bulkImport.imported)}`,
+          `Duplicadas: ${n(bulkImport.duplicates)}`,
+        ]
+      : [
+          `Imported: ${n(bulkImport.imported)}`,
+          `Duplicates: ${n(bulkImport.duplicates)}`,
+        ]),
+    ...notImported,
+  ];
+  const why: Record<string, string> = es
+    ? {
+        'too-many-hands':
+          'Tiene más de 2 millones de manos: no se ha importado ninguna.',
+        'too-much-text':
+          'Los archivos tienen más de 5 GB de texto: no se ha importado ninguna mano.',
+        'unreadable-file': 'No se ha podido abrir uno de los archivos.',
+        'unrecognised-format':
+          'No hemos reconocido el formato de ninguna mano.',
+        'library-full': `Biblioteca llena: ${n(leftOut)} ${leftOut === 1 ? 'mano se quedó sin importar' : 'manos se quedaron sin importar'}.`,
+      }
+    : {
+        'too-many-hands':
+          'It has more than 2 million hands: none was imported.',
+        'too-much-text':
+          'The files hold more than 5 GB of text: no hand was imported.',
+        'unreadable-file': 'One of the files could not be opened.',
+        'unrecognised-format': 'We did not recognise the format of any hand.',
+        'library-full': `Library full: ${n(leftOut)} ${leftOut === 1 ? 'hand was left unimported' : 'hands were left unimported'}.`,
+      };
+  const reason = bulkImport.reason ? why[bulkImport.reason] : undefined;
+  const footer = es
+    ? 'Te escribimos porque empezaste esta importación en Runout.'
+    : 'You are receiving this because you started this import on Runout.';
+  return write(
+    input.to,
+    language,
+    subject,
+    [lead, ...(reason ? [reason] : []), ...counts],
+    es ? 'Ver importaciones' : 'See imports',
+    `${frontendUrl}/library/imports`,
+    [footer],
+  );
+}
+
+/** A Bulk Import without advance, as Administrators are told it. */
+export interface StalledBulkImport {
+  /** Its Account's email, or its id when it has none. */
+  account: string;
+  fileNames: string[];
+  /** Null while its files are not counted yet. */
+  total: number | null;
+  processed: number;
+}
+
+/** The email to an Administrator about a Bulk Import that stalled, in their language. */
+function bulkImportStalled(
+  frontendUrl: string,
+  input: { to: string; language: Language; bulkImport: StalledBulkImport },
+): Email {
+  const { language, bulkImport } = input;
+  const number = new Intl.NumberFormat(INTL[language]);
+  const n = (count: number) => number.format(count);
+  const files = bulkImport.fileNames.join(', ');
+  const es = language === 'es';
+  const lead = es
+    ? `La importación de ${files} de ${bulkImport.account} lleva más de 30 minutos sin avanzar.`
+    : `The import of ${files} by ${bulkImport.account} has not advanced for over 30 minutes.`;
+  const where =
+    bulkImport.total === null
+      ? es
+        ? 'Aún no ha empezado a añadir manos.'
+        : 'It has not started adding hands yet.'
+      : es
+        ? `Va por ${n(bulkImport.processed)} de ${n(bulkImport.total)} manos.`
+        : `It is at ${n(bulkImport.processed)} of ${n(bulkImport.total)} hands.`;
+  const footer = es
+    ? 'Te escribimos porque eres administrador de Runout. No volveremos a avisarte de esta importación salvo que avance y se vuelva a atascar.'
+    : 'You are receiving this because you are a Runout Administrator. We will not tell you about this import again unless it advances and stalls again.';
+  return write(
+    input.to,
+    language,
+    es ? 'Una importación está atascada' : 'An import has stalled',
+    [lead, where],
+    es ? 'Ver importaciones' : 'See imports',
+    `${frontendUrl}/admin/imports`,
+    [footer],
+  );
 }
 
 const FALLBACK: Record<Language, string> = {

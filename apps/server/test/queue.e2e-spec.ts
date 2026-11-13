@@ -1,5 +1,9 @@
 import request from 'supertest';
-import { fixture, freshHandHistory } from './support/hand-histories.js';
+import {
+  fixture,
+  freshHandHistory,
+  manyHands,
+} from './support/hand-histories.js';
 import { RoomClient } from './support/room-client.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -191,13 +195,15 @@ describe('Pasting Hands into the Queue (e2e)', () => {
     const master = await newAccount(running.httpServer);
     const code = await createRoom(master.token);
     await join(master.token, code, 'Javier');
-    const session = Array.from({ length: 100 }, () =>
-      freshHandHistory('pokerstars-session.txt'),
-    ).join('\n\n');
+    // The most one import may queue, each Hand pasted three times over:
+    // the repeats are duplicates, which do not count towards the 50.
+    const fifty = manyHands(50);
+    const session = [fifty, fifty, fifty].join('\n\n');
+    expect(session.length).toBeGreaterThan(150_000);
 
     const res = await paste(master.token, code, session).expect(201);
 
-    expect(res.body.imported).toBe(400);
+    expect(res.body.imported).toBe(50);
   });
 
   it('refuses a paste from someone who is not a Participant of the Room', async () => {

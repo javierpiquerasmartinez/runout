@@ -670,3 +670,104 @@ export const goals = pgTable(
   },
   (table) => [index('goals_identity_id_idx').on(table.identityId)],
 );
+
+/** Where a Bulk Import is; the record is also the import service's queue. */
+export const BULK_IMPORT_STATUSES = [
+  'uploading',
+  'waiting',
+  'counting',
+  'running',
+  'paused',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
+export type BulkImportStatus = (typeof BULK_IMPORT_STATUSES)[number];
+
+/** Why a Bulk Import ended short of adding its Hands. */
+export const BULK_IMPORT_REASONS = [
+  'too-many-hands',
+  'too-much-text',
+  'unreadable-file',
+  'unrecognised-format',
+  'library-full',
+] as const;
+export type BulkImportReason = (typeof BULK_IMPORT_REASONS)[number];
+
+/** One file of a Bulk Import, as stored while it is imported. */
+export interface BulkImportFile {
+  name: string;
+  /** In bytes, as the browser gave it. */
+  size: number;
+  /** Where it is in the file store. */
+  key: string;
+  /** Its multipart upload, until the upload is complete. */
+  uploadId: string;
+}
+
+/**
+ * A Bulk Import: an Account's import into its Library too large to wait for,
+ * added by the import service batch by batch. It never holds a Hand's text.
+ */
+export const bulkImports = pgTable(
+  'bulk_imports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    status: text('status', { enum: BULK_IMPORT_STATUSES }).notNull(),
+    files: jsonb('files').$type<BulkImportFile[]>().notNull(),
+    /** The Hands its files hold; null until they are counted. */
+    total: integer('total'),
+    /** Hands gone through so far, in the files' order: where it resumes. */
+    processed: integer('processed').notNull().default(0),
+    imported: integer('imported').notNull().default(0),
+    duplicates: integer('duplicates').notNull().default(0),
+    /** How many Hands were not imported, per reason. */
+    notImported: jsonb('not_imported')
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+    /**
+     * Why it ended short of adding its Hands, when it did: `too-many-hands`
+     * past the limit, `too-much-text` when the files unpack to more text than
+     * theirs, `unreadable-file` when a file is no text or zip,
+     * `unrecognised-format` when nothing in the files is a Hand, and
+     * `library-full` when the Library reached its capacity.
+     */
+    reason: text('reason').$type<BulkImportReason>(),
+    /**
+     * Why it failed, when it did, for Administrators: a technical code, such
+     * as Postgres's SQLSTATE or Node's error code, never a Hand's text.
+     */
+    failureCode: text('failure_code'),
+    /**
+     * Stalled: no advance for a long while. Administrators see it as
+     * Atascada; the Importer still sees it in progress.
+     */
+    stalled: boolean('stalled').notNull().default(false),
+    /**
+     * When the files of a failed import were let go, 7 days after it failed:
+     * from then on it can no longer be retried.
+     */
+    filesDeletedAt: timestamp('files_deleted_at', { withTimezone: true }),
+    /** When a batch last committed; null before the first. */
+    lastAdvancedAt: timestamp('last_advanced_at', { withTimezone: true }),
+    /**
+     * When it last began waiting for the import service, as its upload
+     * completed: without advance since then, it may be stalled.
+     */
+    waitingSince: timestamp('waiting_since', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('bulk_imports_identity_id_idx').on(table.identityId),
+    index('bulk_imports_status_idx').on(table.status),
+    // An Account has at most one unfinished Bulk Import, so each gets its turn.
+    uniqueIndex('bulk_imports_one_unfinished_idx')
+      .on(table.identityId)
+      .where(sql`${table.status} not in ('completed', 'failed', 'cancelled')`),
+  ],
+);
