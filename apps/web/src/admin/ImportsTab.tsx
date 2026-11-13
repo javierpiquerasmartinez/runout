@@ -69,6 +69,7 @@ export function ImportsTab() {
             setPageNumber(1)
           }}
         />
+        {page && <StorageGauge used={page.storage.used} threshold={page.storage.threshold} />}
       </div>
       {failure && (
         <p className="admin-notice" data-tone="alert" role="alert">
@@ -266,6 +267,39 @@ function Reason({ bulkImport, stalled }: { bulkImport: AdminBulkImport; stalled:
   }
   if (bulkImport.reason) return <span className="ro-mono">{bulkImport.reason}</span>
   return <>—</>
+}
+
+const MB = 1024 * 1024
+
+/**
+ * The database's size against the threshold at which the storage guard
+ * pauses Bulk Imports. At or past it, in the alert colour.
+ */
+function StorageGauge({ used, threshold }: { used: number; threshold: number }) {
+  const { t, formatNumber } = useI18n()
+  const sizes = t('admin.imports.storageOf', {
+    used: formatNumber(Math.round(used / MB)),
+    threshold: formatNumber(Math.round(threshold / MB)),
+  })
+  return (
+    <div
+      className="admin-storage"
+      role="meter"
+      aria-label={t('admin.imports.storage')}
+      aria-valuemin={0}
+      aria-valuemax={threshold}
+      aria-valuenow={used}
+      aria-valuetext={sizes}
+    >
+      <div className="admin-storage__label">
+        <span>{t('admin.imports.storage')}</span>
+        <span className="ro-mono">{sizes}</span>
+      </div>
+      <span className="admin-storage__bar" data-reached={used >= threshold || undefined}>
+        <span className="admin-storage__fill" style={{ width: `${Math.min(100, (100 * used) / threshold)}%` }} />
+      </span>
+    </div>
+  )
 }
 
 /** "Hoy, 9:12", "Ayer, 22:05" or "2 nov 2026", as the board words a moment. */

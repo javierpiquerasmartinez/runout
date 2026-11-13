@@ -1375,6 +1375,8 @@ export const en: Messages = {
   'admin.imports.discarded.one': '{count} discarded',
   'admin.imports.discarded.other': '{count} discarded',
   'admin.imports.noProgressSince': 'No progress since {time}',
+  'admin.imports.storage': 'Database',
+  'admin.imports.storageOf': '{used} MB of {threshold} MB',
   'admin.imports.storageFull': 'Storage at its limit',
   'admin.imports.failedAfter': '{code} after 3 attempts',
   'admin.imports.cancel': 'Cancel',

@@ -8,6 +8,7 @@ import {
 } from '../database/schema.js';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { ENDED, retryable } from '../bulk-imports/bulk-imports.service.js';
+import { Storage } from '../storage/storage.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from './admin-query.js';
 import { person } from './accounts.service.js';
@@ -51,6 +52,7 @@ export class BulkImportsAdminService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly storage: Storage,
   ) {}
 
   async list(query: {
@@ -62,6 +64,8 @@ export class BulkImportsAdminService {
     page: number;
     pageSize: number;
     imports: AdminBulkImportView[];
+    /** The database's size against the threshold at which Bulk Imports pause, in bytes. */
+    storage: { used: number; threshold: number };
   }> {
     const filter = oneOf(query.status, BULK_IMPORT_FILTERS);
     const { page, pageSize } = adminPage(query);
@@ -74,7 +78,7 @@ export class BulkImportsAdminService {
         notInArray(bulkImports.status, ENDED),
       ),
     }[filter];
-    const [[{ total }], rows] = await Promise.all([
+    const [[{ total }], rows, used] = await Promise.all([
       this.db
         .select({ total: sql<number>`count(*)::int` })
         .from(bulkImports)
@@ -87,12 +91,14 @@ export class BulkImportsAdminService {
         .orderBy(sql`${bulkImports.createdAt} desc, ${bulkImports.id}`)
         .limit(pageSize)
         .offset((page - 1) * pageSize),
+      this.storage.used(),
     ]);
     const now = this.clock.now();
     return {
       total,
       page,
       pageSize,
+      storage: { used, threshold: this.storage.threshold },
       imports: rows.map(({ record, account }) => ({
         id: record.id,
         account: person(account),

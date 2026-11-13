@@ -7,7 +7,7 @@ import {
   type AdministratorEmails,
 } from '../identity/administrators.js';
 import { DEFAULT_PREFERENCES } from '../identity/identity.service.js';
-import { EmailWriter } from '../mail/emails.js';
+import { EmailWriter, type Language } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
 
 /**
@@ -26,6 +26,51 @@ export class AdministratorsEmail {
     private readonly administrators: AdministratorEmails,
     private readonly emails: EmailWriter,
   ) {}
+
+  /**
+   * Tells every Administrator that Bulk Imports paused, the database having
+   * reached its threshold. A failed send is logged, never thrown.
+   */
+  async storageReached(storage: {
+    paused: number;
+    used: number;
+    threshold: number;
+  }): Promise<void> {
+    try {
+      for (const { email, language } of await this.recipients()) {
+        await this.mailer
+          .send(this.emails.bulkImportsPaused({ to: email, language, storage }))
+          .catch((error: unknown) =>
+            this.logger.error(
+              `Could not email ${email} that Bulk Imports paused: ${messageOf(error)}`,
+            ),
+          );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Could not email the Administrators that Bulk Imports paused: ${messageOf(error)}`,
+      );
+    }
+  }
+
+  /** Every Administrator, with their Account's language or the default one. */
+  private async recipients(): Promise<{ email: string; language: Language }[]> {
+    const to = this.administrators.list();
+    if (to.length === 0) return [];
+    const languages = new Map(
+      (
+        await this.db
+          .select({ email: identities.email, language: preferences.language })
+          .from(identities)
+          .innerJoin(preferences, eq(preferences.identityId, identities.id))
+          .where(inArray(identities.email, to))
+      ).map(({ email, language }) => [email, language]),
+    );
+    return to.map((email) => ({
+      email,
+      language: languages.get(email) ?? DEFAULT_PREFERENCES.language,
+    }));
+  }
 
   /** Sends it for failed import `id`, as it now stands. A failed send is logged, never thrown. */
   async importFailed(id: string): Promise<void> {

@@ -50,6 +50,10 @@ projects:
         sync: false
       - key: R2_BUCKET
         sync: false
+      # The database size, in MB, at which Bulk Imports pause: 800 on Neon's
+      # Free plan. Raise it after upgrading.
+      - key: STORAGE_THRESHOLD_MB
+        value: "800"
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
       # Runs after the build and before the new version starts. If a
@@ -101,6 +105,12 @@ projects:
           name: runout
           type: web
           envVarKey: R2_BUCKET
+      # The API's, so that both pause and resume at the same size.
+      - key: STORAGE_THRESHOLD_MB
+        fromService:
+          name: runout
+          type: web
+          envVarKey: STORAGE_THRESHOLD_MB
       # The email to the Importer when a Bulk Import ends: the API's Resend
       # settings, and the web's origin its link leads to. FRONTEND_URL also
       # marks the service as production, which then requires Resend.

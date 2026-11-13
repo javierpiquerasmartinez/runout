@@ -26,6 +26,7 @@ function invitation(id: string, email: string, status: string, extra: object = {
   }
 }
 
+const MB = 1024 * 1024
 const counts = { libraryHands: 0, imports: 0, ranges: 0, libraryTags: 0, labTags: 0, notes: 0, roomsCreated: 0, roomsJoined: 0 }
 
 function account(id: string, email: string, extra: object = {}) {
@@ -392,7 +393,13 @@ describe('the Imports tab', () => {
             finishedAt: '2026-11-02T12:00:00Z',
           }),
         ].filter((each) => status !== 'failed' || each.status === 'failed')
-        return Response.json({ total: imports.length, page: 1, pageSize: 50, imports })
+        return Response.json({
+          total: imports.length,
+          page: 1,
+          pageSize: 50,
+          imports,
+          storage: { used: 412 * MB, threshold: 800 * MB },
+        })
       },
       'POST /admin/bulk-imports/1/cancel': () => {
         firstStatus = 'cancelled'
@@ -431,6 +438,15 @@ describe('the Imports tab', () => {
     expect(rows[4].textContent).toMatch(/Paused.*Storage at its limit/)
     expect(rows[6].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 discarded/)
     expect(calls[0].search).toContain('status=all')
+  })
+
+  it('shows the database size against the threshold at which imports pause', async () => {
+    renderTab('imports')
+
+    const gauge = await screen.findByRole('meter', { name: 'Database' })
+    expect(gauge.getAttribute('aria-valuenow')).toBe(String(412 * MB))
+    expect(gauge.getAttribute('aria-valuemax')).toBe(String(800 * MB))
+    expect(screen.getByText('412 MB of 800 MB')).toBeTruthy()
   })
 
   it('filters by status', async () => {

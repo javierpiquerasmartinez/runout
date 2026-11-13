@@ -26,6 +26,7 @@ import {
 import { UnreadableUpload } from '../hands/import/upload.js';
 import { addToLibrary, inLibrary } from '../library/library-entries.js';
 import { LIBRARY_CAPACITY } from '../library/library-limits.js';
+import { Storage } from '../storage/storage.js';
 import { BULK_IMPORT_LIMIT } from './bulk-import-limit.js';
 import { AdministratorsEmail } from './administrators-email.js';
 import { ImporterEmail } from './importer-email.js';
@@ -78,6 +79,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
     private readonly importerEmail: ImporterEmail,
     private readonly administratorsEmail: AdministratorsEmail,
+    private readonly storage: Storage,
   ) {}
 
   /** Imports left waiting or interrupted go on as soon as the service starts. */
@@ -135,6 +137,11 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       )
       .limit(1);
     if (!next) return false;
+    // Before each batch: past the threshold, every write in Runout could fail.
+    if (next.status === 'running' && (await this.storage.reached())) {
+      await this.pauseAll();
+      return true;
+    }
     for (let attempt = 1; ; attempt++) {
       try {
         if (next.status === 'running') await this.addBatch(next);
@@ -157,6 +164,36 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
           return true;
         }
       }
+    }
+  }
+
+  /**
+   * The storage guard: every import being advanced pauses, until the API's
+   * hourly check finds the database below its threshold again. The
+   * Administrators are told when the first ones pause, not again for those
+   * that join them.
+   */
+  private async pauseAll(): Promise<void> {
+    const paused = await this.db.transaction(async (tx) => {
+      const [already] = await tx
+        .select({ id: bulkImports.id })
+        .from(bulkImports)
+        .where(eq(bulkImports.status, 'paused'))
+        .limit(1);
+      const pausing = await tx
+        .update(bulkImports)
+        .set({ status: 'paused', stalled: false })
+        .where(active)
+        .returning({ id: bulkImports.id });
+      return already ? 0 : pausing.length;
+    });
+    await this.closeReaders();
+    if (paused > 0) {
+      await this.administratorsEmail.storageReached({
+        paused,
+        used: await this.storage.used(),
+        threshold: this.storage.threshold,
+      });
     }
   }
 

@@ -25,6 +25,10 @@ import {
   AdministratorEmails,
 } from '../../src/identity/administrators.js';
 import { MAILER } from '../../src/mail/mailer.js';
+import {
+  DEFAULT_STORAGE_THRESHOLD_MB,
+  STORAGE_THRESHOLD,
+} from '../../src/storage/storage.js';
 import { FakeInbox } from './inbox.js';
 import { MemoryFileStore } from './memory-file-store.js';
 import { TestClock } from './test-clock.js';
@@ -59,6 +63,8 @@ export interface StartImportServiceOptions {
   inbox?: FakeInbox;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
   administratorEmails?: string[];
+  /** The database size, in bytes, at which Bulk Imports pause; 800 MB otherwise, as in production. */
+  storageThreshold?: number;
 }
 
 /** Boots the import service in-process on a random port, wired like production. */
@@ -85,6 +91,10 @@ export async function startImportService(
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)
     .useValue(new AdministratorEmails(options.administratorEmails ?? []))
+    .overrideProvider(STORAGE_THRESHOLD)
+    .useValue(
+      options.storageThreshold ?? DEFAULT_STORAGE_THRESHOLD_MB * 1024 * 1024,
+    )
     .compile();
 
   const app = moduleRef.createNestApplication();
