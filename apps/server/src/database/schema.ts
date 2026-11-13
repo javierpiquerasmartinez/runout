@@ -732,5 +732,9 @@ export const bulkImports = pgTable(
   (table) => [
     index('bulk_imports_identity_id_idx').on(table.identityId),
     index('bulk_imports_status_idx').on(table.status),
+    // An Account has at most one unfinished Bulk Import, so each gets its turn.
+    uniqueIndex('bulk_imports_one_unfinished_idx')
+      .on(table.identityId)
+      .where(sql`${table.status} not in ('completed', 'failed', 'cancelled')`),
   ],
 );
