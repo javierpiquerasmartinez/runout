@@ -2,9 +2,11 @@ import * as THREE from 'three'
 import { Line2 } from 'three/addons/lines/Line2.js'
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { FilmPass } from 'three/addons/postprocessing/FilmPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { FullScreenQuad, Pass } from 'three/addons/postprocessing/Pass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { SUIT_PATHS, type Suit } from '../../ui/suits'
@@ -12,12 +14,18 @@ import { waveCrestAt, waveHeightAt, wavePoints } from './brandWave'
 import {
   beatAt,
   cameraAt,
+  card,
+  chip,
+  depthOfField,
   ease,
   figuresAt,
   layoutFor,
+  placesFor,
   potCentre,
+  seatChips,
+  stackOf,
   staggeredBeatAt,
-  type Layout,
+  type Places,
   type Point,
 } from './choreography'
 import { paceOf, tierBelow, type Tier } from './quality'
@@ -45,27 +53,14 @@ const waveRise = 10 / 18
 const waveMiddle = 1.3
 
 const chipCount = 960
-const chipRadius = 0.115
-const chipHeight = 0.024
-const seatCount = 6
-/**
- * How many chips each seat sits with, the Hero's first: a big stack, a short
- * one, and nobody with the same. The rest of the chips are not on the table:
- * they come out of the pot as it bursts, to build the graph.
- */
-const seatChips = [96, 150, 34, 58, 118, 22]
-/** How many chips a seat piles up before starting another stack, and how many stacks it sets side by side. */
-const stackOf = 20
-const stacksAcross = 4
-/** Stacks stand this far apart, centre to centre: a chip and a finger's gap. */
-const stackGap = 0.26
-/** Where round the table each seat keeps its chips, in degrees; the short stack on the Hero's right keeps clear of the Hero's. */
-const stackAngles = [90, 150, 210, 270, 330, 14]
+const { radius: chipRadius, height: chipHeight } = chip
+/** The chips no seat sits with are not on the table: they come out of the pot as it bursts, to build the graph. */
+const seatCount = seatChips.length
 const graphColumns = 24
 /** The graph's shortest stack, as a share of its tallest. */
 const graphFloor = 0.12
 
-const cardSize = { width: 0.62, length: 0.88, thick: 0.01 }
+const cardSize = card
 
 /** The Hand the scroll plays: the Hero's cards, then the board. The river brings the flush. */
 const hand = {
@@ -84,6 +79,87 @@ const drawnWith: Record<Tier, { pixelRatio: number; shadows: number; samples: nu
   still: { pixelRatio: 2, shadows: 2048, samples: 4 },
 }
 
+/** The layer the wave is drawn on where there is a depth of field: apart from everything else, so it is never blurred. */
+const waveLayer = 1
+
+/**
+ * Draws one layer of the scene, sharp, over what the passes before it made
+ * of the rest. Whatever stands in front of that layer still hides it.
+ */
+class LayerOverPass extends Pass {
+  private readonly unseen = new THREE.MeshBasicMaterial({ colorWrite: false })
+  /** The layer alone, on nothing. */
+  private readonly alone: THREE.WebGLRenderTarget
+  private readonly laid = new THREE.ShaderMaterial({
+    uniforms: { tUnder: { value: null }, tOver: { value: null } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tUnder;
+      uniform sampler2D tOver;
+      varying vec2 vUv;
+      void main() {
+        vec4 over = texture2D( tOver, vUv );
+        gl_FragColor = vec4( texture2D( tUnder, vUv ).rgb * ( 1.0 - over.a ) + over.rgb, 1.0 );
+      }`,
+  })
+  private readonly quad = new FullScreenQuad(this.laid)
+  private readonly clearColour = new THREE.Color()
+
+  private readonly scene: THREE.Scene
+  private readonly camera: THREE.Camera
+  private readonly layer: number
+
+  constructor(scene: THREE.Scene, camera: THREE.Camera, layer: number, samples: number) {
+    super()
+    this.scene = scene
+    this.camera = camera
+    this.layer = layer
+    this.alone = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples })
+    this.laid.uniforms.tOver.value = this.alone.texture
+  }
+
+  override setSize(width: number, height: number) {
+    this.alone.setSize(width, height)
+  }
+
+  override render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
+    renderer.getClearColor(this.clearColour)
+    const clearAlpha = renderer.getClearAlpha()
+    const autoClear = renderer.autoClear
+    renderer.autoClear = false
+    renderer.setClearColor(0x000000, 0)
+    renderer.setRenderTarget(this.alone)
+    renderer.clear()
+    // The rest of the scene, unseen, for its depths alone.
+    this.scene.overrideMaterial = this.unseen
+    renderer.render(this.scene, this.camera)
+    this.scene.overrideMaterial = null
+    // A target with smoothed edges keeps its depths from one drawing to the next, but not its colours.
+    renderer.clear(true, false, false)
+    this.camera.layers.set(this.layer)
+    renderer.render(this.scene, this.camera)
+    this.camera.layers.set(0)
+
+    this.laid.uniforms.tUnder.value = readBuffer.texture
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer)
+    this.quad.render(renderer)
+    renderer.setClearColor(this.clearColour, clearAlpha)
+    renderer.autoClear = autoClear
+  }
+
+  override dispose() {
+    this.unseen.dispose()
+    this.alone.dispose()
+    this.laid.dispose()
+    this.quad.dispose()
+  }
+}
+
 /** Where the graph of chips is on the canvas, in CSS pixels from its top left. */
 export type GraphOnScreen = {
   /** How visible the Results Graph's figures are, from 0 to 1. */
@@ -100,6 +176,11 @@ export type GraphOnScreen = {
 export type LandingSceneOptions = {
   /** The tier to start on; the scene falls to the one below if it can't keep up. */
   tier: Tier
+  /**
+   * Whether to draw with a shallow depth of field: see `depthOfFieldFor`.
+   * Whatever is asked, the scene drops it when it falls a tier.
+   */
+  depthOfField?: boolean
   /** Told every frame the graph's place or its figures' visibility changes. */
   onGraph?(graph: GraphOnScreen): void
   /** Told when the scene falls to a lower tier. */
@@ -202,30 +283,6 @@ function cardOutline(): THREE.ShapeGeometry {
   return geometry
 }
 
-/** Where things sit on the felt for a layout. */
-function placesFor(layout: Layout) {
-  const { table, portrait } = layout
-  // The deck sits in the gap between two seats' chips, on the far side.
-  const dealer = (240 * Math.PI) / 180
-  const deck: Point = [Math.cos(dealer) * table.across * 0.74, 0, Math.sin(dealer) * table.deep * 0.74]
-  const seats = Array.from({ length: seatCount }, (_, seat) => {
-    const angle = Math.PI / 2 + (seat * 2 * Math.PI) / seatCount
-    return { across: Math.cos(angle), deep: Math.sin(angle) }
-  })
-  return {
-    deck,
-    /** The seats' discs, just outside the rim; seat 0 is the Hero's, nearest the visitor. */
-    seats: seats.map(({ across, deep }): Point => [across * (table.across + 0.55), 0.01, deep * (table.deep + 0.55)]),
-    /** Each seat's chips, inside the rim. */
-    stacks: stackAngles.map((degrees, seat): Point => {
-      // The Hero's stand well to the side of their cards, clear of the board from where the visitor sits.
-      if (seat === 0) return portrait ? [1.25, 0, 2.05] : [2.2, 0, 1.2]
-      const angle = (degrees * Math.PI) / 180
-      return [Math.cos(angle) * table.across * 0.74, 0, Math.sin(angle) * table.deep * 0.74]
-    }),
-  }
-}
-
 /** Draws the scene on `canvas`. Throws where there is no WebGL. */
 export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSceneOptions): LandingScene {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
@@ -238,6 +295,8 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   renderer.toneMappingExposure = 1.15
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // The shadows are cast once a frame, however many times the frame's passes draw the scene.
+  renderer.shadowMap.autoUpdate = false
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(fieldOfView, 1, 0.05, 100)
@@ -284,16 +343,18 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     stale = true
   })
 
-  // What is drawn, then the glow of whatever is brighter than white, then a little grain.
+  // What is drawn, out of focus where it is far from what the shot is of, then the wave over it, sharp,
+  // then the glow of whatever is brighter than white, then a little grain.
   let composer: EffectComposer | null = null
+  let lens: BokehPass | null = null
   let composerTarget: THREE.WebGLRenderTarget | null = null
   function leaveComposer() {
     composer?.passes.forEach((pass) => pass.dispose())
     composer?.dispose()
     composerTarget?.dispose()
   }
-  /** Sets the renderer up for the tier: how many pixels, how fine the shadows, how smooth the edges. */
-  function drawWith(next: Tier) {
+  /** Sets the renderer up for the tier: how many pixels, how fine the shadows, how smooth the edges, and whether there is a depth of field. */
+  function drawWith(next: Tier, withDepthOfField: boolean) {
     tier = next
     pace = paceOf(tier)
     const { pixelRatio, shadows, samples } = drawnWith[tier]
@@ -305,6 +366,22 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     composerTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples })
     composer = new EffectComposer(renderer, composerTarget)
     composer.addPass(new RenderPass(scene, camera))
+    lens = null
+    if (withDepthOfField) {
+      // The wave is left out of what the lens blurs, and drawn after it.
+      camera.layers.set(0)
+      lens = new BokehPass(scene, camera, { maxblur: depthOfField.most })
+      // The dark beyond the scene is at no distance: left as it is, so nothing in focus bleeds into it.
+      // Should the addon's shader change and this line of it go, the dark is blurred like anything far away.
+      lens.materialBokeh.fragmentShader = lens.materialBokeh.fragmentShader.replace(
+        'float factor = ( focus + viewZ );',
+        'float factor = getDepth( vUv ) < 0.99999 ? focus + viewZ : 0.0;',
+      )
+      composer.addPass(lens)
+      composer.addPass(new LayerOverPass(scene, camera, waveLayer, samples))
+    } else {
+      camera.layers.enable(waveLayer)
+    }
     composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.7, 1.15))
     composer.addPass(new FilmPass(0.22))
     composer.addPass(new OutputPass())
@@ -323,6 +400,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   lineMaterial.color.multiplyScalar(3.2)
   const line = new Line2(lineGeometry, lineMaterial)
   line.frustumCulled = false
+  line.layers.set(waveLayer)
   scene.add(line)
   const lineSegments = lineGeometry.getAttribute('instanceStart') as THREE.InterleavedBufferAttribute
   const linePosition = new Float32Array(linePoints * 3)
@@ -395,11 +473,10 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       return { mesh, street, index, count: hand[street].length }
     }),
   )
-  /** Where each card comes to rest: the Hero's two near the visitor, the board across the middle. */
-  function cardRest(street: Street, index: number): Point {
-    if (street === 'hole') return [(index - 0.5) * 0.72, 0, 0.95]
-    const place = street === 'flop' ? index : street === 'turn' ? 3 : 4
-    return [(place - 2) * 0.74, 0, 0]
+  /** Where each card comes to rest: the Hero's two, or its place along the board. */
+  function cardRest(places: Places, street: Street, index: number): Point {
+    if (street === 'hole') return places.hole[index]
+    return places.board[street === 'flop' ? index : street === 'turn' ? 3 : 4]
   }
 
   // ---------- The chips ----------
@@ -470,14 +547,9 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       }
       seatOf[chip] = { seat: seatFilling < seatCount ? seatFilling : -1, inSeat: held++ }
     }
-    const stacksAt = seatChips.map((count) => Math.ceil(count / stackOf))
 
     return graph.map((inGraph, chip) => {
       const { seat, inSeat } = seatOf[chip]
-      const stack = Math.floor(inSeat / stackOf)
-      const stacksHere = seat < 0 ? 1 : stacksAt[seat]
-      const rows = Math.ceil(stacksHere / stacksAcross)
-      const inRow = Math.min(stacksAcross, stacksHere - Math.floor(stack / stacksAcross) * stacksAcross)
       const heap = seeded(chip + 3.1)
       const turn = seeded(chip + 5.7) * Math.PI * 2
       const spread = Math.sqrt(seeded(chip + 7.3)) * 0.78
@@ -487,12 +559,9 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       return {
         inGraph,
         seat,
-        /** Within the seat's stacks: rows of up to four, each row centred. */
-        inStack: {
-          across: ((stack % stacksAcross) - (inRow - 1) / 2) * stackGap,
-          deep: (Math.floor(stack / stacksAcross) - (rows - 1) / 2) * stackGap,
-          level: inSeat % stackOf,
-        },
+        /** Which of the seat's stacks it is in, and how far up it. */
+        stack: Math.floor(inSeat / stackOf),
+        level: inSeat % stackOf,
         /** In the pot's heap. */
         inPot: [
           potCentre[0] + Math.cos(turn) * spread,
@@ -536,7 +605,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   const onScreen = new THREE.Vector3()
   let figuresShown = 0
 
-  drawWith(tier)
+  drawWith(tier, options.depthOfField ?? false)
 
   function resize() {
     const box = canvas.getBoundingClientRect()
@@ -563,7 +632,8 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       shown = target
       last = now
     } else if (document.visibilityState === 'visible' && pace.frame(now - last)) {
-      drawWith(tierBelow(tier))
+      // A tier it fell to draws less: no depth of field, even in a still.
+      drawWith(tierBelow(tier), false)
       options.onTier?.(tier)
     }
     stale = false
@@ -622,7 +692,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     const mucked = beatAt('muck', p) * (1 - beatAt('room', p))
     for (const { mesh, street, index, count } of cards) {
       const dealt = staggeredBeatAt(street, p, index, count, 0.6) * (1 - mucked)
-      const rest = cardRest(street, index)
+      const rest = cardRest(places, street, index)
       mesh.visible = tableUp > 0 && dealt > 0
       mesh.position.set(
         mix(places.deck[0], rest[0], dealt),
@@ -644,10 +714,10 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       const afloat = burst * (1 - stacked)
 
       // A chip that isn't any seat's waits unseen where the pot gathers.
-      const stack = onTable ? places.stacks[parts.seat] : parts.inPot
-      const seatX = onTable ? stack[0] + parts.inStack.across : stack[0]
-      const seatY = onTable ? chipHeight / 2 + parts.inStack.level * chipHeight : stack[1]
-      const seatZ = onTable ? stack[2] + parts.inStack.deep : stack[2]
+      const stack = onTable ? places.stacks[parts.seat][parts.stack].at : parts.inPot
+      const seatX = stack[0]
+      const seatY = onTable ? chipHeight / 2 + parts.level * chipHeight : stack[1]
+      const seatZ = stack[2]
       const sway = afloat * 0.09
       const cloudX = parts.inCloud[0] + Math.sin(time * 0.5 + parts.drift) * sway
       const cloudY = parts.inCloud[1] + Math.cos(time * 0.4 + parts.drift) * sway
@@ -704,6 +774,12 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     }
     figuresShown = figures
 
+    if (lens) {
+      const uniforms = lens.uniforms as Record<'focus' | 'aperture', THREE.IUniform<number>>
+      uniforms.focus.value = view.focus
+      uniforms.aperture.value = depthOfField.strength / view.focus
+    }
+    renderer.shadowMap.needsUpdate = true
     composer?.render(seconds)
   }
 

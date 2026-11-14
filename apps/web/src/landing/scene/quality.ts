@@ -24,6 +24,17 @@ export function tierFor({ reducedMotion, coarsePointer, cores, memory }: Device)
   return 'high'
 }
 
+/**
+ * Whether a tier is drawn with a shallow depth of field on a device: `high`
+ * is, `medium` never, and a still only where it stands in for `high`, for a
+ * Visitor who asked for less motion on a device that could have played it.
+ * A still the scene fell to because the device couldn't keep up has none.
+ */
+export function depthOfFieldFor(tier: Tier, device: Device): boolean {
+  if (tier === 'high') return true
+  return tier === 'still' && tierFor({ ...device, reducedMotion: false }) === 'high'
+}
+
 /** The tier to fall back to from one that is too much; `still` is the last. */
 export function tierBelow(tier: Tier): Tier {
   return tier === 'high' ? 'medium' : 'still'

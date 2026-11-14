@@ -86,12 +86,99 @@ export type Layout = {
   graphWidth: number
 }
 
+const wide: Layout = { portrait: false, table: { across: 4, deep: 2.2 }, waveWidth: 4.6, graphWidth: 6 }
+const tall: Layout = { portrait: true, table: { across: 2.3, deep: 3.9 }, waveWidth: 3.2, graphWidth: 3.6 }
+
 /** The layout for a viewport's width over its height. */
 export function layoutFor(aspect: number): Layout {
-  const portrait = aspect < 1
-  return portrait
-    ? { portrait, table: { across: 2.3, deep: 3.9 }, waveWidth: 3.2, graphWidth: 3.6 }
-    : { portrait, table: { across: 4, deep: 2.2 }, waveWidth: 4.6, graphWidth: 6 }
+  return aspect < 1 ? tall : wide
+}
+
+/** A chip, lying flat. */
+export const chip = { radius: 0.115, height: 0.024 }
+
+/** A card, lying flat with its length towards the visitor. The deck is as wide and as long. */
+export const card = { width: 0.62, length: 0.88, thick: 0.01 }
+
+/**
+ * How many chips each seat sits with, the Hero's first: a big stack, a short
+ * one, and nobody with the same.
+ */
+export const seatChips = [96, 150, 34, 58, 118, 22] as const
+
+/** How many chips a seat piles up before starting another stack, and how many stacks it sets side by side. */
+export const stackOf = 20
+const stacksAcross = 4
+/** Stacks stand this far apart, centre to centre: a chip and a finger's gap. */
+const stackGap = 0.26
+
+/** Where things sit on the felt, each by its centre. */
+export type Places = {
+  deck: Point
+  /** The seats' discs, just outside the rim; seat 0 is the Hero's, nearest the visitor. */
+  seats: readonly Point[]
+  /** Each seat's stacks, inside the rim: where each stands and how many chips it holds. */
+  stacks: readonly (readonly { at: Point; chips: number }[])[]
+  /** The Hero's two cards, near the visitor. */
+  hole: readonly Point[]
+  /** The board's five cards, across the middle. */
+  board: readonly Point[]
+}
+
+/** The point on the felt at `degrees` round the table from its right, `reach` of the way out to the rim. */
+function roundTable({ table }: Layout, degrees: number, reach = 0.74): Point {
+  const angle = (degrees * Math.PI) / 180
+  return [Math.cos(angle) * table.across * reach, 0, Math.sin(angle) * table.deep * reach]
+}
+
+/** `count` things in a row across, `gap` apart, centred on `x`, at `z`. */
+function row(count: number, gap: number, x: number, z: number): Point[] {
+  return Array.from({ length: count }, (_, index): Point => [x + (index - (count - 1) / 2) * gap, 0, z])
+}
+
+function layPlaces(layout: Layout): Places {
+  const { table, portrait } = layout
+  // The middle of each seat's chips: round the table, the short stack on the Hero's right keeping clear of
+  // the Hero's, which stand well to the side of their cards, clear of the board from where the visitor sits.
+  const stacksAt: Point[] = [
+    portrait ? [1.25, 0, 2.05] : [2.2, 0, 1.2],
+    // On a tall table the seats either side of the Hero keep nearer the visitor's end, where their chips
+    // don't stand between the visitor and the ends of the board.
+    roundTable(layout, portrait ? 144 : 150),
+    roundTable(layout, 210),
+    roundTable(layout, 270),
+    roundTable(layout, 330),
+    roundTable(layout, portrait ? 30 : 14),
+  ]
+  return {
+    // The deck sits in the gap between two seats' chips, on the far side.
+    deck: roundTable(layout, 240),
+    seats: seatChips.map((_, seat): Point => {
+      const angle = Math.PI / 2 + (seat * 2 * Math.PI) / seatChips.length
+      return [Math.cos(angle) * (table.across + 0.55), 0.01, Math.sin(angle) * (table.deep + 0.55)]
+    }),
+    // Rows of up to four stacks, each row centred, the full stacks first.
+    stacks: seatChips.map((chips, seat) => {
+      const stacks = Math.ceil(chips / stackOf)
+      const rows = Math.ceil(stacks / stacksAcross)
+      const [x, , z] = stacksAt[seat]
+      return Array.from({ length: rows }, (_, inRows) =>
+        row(Math.min(stacksAcross, stacks - inRows * stacksAcross), stackGap, x, z + (inRows - (rows - 1) / 2) * stackGap),
+      )
+        .flat()
+        .map((at, stack) => ({ at, chips: Math.min(stackOf, chips - stack * stackOf) }))
+    }),
+    hole: row(2, 0.72, 0, 0.95),
+    // A tall table is narrow: its board is laid closer, to leave a card's width of felt on both sides.
+    board: row(5, portrait ? 0.65 : 0.74, 0, 0),
+  }
+}
+
+const places = { wide: layPlaces(wide), tall: layPlaces(tall) }
+
+/** Where things sit on the felt for a layout. */
+export function placesFor(layout: Layout): Places {
+  return layout.portrait ? places.tall : places.wide
 }
 
 /** How visible the Results Graph's figures are round the graph of chips, from 0 to 1: there until the chips go home. */
@@ -106,6 +193,32 @@ export const potCentre: Point = [0, 0.15, -0.95]
 export const graphHeight = 1.9
 
 /**
+ * What the page keeps over the scene, as shares of the screen's height from
+ * its top: the bar ends above `bar` and no caption starts above `copy`. The
+ * page's styles hold the copy to it; the shots that have something to read
+ * fit it in between.
+ */
+export const clear = { bar: 0.13, copy: 0.6 }
+
+/** How far beyond the rim the seats' discs reach. */
+const seatReach = 0.85
+
+/**
+ * The depth of field, where the scene is drawn with one. What a shot focuses
+ * on is sharp, and the rest is blurred by `strength` times how far it is from
+ * the focus, as a share of the focus's own distance: so the close shots, on
+ * the board and in among the chips, are the shallow ones. `most` is the most
+ * anything is blurred, as a share of the screen's width. Both are tuned by eye.
+ */
+export const depthOfField = { strength: 0.012, most: 0.014 }
+
+/** The top and bottom of a stretch of the screen, as shares of its height from the top. */
+type Band = { top: number; bottom: number }
+
+const wholeScreen: Band = { top: 0, bottom: 1 }
+const betweenBarAndCopy: Band = { top: clear.bar, bottom: clear.copy }
+
+/**
  * One view of the scene: what the camera looks at, from how high above the
  * horizon, and the box around that point which must fit on screen whatever
  * the viewport's shape.
@@ -116,13 +229,19 @@ type Shot = {
   /** Degrees above the horizon: 0 looks level, 90 straight down. */
   elevation: number
   frame: { width: number; height: number }
+  /** The stretch of the screen's height the frame is fitted in and centred on; the whole of it unless said. */
+  band?: Band
+  /** What is sharp where there is a depth of field; the target unless said. */
+  focus?: Point
 }
 
-function shots({ table, waveWidth, graphWidth, portrait }: Layout): Shot[] {
+function shots({ table, waveWidth, graphWidth }: Layout): Shot[] {
   const tilted = (elevation: number) => 2 * table.deep * Math.sin((elevation * Math.PI) / 180) + 1.2
-  // From above, the table takes the upper half of the screen, under the bar and clear of the copy.
-  const overTableFrame = { width: 2 * table.across + 2, height: (2 * table.deep) / 0.48 }
-  const overTable: Point = [0, 0, table.deep * 0.58]
+  // From above, the table and its seats, with a little air round them.
+  const overTableFrame = { width: 2 * (table.across + seatReach) + 0.3, height: 2 * (table.deep + seatReach) + 0.3 }
+  // The graph, with room over it for the legend and under it for the first and last Hand.
+  const graphFrame = { width: graphWidth + 1, height: graphHeight + 1.3 }
+  const board: Point = [0, 0, 0]
   return [
     // The wave alone, level, in the dark, above the middle of the screen to leave the copy room.
     { at: 0, target: [0, 0.8, 0], elevation: 0, frame: { width: waveWidth + 2.6, height: 4.4 } },
@@ -130,52 +249,49 @@ function shots({ table, waveWidth, graphWidth, portrait }: Layout): Shot[] {
     // The whole table.
     { at: beats.hole[0], target: [0, 0, 0], elevation: 38, frame: { width: 2 * table.across + 0.8, height: tilted(38) } },
     // Over the board and the Hero's cards while the flop comes.
-    { at: beats.flop[1], target: [0, 0, 0.35], elevation: 50, frame: { width: 4.7, height: portrait ? 4.4 : 3.2 } },
-    // Close on the board for the river.
-    { at: beats.river[1], target: [0, 0.1, 0], elevation: 30, frame: { width: 4.3, height: 2 } },
+    { at: beats.flop[1], target: [0, 0, 0.5], elevation: 50, frame: { width: 4.7, height: 1.9 }, band: betweenBarAndCopy },
+    // Close on the board for the river, the Hero's cards kept in view under it.
+    {
+      at: beats.river[1],
+      target: [0, 0.05, 0.5],
+      elevation: 34,
+      frame: { width: 4.3, height: 1.4 },
+      band: betweenBarAndCopy,
+      focus: board,
+    },
     // The pot.
     { at: beats.pot[1], target: potCentre, elevation: 20, frame: { width: 2.4, height: 1.5 } },
     // Among the chips.
     { at: 0.7, target: [0, 0.5, -0.6], elevation: 6, frame: { width: 0.7, height: 0.5 } },
     // Side-on to the graph.
-    {
-      at: beats.graph[1] - 0.04,
-      target: [0, graphHeight / 2, 0],
-      elevation: 3,
-      frame: { width: graphWidth + 1, height: graphHeight + 1.4 },
-    },
-    {
-      at: beats.line[1],
-      target: [0, graphHeight / 2, 0],
-      elevation: 5,
-      frame: { width: graphWidth + 1, height: graphHeight + 1.4 },
-    },
-    // Over the table, seats and all, held in the upper part of the screen to leave the copy room.
-    {
-      at: beats.seats[0] + 0.06,
-      target: overTable,
-      elevation: 78,
-      frame: overTableFrame,
-    },
-    {
-      at: 1,
-      target: overTable,
-      elevation: 82,
-      frame: overTableFrame,
-    },
+    { at: beats.graph[1] - 0.04, target: [0, graphHeight / 2, 0], elevation: 3, frame: graphFrame, band: betweenBarAndCopy },
+    { at: beats.line[1], target: [0, graphHeight / 2, 0], elevation: 5, frame: graphFrame, band: betweenBarAndCopy },
+    // Over the table, seats and all, under the bar and above the copy.
+    { at: beats.seats[0] + 0.06, target: [0, 0, 0], elevation: 78, frame: overTableFrame, band: betweenBarAndCopy },
+    { at: 1, target: [0, 0, 0], elevation: 82, frame: overTableFrame, band: betweenBarAndCopy },
   ]
 }
 
 const mix = (from: number, to: number, t: number) => from + (to - from) * t
+const mixPoint = (from: Point, to: Point, t: number): Point => [
+  mix(from[0], to[0], t),
+  mix(from[1], to[1], t),
+  mix(from[2], to[2], t),
+]
 
 /**
  * Where the camera is and what it looks at, for a scroll progress, a
  * viewport's width over its height and the camera's vertical field of view
  * in degrees. The camera always faces the scene from the visitor's side;
- * its distance is whatever fits the shot's frame in the viewport, so a tall
- * phone and a wide monitor both see the whole of it.
+ * its distance is whatever fits the shot's frame in its band of the
+ * viewport, so a tall phone and a wide monitor both see the whole of it.
+ * `focus` is how far in front of the camera the shot is sharp.
  */
-export function cameraAt(progress: number, aspect: number, fieldOfView: number): { position: Point; target: Point } {
+export function cameraAt(
+  progress: number,
+  aspect: number,
+  fieldOfView: number,
+): { position: Point; target: Point; focus: number } {
   const keys = shots(layoutFor(aspect))
   const p = clamp01(progress)
   let i = 1
@@ -184,21 +300,27 @@ export function cameraAt(progress: number, aspect: number, fieldOfView: number):
   const to = keys[i]
   const t = to.at > from.at ? ease((p - from.at) / (to.at - from.at)) : 1
 
-  const target: Point = [
-    mix(from.target[0], to.target[0], t),
-    mix(from.target[1], to.target[1], t),
-    mix(from.target[2], to.target[2], t),
-  ]
+  const subject = mixPoint(from.target, to.target, t)
+  const sharp = mixPoint(from.focus ?? from.target, to.focus ?? to.target, t)
   const elevation = (mix(from.elevation, to.elevation, t) * Math.PI) / 180
   // Sizes are mixed by ratio, so a move in closes at an even pace.
   const width = from.frame.width * (to.frame.width / from.frame.width) ** t
   const height = from.frame.height * (to.frame.height / from.frame.height) ** t
+  const top = mix((from.band ?? wholeScreen).top, (to.band ?? wholeScreen).top, t)
+  const bottom = mix((from.band ?? wholeScreen).bottom, (to.band ?? wholeScreen).bottom, t)
 
   const half = Math.tan((fieldOfView * Math.PI) / 360)
-  const distance = Math.max(height / (2 * half), width / (2 * half * aspect))
+  const distance = Math.max(height / (2 * half * (bottom - top)), width / (2 * half * aspect))
+  // The camera is slid in its own plane, so the subject sits in the middle of the band rather than of the screen.
+  const slide = (0.5 - (top + bottom) / 2) * 2 * half * distance
+  const up = Math.sin(elevation)
+  const back = Math.cos(elevation)
+  const target: Point = [subject[0], subject[1] - back * slide, subject[2] + up * slide]
+  const position: Point = [target[0], target[1] + distance * up, target[2] + distance * back]
   return {
     target,
-    position: [target[0], target[1] + distance * Math.sin(elevation), target[2] + distance * Math.cos(elevation)],
+    position,
+    focus: (position[1] - sharp[1]) * up + (position[2] - sharp[2]) * back,
   }
 }
 
