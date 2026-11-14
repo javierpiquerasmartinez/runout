@@ -29,9 +29,8 @@ import { Icon } from '../ui/Icon'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toggle } from '../ui/Toggle'
+import { settingsPath } from './paths'
 import './SettingsPage.css'
-
-export const settingsPath = '/settings'
 
 /**
  * The "Ajustes y perfil" board: who this person is in the Rooms and how they

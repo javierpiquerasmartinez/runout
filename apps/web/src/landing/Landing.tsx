@@ -1,9 +1,10 @@
 import { useEffect, useRef, type CSSProperties } from 'react'
 import { useI18n } from '../i18n'
+import { whenIdle, whenPainted } from '../idle'
+import { loginPath } from '../identity/accessPaths'
 import { enterRoomPath } from '../room/roomCode'
 import { followLink } from '../routing'
 import { Brand } from '../ui/Brand'
-import { loginPath } from './LoginPage'
 import { captionAt, playheadAfter, stops, type Caption } from './scene/choreography'
 import { depthOfFieldFor, tierFor, type Tier } from './scene/quality'
 import { allInEvAt, sampleResults, totalOf, winRateOf, resultAt } from './scene/sampleResults'
@@ -148,8 +149,11 @@ export function Landing() {
       { signal: left.signal },
     )
 
-    // The scene and three.js come after the copy and the two ways on, in their own chunk.
-    void import('./scene/LandingScene').then(({ mountLandingScene }) => {
+    // The scene and three.js come in their own chunk, asked for once the copy and the two ways on have painted and the browser is idle.
+    const sceneLoaded = whenPainted(left.signal)
+      .then(() => whenIdle(left.signal))
+      .then(() => import('./scene/LandingScene'))
+    void sceneLoaded.then(({ mountLandingScene }) => {
       if (left.signal.aborted || !canvas.current) return
       try {
         const scene = mountLandingScene(canvas.current, {

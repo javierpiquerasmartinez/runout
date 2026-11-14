@@ -1,5 +1,5 @@
 import type { QueueEntry } from '../room/roomClient'
-import { roomPath } from '../room/roomCode'
+import { libraryPath } from './paths'
 import type { Zoom } from './results'
 
 /*
@@ -7,7 +7,7 @@ import type { Zoom } from './results'
  * page at a time. Shapes mirror the server's (ADR 0001: no shared code).
  */
 
-export const libraryPath = '/library'
+export { libraryPath, roomCodeFromLibraryPath, roomLibraryPath } from './paths'
 
 /** Where the Library shows its Results Graph instead of its Hands. */
 export const libraryGraphPath = `${libraryPath}/graph`
@@ -132,16 +132,6 @@ export function libraryHandIdFromPath(path: string): string | null {
   const prefix = libraryHandPath('')
   const id = path.startsWith(prefix) ? path.slice(prefix.length) : ''
   return id && !id.includes('/') ? decodeURIComponent(id) : null
-}
-
-/** Where a Participant picks Hands of their Library to add to the Room's Queue, still in the Room. */
-export function roomLibraryPath(code: string): string {
-  return `${roomPath(code)}${libraryPath}`
-}
-
-/** The Room Code in a Room's Library path, or null for any other path. */
-export function roomCodeFromLibraryPath(path: string): string | null {
-  return path.match(/^\/room\/([^/]+)\/library\/?$/)?.[1] ?? null
 }
 
 /** One Library row: what tells the spot apart at a glance. */

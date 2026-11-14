@@ -163,6 +163,27 @@ test.describe('a Visitor', () => {
     await expect(page.getByRole('listitem')).toHaveCount(0)
   })
 
+  test('is asked for the scene only once the copy has painted', async ({ page }) => {
+    // Notes when the headline is painted: it is the largest thing in the page that isn't the scene.
+    await page.addInitScript(() => {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as (PerformanceEntry & { element?: Element; renderTime: number })[]) {
+          if (entry.element?.tagName === 'H1') sessionStorage.setItem('headline-painted', String(entry.renderTime))
+        }
+      }).observe({ type: 'largest-contentful-paint', buffered: true })
+    })
+
+    await page.goto('/')
+    await expect(page.locator('canvas[data-ready]')).toBeAttached({ timeout: 60_000 })
+
+    const { painted, asked } = await page.evaluate(() => ({
+      painted: Number(sessionStorage.getItem('headline-painted')),
+      asked: performance.getEntriesByType('resource').find((entry) => /LandingScene/.test(entry.name))?.startTime,
+    }))
+    expect(painted).toBeGreaterThan(0)
+    expect(asked).toBeGreaterThan(painted)
+  })
+
   test('finds the two ways on first with the keyboard, and sees where focus is', async ({ page }) => {
     await page.goto('/')
     await rests(page, 0)

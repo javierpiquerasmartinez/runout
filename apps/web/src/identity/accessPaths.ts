@@ -1,4 +1,5 @@
-/** The pages of getting in: an Invitation's link and choosing a new password. */
+/** The pages of getting in: the sign-in screen (Google, or an email and its password), an Invitation's link and choosing a new password. */
+export const loginPath = '/login'
 export const invitationPathPrefix = '/invitation/'
 export const resetPasswordPath = '/reset-password'
 
