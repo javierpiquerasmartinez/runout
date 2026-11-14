@@ -8,30 +8,30 @@
  * A finger's swipe moves on one stop instead of dragging the page: see the
  * page's `step`. Two fingers still pinch to zoom.
  */
-:root:has(.landing-lab) {
+:root:has(.landing) {
   scroll-snap-type: y mandatory;
   touch-action: pinch-zoom;
   overscroll-behavior: none;
 }
 
-.landing-lab__stop {
+.landing__stop {
   height: 100svh;
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
 
-:root:has(.landing-lab),
-:root:has(.landing-lab) body {
+:root:has(.landing),
+:root:has(.landing) body {
   background: #050606;
   color-scheme: dark;
 }
 
-.landing-lab {
+.landing {
   position: relative;
   color: var(--text-primary);
 }
 
-.landing-lab__scene {
+.landing__scene {
   position: fixed;
   inset: 0;
   width: 100%;
@@ -40,13 +40,13 @@
   transition: opacity 600ms ease;
 }
 
-.landing-lab__scene[data-ready] {
+.landing__scene[data-ready] {
   opacity: 1;
 }
 
 /* ---------- The Results Graph's figures, round the graph of chips ---------- */
 
-.landing-lab__figures {
+.landing__figures {
   position: fixed;
   inset: 0;
   z-index: 1;
@@ -58,7 +58,7 @@
 }
 
 /* A rule across the graph at a figure, the figure sitting on its left end. */
-.landing-lab__rule {
+.landing__rule {
   position: absolute;
   left: var(--left);
   width: var(--width);
@@ -69,7 +69,7 @@
   line-height: 1;
 }
 
-.landing-lab__ev {
+.landing__ev {
   position: absolute;
   left: var(--left);
   top: var(--crest);
@@ -83,19 +83,19 @@
   stroke-linejoin: round;
 }
 
-.landing-lab__hands {
+.landing__hands {
   position: absolute;
   left: var(--left);
   top: calc(var(--floor) + 8px);
   line-height: 1;
 }
 
-.landing-lab__hands--last {
+.landing__hands--last {
   left: auto;
   right: calc(100% - var(--left) - var(--width));
 }
 
-.landing-lab__legend {
+.landing__legend {
   position: absolute;
   left: var(--left);
   width: var(--width);
@@ -111,34 +111,34 @@
   color: var(--text-secondary);
 }
 
-.landing-lab__legend li {
+.landing__legend li {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.landing-lab__legend b {
+.landing__legend b {
   font-weight: 400;
   color: var(--text-primary);
 }
 
-.landing-lab__swatch {
+.landing__swatch {
   width: 10px;
   height: 2px;
   border-radius: 1px;
 }
 
-.landing-lab__swatch--result {
+.landing__swatch--result {
   background: var(--brass);
 }
 
-.landing-lab__swatch--ev {
+.landing__swatch--ev {
   background: var(--graph-teal);
 }
 
 /* ---------- The two ways on, always in reach ---------- */
 
-.landing-lab__bar {
+.landing__bar {
   position: fixed;
   top: 0;
   left: 0;
@@ -154,19 +154,19 @@
     max(18px, env(safe-area-inset-left));
 }
 
-.landing-lab__brand {
+.landing__brand {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.landing-lab__beta {
+.landing__beta {
   font-size: 10px;
   letter-spacing: 0.14em;
   color: var(--brass-ink);
 }
 
-.landing-lab__doors {
+.landing__doors {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -175,7 +175,7 @@
   margin-left: auto;
 }
 
-.landing-lab__code {
+.landing__code {
   font-size: 14px;
   color: var(--text-secondary, inherit);
 }
@@ -188,7 +188,7 @@
  * title, two of text and the hint in a window 600 px tall.
  */
 
-.landing-lab__copy {
+.landing__copy {
   position: fixed;
   left: 0;
   right: 0;
@@ -199,7 +199,7 @@
   background: linear-gradient(to top, rgb(5 6 6 / 82%), rgb(5 6 6 / 0%));
 }
 
-.landing-lab__caption {
+.landing__caption {
   position: absolute;
   left: 0;
   right: 0;
@@ -209,7 +209,7 @@
   opacity: 0;
 }
 
-.landing-lab__title {
+.landing__title {
   margin: 0 auto;
   max-width: 18ch;
   font-size: clamp(30px, min(5.2vw, 10.4dvh - 34px), 62px);
@@ -218,7 +218,7 @@
   text-wrap: balance;
 }
 
-.landing-lab__line {
+.landing__line {
   margin: 14px auto 0;
   max-width: 44ch;
   font-size: clamp(15px, min(1.5vw, 2.8dvh), 19px);
@@ -227,7 +227,7 @@
   text-wrap: pretty;
 }
 
-.landing-lab__hint {
+.landing__hint {
   margin: 22px 0 0;
   font-size: 11px;
   letter-spacing: 0.16em;

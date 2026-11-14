@@ -31,6 +31,14 @@ const PHONE = { width: 360, height: 640 }
 /** Where the story is played through: a smaller window, so a browser with no graphics card keeps up. */
 const WINDOW = { width: 1024, height: 640 }
 
+/*
+ * Headless Chromium draws WebGL in software unless told otherwise, at two or
+ * three frames a second for this scene, and the story plays no faster than
+ * its frames. With the machine's graphics card a stretch takes its three
+ * seconds; without one the flag does nothing and `rests` waits longer.
+ */
+test.use({ launchOptions: { args: ['--enable-gpu'] } })
+
 test.describe('a Visitor', () => {
   test.use({ viewport: WINDOW })
 

@@ -186,23 +186,23 @@ export function Landing() {
   }, [])
 
   return (
-    <main ref={page} className="landing-lab" data-theme="dark">
+    <main ref={page} className="landing" data-theme="dark">
       {stops.map(({ at }) => (
-        <div key={at} className="landing-lab__stop" />
+        <div key={at} className="landing__stop" />
       ))}
 
-      <canvas ref={canvas} className="landing-lab__scene" aria-hidden="true" />
+      <canvas ref={canvas} className="landing__scene" aria-hidden="true" />
 
       {/* The one moment of the app itself: the Results Graph's rules, figures and legend, round the graph of chips. */}
-      <div ref={figures} className="landing-lab__figures" aria-hidden="true">
-        <ul className="landing-lab__legend">
+      <div ref={figures} className="landing__figures" aria-hidden="true">
+        <ul className="landing__legend">
           <li>
-            <span className="landing-lab__swatch landing-lab__swatch--result" />
+            <span className="landing__swatch landing__swatch--result" />
             {t('library.results.line.result')}
             <b className="ro-mono">{bigBlinds(totalOf(resultAt))}</b>
           </li>
           <li>
-            <span className="landing-lab__swatch landing-lab__swatch--ev" />
+            <span className="landing__swatch landing__swatch--ev" />
             {t('library.results.line.allInEv')}
             <b className="ro-mono">{bigBlinds(totalOf(allInEvAt))}</b>
           </li>
@@ -216,28 +216,28 @@ export function Landing() {
         {sampleResults.rules.map((figure) => (
           <span
             key={figure}
-            className="landing-lab__rule ro-mono"
+            className="landing__rule ro-mono"
             style={{ '--up': figure / sampleResults.crest } as CSSProperties}
           >
             {formatNumber(figure, { notation: 'compact', maximumFractionDigits: 1, signDisplay: 'exceptZero' })}
           </span>
         ))}
-        <svg className="landing-lab__ev" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <svg className="landing__ev" viewBox="0 0 100 100" preserveAspectRatio="none">
           <path d={allInEvPath} vectorEffect="non-scaling-stroke" />
         </svg>
-        <span className="landing-lab__hands ro-mono">{t('library.results.hand', { hand: 1 })}</span>
-        <span className="landing-lab__hands landing-lab__hands--last ro-mono">
+        <span className="landing__hands ro-mono">{t('library.results.hand', { hand: 1 })}</span>
+        <span className="landing__hands landing__hands--last ro-mono">
           {formatNumber(sampleResults.hands, { useGrouping: true })}
         </span>
       </div>
 
-      <header className="landing-lab__bar">
-        <div className="landing-lab__brand">
+      <header className="landing__bar">
+        <div className="landing__brand">
           <Brand size="landing" href={null} />
-          <span className="landing-lab__beta ro-mono">{t('brand.beta')}</span>
+          <span className="landing__beta ro-mono">{t('brand.beta')}</span>
         </div>
-        <nav className="landing-lab__doors">
-          <a href={enterRoomPath} className="landing-lab__code" onClick={followLink}>
+        <nav className="landing__doors">
+          <a href={enterRoomPath} className="landing__code" onClick={followLink}>
             {t('landing.haveCode')}
           </a>
           <a href={loginPath} className="ro-btn ro-btn--primary" onClick={followLink}>
@@ -246,17 +246,17 @@ export function Landing() {
         </nav>
       </header>
 
-      <div ref={copy} className="landing-lab__copy">
+      <div ref={copy} className="landing__copy">
         {captions.map((caption) => (
-          <div key={caption} className="landing-lab__caption" data-caption={caption}>
+          <div key={caption} className="landing__caption" data-caption={caption}>
             {caption === 'opening' ? (
-              <h1 className="landing-lab__title ro-serif">{t('landing.opening.title')}</h1>
+              <h1 className="landing__title ro-serif">{t('landing.opening.title')}</h1>
             ) : (
-              <h2 className="landing-lab__title ro-serif">{t(`landing.${caption}.title`)}</h2>
+              <h2 className="landing__title ro-serif">{t(`landing.${caption}.title`)}</h2>
             )}
-            <p className="landing-lab__line">{t(`landing.${caption}.line`)}</p>
-            {caption === 'opening' && <p className="landing-lab__hint ro-mono">{t('landing.scrollHint')}</p>}
-            {caption === 'rooms' && <p className="landing-lab__hint ro-mono">{t('landing.close.title')}</p>}
+            <p className="landing__line">{t(`landing.${caption}.line`)}</p>
+            {caption === 'opening' && <p className="landing__hint ro-mono">{t('landing.scrollHint')}</p>}
+            {caption === 'rooms' && <p className="landing__hint ro-mono">{t('landing.close.title')}</p>}
           </div>
         ))}
       </div>
