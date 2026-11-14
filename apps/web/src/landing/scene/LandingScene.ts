@@ -14,13 +14,18 @@ import { waveCrestAt, waveHeightAt, wavePoints } from './brandWave'
 import {
   beatAt,
   cameraAt,
+  card,
+  chip,
   depthOfField,
   ease,
   figuresAt,
   layoutFor,
+  placesFor,
   potCentre,
+  seatChips,
+  stackOf,
   staggeredBeatAt,
-  type Layout,
+  type Places,
   type Point,
 } from './choreography'
 import { paceOf, tierBelow, type Tier } from './quality'
@@ -48,27 +53,14 @@ const waveRise = 10 / 18
 const waveMiddle = 1.3
 
 const chipCount = 960
-const chipRadius = 0.115
-const chipHeight = 0.024
-const seatCount = 6
-/**
- * How many chips each seat sits with, the Hero's first: a big stack, a short
- * one, and nobody with the same. The rest of the chips are not on the table:
- * they come out of the pot as it bursts, to build the graph.
- */
-const seatChips = [96, 150, 34, 58, 118, 22]
-/** How many chips a seat piles up before starting another stack, and how many stacks it sets side by side. */
-const stackOf = 20
-const stacksAcross = 4
-/** Stacks stand this far apart, centre to centre: a chip and a finger's gap. */
-const stackGap = 0.26
-/** Where round the table each seat keeps its chips, in degrees; the short stack on the Hero's right keeps clear of the Hero's. */
-const stackAngles = [90, 150, 210, 270, 330, 14]
+const { radius: chipRadius, height: chipHeight } = chip
+/** The chips no seat sits with are not on the table: they come out of the pot as it bursts, to build the graph. */
+const seatCount = seatChips.length
 const graphColumns = 24
 /** The graph's shortest stack, as a share of its tallest. */
 const graphFloor = 0.12
 
-const cardSize = { width: 0.62, length: 0.88, thick: 0.01 }
+const cardSize = card
 
 /** The Hand the scroll plays: the Hero's cards, then the board. The river brings the flush. */
 const hand = {
@@ -291,30 +283,6 @@ function cardOutline(): THREE.ShapeGeometry {
   return geometry
 }
 
-/** Where things sit on the felt for a layout. */
-function placesFor(layout: Layout) {
-  const { table, portrait } = layout
-  // The deck sits in the gap between two seats' chips, on the far side.
-  const dealer = (240 * Math.PI) / 180
-  const deck: Point = [Math.cos(dealer) * table.across * 0.74, 0, Math.sin(dealer) * table.deep * 0.74]
-  const seats = Array.from({ length: seatCount }, (_, seat) => {
-    const angle = Math.PI / 2 + (seat * 2 * Math.PI) / seatCount
-    return { across: Math.cos(angle), deep: Math.sin(angle) }
-  })
-  return {
-    deck,
-    /** The seats' discs, just outside the rim; seat 0 is the Hero's, nearest the visitor. */
-    seats: seats.map(({ across, deep }): Point => [across * (table.across + 0.55), 0.01, deep * (table.deep + 0.55)]),
-    /** Each seat's chips, inside the rim. */
-    stacks: stackAngles.map((degrees, seat): Point => {
-      // The Hero's stand well to the side of their cards, clear of the board from where the visitor sits.
-      if (seat === 0) return portrait ? [1.25, 0, 2.05] : [2.2, 0, 1.2]
-      const angle = (degrees * Math.PI) / 180
-      return [Math.cos(angle) * table.across * 0.74, 0, Math.sin(angle) * table.deep * 0.74]
-    }),
-  }
-}
-
 /** Draws the scene on `canvas`. Throws where there is no WebGL. */
 export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSceneOptions): LandingScene {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
@@ -505,11 +473,10 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       return { mesh, street, index, count: hand[street].length }
     }),
   )
-  /** Where each card comes to rest: the Hero's two near the visitor, the board across the middle. */
-  function cardRest(street: Street, index: number): Point {
-    if (street === 'hole') return [(index - 0.5) * 0.72, 0, 0.95]
-    const place = street === 'flop' ? index : street === 'turn' ? 3 : 4
-    return [(place - 2) * 0.74, 0, 0]
+  /** Where each card comes to rest: the Hero's two, or its place along the board. */
+  function cardRest(places: Places, street: Street, index: number): Point {
+    if (street === 'hole') return places.hole[index]
+    return places.board[street === 'flop' ? index : street === 'turn' ? 3 : 4]
   }
 
   // ---------- The chips ----------
@@ -580,14 +547,9 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       }
       seatOf[chip] = { seat: seatFilling < seatCount ? seatFilling : -1, inSeat: held++ }
     }
-    const stacksAt = seatChips.map((count) => Math.ceil(count / stackOf))
 
     return graph.map((inGraph, chip) => {
       const { seat, inSeat } = seatOf[chip]
-      const stack = Math.floor(inSeat / stackOf)
-      const stacksHere = seat < 0 ? 1 : stacksAt[seat]
-      const rows = Math.ceil(stacksHere / stacksAcross)
-      const inRow = Math.min(stacksAcross, stacksHere - Math.floor(stack / stacksAcross) * stacksAcross)
       const heap = seeded(chip + 3.1)
       const turn = seeded(chip + 5.7) * Math.PI * 2
       const spread = Math.sqrt(seeded(chip + 7.3)) * 0.78
@@ -597,12 +559,9 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       return {
         inGraph,
         seat,
-        /** Within the seat's stacks: rows of up to four, each row centred. */
-        inStack: {
-          across: ((stack % stacksAcross) - (inRow - 1) / 2) * stackGap,
-          deep: (Math.floor(stack / stacksAcross) - (rows - 1) / 2) * stackGap,
-          level: inSeat % stackOf,
-        },
+        /** Which of the seat's stacks it is in, and how far up it. */
+        stack: Math.floor(inSeat / stackOf),
+        level: inSeat % stackOf,
         /** In the pot's heap. */
         inPot: [
           potCentre[0] + Math.cos(turn) * spread,
@@ -733,7 +692,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     const mucked = beatAt('muck', p) * (1 - beatAt('room', p))
     for (const { mesh, street, index, count } of cards) {
       const dealt = staggeredBeatAt(street, p, index, count, 0.6) * (1 - mucked)
-      const rest = cardRest(street, index)
+      const rest = cardRest(places, street, index)
       mesh.visible = tableUp > 0 && dealt > 0
       mesh.position.set(
         mix(places.deck[0], rest[0], dealt),
@@ -755,10 +714,10 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       const afloat = burst * (1 - stacked)
 
       // A chip that isn't any seat's waits unseen where the pot gathers.
-      const stack = onTable ? places.stacks[parts.seat] : parts.inPot
-      const seatX = onTable ? stack[0] + parts.inStack.across : stack[0]
-      const seatY = onTable ? chipHeight / 2 + parts.inStack.level * chipHeight : stack[1]
-      const seatZ = onTable ? stack[2] + parts.inStack.deep : stack[2]
+      const stack = onTable ? places.stacks[parts.seat][parts.stack].at : parts.inPot
+      const seatX = stack[0]
+      const seatY = onTable ? chipHeight / 2 + parts.level * chipHeight : stack[1]
+      const seatZ = stack[2]
       const sway = afloat * 0.09
       const cloudX = parts.inCloud[0] + Math.sin(time * 0.5 + parts.drift) * sway
       const cloudY = parts.inCloud[1] + Math.cos(time * 0.4 + parts.drift) * sway

@@ -5,15 +5,21 @@ import {
   beats,
   cameraAt,
   captionAt,
+  card,
+  chip,
   clear,
   figuresAt,
   graphHeight,
   layoutFor,
+  placesFor,
   playheadAfter,
   staggeredBeatAt,
   stops,
   type Beat,
   type Caption,
+  type Layout,
+  type Places,
+  type Point,
 } from './choreography'
 
 const wide = 16 / 9
@@ -148,13 +154,12 @@ describe('cameraAt', () => {
 
   it.each(windows)("keeps the board and the Hero's cards under the bar and above the copy in $name", ({ width, height }) => {
     const aspect = width / height
-    // A card is 0.62 across and 0.88 long; the board's five lie 0.74 apart across the middle, the Hero's two nearer the Visitor.
-    const corners = (x: number, z: number) =>
-      [-0.31, 0.31].flatMap((dx) => [-0.44, 0.44].map((dz) => [x + dx, 0, z + dz] as const))
-    const board = [-2, -1, 0, 1, 2].flatMap((place) => corners(place * 0.74, 0))
-    const hole = [-0.36, 0.36].flatMap((x) => corners(x, 0.95))
+    const { board, hole } = placesFor(layoutFor(aspect))
+    const corners = [...board, ...hole].flatMap(([x, , z]) =>
+      [-card.width / 2, card.width / 2].flatMap((dx) => [-card.length / 2, card.length / 2].map((dz) => [x + dx, 0, z + dz] as const)),
+    )
     for (const stop of [stops[2].at, stops[3].at]) {
-      for (const corner of [...board, ...hole]) {
+      for (const corner of corners) {
         const { x, y } = onScreen(corner, stop, aspect)
         expect(y).toBeGreaterThan(clear.bar)
         expect(y).toBeLessThan(clear.copy)
@@ -249,6 +254,143 @@ describe('playheadAfter', () => {
     )
     expect(showing).toEqual(['opening', 'library', 'library', 'library', undefined, 'results', 'rooms'])
   })
+})
+
+describe('placesFor', () => {
+  const layouts = [
+    ['the wide layout', wide],
+    ['the tall layout', tall],
+  ] as const
+  /** Screens of every shape, from an ultrawide monitor to a tall phone. */
+  const screens = [21 / 9, wide, 4 / 3, 3 / 4, 9 / 16, tall]
+
+  type Disc = { x: number; z: number; radius: number }
+  type Box = { x: number; z: number; width: number; length: number }
+
+  const stacksOf = (seat: Places['stacks'][number]): Disc[] =>
+    seat.map(({ at }) => ({ x: at[0], z: at[2], radius: chip.radius }))
+  const cardAt = (at: Point): Box => ({ x: at[0], z: at[2], width: card.width, length: card.length })
+
+  const discsOverlap = (a: Disc, b: Disc) => Math.hypot(a.x - b.x, a.z - b.z) < a.radius + b.radius
+  const discOverlapsBox = (disc: Disc, box: Box) =>
+    Math.hypot(
+      Math.max(0, Math.abs(disc.x - box.x) - box.width / 2),
+      Math.max(0, Math.abs(disc.z - box.z) - box.length / 2),
+    ) < disc.radius
+  const boxesOverlap = (a: Box, b: Box) =>
+    Math.abs(a.x - b.x) < (a.width + b.width) / 2 && Math.abs(a.z - b.z) < (a.length + b.length) / 2
+
+  /** The felt ends where the padded rail begins, a little inside the line of light. */
+  const felt = 0.985
+  const onTheFelt = (x: number, z: number, { table }: Layout) =>
+    Math.hypot(x / (table.across * felt), z / (table.deep * felt)) <= 1
+  const discOnTheFelt = (disc: Disc, layout: Layout) =>
+    Array.from({ length: 16 }, (_, i) => (i * Math.PI) / 8).every((angle) =>
+      onTheFelt(disc.x + Math.cos(angle) * disc.radius, disc.z + Math.sin(angle) * disc.radius, layout),
+    )
+  const boxOnTheFelt = (box: Box, layout: Layout) =>
+    [-1, 1].every((side) =>
+      [-1, 1].every((end) => onTheFelt(box.x + (side * box.width) / 2, box.z + (end * box.length) / 2, layout)),
+    )
+
+  it.each(layouts)(
+    'sits the seats with 96, 150, 34, 58, 118 and 22 chips, the Hero first, in stacks of 20, in %s',
+    (_name, aspect) => {
+      const { stacks } = placesFor(layoutFor(aspect))
+      expect(stacks.map((seat) => seat.map((stack) => stack.chips))).toEqual([
+        [20, 20, 20, 20, 16],
+        [20, 20, 20, 20, 20, 20, 20, 10],
+        [20, 14],
+        [20, 20, 18],
+        [20, 20, 20, 20, 20, 18],
+        [20, 2],
+      ])
+    },
+  )
+
+  it.each(layouts)("keeps every seat's stacks clear of each other and of every other seat's in %s", (_name, aspect) => {
+    const all = placesFor(layoutFor(aspect)).stacks.flatMap(stacksOf)
+    expect(all).toHaveLength(26)
+    for (const [i, a] of all.entries())
+      for (const b of all.slice(i + 1)) expect(discsOverlap(a, b), JSON.stringify([a, b])).toBe(false)
+  })
+
+  it.each(layouts)("keeps every seat's stacks off the deck, the Hero's cards and the board in %s", (_name, aspect) => {
+    const places = placesFor(layoutFor(aspect))
+    expect(places.hole).toHaveLength(2)
+    expect(places.board).toHaveLength(5)
+    const flat = [places.deck, ...places.hole, ...places.board].map(cardAt)
+    for (const stack of places.stacks.flatMap(stacksOf))
+      for (const box of flat) expect(discOverlapsBox(stack, box), JSON.stringify([stack, box])).toBe(false)
+  })
+
+  it.each(layouts)('lays no card on another, nor on the deck, in %s', (_name, aspect) => {
+    const places = placesFor(layoutFor(aspect))
+    const flat = [places.deck, ...places.hole, ...places.board].map(cardAt)
+    for (const [i, a] of flat.entries()) for (const b of flat.slice(i + 1)) expect(boxesOverlap(a, b)).toBe(false)
+  })
+
+  it.each(layouts)('has every stack, the deck and every card at rest inside the rim in %s', (_name, aspect) => {
+    const layout = layoutFor(aspect)
+    const places = placesFor(layout)
+    for (const stack of places.stacks.flatMap(stacksOf)) expect(discOnTheFelt(stack, layout), JSON.stringify(stack)).toBe(true)
+    for (const box of [places.deck, ...places.hole, ...places.board].map(cardAt))
+      expect(boxOnTheFelt(box, layout), JSON.stringify(box)).toBe(true)
+  })
+
+  it("leaves at least a card's width of felt on both sides of the board on a tall table", () => {
+    const layout = layoutFor(tall)
+    const { board } = placesFor(layout)
+    // A card's width beyond the board's outer edges, at both ends of its cards, is still felt.
+    const beyond = Math.max(...board.map((at) => Math.abs(at[0]))) + card.width / 2 + card.width
+    for (const x of [-beyond, beyond]) for (const z of [-card.length / 2, card.length / 2]) expect(onTheFelt(x, z, layout)).toBe(true)
+  })
+
+  /** Whether the straight line from `from` to `to` passes through a stack of `chips` standing at `at`. */
+  function passesThrough(from: Point, to: Point, at: Point, chips: number): boolean {
+    const dx = to[0] - from[0]
+    const dz = to[2] - from[2]
+    const ox = from[0] - at[0]
+    const oz = from[2] - at[2]
+    const a = dx * dx + dz * dz
+    const b = 2 * (ox * dx + oz * dz)
+    const c = ox * ox + oz * oz - chip.radius ** 2
+    const root = b * b - 4 * a * c
+    if (a === 0 || root <= 0) return false
+    // Within the stack's round between `enter` and `leave`, and lower than its top until `top`.
+    const enter = Math.max(0, (-b - Math.sqrt(root)) / (2 * a))
+    const leave = Math.min(1, (-b + Math.sqrt(root)) / (2 * a))
+    const top = to[1] > from[1] ? (chips * chip.height - from[1]) / (to[1] - from[1]) : 1
+    return enter < Math.min(leave, top)
+  }
+
+  /** Points all over a card lying at `at`. */
+  const pointsOn = (at: Point): Point[] =>
+    [-0.5, -0.25, 0, 0.25, 0.5].flatMap((across) =>
+      [-0.5, -0.25, 0, 0.25, 0.5].map(
+        (along): Point => [at[0] + across * card.width, card.thick, at[2] + along * card.length],
+      ),
+    )
+
+  it.each([
+    ['when the flop is down', stops[2].at, 3],
+    ['when the river is down', stops[3].at, 5],
+  ])(
+    "stands no seat's chips between the visitor and the Hero's cards or the board %s, on any shape of screen",
+    (_when, at, dealt) => {
+      for (const aspect of screens) {
+        const places = placesFor(layoutFor(aspect))
+        const { position } = cameraAt(at, aspect, fieldOfView)
+        for (const point of [...places.hole, ...places.board.slice(0, dealt)].flatMap(pointsOn))
+          for (const [seat, stacks] of places.stacks.entries())
+            for (const stack of stacks)
+              expect(
+                passesThrough(point, position, stack.at, stack.chips),
+                `aspect ${aspect}, seat ${seat}, ${JSON.stringify(point)}`,
+              ).toBe(false)
+      }
+    },
+  )
 })
 
 describe('figuresAt', () => {
