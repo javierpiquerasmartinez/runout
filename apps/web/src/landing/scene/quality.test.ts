@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { paceOf, tierBelow, tierFor } from './quality'
+import { depthOfFieldFor, paceOf, tierBelow, tierFor } from './quality'
 
 const desktop = { reducedMotion: false, coarsePointer: false, cores: 10, memory: 8 }
 
@@ -17,6 +17,20 @@ describe('tierFor', () => {
 
   it('draws stills for a Visitor who asked for less motion, whatever the device', () => {
     expect(tierFor({ ...desktop, reducedMotion: true })).toBe('still')
+  })
+})
+
+describe('depthOfFieldFor', () => {
+  it('gives the high tier a depth of field and the medium tier none', () => {
+    expect(depthOfFieldFor('high', desktop)).toBe(true)
+    expect(depthOfFieldFor('medium', desktop)).toBe(false)
+    expect(depthOfFieldFor('medium', { ...desktop, coarsePointer: true })).toBe(false)
+  })
+
+  it('gives a still its depth of field only on a device that would have started on high', () => {
+    expect(depthOfFieldFor('still', { ...desktop, reducedMotion: true })).toBe(true)
+    expect(depthOfFieldFor('still', { ...desktop, reducedMotion: true, coarsePointer: true })).toBe(false)
+    expect(depthOfFieldFor('still', { ...desktop, reducedMotion: true, cores: 4 })).toBe(false)
   })
 })
 

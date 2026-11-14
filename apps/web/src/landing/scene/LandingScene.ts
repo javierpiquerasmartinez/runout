@@ -2,9 +2,11 @@ import * as THREE from 'three'
 import { Line2 } from 'three/addons/lines/Line2.js'
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { FilmPass } from 'three/addons/postprocessing/FilmPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { FullScreenQuad, Pass } from 'three/addons/postprocessing/Pass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { SUIT_PATHS, type Suit } from '../../ui/suits'
@@ -12,6 +14,7 @@ import { waveCrestAt, waveHeightAt, wavePoints } from './brandWave'
 import {
   beatAt,
   cameraAt,
+  depthOfField,
   ease,
   figuresAt,
   layoutFor,
@@ -84,6 +87,87 @@ const drawnWith: Record<Tier, { pixelRatio: number; shadows: number; samples: nu
   still: { pixelRatio: 2, shadows: 2048, samples: 4 },
 }
 
+/** The layer the wave is drawn on where there is a depth of field: apart from everything else, so it is never blurred. */
+const waveLayer = 1
+
+/**
+ * Draws one layer of the scene, sharp, over what the passes before it made
+ * of the rest. Whatever stands in front of that layer still hides it.
+ */
+class LayerOverPass extends Pass {
+  private readonly unseen = new THREE.MeshBasicMaterial({ colorWrite: false })
+  /** The layer alone, on nothing. */
+  private readonly alone: THREE.WebGLRenderTarget
+  private readonly laid = new THREE.ShaderMaterial({
+    uniforms: { tUnder: { value: null }, tOver: { value: null } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tUnder;
+      uniform sampler2D tOver;
+      varying vec2 vUv;
+      void main() {
+        vec4 over = texture2D( tOver, vUv );
+        gl_FragColor = vec4( texture2D( tUnder, vUv ).rgb * ( 1.0 - over.a ) + over.rgb, 1.0 );
+      }`,
+  })
+  private readonly quad = new FullScreenQuad(this.laid)
+  private readonly clearColour = new THREE.Color()
+
+  private readonly scene: THREE.Scene
+  private readonly camera: THREE.Camera
+  private readonly layer: number
+
+  constructor(scene: THREE.Scene, camera: THREE.Camera, layer: number, samples: number) {
+    super()
+    this.scene = scene
+    this.camera = camera
+    this.layer = layer
+    this.alone = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples })
+    this.laid.uniforms.tOver.value = this.alone.texture
+  }
+
+  override setSize(width: number, height: number) {
+    this.alone.setSize(width, height)
+  }
+
+  override render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
+    renderer.getClearColor(this.clearColour)
+    const clearAlpha = renderer.getClearAlpha()
+    const autoClear = renderer.autoClear
+    renderer.autoClear = false
+    renderer.setClearColor(0x000000, 0)
+    renderer.setRenderTarget(this.alone)
+    renderer.clear()
+    // The rest of the scene, unseen, for its depths alone.
+    this.scene.overrideMaterial = this.unseen
+    renderer.render(this.scene, this.camera)
+    this.scene.overrideMaterial = null
+    // A target with smoothed edges keeps its depths from one drawing to the next, but not its colours.
+    renderer.clear(true, false, false)
+    this.camera.layers.set(this.layer)
+    renderer.render(this.scene, this.camera)
+    this.camera.layers.set(0)
+
+    this.laid.uniforms.tUnder.value = readBuffer.texture
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer)
+    this.quad.render(renderer)
+    renderer.setClearColor(this.clearColour, clearAlpha)
+    renderer.autoClear = autoClear
+  }
+
+  override dispose() {
+    this.unseen.dispose()
+    this.alone.dispose()
+    this.laid.dispose()
+    this.quad.dispose()
+  }
+}
+
 /** Where the graph of chips is on the canvas, in CSS pixels from its top left. */
 export type GraphOnScreen = {
   /** How visible the Results Graph's figures are, from 0 to 1. */
@@ -100,6 +184,11 @@ export type GraphOnScreen = {
 export type LandingSceneOptions = {
   /** The tier to start on; the scene falls to the one below if it can't keep up. */
   tier: Tier
+  /**
+   * Whether to draw with a shallow depth of field: see `depthOfFieldFor`.
+   * Whatever is asked, the scene drops it when it falls a tier.
+   */
+  depthOfField?: boolean
   /** Told every frame the graph's place or its figures' visibility changes. */
   onGraph?(graph: GraphOnScreen): void
   /** Told when the scene falls to a lower tier. */
@@ -238,6 +327,8 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   renderer.toneMappingExposure = 1.15
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // The shadows are cast once a frame, however many times the frame's passes draw the scene.
+  renderer.shadowMap.autoUpdate = false
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(fieldOfView, 1, 0.05, 100)
@@ -284,16 +375,18 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     stale = true
   })
 
-  // What is drawn, then the glow of whatever is brighter than white, then a little grain.
+  // What is drawn, out of focus where it is far from what the shot is of, then the wave over it, sharp,
+  // then the glow of whatever is brighter than white, then a little grain.
   let composer: EffectComposer | null = null
+  let lens: BokehPass | null = null
   let composerTarget: THREE.WebGLRenderTarget | null = null
   function leaveComposer() {
     composer?.passes.forEach((pass) => pass.dispose())
     composer?.dispose()
     composerTarget?.dispose()
   }
-  /** Sets the renderer up for the tier: how many pixels, how fine the shadows, how smooth the edges. */
-  function drawWith(next: Tier) {
+  /** Sets the renderer up for the tier: how many pixels, how fine the shadows, how smooth the edges, and whether there is a depth of field. */
+  function drawWith(next: Tier, withDepthOfField: boolean) {
     tier = next
     pace = paceOf(tier)
     const { pixelRatio, shadows, samples } = drawnWith[tier]
@@ -305,6 +398,22 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     composerTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples })
     composer = new EffectComposer(renderer, composerTarget)
     composer.addPass(new RenderPass(scene, camera))
+    lens = null
+    if (withDepthOfField) {
+      // The wave is left out of what the lens blurs, and drawn after it.
+      camera.layers.set(0)
+      lens = new BokehPass(scene, camera, { maxblur: depthOfField.most })
+      // The dark beyond the scene is at no distance: left as it is, so nothing in focus bleeds into it.
+      // Should the addon's shader change and this line of it go, the dark is blurred like anything far away.
+      lens.materialBokeh.fragmentShader = lens.materialBokeh.fragmentShader.replace(
+        'float factor = ( focus + viewZ );',
+        'float factor = getDepth( vUv ) < 0.99999 ? focus + viewZ : 0.0;',
+      )
+      composer.addPass(lens)
+      composer.addPass(new LayerOverPass(scene, camera, waveLayer, samples))
+    } else {
+      camera.layers.enable(waveLayer)
+    }
     composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.7, 1.15))
     composer.addPass(new FilmPass(0.22))
     composer.addPass(new OutputPass())
@@ -323,6 +432,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   lineMaterial.color.multiplyScalar(3.2)
   const line = new Line2(lineGeometry, lineMaterial)
   line.frustumCulled = false
+  line.layers.set(waveLayer)
   scene.add(line)
   const lineSegments = lineGeometry.getAttribute('instanceStart') as THREE.InterleavedBufferAttribute
   const linePosition = new Float32Array(linePoints * 3)
@@ -536,7 +646,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   const onScreen = new THREE.Vector3()
   let figuresShown = 0
 
-  drawWith(tier)
+  drawWith(tier, options.depthOfField ?? false)
 
   function resize() {
     const box = canvas.getBoundingClientRect()
@@ -563,7 +673,8 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       shown = target
       last = now
     } else if (document.visibilityState === 'visible' && pace.frame(now - last)) {
-      drawWith(tierBelow(tier))
+      // A tier it fell to draws less: no depth of field, even in a still.
+      drawWith(tierBelow(tier), false)
       options.onTier?.(tier)
     }
     stale = false
@@ -704,6 +815,12 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     }
     figuresShown = figures
 
+    if (lens) {
+      const uniforms = lens.uniforms as Record<'focus' | 'aperture', THREE.IUniform<number>>
+      uniforms.focus.value = view.focus
+      uniforms.aperture.value = depthOfField.strength / view.focus
+    }
+    renderer.shadowMap.needsUpdate = true
     composer?.render(seconds)
   }
 

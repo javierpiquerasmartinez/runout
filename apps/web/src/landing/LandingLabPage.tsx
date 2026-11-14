@@ -5,7 +5,7 @@ import { followLink } from '../routing'
 import { Brand } from '../ui/Brand'
 import { loginPath } from './LoginPage'
 import { captionAt, playheadAfter, stops, type Caption } from './scene/choreography'
-import { tierFor, type Tier } from './scene/quality'
+import { depthOfFieldFor, tierFor, type Tier } from './scene/quality'
 import { allInEvAt, sampleResults, totalOf, winRateOf, resultAt } from './scene/sampleResults'
 import './LandingLabPage.css'
 
@@ -42,12 +42,13 @@ export function LandingLabPage() {
     // One picture per stop, and no glide between them, for whoever asked for less motion or can't run the scene.
     // The lab alone takes a tier by hand, `?tier=still`, to look at each on any machine.
     const asked = new URLSearchParams(window.location.search).get('tier')
-    let tier: Tier = asked === 'high' || asked === 'medium' || asked === 'still' ? asked : tierFor({
+    const device = {
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       coarsePointer: window.matchMedia('(pointer: coarse)').matches,
       cores: navigator.hardwareConcurrency,
       memory: (navigator as { deviceMemory?: number }).deviceMemory,
-    })
+    }
+    let tier: Tier = asked === 'high' || asked === 'medium' || asked === 'still' ? asked : tierFor(device)
 
     let playhead = 0
     let frame = 0
@@ -152,6 +153,7 @@ export function LandingLabPage() {
       try {
         const scene = mountLandingScene(canvas.current, {
           tier,
+          depthOfField: depthOfFieldFor(tier, device),
           onTier: (lower) => (tier = lower),
           // The Results Graph's figures, laid where the graph of chips is on screen.
           onGraph({ showing, left, right, zero, crest, floor }) {

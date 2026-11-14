@@ -172,7 +172,13 @@
   color: var(--text-secondary, inherit);
 }
 
-/* ---------- The copy, held in the lower third ---------- */
+/*
+ * ---------- The copy, held in the lower two fifths ----------
+ * No caption starts higher than 60% of the way down the screen, which the
+ * scene's shots count on (`clear.copy` in the choreography): the type shrinks
+ * with the window's height as well as its width, down to three lines of
+ * title, two of text and the hint in a window 600 px tall.
+ */
 
 .landing-lab__copy {
   position: fixed;
@@ -189,7 +195,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(9dvh, env(safe-area-inset-bottom));
+  bottom: max(7dvh, env(safe-area-inset-bottom));
   padding: 0 24px;
   text-align: center;
   visibility: hidden;
@@ -199,7 +205,7 @@
 .landing-lab__title {
   margin: 0 auto;
   max-width: 18ch;
-  font-size: clamp(30px, 5.2vw, 62px);
+  font-size: clamp(30px, min(5.2vw, 10.4dvh - 34px), 62px);
   font-weight: 400;
   line-height: 1.05;
   text-wrap: balance;
@@ -208,7 +214,7 @@
 .landing-lab__line {
   margin: 14px auto 0;
   max-width: 44ch;
-  font-size: clamp(15px, 1.5vw, 19px);
+  font-size: clamp(15px, min(1.5vw, 2.8dvh), 19px);
   line-height: 1.45;
   color: var(--text-secondary, inherit);
   text-wrap: pretty;
