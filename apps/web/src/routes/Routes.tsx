@@ -11,7 +11,7 @@ import { invitationTokenFromPath, resetPasswordPath, resetTokenFromPath } from '
 import { useSession } from '../identity/context'
 import { InvitationPage } from '../identity/InvitationPage'
 import { CompleteResetPage, RequestResetPage } from '../identity/ResetPasswordPages'
-import { LandingPage } from '../landing/LandingPage'
+import { Landing } from '../landing/Landing'
 import { isLabPath, labAnalysisPath, labPath, labRangeIdFromPath, labRangesPath } from '../lab/lab'
 import { LabAnalysisPage } from '../lab/LabAnalysisPage'
 import { LabRangesPage } from '../lab/LabRangesPage'
@@ -58,7 +58,7 @@ export function Routes() {
     if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`) || isLabPath(path) || isCalendarPath(path) || path === goalsPath) {
       return <Redirect to={loginPath} />
     }
-    return <LandingPage />
+    return <Landing />
   }
   if (path === roomsPath) return <RoomsPage />
   // The panel exists only for Administrators; anyone else finds a path that leads nowhere.

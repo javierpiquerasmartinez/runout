@@ -7,9 +7,7 @@ import { loginPath } from './LoginPage'
 import { captionAt, playheadAfter, stops, type Caption } from './scene/choreography'
 import { tierFor, type Tier } from './scene/quality'
 import { allInEvAt, sampleResults, totalOf, winRateOf, resultAt } from './scene/sampleResults'
-import './LandingLabPage.css'
-
-export const landingLabPath = '/landing-lab'
+import './Landing.css'
 
 const captions: Caption[] = ['opening', 'library', 'results', 'rooms']
 
@@ -20,19 +18,19 @@ const allInEvPath = Array.from({ length: 61 }, (_, i) => {
 }).join(' ')
 
 /**
- * A throwaway prototype of the Landing to come: one Hand played in a
- * 3D scene, stop by stop. The page is one screen per stop and
- * snaps to them; each scroll moves on one, and the story plays up to it at
- * its own pace rather than the finger's. Here to judge rhythm and framing on
- * real screens before it takes the Landing's place; it is not linked from anywhere.
+ * `/` and any unknown path for a Visitor: one Hand played in a 3D scene
+ * behind the copy, stop by stop. The page is one screen per stop and snaps
+ * to them; each scroll moves on one, and the story plays up to it at its own
+ * pace rather than the finger's. Signing in and bringing a Room Code are in
+ * a bar that never leaves the top. An Account never sees it: `/` is its Home.
  */
-export function LandingLabPage() {
+export function Landing() {
   const { t, formatNumber } = useI18n()
   const bigBlinds = (value: number) => t('room.table.bigBlinds', { value: formatNumber(value, { signDisplay: 'exceptZero' }) })
+  const page = useRef<HTMLElement>(null)
   const figures = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const copy = useRef<HTMLDivElement>(null)
-  const readout = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     const left = new AbortController()
@@ -40,11 +38,9 @@ export function LandingLabPage() {
     let setProgress = (_progress: number) => {}
 
     // One picture per stop, and no glide between them, for whoever asked for less motion or can't run the scene.
-    // The lab alone takes a tier by hand, `?tier=still`, to look at each on any machine.
-    const asked = new URLSearchParams(window.location.search).get('tier')
-    let tier: Tier = asked === 'high' || asked === 'medium' || asked === 'still' ? asked : tierFor({
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+    let tier: Tier = tierFor({
+      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      coarsePointer: window.matchMedia?.('(pointer: coarse)').matches ?? false,
       cores: navigator.hardwareConcurrency,
       memory: (navigator as { deviceMemory?: number }).deviceMemory,
     })
@@ -61,12 +57,14 @@ export function LandingLabPage() {
     }
     const show = () => {
       setProgress(playhead)
+      // Faded out, never hidden: a screen reader reads every caption, in the story's order.
       copy.current?.querySelectorAll<HTMLElement>('[data-caption]').forEach((element) => {
-        const showing = captionAt(element.dataset.caption as Caption, playhead)
-        element.style.opacity = String(showing)
-        element.style.visibility = showing > 0 ? 'visible' : 'hidden'
+        element.style.opacity = String(captionAt(element.dataset.caption as Caption, playhead))
       })
-      if (readout.current) readout.current.textContent = `${(playhead * 100).toFixed(1)} %`
+      // The stop the story is resting at, and none while it plays.
+      if (!page.current) return
+      if (playhead === stops[stopAt()].at) page.current.dataset.stop = String(stopAt())
+      else delete page.current.dataset.stop
     }
     /** Plays towards the stop scrolled to, a frame at a time, and rests once there. */
     const play = (now: number) => {
@@ -112,10 +110,12 @@ export function LandingLabPage() {
       { signal: left.signal, passive: false },
     )
     let touchedAt: number | null = null
-    window.addEventListener('touchstart', (event) => (touchedAt = event.touches[0].clientY), {
-      signal: left.signal,
-      passive: true,
-    })
+    window.addEventListener(
+      'touchstart',
+      // A second finger makes it a pinch, which is the browser's.
+      (event) => (touchedAt = event.touches.length === 1 ? event.touches[0].clientY : null),
+      { signal: left.signal, passive: true },
+    )
     window.addEventListener(
       'touchend',
       (event) => {
@@ -138,7 +138,8 @@ export function LandingLabPage() {
             : event.key === 'ArrowUp' || event.key === 'PageUp' || (event.key === ' ' && event.shiftKey)
               ? -1
               : 0
-        if (!by || event.target instanceof HTMLAnchorElement) return
+        // With a modifier the key is the browser's or the system's.
+        if (!by || event.metaKey || event.ctrlKey || event.altKey) return
         event.preventDefault()
         heldUntil = 0
         step(by)
@@ -183,7 +184,7 @@ export function LandingLabPage() {
   }, [])
 
   return (
-    <main className="landing-lab" data-theme="dark">
+    <main ref={page} className="landing-lab" data-theme="dark">
       {stops.map(({ at }) => (
         <div key={at} className="landing-lab__stop" />
       ))}
@@ -230,7 +231,7 @@ export function LandingLabPage() {
 
       <header className="landing-lab__bar">
         <div className="landing-lab__brand">
-          <Brand size="landing" />
+          <Brand size="landing" href={null} />
           <span className="landing-lab__beta ro-mono">{t('brand.beta')}</span>
         </div>
         <nav className="landing-lab__doors">
@@ -257,8 +258,6 @@ export function LandingLabPage() {
           </div>
         ))}
       </div>
-
-      <span ref={readout} className="landing-lab__readout ro-mono" aria-hidden="true" />
     </main>
   )
 }

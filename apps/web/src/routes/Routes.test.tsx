@@ -132,25 +132,23 @@ describe('Routes · the landing, for visitors', () => {
       "Your graph doesn't lie.",
       'It all ends up here.',
       'One table. The whole group. The same hand.',
-      'Invitation only.',
     ]) {
       expect(screen.getByRole('heading', { name: headline })).toBeTruthy()
     }
+    // Under the Rooms, where the story ends.
+    expect(screen.getByText('Invitation only.')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
     expect(screen.getByRole('link', { name: 'Have a room code?' }).getAttribute('href')).toBe('/room')
     expect(screen.queryByRole('heading', { name: 'Create a room' })).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('keeps its background video away from assistive technology', async () => {
+  it('keeps its scene away from assistive technology, and has one top-level heading', async () => {
     renderAt('/', visitor())
 
     expect(await landing()).toBeTruthy()
-    const videos = document.querySelectorAll('video')
-    expect(videos.length).toBeGreaterThan(0)
-    for (const video of videos) {
-      expect(video.closest('[aria-hidden="true"]')).not.toBeNull()
-    }
+    expect(document.querySelector('canvas')?.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   })
 
   it('is where an unknown path falls back to', async () => {

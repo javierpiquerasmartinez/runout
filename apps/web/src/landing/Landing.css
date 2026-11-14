@@ -1,13 +1,16 @@
 /*
- * The Landing's prototype: a 3D scene held behind the copy. Always dark,
+ * The Landing: a 3D scene held behind the copy. Always dark,
  * whatever the theme. The page is one screen per stop of the story and snaps
  * to them, one at a time; the scene, the bar and the copy never move.
  */
 
-/* A finger's swipe moves on one stop instead of dragging the page: see the page's `step`. */
+/*
+ * A finger's swipe moves on one stop instead of dragging the page: see the
+ * page's `step`. Two fingers still pinch to zoom.
+ */
 :root:has(.landing-lab) {
   scroll-snap-type: y mandatory;
-  touch-action: none;
+  touch-action: pinch-zoom;
   overscroll-behavior: none;
 }
 
@@ -144,7 +147,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  /* Where the bar is too narrow for all of it, the two ways on go under the brand rather than away. */
+  flex-wrap: wrap;
+  gap: 10px 12px;
   padding: max(14px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 14px
     max(18px, env(safe-area-inset-left));
 }
@@ -163,8 +168,11 @@
 
 .landing-lab__doors {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
+  justify-content: flex-end;
+  gap: 8px 18px;
+  margin-left: auto;
 }
 
 .landing-lab__code {
@@ -192,7 +200,6 @@
   bottom: max(9dvh, env(safe-area-inset-bottom));
   padding: 0 24px;
   text-align: center;
-  visibility: hidden;
   opacity: 0;
 }
 
@@ -220,19 +227,4 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--brass-ink);
-}
-
-.landing-lab__readout {
-  position: fixed;
-  left: 12px;
-  bottom: 10px;
-  z-index: 2;
-  font-size: 11px;
-  opacity: 0.45;
-}
-
-@media (max-width: 520px) {
-  .landing-lab__code {
-    display: none;
-  }
 }

@@ -5,7 +5,6 @@ import { useI18n } from './i18n'
 import { FirstDisplayName } from './identity/ChooseDisplayName'
 import { ImpersonationBanner } from './identity/ImpersonationBanner'
 import { SessionProvider } from './identity/SessionProvider'
-import { LandingLabPage, landingLabPath } from './landing/LandingLabPage'
 import { roomCodeFromLibraryPath } from './library/library'
 import { RoomHolder } from './room/RoomHolder'
 import { roomCodeFromPath } from './room/roomCode'
@@ -20,7 +19,6 @@ function App() {
   const path = usePath()
   if (path === designSystemPath) return <DesignSystemPage />
   if (path === statusPath) return <ConnectionStatus />
-  if (path === landingLabPath) return <LandingLabPage />
   return (
     <SessionProvider>
       <ImpersonationBanner />

@@ -6,19 +6,28 @@ import { BrandMark } from './BrandMark'
  * The brand lockup, mark and wordmark, as every header draws it: 19 px,
  * 0.09em apart, or the "Bienvenida" board's 27 px, 0.1em apart, on the landing
  * and `/login`. It leads to the start, unless a screen gives another `href`
- * and the `label` that says where it goes.
+ * and the `label` that says where it goes, or no `href` at all: the Landing
+ * is the start, and its brand leads nowhere.
  */
 export function Brand({
   href = '/',
   label,
   size = 'header',
 }: {
-  href?: string
+  href?: string | null
   label?: string
   size?: 'header' | 'landing'
 }) {
   const { t } = useI18n()
   const landing = size === 'landing'
+  if (href === null) {
+    return (
+      <span className="ro-brand ro-brand--landing">
+        <BrandMark size={26} />
+        <span className="ro-serif">{t('brand.wordmark')}</span>
+      </span>
+    )
+  }
   return (
     <a
       href={href}
