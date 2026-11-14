@@ -47,6 +47,24 @@
       "port": 5173,
       "autoPort": false,
       "url": "http://127.0.0.1:5173"
+    },
+    {
+      "name": "runout-web-second",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@runout/web",
+        "exec",
+        "vite",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "port": 5174,
+      "autoPort": false,
+      "url": "http://127.0.0.1:5174"
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { useI18n } from '../i18n'
 import { usePreferences } from '../preferences/context'
 import type { DeckStyle } from '../preferences/preferences'
+import { SUIT_PATHS, type Suit } from './suits'
 
 /*
  * Card sprites from the "Cartas" board: the classic ivory deck (four colours
@@ -9,15 +10,6 @@ import type { DeckStyle } from '../preferences/preferences'
  */
 
 export type CardSize = 'community' | 'hero' | 'opponent' | 'list'
-
-type Suit = 's' | 'h' | 'd' | 'c'
-
-const SUIT_PATHS: Record<Suit, string> = {
-  s: 'M12 2.5S4 8 4 12.7c0 2.6 1.9 4.3 4.1 4.3 1.3 0 2.3-.5 3-1.3-.2 1.9-.9 3.4-2.1 4.3h6c-1.2-.9-1.9-2.4-2.1-4.3.7.8 1.7 1.3 3 1.3 2.2 0 4.1-1.7 4.1-4.3C20 8 12 2.5 12 2.5z',
-  h: 'M12 21S3 14.5 3 8.8C3 5.6 5.4 3.5 8.1 3.5c1.7 0 3.1.8 3.9 2.1.8-1.3 2.2-2.1 3.9-2.1C18.6 3.5 21 5.6 21 8.8 21 14.5 12 21 12 21z',
-  d: 'M12 2.5 20 12l-8 9.5L4 12z',
-  c: 'M12 3a3.6 3.6 0 0 0-2.7 6c-.4-.2-.9-.3-1.4-.3a3.6 3.6 0 1 0 2.2 6.5c.4-.3.8-.6 1.1-1-.1 2-.8 3.6-2.1 4.8h6c-1.3-1.2-2-2.8-2.1-4.8.3.4.7.7 1.1 1a3.6 3.6 0 1 0 2.2-6.5c-.5 0-1 .1-1.4.3A3.6 3.6 0 0 0 12 3z',
-}
 
 /** A card as the server writes it, rank then suit, tens as "10": "As", "10h". */
 function parse(card: string): { rank: string; suit: Suit } {
