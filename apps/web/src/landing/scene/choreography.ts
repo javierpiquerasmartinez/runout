@@ -86,12 +86,99 @@ export type Layout = {
   graphWidth: number
 }
 
+const wide: Layout = { portrait: false, table: { across: 4, deep: 2.2 }, waveWidth: 4.6, graphWidth: 6 }
+const tall: Layout = { portrait: true, table: { across: 2.3, deep: 3.9 }, waveWidth: 3.2, graphWidth: 3.6 }
+
 /** The layout for a viewport's width over its height. */
 export function layoutFor(aspect: number): Layout {
-  const portrait = aspect < 1
-  return portrait
-    ? { portrait, table: { across: 2.3, deep: 3.9 }, waveWidth: 3.2, graphWidth: 3.6 }
-    : { portrait, table: { across: 4, deep: 2.2 }, waveWidth: 4.6, graphWidth: 6 }
+  return aspect < 1 ? tall : wide
+}
+
+/** A chip, lying flat. */
+export const chip = { radius: 0.115, height: 0.024 }
+
+/** A card, lying flat with its length towards the visitor. The deck is as wide and as long. */
+export const card = { width: 0.62, length: 0.88, thick: 0.01 }
+
+/**
+ * How many chips each seat sits with, the Hero's first: a big stack, a short
+ * one, and nobody with the same.
+ */
+export const seatChips = [96, 150, 34, 58, 118, 22] as const
+
+/** How many chips a seat piles up before starting another stack, and how many stacks it sets side by side. */
+export const stackOf = 20
+const stacksAcross = 4
+/** Stacks stand this far apart, centre to centre: a chip and a finger's gap. */
+const stackGap = 0.26
+
+/** Where things sit on the felt, each by its centre. */
+export type Places = {
+  deck: Point
+  /** The seats' discs, just outside the rim; seat 0 is the Hero's, nearest the visitor. */
+  seats: readonly Point[]
+  /** Each seat's stacks, inside the rim: where each stands and how many chips it holds. */
+  stacks: readonly (readonly { at: Point; chips: number }[])[]
+  /** The Hero's two cards, near the visitor. */
+  hole: readonly Point[]
+  /** The board's five cards, across the middle. */
+  board: readonly Point[]
+}
+
+/** The point on the felt at `degrees` round the table from its right, `reach` of the way out to the rim. */
+function roundTable({ table }: Layout, degrees: number, reach = 0.74): Point {
+  const angle = (degrees * Math.PI) / 180
+  return [Math.cos(angle) * table.across * reach, 0, Math.sin(angle) * table.deep * reach]
+}
+
+/** `count` things in a row across, `gap` apart, centred on `x`, at `z`. */
+function row(count: number, gap: number, x: number, z: number): Point[] {
+  return Array.from({ length: count }, (_, index): Point => [x + (index - (count - 1) / 2) * gap, 0, z])
+}
+
+function layPlaces(layout: Layout): Places {
+  const { table, portrait } = layout
+  // The middle of each seat's chips: round the table, the short stack on the Hero's right keeping clear of
+  // the Hero's, which stand well to the side of their cards, clear of the board from where the visitor sits.
+  const stacksAt: Point[] = [
+    portrait ? [1.25, 0, 2.05] : [2.2, 0, 1.2],
+    // On a tall table the seats either side of the Hero keep nearer the visitor's end, where their chips
+    // don't stand between the visitor and the ends of the board.
+    roundTable(layout, portrait ? 144 : 150),
+    roundTable(layout, 210),
+    roundTable(layout, 270),
+    roundTable(layout, 330),
+    roundTable(layout, portrait ? 30 : 14),
+  ]
+  return {
+    // The deck sits in the gap between two seats' chips, on the far side.
+    deck: roundTable(layout, 240),
+    seats: seatChips.map((_, seat): Point => {
+      const angle = Math.PI / 2 + (seat * 2 * Math.PI) / seatChips.length
+      return [Math.cos(angle) * (table.across + 0.55), 0.01, Math.sin(angle) * (table.deep + 0.55)]
+    }),
+    // Rows of up to four stacks, each row centred, the full stacks first.
+    stacks: seatChips.map((chips, seat) => {
+      const stacks = Math.ceil(chips / stackOf)
+      const rows = Math.ceil(stacks / stacksAcross)
+      const [x, , z] = stacksAt[seat]
+      return Array.from({ length: rows }, (_, inRows) =>
+        row(Math.min(stacksAcross, stacks - inRows * stacksAcross), stackGap, x, z + (inRows - (rows - 1) / 2) * stackGap),
+      )
+        .flat()
+        .map((at, stack) => ({ at, chips: Math.min(stackOf, chips - stack * stackOf) }))
+    }),
+    hole: row(2, 0.72, 0, 0.95),
+    // A tall table is narrow: its board is laid closer, to leave a card's width of felt on both sides.
+    board: row(5, portrait ? 0.65 : 0.74, 0, 0),
+  }
+}
+
+const places = { wide: layPlaces(wide), tall: layPlaces(tall) }
+
+/** Where things sit on the felt for a layout. */
+export function placesFor(layout: Layout): Places {
+  return layout.portrait ? places.tall : places.wide
 }
 
 /** How visible the Results Graph's figures are round the graph of chips, from 0 to 1: there until the chips go home. */
