@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "capture:landing": "node scripts/capture-landing.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

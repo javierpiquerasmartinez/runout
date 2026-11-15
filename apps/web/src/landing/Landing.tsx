@@ -4,9 +4,10 @@ import { enterRoomPath } from '../room/roomCode'
 import { followLink } from '../routing'
 import { Brand } from '../ui/Brand'
 import { loginPath } from './LoginPage'
-import { captionAt, playheadAfter, stops, type Caption } from './scene/choreography'
+import { captionAt, layoutFor, playheadAfter, stops, type Caption } from './scene/choreography'
 import { depthOfFieldFor, tierFor, type Tier } from './scene/quality'
 import { allInEvAt, sampleResults, totalOf, winRateOf, resultAt } from './scene/sampleResults'
+import { stillOf } from './stills'
 import './Landing.css'
 
 const captions: Caption[] = ['opening', 'library', 'results', 'rooms']
@@ -30,6 +31,7 @@ export function Landing() {
   const page = useRef<HTMLElement>(null)
   const figures = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
+  const still = useRef<HTMLImageElement>(null)
   const copy = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,6 +47,8 @@ export function Landing() {
       memory: (navigator as { deviceMemory?: number }).deviceMemory,
     }
     let tier: Tier = tierFor(device)
+    /** The scene can't be drawn here: a picture of it stands in at every stop. */
+    let pictured = false
 
     let playhead = 0
     let frame = 0
@@ -66,6 +70,19 @@ export function Landing() {
       if (!page.current) return
       if (playhead === stops[stopAt()].at) page.current.dataset.stop = String(stopAt())
       else delete page.current.dataset.stop
+      // The picture of the stop, in the screen's shape: asked for only now that it is shown.
+      if (pictured && still.current) {
+        const address = stillOf(stopAt(), layoutFor(window.innerWidth / window.innerHeight).portrait)
+        if (still.current.getAttribute('src') !== address) still.current.src = address
+        still.current.hidden = false
+      }
+    }
+    /** Shows pictures of the scene in its place, and steps between stops as a still does. */
+    const picture = () => {
+      if (left.signal.aborted) return
+      tier = 'still'
+      pictured = true
+      follow()
     }
     /** Plays towards the stop scrolled to, a frame at a time, and rests once there. */
     const play = (now: number) => {
@@ -174,9 +191,10 @@ export function Landing() {
         canvas.current.dataset.ready = 'true'
         show()
       } catch {
-        // No WebGL: the copy and the two ways on stand on the dark alone.
+        // No WebGL.
+        picture()
       }
-    })
+    }, picture)
 
     return () => {
       left.abort()
@@ -192,6 +210,8 @@ export function Landing() {
       ))}
 
       <canvas ref={canvas} className="landing__scene" aria-hidden="true" />
+      {/* A picture of the scene, where the scene can't be drawn. */}
+      <img ref={still} className="landing__still" alt="" aria-hidden="true" hidden />
 
       {/* The one moment of the app itself: the Results Graph's rules, figures and legend, round the graph of chips. */}
       <div ref={figures} className="landing__figures" aria-hidden="true">
