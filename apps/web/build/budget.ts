@@ -11,13 +11,15 @@ import type { Plugin } from 'vite'
 /** What the budget weighs, in bytes. */
 export type Weights = {
   /**
-   * What a Visitor downloads before the copy and the two ways on can show:
-   * the document, the scripts it asks for with everything they import
-   * outright, and their styles, each gzipped. Fonts are not counted: the copy
-   * shows in a fallback face until they arrive.
+   * What a Visitor downloads before the copy and the two ways on can show,
+   * for the heavier of the Landing's documents: the document, the scripts it
+   * asks for with everything they import outright, the chunks it asks for
+   * ahead (the messages in its language) and its styles, each gzipped as it
+   * is written to disk. Fonts are not counted: the copy shows in a fallback
+   * face until they arrive.
    */
   criticalPath: number
-  /** The chunk that holds the scene and three.js, gzipped. */
+  /** The chunk that holds the scene, with what it imports outright that the critical path hasn't brought already: three.js. Gzipped. */
   sceneChunk: number
   /** The pictures in `src/landing/scene/textures`, as they are: already compressed. */
   textures: number
@@ -27,10 +29,12 @@ export type Weights = {
  * The ceilings, each a little above what the build of 2026-11-15 weighed
  * (gzip -9; 1 kB is 1000 bytes):
  *
- * - critical path 133.8 kB: entry script 78.4 kB, a shared chunk 43.4 kB (the
- *   whole message catalogue, both languages), the React runtime 3.4 kB,
- *   styles 8.1 kB, the document 0.5 kB
- * - scene chunk 157.4 kB, nearly all of it three.js's renderer, which comes
+ * - critical path 99.9 kB, for the Landing in Spanish, the heavier of the two
+ *   by a tenth of a kB: entry script 82.3 kB, the chunks it imports outright
+ *   5.9 kB (the React runtime 3.4 kB, routing 2.4 kB), the Landing's messages
+ *   in the document's language 0.9 kB, styles 8.1 kB, the document with the
+ *   Landing in it 2.8 kB
+ * - scene chunk 157.6 kB, nearly all of it three.js's renderer, which comes
  *   whole however little of it a scene uses
  * - textures 132.8 kB: felt 64.8 kB, card back 44.5 kB, chip face 17.9 kB,
  *   studio 5.6 kB
@@ -39,49 +43,78 @@ export type Weights = {
  * says what each is made from. The build prints what it weighed.
  */
 export const ceilings: Weights = {
-  criticalPath: 138_000,
+  criticalPath: 102_000,
   sceneChunk: 160_000,
   textures: 250_000,
 }
 
-type Chunk = { type: 'chunk'; fileName: string; code: string; isEntry: boolean; imports: string[]; moduleIds: string[] }
+type Chunk = { type: 'chunk'; fileName: string; code: string; imports: string[]; moduleIds: string[] }
 type Asset = { type: 'asset'; fileName: string; source: string | Uint8Array; originalFileNames?: string[] }
 type Bundle = Record<string, Chunk | Asset | { type: string }>
 
-const scene = '/src/landing/scene/LandingScene.ts'
+/** The document that holds no Landing: the app's, for every other path (`landingDocuments.ts`). */
+const appDocument = 'app.html'
+const scene = 'src/landing/scene/LandingScene.ts'
 const texturesFolder = 'src/landing/scene/textures/'
 
 const gzipped = (content: string | Uint8Array) => gzipSync(content, { level: 9 }).length
 
-/** Weighs what the build is about to write. */
+/**
+ * Weighs what the build is about to write. It fails where it finds nothing
+ * to weigh (no Landing document, the scene's module or its textures not
+ * where they are looked for), since a budget that weighs nothing is never
+ * passed.
+ */
 export function weigh(bundle: Bundle): Weights {
   const files = Object.values(bundle)
-  const chunks = files.filter((file): file is Chunk => file.type === 'chunk')
-  const assets = files.filter((file): file is Asset => file.type === 'asset')
-  const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
-
-  // The document's scripts and everything they import outright.
-  const first = new Set<Chunk>()
-  const take = (chunk: Chunk | undefined) => {
-    if (!chunk || first.has(chunk)) return
-    first.add(chunk)
-    chunk.imports.forEach((name) => take(byName.get(name)))
+  const chunks = new Map(files.filter((file): file is Chunk => file.type === 'chunk').map((chunk) => [chunk.fileName, chunk]))
+  const assets = new Map(files.filter((file): file is Asset => file.type === 'asset').map((asset) => [asset.fileName, asset]))
+  const nothing = (what: string): never => {
+    throw new Error(`The Landing's budget found nothing to weigh: ${what}. What it looks for is in apps/web/build/budget.ts.`)
   }
-  chunks.filter((chunk) => chunk.isEntry).forEach(take)
-  // Their styles: the ones the document links to.
-  const document = assets.find((asset) => asset.fileName === 'index.html')
-  const markup = document ? String(document.source) : ''
-  const styles = assets.filter((asset) => asset.fileName.endsWith('.css') && markup.includes(asset.fileName))
 
-  const sceneChunk = chunks.find((chunk) => chunk.moduleIds.some((id) => id.replace(/[?#].*$/, '').endsWith(scene)))
-  const textures = assets.filter((asset) => asset.originalFileNames?.some((name) => name.includes(texturesFolder)))
+  /** A chunk and everything it imports outright, by file name. */
+  const withImports = (fileName: string, into = new Set<string>()) => {
+    const chunk = chunks.get(fileName)
+    if (!chunk || into.has(fileName)) return into
+    into.add(fileName)
+    chunk.imports.forEach((name) => withImports(name, into))
+    return into
+  }
+  const weightOf = (fileName: string) => {
+    const file = chunks.get(fileName) ?? assets.get(fileName)
+    if (!file) return nothing(`${fileName}, which a Landing document asks for`)
+    return gzipped(file.type === 'chunk' ? file.code : file.source)
+  }
+
+  // What each Landing document has the browser download before it can show: its scripts, the chunks it asks for ahead and its styles.
+  const documents = [...assets.values()].filter(({ fileName }) => fileName.endsWith('.html') && fileName !== appDocument)
+  if (!documents.length) nothing('no Landing document among the files of the build')
+  const paths = documents.map((document) => {
+    const markup = String(document.source)
+    const asked = (pattern: RegExp) => [...markup.matchAll(pattern)].map(([, address]) => address.replace(/^\//, ''))
+    const scripts = asked(/<script\b[^>]*\bsrc="([^"]+)"/g)
+    if (!scripts.length) nothing(`${document.fileName} asks for no script`)
+    const first = new Set<string>()
+    for (const script of [...scripts, ...asked(/<link\b[^>]*\brel="modulepreload"[^>]*\bhref="([^"]+)"/g)]) {
+      if (!chunks.has(script)) nothing(`${script}, which ${document.fileName} asks for`)
+      withImports(script, first)
+    }
+    const styles = asked(/<link\b[^>]*\brel="stylesheet"[^>]*\bhref="([^"]+)"/g)
+    return { first, weight: gzipped(document.source) + [...first, ...styles].reduce((sum, name) => sum + weightOf(name), 0) }
+  })
+  const heaviest = paths.reduce((heavier, path) => (path.weight > heavier.weight ? path : heavier))
+
+  const sceneChunk = [...chunks.values()].find((chunk) => chunk.moduleIds.some((id) => id.replace(/[?#].*$/, '').endsWith(`/${scene}`)))
+  if (!sceneChunk) return nothing(`no chunk holds ${scene}`)
+  const later = [...withImports(sceneChunk.fileName)].filter((name) => !heaviest.first.has(name))
+
+  const textures = [...assets.values()].filter((asset) => asset.originalFileNames?.some((name) => name.includes(texturesFolder)))
+  if (!textures.length) nothing(`no picture of the build comes from ${texturesFolder}`)
 
   return {
-    criticalPath:
-      (document ? gzipped(document.source) : 0) +
-      [...first].reduce((sum, chunk) => sum + gzipped(chunk.code), 0) +
-      styles.reduce((sum, style) => sum + gzipped(style.source), 0),
-    sceneChunk: sceneChunk ? gzipped(sceneChunk.code) : 0,
+    criticalPath: heaviest.weight,
+    sceneChunk: later.reduce((sum, name) => sum + weightOf(name), 0),
     textures: textures.reduce((sum, texture) => sum + texture.source.length, 0),
   }
 }
@@ -110,16 +143,20 @@ export function landingBudget(limits: Weights = ceilings, weighed?: (weights: We
     name: 'runout:landing-budget',
     apply: 'build',
     enforce: 'post',
-    generateBundle(_options, bundle) {
-      const weights = weigh(bundle as unknown as Bundle)
-      weighed?.(weights)
-      this.info(
-        `The Landing weighs: critical path ${kB(weights.criticalPath)}, scene chunk ${kB(weights.sceneChunk)}, textures ${kB(weights.textures)}`,
-      )
-      const over = overweight(weights, limits)
-      if (over.length) {
-        this.error(`${over.join('\n')}\nThe ceilings are in apps/web/build/budget.ts.`)
-      }
+    // After every other plugin has had the bundle: the files are weighed as they are written, the Landing in its documents.
+    generateBundle: {
+      order: 'post',
+      handler(_options, bundle) {
+        const weights = weigh(bundle as unknown as Bundle)
+        weighed?.(weights)
+        this.info(
+          `The Landing weighs: critical path ${kB(weights.criticalPath)}, scene chunk ${kB(weights.sceneChunk)}, textures ${kB(weights.textures)}`,
+        )
+        const over = overweight(weights, limits)
+        if (over.length) {
+          this.error(`${over.join('\n')}\nThe ceilings are in apps/web/build/budget.ts.`)
+        }
+      },
     },
   }
 }

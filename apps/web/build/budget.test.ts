@@ -1,5 +1,9 @@
 // @vitest-environment node
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gzipSync } from 'node:zlib'
 import { build } from 'vite'
 import { describe, expect, it } from 'vitest'
 import { ceilings, landingBudget, type Weights } from './budget.ts'
@@ -31,7 +35,37 @@ async function builtWithin(limits: Weights, weighed?: (weights: Weights) => void
   }
 }
 
+/** The same build, written to a folder of its own, and what each file written there weighs gzipped. */
+async function writtenWeights(weighed: (weights: Weights) => void) {
+  const into = mkdtempSync(join(tmpdir(), 'runout-budget-'))
+  const env = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    await build({ root: web, mode: 'production', logLevel: 'silent', build: { outDir: into, emptyOutDir: true }, plugins: [landingBudget(ceilings, weighed)] })
+    const weightOf = (file: string) => gzipSync(readFileSync(join(into, file)), { level: 9 }).length
+    return { weightOf, read: (file: string) => readFileSync(join(into, file), 'utf8') }
+  } finally {
+    process.env.NODE_ENV = env
+  }
+}
+
 describe("the Landing's weight", () => {
+  it('is the weight of the files as they are written to disk, for the heavier of the two documents', async () => {
+    let weights: Weights | undefined
+    const { weightOf, read } = await writtenWeights((measured) => (weights = measured))
+
+    // What each document asks for: its script, the chunks it asks for ahead and its styles. The script's own imports are among those asked for ahead.
+    const downloadedFor = (document: string) =>
+      [...read(document).matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)="\/(assets\/[^"]+\.(?:js|css))"/g)]
+        .map(([, file]) => weightOf(file))
+        .reduce((sum, weight) => sum + weight, weightOf(document))
+    const [spanish, english] = [downloadedFor('index.html'), downloadedFor('en/index.html')]
+
+    expect(spanish).not.toBe(english)
+    expect(weights?.criticalPath).toBe(Math.max(spanish, english))
+  }, 120_000)
+
+
   it('is within its ceilings, and not far under them', async () => {
     let weights: Weights | undefined
     await builtWithin(ceilings, (measured) => (weights = measured))
@@ -50,7 +84,7 @@ describe("the Landing's weight", () => {
   })
 
   it('fails the build, naming what grew and by how much', async () => {
-    const tight: Weights = { criticalPath: 100_000, sceneChunk: ceilings.sceneChunk, textures: 1_000 }
+    const tight: Weights = { criticalPath: 50_000, sceneChunk: ceilings.sceneChunk, textures: 1_000 }
     let weights: Weights | undefined
     const failure = await builtWithin(tight, (measured) => (weights = measured)).then(
       () => null,
@@ -59,7 +93,7 @@ describe("the Landing's weight", () => {
 
     const kB = (bytes: number) => (bytes / 1000).toFixed(1)
     expect(failure).toContain(
-      `The Landing's critical path weighs ${kB(weights!.criticalPath)} kB, ${kB(weights!.criticalPath - 100_000)} kB over its ceiling of 100.0 kB`,
+      `The Landing's critical path weighs ${kB(weights!.criticalPath)} kB, ${kB(weights!.criticalPath - 50_000)} kB over its ceiling of 50.0 kB`,
     )
     expect(failure).toContain(
       `The scene's textures weigh ${kB(weights!.textures)} kB, ${kB(weights!.textures - 1_000)} kB over their ceiling of 1.0 kB`,

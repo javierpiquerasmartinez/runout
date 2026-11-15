@@ -11,7 +11,7 @@ const backend = process.env.RUNOUT_SERVER_URL ?? 'http://localhost:3000'
 export default defineConfig({
   /*
    * The build asks ahead for the headline's font, writes the Landing into its documents, and fails when the
-   * Landing passes its weight budget. In that order: the budget weighs `index.html` once the Landing is in it.
+   * Landing passes its weight budget, which is weighed last of all, once the documents and every file are as written.
    */
   plugins: [react(), preloadHeadlineFont(), landingDocuments(), landingBudget()],
   server: {
