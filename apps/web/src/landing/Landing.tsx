@@ -5,10 +5,10 @@ import { loginPath } from '../identity/accessPaths'
 import { enterRoomPath } from '../room/roomCode'
 import { followLink } from '../routing'
 import { Brand } from '../ui/Brand'
-import { captionAt, layoutFor, playheadAfter, stops, type Caption } from './scene/choreography'
+import { captionAt, layoutFor, playheadAfter, stops, type Caption, type GraphOnScreen } from './scene/choreography'
 import { depthOfFieldFor, tierFor, type Tier } from './scene/quality'
 import { allInEvAt, sampleResults, totalOf, winRateOf, resultAt } from './scene/sampleResults'
-import { stillOf } from './stills'
+import { graphInStill, stillOf } from './stills'
 import './Landing.css'
 
 const captions: Caption[] = ['opening', 'library', 'results', 'rooms']
@@ -55,6 +55,19 @@ export function Landing() {
     let frame = 0
     let last = 0
 
+    /** Lays the Results Graph's figures where the graph of chips is on screen. */
+    const layFigures = ({ showing, left, right, zero, crest, floor }: GraphOnScreen) => {
+      const style = figures.current?.style
+      if (!style) return
+      style.opacity = String(showing)
+      style.visibility = showing > 0 ? 'visible' : 'hidden'
+      style.setProperty('--left', `${left}px`)
+      style.setProperty('--width', `${right - left}px`)
+      style.setProperty('--zero', `${zero}px`)
+      style.setProperty('--crest', `${crest}px`)
+      style.setProperty('--floor', `${floor}px`)
+    }
+
     /** The stop the page is scrolled to: its screens are all the same height. */
     const screen = () => document.documentElement.scrollHeight / stops.length
     const stopAt = () => {
@@ -76,6 +89,8 @@ export function Landing() {
         const address = stillOf(stopAt(), layoutFor(window.innerWidth / window.innerHeight).portrait)
         if (still.current.getAttribute('src') !== address) still.current.src = address
         still.current.hidden = false
+        // No scene says where the graph is: the picture's graph is where the scene drew it.
+        layFigures(graphInStill(stopAt(), window.innerWidth, window.innerHeight))
       }
     }
     /** Shows pictures of the scene in its place, and steps between stops as a still does. */
@@ -177,18 +192,7 @@ export function Landing() {
           tier,
           depthOfField: depthOfFieldFor(tier, device),
           onTier: (lower) => (tier = lower),
-          // The Results Graph's figures, laid where the graph of chips is on screen.
-          onGraph({ showing, left, right, zero, crest, floor }) {
-            const style = figures.current?.style
-            if (!style) return
-            style.opacity = String(showing)
-            style.visibility = showing > 0 ? 'visible' : 'hidden'
-            style.setProperty('--left', `${left}px`)
-            style.setProperty('--width', `${right - left}px`)
-            style.setProperty('--zero', `${zero}px`)
-            style.setProperty('--crest', `${crest}px`)
-            style.setProperty('--floor', `${floor}px`)
-          },
+          onGraph: layFigures,
         })
         setProgress = scene.setProgress
         dispose = scene.dispose

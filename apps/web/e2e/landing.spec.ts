@@ -26,6 +26,8 @@ const captionAtStop = [
   titles.rooms,
 ]
 const lastStop = captionAtStop.length - 1
+/** The stop the story rests at with the graph of chips on screen. */
+const graphStop = 5
 
 const DESKTOP = { width: 1440, height: 900 }
 const PHONE = { width: 360, height: 640 }
@@ -397,6 +399,21 @@ for (const [name, viewport, shape] of [
         expect(Math.max(width, height)).toBe(1600)
         seen.push(src)
         expect(await captionsShowing(page), `at stop ${stop}`).toEqual(caption ? [caption] : [])
+        // The Results Graph's legend and its first Hand are laid over the picture of the graph, under the bar
+        // and above the copy, and over no other picture.
+        const legend = page.getByText('EV all-in')
+        if (stop === graphStop) {
+          const clear = clearFor(layoutFor(viewport.width / viewport.height))
+          const over = (await legend.boundingBox())!
+          const under = (await page.getByText('Mano 1').boundingBox())!
+          expect(over.y).toBeGreaterThan(clear.bar * viewport.height)
+          expect(under.y + under.height).toBeLessThan(clear.copy * viewport.height)
+          expect(over.y + over.height).toBeLessThan(under.y)
+          expect(under.x).toBeGreaterThan(0)
+          await expect(legend).toBeVisible()
+        } else {
+          await expect(legend).toBeHidden()
+        }
         if (stop === 1) expect(await scrolledThrough(page)).toEqual([viewport.height])
       }
 

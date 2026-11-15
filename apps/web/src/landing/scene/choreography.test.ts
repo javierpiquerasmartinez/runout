@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { waveHeightAt, wavePoints } from './brandWave'
+import { waveCrestAt, waveHeightAt, wavePoints } from './brandWave'
 import {
   beatAt,
   beats,
@@ -10,9 +10,12 @@ import {
   clearFor,
   figuresAt,
   graphHeight,
+  graphOnScreen,
+  graphTopAt,
   layoutFor,
   placesFor,
   playheadAfter,
+  seatDisc,
   staggeredBeatAt,
   stops,
   type Beat,
@@ -86,6 +89,13 @@ describe('beatAt', () => {
     for (let i = 1; i < order.length; i++) expect(beats[order[i]][0]).toBeGreaterThanOrEqual(beats[order[i - 1]][1])
     expect(beatAt('river', beats.pot[0] + 0.02)).toBe(1)
   })
+
+  it("has moved nothing of the Hand while the story rests at the table's stop", () => {
+    const table = stops[1].at
+    expect(beatAt('table', table)).toBe(1)
+    for (const street of ['hole', 'flop', 'turn', 'river'] as const)
+      for (const card of [0, 1, 2]) expect(staggeredBeatAt(street, table, card, 3, 0.6)).toBe(0)
+  })
 })
 
 describe('staggeredBeatAt', () => {
@@ -149,6 +159,31 @@ describe('cameraAt', () => {
       expect(x).toBeGreaterThan(0)
       expect(x).toBeLessThan(1)
     }
+  })
+
+  it.each(windows)('fills the stretch between the bar and the copy with the table and its seats in $name', ({ width, height }) => {
+    const aspect = width / height
+    const clear = clearFor(layoutFor(aspect))
+    const edges = placesFor(layoutFor(aspect)).seats.flatMap(([x, , z]) =>
+      Array.from({ length: 24 }, (_, i) => (i * Math.PI) / 12).map((angle) =>
+        onScreen([x + Math.cos(angle) * seatDisc.outer, 0, z + Math.sin(angle) * seatDisc.outer], 1, aspect),
+      ),
+    )
+    const across = Math.max(...edges.map(({ x }) => x)) - Math.min(...edges.map(({ x }) => x))
+    const down = Math.max(...edges.map(({ y }) => y)) - Math.min(...edges.map(({ y }) => y))
+    // Whichever binds: the stretch's height or the screen's width.
+    expect(Math.max(across, down / (clear.copy - clear.bar))).toBeGreaterThan(0.97)
+  })
+
+  it.each(windows)('fills most of the stretch between the bar and the copy with the graph in $name', ({ width, height }) => {
+    const aspect = width / height
+    const { graphWidth } = layoutFor(aspect)
+    const clear = clearFor(layoutFor(aspect))
+    const stop = stops[5].at
+    const across = onScreen([graphWidth / 2, 0, 0], stop, aspect).x - onScreen([-graphWidth / 2, 0, 0], stop, aspect).x
+    const down = onScreen([0, 0, 0], stop, aspect).y - onScreen([0, graphHeight + 0.07, 0], stop, aspect).y
+    // The legend and the first and last Hand keep the rest of the height; a tall screen's width binds first.
+    expect(Math.max(across / 0.75, down / (clear.copy - clear.bar) / 0.7)).toBeGreaterThan(1)
   })
 
   it.each(windows)("leaves the Results Graph's legend and its first and last Hand room round the graph in $name", ({ width, height }) => {
@@ -412,5 +447,41 @@ describe('placesFor', () => {
 describe('figuresAt', () => {
   it("shows the Results Graph's figures at the graph's stop and nowhere else the story rests", () => {
     expect(stops.map(({ at }) => figuresAt(at))).toEqual([0, 0, 0, 0, 0, 1, 0])
+  })
+})
+
+describe('graphTopAt', () => {
+  it('stands the tallest stack as high as the graph is said to be, where the wave crests', () => {
+    expect(graphTopAt(waveCrestAt)).toBeCloseTo(graphHeight, 1)
+    for (const x of [0, 0.2, 0.6, 0.8, 1]) expect(graphTopAt(x)).toBeLessThan(graphTopAt(waveCrestAt))
+  })
+})
+
+describe('graphOnScreen', () => {
+  it.each(windows)('says where the graph is on screen at its stop in $name, as the scene draws it there', ({ width, height }) => {
+    const aspect = width / height
+    const { graphWidth } = layoutFor(aspect)
+    const stop = stops[5].at
+    const graph = graphOnScreen(stop, width, height)
+    expect(graph.showing).toBe(1)
+    expect(graph.left).toBeCloseTo(onScreen([-graphWidth / 2, 0, 0], stop, aspect).x * width)
+    expect(graph.right).toBeCloseTo(onScreen([graphWidth / 2, 0, 0], stop, aspect).x * width)
+    // The line runs a little over the stacks: where it starts from, its crest, and the felt under them.
+    expect(graph.zero).toBeCloseTo(onScreen([0, graphTopAt(0) + 0.07, 0], stop, aspect).y * height)
+    expect(graph.crest).toBeCloseTo(onScreen([0, graphTopAt(waveCrestAt) + 0.07, 0], stop, aspect).y * height)
+    expect(graph.floor).toBeCloseTo(onScreen([0, 0, 0], stop, aspect).y * height)
+    expect(graph.crest).toBeLessThan(graph.zero)
+    expect(graph.zero).toBeLessThan(graph.floor)
+  })
+
+  it('is seen from wherever the camera has leant to', () => {
+    const stop = stops[5].at
+    const { position, target } = cameraAt(stop, wide, fieldOfView)
+    const leant = graphOnScreen(stop, 1600, 900, { position: [position[0] + 1, position[1], position[2]], target })
+    expect(leant.left).not.toBeCloseTo(graphOnScreen(stop, 1600, 900).left)
+  })
+
+  it('shows no figures where the story is not at the graph', () => {
+    expect(graphOnScreen(stops[4].at, 1600, 900).showing).toBe(0)
   })
 })

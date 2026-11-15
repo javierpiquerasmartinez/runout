@@ -10,21 +10,29 @@ import { FullScreenQuad, Pass } from 'three/addons/postprocessing/Pass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { SUIT_PATHS, type Suit } from '../../ui/suits'
-import { waveCrestAt, waveHeightAt, wavePoints } from './brandWave'
+import { wavePoints } from './brandWave'
 import {
   beatAt,
   cameraAt,
   card,
   chip,
+  chipCount,
   depthOfField,
   ease,
+  fieldOfView,
   figuresAt,
+  graphColumns,
+  graphOnScreen,
+  graphTopAt,
   layoutFor,
+  lineOverGraph,
   placesFor,
   potCentre,
   seatChips,
+  seatDisc,
   stackOf,
   staggeredBeatAt,
+  type GraphOnScreen,
   type Places,
   type Point,
 } from './choreography'
@@ -42,7 +50,6 @@ import studioUrl from './textures/studio-2.webp'
  * what happens when; this file only draws it.
  */
 
-const fieldOfView = 40
 const brass = 0xe0a050
 
 /** Seconds the wave takes to draw itself when the page opens, whatever the scroll. */
@@ -54,13 +61,9 @@ const waveCurve = wavePoints(linePoints)
 const waveRise = 10 / 18
 const waveMiddle = 1.3
 
-const chipCount = 960
 const { radius: chipRadius, height: chipHeight } = chip
 /** The chips no seat sits with are not on the table: they come out of the pot as it bursts, to build the graph. */
 const seatCount = seatChips.length
-const graphColumns = 24
-/** The graph's shortest stack, as a share of its tallest. */
-const graphFloor = 0.12
 
 const cardSize = card
 
@@ -160,19 +163,6 @@ class LayerOverPass extends Pass {
     this.laid.dispose()
     this.quad.dispose()
   }
-}
-
-/** Where the graph of chips is on the canvas, in CSS pixels from its top left. */
-export type GraphOnScreen = {
-  /** How visible the Results Graph's figures are, from 0 to 1. */
-  showing: number
-  /** The graph's two ends across. */
-  left: number
-  right: number
-  /** Down the canvas: where the line starts from, the line's crest, and the felt the chips stand on. */
-  zero: number
-  crest: number
-  floor: number
 }
 
 export type LandingSceneOptions = {
@@ -419,14 +409,17 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   felt.receiveShadow = true
   scene.add(felt)
 
-  // The padded rail round the felt, under the line of light.
-  const railMaterial = keep(new THREE.MeshStandardMaterial({ color: 0x0b0e0d, roughness: 0.45, transparent: true }))
+  // The padded rail round the felt, under the line of light: dark and matt, so it takes no sheen from the
+  // light or the studio and reads as the table's edge, not as a second, paler band beside the line.
+  const railMaterial = keep(
+    new THREE.MeshStandardMaterial({ color: 0x0b0e0d, roughness: 1, envMapIntensity: 0.1, transparent: true }),
+  )
   const rail = new THREE.Mesh(keep(new THREE.RingGeometry(0.985, 1.085, 128)), railMaterial)
   rail.rotation.x = -Math.PI / 2
   rail.position.y = 0.004
   scene.add(rail)
 
-  const seatGeometry = keep(new THREE.RingGeometry(0.2, 0.3, 48))
+  const seatGeometry = keep(new THREE.RingGeometry(seatDisc.inner, seatDisc.outer, 48))
   const seats = Array.from({ length: seatCount }, () => {
     const material = keep(
       new THREE.MeshStandardMaterial({ color: 0x1a201e, emissive: brass, emissiveIntensity: 0, transparent: true }),
@@ -505,15 +498,6 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   scene.add(chips)
   disposables.push(chips)
 
-  /** How many chips each column of the graph holds, summing to every chip there is. */
-  const columnHeights = Array.from(
-    { length: graphColumns },
-    (_, column) => graphFloor + (1 - graphFloor) * waveHeightAt(column / (graphColumns - 1)),
-  )
-  const chipsPerHeight = chipCount / columnHeights.reduce((sum, height) => sum + height, 0)
-  /** The top of the graph at `x` across it, from 0 to 1: where the wave runs. */
-  const graphTopAt = (x: number) => (graphFloor + (1 - graphFloor) * waveHeightAt(x)) * chipsPerHeight * chipHeight
-
   /**
    * A chip's place in the cloud the camera dives through: above the felt, and
    * out of the corridor the camera flies along, so none ever fills the screen.
@@ -530,7 +514,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   const chipParts = (() => {
     const graph: { column: number; level: number }[] = []
     for (let column = 0; graph.length < chipCount; column = (column + 1) % graphColumns) {
-      const wanted = Math.round(columnHeights[column] * chipsPerHeight)
+      const wanted = Math.round(graphTopAt(column / (graphColumns - 1)) / chipHeight)
       const held = graph.filter((chip) => chip.column === column).length
       if (held < wanted || graph.length >= chipCount - graphColumns) graph.push({ column, level: held })
     }
@@ -603,7 +587,6 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   const rotation = new THREE.Quaternion()
   const scale = new THREE.Vector3()
   const spun = new THREE.Quaternion()
-  const onScreen = new THREE.Vector3()
   let figuresShown = 0
 
   drawWith(tier, options.depthOfField ?? false)
@@ -661,7 +644,7 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       const x = mix(mix((wave.x - 0.5) * waveWidth, table.across * Math.cos(angle), toRim), (wave.x - 0.5) * graphWidth, toGraph)
       const y = mix(
         mix(waveMiddle + (wave.y - 0.5) * waveWidth * waveRise, 0.02, toRim),
-        graphTopAt(wave.x) + 0.07,
+        graphTopAt(wave.x) + lineOverGraph,
         toGraph,
       )
       const z = mix(mix(0, table.deep * Math.sin(angle), toRim), 0, toGraph)
@@ -760,17 +743,8 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
     // Where the graph is on screen, for the Results Graph's figures laid over it.
     const figures = figuresAt(p)
     if (options.onGraph && (figures > 0 || figuresShown > 0)) {
-      camera.updateMatrixWorld()
-      const across = (x: number) => ((onScreen.set(x, 0, 0).project(camera).x + 1) / 2) * width
-      const down = (y: number) => ((1 - onScreen.set(0, y, 0).project(camera).y) / 2) * height
-      options.onGraph({
-        showing: figures,
-        left: across(-graphWidth / 2),
-        right: across(graphWidth / 2),
-        zero: down(graphTopAt(0) + 0.07),
-        crest: down(graphTopAt(waveCrestAt) + 0.07),
-        floor: down(0),
-      })
+      const { x, y, z } = camera.position
+      options.onGraph(graphOnScreen(p, width, height, { position: [x, y, z], target: view.target }))
     }
     figuresShown = figures
 

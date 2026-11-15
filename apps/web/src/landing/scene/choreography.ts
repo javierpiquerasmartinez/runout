@@ -9,6 +9,10 @@
  * Nothing here knows about three.js or the DOM: `scene/LandingScene` draws
  * what these functions say, and scrolling back up rewinds it exactly.
  */
+import { waveCrestAt, waveHeightAt } from './brandWave'
+
+/** The camera's vertical field of view, in degrees. */
+export const fieldOfView = 40
 
 /** A point in the scene: `x` across, `y` up, `z` towards the visitor; the felt is `y = 0`. */
 export type Point = readonly [x: number, y: number, z: number]
@@ -19,7 +23,8 @@ export const beats = {
   rim: [0.06, 0.2],
   /** The felt, the deck and every seat's chips come up out of the dark. */
   table: [0.14, 0.24],
-  hole: [0.22, 0.3],
+  /** The Hero's cards leave the deck as the story leaves the table's stop, and not before. */
+  hole: [0.24, 0.3],
   flop: [0.3, 0.4],
   turn: [0.4, 0.46],
   river: [0.46, 0.52],
@@ -94,6 +99,12 @@ export function layoutFor(aspect: number): Layout {
   return aspect < 1 ? tall : wide
 }
 
+/** A seat's disc, lying flat just outside the rim: a ring, by its inner and outer radius. */
+export const seatDisc = { inner: 0.2, outer: 0.3 }
+/** How far beyond the rim a seat's disc is centred, and how far it reaches. */
+const seatOut = 0.55
+const seatReach = seatOut + seatDisc.outer
+
 /** A chip, lying flat. */
 export const chip = { radius: 0.115, height: 0.024 }
 
@@ -155,7 +166,7 @@ function layPlaces(layout: Layout): Places {
     deck: roundTable(layout, 240),
     seats: seatChips.map((_, seat): Point => {
       const angle = Math.PI / 2 + (seat * 2 * Math.PI) / seatChips.length
-      return [Math.cos(angle) * (table.across + 0.55), 0.01, Math.sin(angle) * (table.deep + 0.55)]
+      return [Math.cos(angle) * (table.across + seatOut), 0.01, Math.sin(angle) * (table.deep + seatOut)]
     }),
     // Rows of up to four stacks, each row centred, the full stacks first.
     stacks: seatChips.map((chips, seat) => {
@@ -189,8 +200,30 @@ export function figuresAt(progress: number): number {
 /** Where the pot gathers: just behind the board. */
 export const potCentre: Point = [0, 0.15, -0.95]
 
-/** How high the tallest stack of the graph stands. */
+/** How many chips there are: every seat's, and the rest, which come out of the pot as it bursts to build the graph. */
+export const chipCount = 960
+
+/** How many stacks the graph is, and its shortest as a share of its tallest. */
+export const graphColumns = 24
+const graphFloor = 0.12
+
+/** How high each of the graph's stacks is, as a share of the tallest: the Runout wave, on a floor. */
+const graphShareAt = (x: number) => graphFloor + (1 - graphFloor) * waveHeightAt(x)
+
+/** How many chips a stack as tall as the tallest holds, when every chip there is goes into the graph. */
+const graphChips =
+  chipCount / Array.from({ length: graphColumns }, (_, column) => graphShareAt(column / (graphColumns - 1))).reduce((a, b) => a + b)
+
+/** The top of the graph at `x` across it, from 0 to 1: where the wave runs. */
+export function graphTopAt(x: number): number {
+  return graphShareAt(x) * graphChips * chip.height
+}
+
+/** How high the tallest stack of the graph stands, near enough: what the shots of it are framed for. */
 export const graphHeight = 1.9
+/** How far over the stacks the line runs. */
+export const lineOverGraph = 0.07
+const graphTop = graphHeight + lineOverGraph
 
 /**
  * What the page keeps over the scene in a layout, as shares of the screen's
@@ -203,9 +236,6 @@ export const graphHeight = 1.9
 export function clearFor({ portrait }: Layout): { bar: number; copy: number } {
   return { bar: portrait ? 0.15 : 0.13, copy: 0.6 }
 }
-
-/** How far beyond the rim the seats' discs reach. */
-const seatReach = 0.85
 
 /**
  * The depth of field, where the scene is drawn with one. What a shot focuses
@@ -243,10 +273,26 @@ function shots(layout: Layout): Shot[] {
   const clear = clearFor(layout)
   const betweenBarAndCopy: Band = { top: clear.bar, bottom: clear.copy }
   const tilted = (elevation: number) => 2 * table.deep * Math.sin((elevation * Math.PI) / 180) + 1.2
-  // From above, the table and its seats, with a little air round them.
-  const overTableFrame = { width: 2 * (table.across + seatReach) + 0.3, height: 2 * (table.deep + seatReach) + 0.3 }
-  // The graph, with room over it for the legend and under it for the first and last Hand.
-  const graphFrame = { width: graphWidth + 1, height: graphHeight + 1.3 }
+  // From above, the table and its seats and a hair of air, so they fill the stretch they are fitted in: as deep
+  // as they look from that high. The near seats are nearer the camera than the far ones and drawn larger, so
+  // the shot is of a point a little nearer than the table's middle, which leaves both as far from the stretch's ends.
+  const overTable = (elevation: number): Pick<Shot, 'target' | 'elevation' | 'frame' | 'band'> => {
+    const angle = (elevation * Math.PI) / 180
+    const deep = table.deep + seatReach
+    const stretch = Math.tan((fieldOfView * Math.PI) / 360) * (clear.copy - clear.bar)
+    return {
+      target: [0, 0, (deep * stretch) / Math.tan(angle)],
+      elevation,
+      frame: { width: 2 * (table.across + seatReach) + 0.2, height: 2 * deep * Math.sin(angle) * 1.01 },
+      band: betweenBarAndCopy,
+    }
+  }
+  // The graph, from the felt to the line along its top, with room over it for the legend and under it for the
+  // first and last Hand, as shares of the stretch it is fitted in: what they need of the shortest window.
+  const graphRoom = { over: 0.19, under: 0.09 }
+  const graphFrame = { width: graphWidth + 1, height: graphTop / (1 - graphRoom.over - graphRoom.under) }
+  const graphMiddle: Point = [0, graphFrame.height * (0.5 - graphRoom.under), 0]
+  const graph: Point = [0, graphHeight / 2, 0]
   const board: Point = [0, 0, 0]
   return [
     // The wave alone, level, in the dark, above the middle of the screen to leave the copy room.
@@ -270,11 +316,11 @@ function shots(layout: Layout): Shot[] {
     // Among the chips.
     { at: 0.7, target: [0, 0.5, -0.6], elevation: 6, frame: { width: 0.7, height: 0.5 } },
     // Side-on to the graph.
-    { at: beats.graph[1] - 0.04, target: [0, graphHeight / 2, 0], elevation: 3, frame: graphFrame, band: betweenBarAndCopy },
-    { at: beats.line[1], target: [0, graphHeight / 2, 0], elevation: 5, frame: graphFrame, band: betweenBarAndCopy },
+    { at: beats.graph[1] - 0.04, target: graphMiddle, elevation: 3, frame: graphFrame, band: betweenBarAndCopy, focus: graph },
+    { at: beats.line[1], target: graphMiddle, elevation: 5, frame: graphFrame, band: betweenBarAndCopy, focus: graph },
     // Over the table, seats and all, under the bar and above the copy.
-    { at: beats.seats[0] + 0.06, target: [0, 0, 0], elevation: 78, frame: overTableFrame, band: betweenBarAndCopy },
-    { at: 1, target: [0, 0, 0], elevation: 82, frame: overTableFrame, band: betweenBarAndCopy },
+    { at: beats.seats[0] + 0.06, ...overTable(78), focus: board },
+    { at: 1, ...overTable(82), focus: board },
   ]
 }
 
@@ -327,6 +373,59 @@ export function cameraAt(
     target,
     position,
     focus: (position[1] - sharp[1]) * up + (position[2] - sharp[2]) * back,
+  }
+}
+
+/** Where the graph of chips is on the screen, in CSS pixels from its top left. */
+export type GraphOnScreen = {
+  /** How visible the Results Graph's figures are, from 0 to 1. */
+  showing: number
+  /** The graph's two ends across. */
+  left: number
+  right: number
+  /** Down the screen: where the line starts from, the line's crest, and the felt the chips stand on. */
+  zero: number
+  crest: number
+  floor: number
+}
+
+/**
+ * Where the graph of chips is on a screen `width` by `height`, at a scroll
+ * progress, for the Results Graph's figures laid over it: by the same camera
+ * the scene draws with, so a picture of the scene can carry them where there
+ * is no scene. `from` is the camera, where it has leant away from its place.
+ */
+export function graphOnScreen(
+  progress: number,
+  width: number,
+  height: number,
+  from: { position: Point; target: Point } = cameraAt(progress, width / height, fieldOfView),
+): GraphOnScreen {
+  const { graphWidth } = layoutFor(width / height)
+  const { position, target } = from
+  // The camera's own axes: it looks at its target, upright.
+  const ahead = [target[0] - position[0], target[1] - position[1], target[2] - position[2]]
+  const far = Math.hypot(...ahead)
+  const [ax, ay, az] = ahead.map((each) => each / far)
+  const flat = Math.hypot(ax, az)
+  const right = [-az / flat, 0, ax / flat]
+  const up = [-ay * right[2], ax * right[2] - az * right[0], ay * right[0]]
+  const half = Math.tan((fieldOfView * Math.PI) / 360)
+  const seen = (x: number, y: number) => {
+    const to = [x - position[0], y - position[1], -position[2]]
+    const depth = to[0] * ax + to[1] * ay + to[2] * az
+    return {
+      across: (0.5 + (to[0] * right[0] + to[2] * right[2]) / (2 * half * depth * (width / height))) * width,
+      down: (0.5 - (to[0] * up[0] + to[1] * up[1] + to[2] * up[2]) / (2 * half * depth)) * height,
+    }
+  }
+  return {
+    showing: figuresAt(progress),
+    left: seen(-graphWidth / 2, 0).across,
+    right: seen(graphWidth / 2, 0).across,
+    zero: seen(0, graphTopAt(0) + lineOverGraph).down,
+    crest: seen(0, graphTopAt(waveCrestAt) + lineOverGraph).down,
+    floor: seen(0, 0).down,
   }
 }
 
