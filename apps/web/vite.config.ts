@@ -1,12 +1,15 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { configDefaults } from 'vitest/config'
+import { landingBudget } from './build/budget.ts'
+import { preloadHeadlineFont } from './build/headlineFont.ts'
 
 const backend = process.env.RUNOUT_SERVER_URL ?? 'http://localhost:3000'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  // The build asks ahead for the headline's font, and fails when the Landing passes its weight budget.
+  plugins: [react(), preloadHeadlineFont(), landingBudget()],
   server: {
     port: 5173,
     proxy: {

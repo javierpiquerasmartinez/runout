@@ -211,7 +211,8 @@
 
 .landing__title {
   margin: 0 auto;
-  max-width: 18ch;
+  /* 18 of Instrument Serif's zeros, in ems: a fallback face's zero is not as wide, and the lines must break where they will. */
+  max-width: 8.28em;
   font-size: clamp(30px, min(5.2vw, 10.4dvh - 34px), 62px);
   font-weight: 400;
   line-height: 1.05;
@@ -220,7 +221,8 @@
 
 .landing__line {
   margin: 14px auto 0;
-  max-width: 44ch;
+  /* 44 of Instrument Sans's zeros, in ems, as the title's. */
+  max-width: 29.3em;
   font-size: clamp(15px, min(1.5vw, 2.8dvh), 19px);
   line-height: 1.45;
   color: var(--text-secondary, inherit);
