@@ -502,7 +502,9 @@ function picturesAskedFor(page: Page) {
   const asked: string[] = []
   page.on('request', (request) => {
     // In development the page's scripts ask for a module that holds each picture's address: that isn't the picture.
-    if (request.resourceType() === 'image' && new URL(request.url()).pathname.endsWith('.webp')) asked.push(request.url())
+    // The scene's own textures are WebP too: a picture of the scene is named for its shape and its stop.
+    const picture = /\/(?:wide|tall)-\d+[\w.-]*\.webp$/.test(new URL(request.url()).pathname)
+    if (request.resourceType() === 'image' && picture) asked.push(request.url())
   })
   return asked
 }
