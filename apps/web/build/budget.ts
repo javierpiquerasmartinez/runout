@@ -29,12 +29,12 @@ export type Weights = {
  * The ceilings, each a little above what the build of 2026-11-15 weighed
  * (gzip -9; 1 kB is 1000 bytes):
  *
- * - critical path 99.9 kB, for the Landing in Spanish, the heavier of the two
- *   by a tenth of a kB: entry script 82.3 kB, the chunks it imports outright
+ * - critical path 100.0 kB, for the Landing in Spanish, the heavier of the two
+ *   by a tenth of a kB: entry script 82.4 kB, the chunks it imports outright
  *   5.9 kB (the React runtime 3.4 kB, routing 2.4 kB), the Landing's messages
  *   in the document's language 0.9 kB, styles 8.1 kB, the document with the
  *   Landing in it 2.8 kB
- * - scene chunk 157.6 kB, nearly all of it three.js's renderer, which comes
+ * - scene chunk 157.7 kB, nearly all of it three.js's renderer, which comes
  *   whole however little of it a scene uses
  * - textures 132.8 kB: felt 64.8 kB, card back 44.5 kB, chip face 17.9 kB,
  *   studio 5.6 kB

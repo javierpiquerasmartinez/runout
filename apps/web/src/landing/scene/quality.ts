@@ -45,7 +45,7 @@ const slowest: Record<Tier, number> = { high: 1000 / 45, medium: 1000 / 28, stil
 
 /** Frames left out at the start, while shaders compile and textures arrive, and frames averaged after. */
 const warmUp = 40
-const window = 90
+const averaged = 90
 
 /**
  * Watches a tier's frames. `frame` takes the milliseconds since the frame
@@ -61,9 +61,9 @@ export function paceOf(tier: Tier): { frame(milliseconds: number): boolean } {
       if (!(milliseconds > 0) || milliseconds >= 250) return false
       if (++seen <= warmUp) return false
       last.push(milliseconds)
-      if (last.length > window) last.shift()
-      if (last.length < window) return false
-      return last.reduce((sum, each) => sum + each, 0) / window > slowest[tier]
+      if (last.length > averaged) last.shift()
+      if (last.length < averaged) return false
+      return last.reduce((sum, each) => sum + each, 0) / averaged > slowest[tier]
     },
   }
 }

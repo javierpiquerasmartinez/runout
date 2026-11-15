@@ -8,7 +8,7 @@ import './LoginPage.css'
 
 /**
  * `/login`: the brand, Google's button, the password form and the way back
- * to the landing, over a still of the Landing's scene, and dark as the
+ * to the Landing, over a still of the Landing's scene, and dark as the
  * Landing is, whatever the Theme. Runout is invitation-only, and it says so.
  * Once signed in, `routes/Routes` takes the Account to its Home.
  */

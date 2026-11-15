@@ -37,6 +37,7 @@ import {
   type Point,
 } from './choreography'
 import { drawWhileVisible } from './frames'
+import { darkLeftSharp } from './lens'
 import { paceOf, tierBelow, type Tier } from './quality'
 // The textures are made from the originals in `build/textures`, by the script beside them.
 import cardBackUrl from './textures/card-back.webp'
@@ -364,11 +365,12 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       camera.layers.set(0)
       lens = new BokehPass(scene, camera, { maxblur: depthOfField.most })
       // The dark beyond the scene is at no distance: left as it is, so nothing in focus bleeds into it.
-      // Should the addon's shader change and this line of it go, the dark is blurred like anything far away.
-      lens.materialBokeh.fragmentShader = lens.materialBokeh.fragmentShader.replace(
-        'float factor = ( focus + viewZ );',
-        'float factor = getDepth( vUv ) < 0.99999 ? focus + viewZ : 0.0;',
-      )
+      try {
+        lens.materialBokeh.fragmentShader = darkLeftSharp(lens.materialBokeh.fragmentShader)
+      } catch (error) {
+        // Loud where someone can act on it; a Visitor gets the scene with the dark blurred like anything far away.
+        if (import.meta.env.DEV) throw error
+      }
       composer.addPass(lens)
       composer.addPass(new LayerOverPass(scene, camera, waveLayer, samples))
     } else {

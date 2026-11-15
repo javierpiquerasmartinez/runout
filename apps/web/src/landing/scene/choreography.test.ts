@@ -139,11 +139,35 @@ describe('cameraAt', () => {
     expect(cameraAt(0, tall, fieldOfView).position[2]).toBeGreaterThan(cameraAt(0, wide, fieldOfView).position[2])
   })
 
-  it('ends over the table, looking almost straight down', () => {
-    const { position, target } = cameraAt(1, wide, fieldOfView)
+  it('ends over the table on a tall screen, looking almost straight down', () => {
+    const { position, target } = cameraAt(1, tall, fieldOfView)
     expect(target[0]).toBe(0)
     expect(position[0]).toBe(0)
     expect(position[1] - target[1]).toBeGreaterThan((position[2] - target[2]) * 5)
+  })
+
+  // From straight above a wide table is as deep on screen as it is on the felt, and the stretch between the bar and
+  // the copy is all it can fill: a third of the screen's width. Seen from lower it is shallower, and can be wider.
+  it('ends lower over the table on a wide screen, where its rim spans more than half the width', () => {
+    const { position, target } = cameraAt(1, wide, fieldOfView)
+    expect(position[0]).toBe(0)
+    const elevation = (Math.atan2(position[1] - target[1], position[2] - target[2]) * 180) / Math.PI
+    expect(elevation).toBeLessThan(50)
+
+    const { table } = layoutFor(wide)
+    const rim = onScreen([table.across, 0, 0], 1, wide).x - onScreen([-table.across, 0, 0], 1, wide).x
+    expect(rim).toBeGreaterThanOrEqual(0.55)
+    expect(rim).toBeLessThanOrEqual(0.6)
+  })
+
+  it('still sees every card of the board apart from the next at the end, on a wide screen', () => {
+    const { board } = placesFor(layoutFor(wide))
+    // Each card at least 36 px wide and 22 px deep on a 1280 by 720 screen.
+    const [x, , z] = board[2]
+    const across = onScreen([x + card.width / 2, 0, z], 1, wide).x - onScreen([x - card.width / 2, 0, z], 1, wide).x
+    const down = onScreen([x, 0, z + card.length / 2], 1, wide).y - onScreen([x, 0, z - card.length / 2], 1, wide).y
+    expect(across * 1280).toBeGreaterThan(36)
+    expect(down * 720).toBeGreaterThan(22)
   })
 
   it.each(windows)('ends with the table and its seats under the bar and above the copy in $name', ({ width, height }) => {
@@ -427,7 +451,7 @@ describe('placesFor', () => {
     ['when the flop is down', stops[2].at, 3],
     ['when the river is down', stops[3].at, 5],
   ])(
-    "stands no seat's chips between the visitor and the Hero's cards or the board %s, on any shape of screen",
+    "stands no seat's chips between the Visitor and the Hero's cards or the board %s, on any shape of screen",
     (_when, at, dealt) => {
       for (const aspect of screens) {
         const places = placesFor(layoutFor(aspect))

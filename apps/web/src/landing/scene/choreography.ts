@@ -14,7 +14,7 @@ import { waveCrestAt, waveHeightAt } from './brandWave'
 /** The camera's vertical field of view, in degrees. */
 export const fieldOfView = 40
 
-/** A point in the scene: `x` across, `y` up, `z` towards the visitor; the felt is `y = 0`. */
+/** A point in the scene: `x` across, `y` up, `z` towards the Visitor; the felt is `y = 0`. */
 export type Point = readonly [x: number, y: number, z: number]
 
 /** Where each part of the story starts and ends, in scroll progress from 0 to 1. */
@@ -83,7 +83,7 @@ export function staggeredBeatAt(beat: Beat, progress: number, index: number, cou
 /** What the scene is laid out for: a screen wider than tall, or taller than wide. */
 export type Layout = {
   portrait: boolean
-  /** The table's half-width across and half-depth towards the visitor. On a tall screen it is turned end-on. */
+  /** The table's half-width across and half-depth towards the Visitor. On a tall screen it is turned end-on. */
   table: { across: number; deep: number }
   /** How wide the wave is drawn in the opening. */
   waveWidth: number
@@ -108,7 +108,7 @@ const seatReach = seatOut + seatDisc.outer
 /** A chip, lying flat. */
 export const chip = { radius: 0.115, height: 0.024 }
 
-/** A card, lying flat with its length towards the visitor. The deck is as wide and as long. */
+/** A card, lying flat with its length towards the Visitor. The deck is as wide and as long. */
 export const card = { width: 0.62, length: 0.88, thick: 0.01 }
 
 /**
@@ -126,11 +126,11 @@ const stackGap = 0.26
 /** Where things sit on the felt, each by its centre. */
 export type Places = {
   deck: Point
-  /** The seats' discs, just outside the rim; seat 0 is the Hero's, nearest the visitor. */
+  /** The seats' discs, just outside the rim; seat 0 is the Hero's, nearest the Visitor. */
   seats: readonly Point[]
   /** Each seat's stacks, inside the rim: where each stands and how many chips it holds. */
   stacks: readonly (readonly { at: Point; chips: number }[])[]
-  /** The Hero's two cards, near the visitor. */
+  /** The Hero's two cards, near the Visitor. */
   hole: readonly Point[]
   /** The board's five cards, across the middle. */
   board: readonly Point[]
@@ -150,11 +150,11 @@ function row(count: number, gap: number, x: number, z: number): Point[] {
 function layPlaces(layout: Layout): Places {
   const { table, portrait } = layout
   // The middle of each seat's chips: round the table, the short stack on the Hero's right keeping clear of
-  // the Hero's, which stand well to the side of their cards, clear of the board from where the visitor sits.
+  // the Hero's, which stand well to the side of their cards, clear of the board from where the Visitor sits.
   const stacksAt: Point[] = [
     portrait ? [1.25, 0, 2.05] : [2.2, 0, 1.2],
-    // On a tall table the seats either side of the Hero keep nearer the visitor's end, where their chips
-    // don't stand between the visitor and the ends of the board.
+    // On a tall table the seats either side of the Hero keep nearer the Visitor's end, where their chips
+    // don't stand between the Visitor and the ends of the board.
     roundTable(layout, portrait ? 144 : 150),
     roundTable(layout, 210),
     roundTable(layout, 270),
@@ -287,6 +287,23 @@ function shots(layout: Layout): Shot[] {
       band: betweenBarAndCopy,
     }
   }
+  // The same from lower down, where the near seats are a good deal nearer the camera than the far ones and the
+  // table is no longer as deep on screen as its depth times the angle's sine: where the shot must look, and how
+  // deep a frame it needs, for the far seats to come just under the top of the stretch and the near ones just
+  // over its bottom, as the camera's own projection draws them.
+  const lowOverTable = (elevation: number): Pick<Shot, 'target' | 'elevation' | 'frame' | 'band'> => {
+    const angle = (elevation * Math.PI) / 180
+    const deep = table.deep + seatReach
+    const half = Math.tan((fieldOfView * Math.PI) / 360)
+    const lean = half * Math.cos(angle)
+    const nearer = (deep * (clear.copy - clear.bar) * lean) / (Math.sin(angle) - lean * (1 - clear.bar - clear.copy))
+    return {
+      target: [0, 0, nearer],
+      elevation,
+      frame: { width: 2 * (table.across + seatReach) + 0.2, height: 2 * (deep + nearer) * (Math.sin(angle) - lean * (1 - 2 * clear.bar)) * 1.01 },
+      band: betweenBarAndCopy,
+    }
+  }
   // The graph, from the felt to the line along its top, with room over it for the legend and under it for the
   // first and last Hand, as shares of the stretch it is fitted in: what they need of the shortest window.
   const graphRoom = { over: 0.19, under: 0.09 }
@@ -318,9 +335,19 @@ function shots(layout: Layout): Shot[] {
     // Side-on to the graph.
     { at: beats.graph[1] - 0.04, target: graphMiddle, elevation: 3, frame: graphFrame, band: betweenBarAndCopy, focus: graph },
     { at: beats.line[1], target: graphMiddle, elevation: 5, frame: graphFrame, band: betweenBarAndCopy, focus: graph },
-    // Over the table, seats and all, under the bar and above the copy.
-    { at: beats.seats[0] + 0.06, ...overTable(78), focus: board },
-    { at: 1, ...overTable(82), focus: board },
+    // Over the table, seats and all, under the bar and above the copy: from almost straight above on a tall screen.
+    // That view of a wide table is limited by the height of the stretch it is fitted in, and the table comes out
+    // a third of the screen's width; from lower it is shallower on screen and so can be wider, its rim more than
+    // half the width of a 16:9 screen, with the board still read.
+    ...(layout.portrait
+      ? [
+          { at: beats.seats[0] + 0.06, ...overTable(78), focus: board },
+          { at: 1, ...overTable(82), focus: board },
+        ]
+      : [
+          { at: beats.seats[0] + 0.06, ...lowOverTable(38), focus: board },
+          { at: 1, ...lowOverTable(42), focus: board },
+        ]),
   ]
 }
 
@@ -334,7 +361,7 @@ const mixPoint = (from: Point, to: Point, t: number): Point => [
 /**
  * Where the camera is and what it looks at, for a scroll progress, a
  * viewport's width over its height and the camera's vertical field of view
- * in degrees. The camera always faces the scene from the visitor's side;
+ * in degrees. The camera always faces the scene from the Visitor's side;
  * its distance is whatever fits the shot's frame in its band of the
  * viewport, so a tall phone and a wide monitor both see the whole of it.
  * `focus` is how far in front of the camera the shot is sharp.
