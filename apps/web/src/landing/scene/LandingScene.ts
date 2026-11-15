@@ -28,6 +28,7 @@ import {
   type Places,
   type Point,
 } from './choreography'
+import { drawWhileVisible } from './frames'
 import { paceOf, tierBelow, type Tier } from './quality'
 import cardBackUrl from './textures/card-back.jpeg'
 import chipFaceUrl from './textures/chip-face.jpeg'
@@ -592,7 +593,6 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   let shown = 0
   let width = 0
   let height = 0
-  let frame = 0
   let last = performance.now()
   const opened = last
   const pointer = { x: 0, y: 0, shownX: 0, shownY: 0 }
@@ -622,7 +622,6 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
   }
 
   function draw(now: number) {
-    frame = requestAnimationFrame(draw)
     resize()
     if (!width || !height) return
     const still = tier === 'still'
@@ -794,14 +793,15 @@ export function mountLandingScene(canvas: HTMLCanvasElement, options: LandingSce
       { signal: listening.signal, passive: true },
     )
   }
-  frame = requestAnimationFrame(draw)
+  // Nothing is drawn while the page is hidden, and the scene's time stands still until it is seen again.
+  const stopDrawing = drawWhileVisible(draw)
 
   return {
     setProgress(progress) {
       target = Math.min(1, Math.max(0, progress))
     },
     dispose() {
-      cancelAnimationFrame(frame)
+      stopDrawing()
       listening.abort()
       for (const thing of disposables) thing.dispose()
     },

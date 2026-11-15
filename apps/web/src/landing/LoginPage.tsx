@@ -6,9 +6,6 @@ import { Brand } from '../ui/Brand'
 import { Icon } from '../ui/Icon'
 import './LoginPage.css'
 
-/** The sign-in screen: Google, or an email and its password. */
-export const loginPath = '/login'
-
 /**
  * `/login`: the brand, Google's button, the password form and the way back
  * to the landing, over a still of the Landing's scene, and dark as the

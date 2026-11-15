@@ -1,23 +1,28 @@
-import { useState, type ReactNode } from 'react'
+import { Suspense, useState, type ReactNode } from 'react'
 import { useHealth, usePing } from './backend/useBackendStatus'
-import { DesignSystemPage } from './design-system/DesignSystemPage'
 import { useI18n } from './i18n'
 import { FirstDisplayName } from './identity/ChooseDisplayName'
 import { ImpersonationBanner } from './identity/ImpersonationBanner'
 import { SessionProvider } from './identity/SessionProvider'
-import { roomCodeFromLibraryPath } from './library/library'
-import { RoomHolder } from './room/RoomHolder'
+import { roomCodeFromLibraryPath } from './library/paths'
 import { roomCodeFromPath } from './room/roomCode'
 import { usePath } from './routing'
+import { DesignSystemPage, RoomHolder } from './routes/pages'
 import { Routes } from './routes/Routes'
-import { settingsPath } from './settings/SettingsPage'
+import { settingsPath } from './settings/paths'
 
 export const designSystemPath = '/design-system'
 export const statusPath = '/status'
 
 function App() {
   const path = usePath()
-  if (path === designSystemPath) return <DesignSystemPage />
+  if (path === designSystemPath) {
+    return (
+      <Suspense fallback={null}>
+        <DesignSystemPage />
+      </Suspense>
+    )
+  }
   if (path === statusPath) return <ConnectionStatus />
   return (
     <SessionProvider>
@@ -43,9 +48,11 @@ function KeepRoom({ path, children }: { path: string; children: ReactNode }) {
   if (!code) return children
   // Keyed by code, so moving to another Room starts from a clean slate.
   return (
-    <RoomHolder key={code} code={code}>
-      {children}
-    </RoomHolder>
+    <Suspense fallback={null}>
+      <RoomHolder key={code} code={code}>
+        {children}
+      </RoomHolder>
+    </Suspense>
   )
 }
 

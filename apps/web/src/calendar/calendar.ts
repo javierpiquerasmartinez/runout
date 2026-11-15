@@ -44,8 +44,9 @@ export interface Milestone {
   createdAt: string
 }
 
-/** The Calendar ("Calendario"): an Account's study plan. It opens on the current month. */
-export const calendarPath = '/calendar'
+import { calendarPath } from './paths'
+
+export { calendarPath, isCalendarPath } from './paths'
 
 /** How long a Milestone's title may be, as the server allows it. */
 export const MAX_MILESTONE_TITLE_LENGTH = 80
@@ -184,11 +185,6 @@ export function periodSpan(period: Period): CalendarSpan {
   if (period.view === 'week') return { from: period.monday, to: addDays(period.monday, 6) }
   const weeks = monthGrid(period.month)
   return { from: weeks[0][0].date, to: weeks[weeks.length - 1][6].date }
-}
-
-/** Whether this path is the Calendar's or one of its views' or Milestones'. */
-export function isCalendarPath(path: string): boolean {
-  return path === calendarPath || path.startsWith(`${calendarPath}/`)
 }
 
 /** A period's own address: `/calendar/month/YYYY-MM` or `/calendar/week/YYYY-MM-DD` on its Monday. */

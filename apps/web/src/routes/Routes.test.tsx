@@ -540,7 +540,7 @@ describe('Routes · the Administrator panel, only for an Administrator', () => {
   it('opens on Invitations, with each tab a route of its own', async () => {
     renderAt('/admin', fakeSession({ administrator: true }))
 
-    expect(screen.getByRole('heading', { name: 'Administration' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Administration' })).toBeTruthy()
     const tabs = screen.getByRole('navigation', { name: 'Administration sections' })
     expect(within(tabs).getByRole('link', { name: 'Invitations' }).getAttribute('aria-current')).toBe('page')
 
@@ -568,11 +568,11 @@ describe('Routes · the Administrator panel, only for an Administrator', () => {
 describe('Routes · getting in, for anyone', () => {
   it('opens the page to ask for a reset link without an identity', async () => {
     renderAt('/reset-password', visitor())
-    expect(screen.getByRole('heading', { name: 'Change your password' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Change your password' })).toBeTruthy()
   })
 
-  it('lets an Account signed in on this browser finish a reset link too', () => {
+  it('lets an Account signed in on this browser finish a reset link too', async () => {
     renderAt('/reset-password/some-token', account())
-    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Choose a new password' })).toBeTruthy()
   })
 })
