@@ -44,6 +44,19 @@
   opacity: 1;
 }
 
+/*
+ * A picture of the scene in its place, where it can't be drawn: it fills the
+ * screen as the scene would, cut at the sides or at top and bottom where the
+ * screen isn't the picture's shape.
+ */
+.landing__still {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  object-fit: cover;
+}
+
 /* ---------- The Results Graph's figures, round the graph of chips ---------- */
 
 .landing__figures {
@@ -183,7 +196,7 @@
 /*
  * ---------- The copy, held in the lower two fifths ----------
  * No caption starts higher than 60% of the way down the screen, which the
- * scene's shots count on (`clear.copy` in the choreography): the type shrinks
+ * scene's shots count on (`clearFor` in the choreography): the type shrinks
  * with the window's height as well as its width, down to three lines of
  * title, two of text and the hint in a window 600 px tall.
  */
