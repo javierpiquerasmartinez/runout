@@ -26,6 +26,7 @@ import {
   SettingsPage,
 } from './pages'
 import { Redirect } from './Redirect'
+import { ScreenBoundary } from './ScreenBoundary'
 
 /**
  * Which screen this path shows to this browser's identity (none, anonymous,
@@ -36,13 +37,16 @@ import { Redirect } from './Redirect'
  *
  * Every screen but the Landing arrives in its own chunk (`pages`). While one
  * is on its way nothing is shown in its place: it is a moment, and an
- * Account's screens are asked for ahead of its opening them.
+ * Account's screens are asked for ahead of its opening them. One that
+ * doesn't arrive is `ScreenBoundary`'s to recover from.
  */
 export function Routes() {
   return (
-    <Suspense fallback={null}>
-      <Route />
-    </Suspense>
+    <ScreenBoundary at={usePath()}>
+      <Suspense fallback={null}>
+        <Route />
+      </Suspense>
+    </ScreenBoundary>
   )
 }
 

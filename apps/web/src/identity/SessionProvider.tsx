@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../backend/api'
-import { useI18n } from '../i18n'
+import { hasWholeCatalogue, useI18n, wholeCatalogue } from '../i18n'
 import { PreferencesContext } from '../preferences/context'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 import { useTheme } from '../preferences/theme'
@@ -15,6 +15,7 @@ import {
   joinAnonymously,
   keepSession,
   loadSession,
+  recognisedSession,
   rememberLanguage,
   signInWithGoogle,
   signInWithPassword,
@@ -33,12 +34,22 @@ type Loading = { state: 'loading' } | { state: 'ready'; session: Session | null 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { t, setLocale } = useI18n()
   // A browser with no token has no identity, and that is known at once: a Visitor's first draw is the screen they came for.
-  const [loading, setLoading] = useState<Loading>(() => (holdsSession() ? { state: 'loading' } : { state: 'ready', session: null }))
+  // So is one the server has recognised before the app drew anything (see `main.tsx`).
+  const [loading, setLoading] = useState<Loading>(() => {
+    const recognised = recognisedSession()
+    if (recognised === null || (recognised && hasWholeCatalogue())) return { state: 'ready', session: recognised }
+    return holdsSession() ? { state: 'loading' } : { state: 'ready', session: null }
+  })
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     loadSession()
+      // What an identity is shown reads from the whole message catalogue; a Visitor's Landing needs only its own.
+      .then(async (session) => {
+        if (session) await wholeCatalogue()
+        return session
+      })
       .then((session) => !cancelled && setLoading({ state: 'ready', session }))
       .catch(() => !cancelled && setLoading({ state: 'error' }))
     return () => {

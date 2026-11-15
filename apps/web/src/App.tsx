@@ -9,6 +9,7 @@ import { roomCodeFromPath } from './room/roomCode'
 import { usePath } from './routing'
 import { DesignSystemPage, RoomHolder } from './routes/pages'
 import { Routes } from './routes/Routes'
+import { ScreenBoundary } from './routes/ScreenBoundary'
 import { settingsPath } from './settings/paths'
 
 export const designSystemPath = '/design-system'
@@ -18,9 +19,11 @@ function App() {
   const path = usePath()
   if (path === designSystemPath) {
     return (
-      <Suspense fallback={null}>
-        <DesignSystemPage />
-      </Suspense>
+      <ScreenBoundary>
+        <Suspense fallback={null}>
+          <DesignSystemPage />
+        </Suspense>
+      </ScreenBoundary>
     )
   }
   if (path === statusPath) return <ConnectionStatus />
@@ -48,11 +51,13 @@ function KeepRoom({ path, children }: { path: string; children: ReactNode }) {
   if (!code) return children
   // Keyed by code, so moving to another Room starts from a clean slate.
   return (
-    <Suspense fallback={null}>
-      <RoomHolder key={code} code={code}>
-        {children}
-      </RoomHolder>
-    </Suspense>
+    <ScreenBoundary at={path}>
+      <Suspense fallback={null}>
+        <RoomHolder key={code} code={code}>
+          {children}
+        </RoomHolder>
+      </Suspense>
+    </ScreenBoundary>
   )
 }
 

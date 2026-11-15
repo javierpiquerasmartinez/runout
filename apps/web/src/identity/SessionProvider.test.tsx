@@ -71,6 +71,24 @@ describe('SessionProvider in a browser that holds no token', () => {
   })
 })
 
+describe('SessionProvider in a browser the server has recognised already', () => {
+  // The page kept what the document held on screen while it asked whose the token was: the app's first draw is the screen itself.
+  it('shows the app in its first draw, with no loader in between', async () => {
+    const { loadSession } = await import('./identity')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ id: 'guest', displayName: 'Marta', screenNames: [], preferences: { language: 'en' }, account: null, room: { code: 'ABCDEF' } }),
+      ),
+    )
+    await loadSession()
+
+    await renderProvider()
+
+    expect(document.body.textContent).toBe('The app')
+  })
+})
+
 describe('SessionProvider with a server from before a Preference existed', () => {
   // The web can go live before the server that knows a new Preference: what it doesn't send reads as its default.
   it('reads any Preference the server leaves out as its default', async () => {

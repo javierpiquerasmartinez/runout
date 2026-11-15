@@ -1,10 +1,21 @@
+import type { ComponentType } from 'react'
+import { wholeCatalogue } from '../i18n'
 import type { RoomSummary } from '../room/roomClient'
-import { lazyPage } from './lazyPage'
+import { lazyPage as chunk } from './lazyPage'
 
 /*
  * Every screen but the Landing, each in a chunk of its own that its route
  * asks for. The Landing is what a Visitor came for and arrives with the app.
  */
+
+/**
+ * A screen in its own chunk, which arrives with the whole message catalogue:
+ * the first load carries the Landing's messages alone, and every other
+ * screen reads from the rest.
+ */
+function lazyPage<Props extends object>(load: () => Promise<ComponentType<Props>>) {
+  return chunk<Props>(() => Promise.all([load(), wholeCatalogue()]).then(([page]) => page))
+}
 
 export const DesignSystemPage = lazyPage(() => import('../design-system/DesignSystemPage').then((module) => module.DesignSystemPage))
 

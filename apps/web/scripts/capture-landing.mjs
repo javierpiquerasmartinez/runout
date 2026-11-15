@@ -16,6 +16,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { createServer } from 'vite'
+import { preview as previewPicture, stillWindows } from '../src/landing/captures.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const into = fileURLToPath(new URL('../src/landing/stills/', import.meta.url))
@@ -27,22 +28,22 @@ const into = fileURLToPath(new URL('../src/landing/stills/', import.meta.url))
  * phone's two device pixels to one.
  */
 const shapes = [
-  { name: 'wide', window: { width: 1600, height: 900 }, picture: { width: 1600, height: 900 } },
-  { name: 'tall', window: { width: 400, height: 800 }, picture: { width: 800, height: 1600 } },
+  { name: 'wide', window: stillWindows.wide, picture: { width: 1600, height: 900 } },
+  { name: 'tall', window: stillWindows.tall, picture: { width: 800, height: 1600 } },
 ]
 const quality = 0.8
 
 /*
  * The picture a link to Runout previews with (`build/landingDocuments.ts`
  * puts its address in the Landing's documents): the Hand dealt to the river,
- * at 1200 by 630, the 1.91 to 1 that a large preview is shown at, drawn at
- * twice that and scaled down. A JPEG: not everything that previews a link
+ * at the size a large preview is shown at (`src/landing/captures.ts`), drawn
+ * at twice that and scaled down. A JPEG: not everything that previews a link
  * reads WebP.
  */
 const preview = {
-  file: fileURLToPath(new URL('../src/landing/preview.jpg', import.meta.url)),
+  file: `${root}${previewPicture.file}`,
   stop: 3,
-  window: { width: 1200, height: 630 },
+  window: { width: previewPicture.width, height: previewPicture.height },
   quality: 0.82,
 }
 

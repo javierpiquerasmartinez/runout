@@ -112,6 +112,25 @@ test.describe('the language', () => {
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(english.headline)
     })
 
+    test('is shown nothing of the Landing in Spanish while on the way there', async ({ page }) => {
+      await noteWhatShows(page, spanish.headline)
+      // `/en` takes a moment to answer, and the app's script has arrived and run at `/` well before it does.
+      let appArrived = () => {}
+      const arrived = new Promise<void>((resolve) => (appArrived = resolve))
+      page.on('requestfinished', (request) => /\/assets\/index-.*\.js$/.test(request.url()) && appArrived())
+      await page.route(/\/en$/, async (route) => {
+        await arrived
+        await new Promise((ran) => setTimeout(ran, 500))
+        await route.continue()
+      })
+
+      await page.goto('/')
+
+      await expect(page).toHaveURL(/\/en$/)
+      await rests(page)
+      expect(await page.evaluate(() => sessionStorage.getItem('shown'))).toBeNull()
+    })
+
     test('keeps what follows the address on the way', async ({ page }) => {
       await page.goto('/?from=a-friend#top')
 
@@ -207,7 +226,7 @@ test.describe('an Account', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible()
 
     // Being recognised left the marker, which says nothing of whose the session is.
-    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBe('1')
+    expect(await page.evaluate(() => localStorage.getItem('runout.account'))).toBe('1')
 
     await noteWhatShows(page)
     await slowScripts(page)
@@ -224,11 +243,106 @@ test.describe('an Account', () => {
     await page.getByRole('button', { name: 'Cerrar sesión' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: spanish.headline })).toBeVisible()
-    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('runout.account'))).toBeNull()
     await page.evaluate(() => sessionStorage.removeItem('shown'))
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1, name: spanish.headline })).toBeVisible()
     expect(await page.evaluate(() => sessionStorage.getItem('shown'))).toBe('true')
+  })
+})
+
+test.describe('someone in a Room without an Account', () => {
+  test('is shown the Landing in the document at /, which stays on screen while the app finds out who they are', async ({ page, request }) => {
+    const signedIn = await request.post(`${BUILT_URL}/api/sessions/google`, { data: { idToken: 'dev-sign-in|tester-a' } })
+    const account = (await signedIn.json()) as { token: string }
+    const created = await request.post(`${BUILT_URL}/api/rooms`, {
+      headers: { Authorization: `Bearer ${account.token}` },
+      data: { name: 'A Room for a guest', displayName: 'Tester A' },
+    })
+    const { code } = (await created.json()) as { code: string }
+    const joined = await request.post(`${BUILT_URL}/api/rooms/${code}/guests`, { data: { displayName: 'Marta' } })
+    const guest = (await joined.json()) as { token: string }
+    await page.goto('/app.html')
+    await page.evaluate((token) => localStorage.setItem('runout.identityToken', token), guest.token)
+
+    // Notes every frame in which no Landing is on screen, from the first one that had it.
+    await page.addInitScript((headline) => {
+      let seen = false
+      const look = () => {
+        const showing = !!document.querySelector('.landing')?.checkVisibility() && document.querySelector('h1')?.textContent === headline
+        seen ||= showing
+        if (seen && !showing) sessionStorage.setItem('went', 'true')
+        if (showing) sessionStorage.setItem('shown', 'true')
+        requestAnimationFrame(look)
+      }
+      look()
+    }, spanish.headline)
+    await slowScripts(page)
+    // The server takes a moment to say whose the token is.
+    await page.route(/\/api\/identities\/me$/, async (route) => {
+      await new Promise((answered) => setTimeout(answered, 600))
+      await route.continue()
+    })
+
+    await page.goto('/')
+    await rests(page)
+
+    expect(await page.evaluate(() => sessionStorage.getItem('shown'))).toBe('true')
+    expect(await page.evaluate(() => sessionStorage.getItem('went'))).toBeNull()
+    // Being recognised leaves no marker: it is not an Account's session.
+    expect(await page.evaluate(() => localStorage.getItem('runout.account'))).toBeNull()
+  })
+})
+
+test.describe('a tab left open across a deploy', () => {
+  /** Answers for the Sign-in page's chunk as a server does once a newer build has replaced it, for as long as `gone` says. */
+  async function withoutSignInChunk(page: Page, gone: () => boolean) {
+    await page.route(/\/assets\/LoginPage-[\w-]+\.js$/, (route) =>
+      gone() ? route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not found' }) : route.continue(),
+    )
+  }
+
+  test('is answered not found for a file of the build that is gone, not with the app', async ({ request }) => {
+    for (const accept of ['*/*', 'text/html,*/*']) {
+      const gone = await request.get('/assets/LibraryPage-0ld.js', { headers: { accept } })
+      expect(gone.status(), accept).toBe(404)
+    }
+  })
+
+  test('reloads once for a screen whose chunk is gone, and is shown the screen by the build that is there now', async ({ page }) => {
+    // The chunk is gone until the page is loaded again.
+    let loads = 0
+    page.on('request', (request) => request.isNavigationRequest() && loads++)
+    await withoutSignInChunk(page, () => loads < 2)
+    await page.goto('/')
+    await rests(page)
+
+    await page.getByRole('link', { name: spanish.signIn }).click()
+
+    await expect(page.getByRole('main', { name: 'Iniciar sesión' })).toBeVisible()
+    await expect(page).toHaveURL(/\/login$/)
+    expect(loads).toBe(2)
+  })
+
+  test('is told when reloading did not bring the screen, and has it on trying again', async ({ page }) => {
+    let gone = true
+    let loads = 0
+    page.on('request', (request) => request.isNavigationRequest() && loads++)
+    await withoutSignInChunk(page, () => gone)
+    await page.goto('/')
+    await rests(page)
+
+    await page.getByRole('link', { name: spanish.signIn }).click()
+
+    await expect(page.getByRole('alert')).toHaveText('No hemos podido cargar esta pantalla. Comprueba tu conexión y vuelve a intentarlo.')
+    // Reloaded once, and not again.
+    expect(loads).toBe(2)
+
+    gone = false
+    await page.getByRole('button', { name: 'Reintentar' }).click()
+
+    await expect(page.getByRole('main', { name: 'Iniciar sesión' })).toBeVisible()
+    expect(loads).toBe(2)
   })
 })
 

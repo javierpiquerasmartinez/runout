@@ -53,16 +53,17 @@ const TOKEN_KEY = 'runout.identityToken'
 const ADMINISTRATOR_TOKEN_KEY = 'runout.administratorToken'
 
 /**
- * A marker that this browser holds a session, and nothing about whose. The
- * document's own script reads it before first paint, to keep the Landing
- * rendered into it out of sight of someone who is on their way Home (see
- * `index.html`, which names the same key). It is left and cleared with the
- * token.
+ * A marker that this browser is signed in to an Account, and nothing about
+ * whose. The document's own script reads it before first paint, to keep the
+ * Landing rendered into it out of sight of someone who is on their way Home
+ * (see `index.html`, which names the same key). Only an Account's session
+ * leaves it: an anonymous identity is shown the Landing at `/` as any
+ * Visitor is. It is cleared with the token.
  */
-const SIGNED_IN_KEY = 'runout.signedIn'
+export const ACCOUNT_KEY = 'runout.account'
 
 /** The language last read in here by an identity, which the same script takes for the Landing's over the browser's. */
-const LANGUAGE_KEY = 'runout.language'
+export const LANGUAGE_KEY = 'runout.language'
 
 /** Keeps the language an identity reads in, for the Landing this browser is shown once it has none. */
 export function rememberLanguage(language: Preferences['language'], storage: Storage = window.localStorage) {
@@ -70,6 +71,31 @@ export function rememberLanguage(language: Preferences['language'], storage: Sto
 }
 
 let loading: Promise<Session | null> | null = null
+/** The session the server has recognised this browser with, null for none, and undefined until it has answered. */
+let recognised: Session | null | undefined
+
+/** The session this browser has from now on, with no need to ask the server whose it is. */
+function settle(session: Session | null) {
+  recognised = session
+  loading = Promise.resolve(session)
+}
+
+/**
+ * The session this browser has been recognised with, where that is known
+ * already: null for none, and undefined while the server hasn't answered.
+ */
+export function recognisedSession(): Session | null | undefined {
+  return recognised
+}
+
+/**
+ * Whether this browser was signed in to an Account when it was last
+ * recognised, by the marker that leaves: what the document's own script goes
+ * by, before the server has said anything.
+ */
+export function holdsAccount(): boolean {
+  return typeof window !== 'undefined' && readKey(window.localStorage, ACCOUNT_KEY) !== null
+}
 
 /**
  * Whether this browser holds a token, before the server has said whose it is
@@ -87,10 +113,13 @@ export function holdsSession(): boolean {
  * whose Room closed, a session signed out elsewhere) is forgotten.
  */
 export function loadSession(storage: Storage = window.localStorage): Promise<Session | null> {
-  loading ??= fetchSession(storage).catch((error: unknown) => {
-    loading = null
-    throw error
-  })
+  loading ??= fetchSession(storage).then(
+    (session) => (recognised = session),
+    (error: unknown) => {
+      loading = null
+      throw error
+    },
+  )
   return loading
 }
 
@@ -100,9 +129,10 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
   try {
     // The first request of a visit may find the server asleep: it waits for it to wake.
     const identity = await untilAwake(() => api<Identity>('/identities/me', { token: stored }))
-    // A session from before the marker existed leaves it now.
-    writeKey(storage, SIGNED_IN_KEY, '1')
-    return { token: stored, identity: withDefaultPreferences(identity) }
+    const session = { token: stored, identity: withDefaultPreferences(identity) }
+    // An Account's session from before the marker existed leaves it now.
+    writeSession(storage, session)
+    return session
   } catch (error) {
     if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error
   }
@@ -111,7 +141,7 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
   const administrator = readKey(storage, ADMINISTRATOR_TOKEN_KEY)
   if (administrator) {
     removeKey(storage, ADMINISTRATOR_TOKEN_KEY)
-    writeToken(storage, administrator)
+    writeKey(storage, TOKEN_KEY, administrator)
     return fetchSession(storage)
   }
   return null
@@ -120,8 +150,8 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
 /** Keeps a session the server has just handed this browser, as its own from now on. */
 export function keepSession(signedIn: Session, storage: Storage = window.localStorage): Session {
   const session = withDefaults(signedIn)
-  writeToken(storage, session.token)
-  loading = Promise.resolve(session)
+  writeSession(storage, session)
+  settle(session)
   return session
 }
 
@@ -160,9 +190,11 @@ export async function endImpersonation(token: string, storage: Storage = window.
   }
   const administrator = readKey(storage, ADMINISTRATOR_TOKEN_KEY)
   removeKey(storage, ADMINISTRATOR_TOKEN_KEY)
-  if (administrator) writeToken(storage, administrator)
+  // The Administrator's own session is an Account's: the marker stays.
+  if (administrator) writeKey(storage, TOKEN_KEY, administrator)
   else removeToken(storage)
   loading = null
+  recognised = undefined
   return loadSession(storage)
 }
 
@@ -181,8 +213,8 @@ export async function joinAnonymously(
       body: { displayName },
     }),
   )
-  writeToken(storage, session.token)
-  loading = Promise.resolve(session)
+  writeSession(storage, session)
+  settle(session)
   return session
 }
 
@@ -214,8 +246,8 @@ export async function signInWithGoogle(
       body: { idToken },
     }),
   )
-  writeToken(storage, session.token)
-  loading = Promise.resolve(session)
+  writeSession(storage, session)
+  settle(session)
   return session
 }
 
@@ -225,7 +257,7 @@ export async function signInWithGoogle(
  */
 export function forgetSession(storage: Storage = window.localStorage) {
   removeToken(storage)
-  loading = Promise.resolve(null)
+  settle(null)
 }
 
 /** Ends this browser's session on the server and forgets its token; it goes on without an identity. */
@@ -239,7 +271,7 @@ export async function endSession(token: string, storage: Storage = window.localS
   removeToken(storage)
   // So Google doesn't sign the same account straight back in.
   window.google?.accounts.id.disableAutoSelect()
-  loading = Promise.resolve(null)
+  settle(null)
 }
 
 function readToken(storage: Storage): string | null {
@@ -248,12 +280,14 @@ function readToken(storage: Storage): string | null {
 
 function removeToken(storage: Storage) {
   removeKey(storage, TOKEN_KEY)
-  removeKey(storage, SIGNED_IN_KEY)
+  removeKey(storage, ACCOUNT_KEY)
 }
 
-function writeToken(storage: Storage, token: string) {
+/** Keeps a session's token, and leaves the marker if it is an Account's. */
+function writeSession(storage: Storage, { token, identity }: Session) {
   writeKey(storage, TOKEN_KEY, token)
-  writeKey(storage, SIGNED_IN_KEY, '1')
+  if (identity.account) writeKey(storage, ACCOUNT_KEY, '1')
+  else removeKey(storage, ACCOUNT_KEY)
 }
 
 function readKey(storage: Storage, key: string): string | null {

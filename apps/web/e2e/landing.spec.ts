@@ -567,17 +567,17 @@ test.describe('an Account', () => {
 test.describe('signing in', () => {
   test('leaves a marker in the browser that holds nothing about the Account, and signing out clears it', async ({ page }) => {
     await page.goto('/')
-    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('runout.account'))).toBeNull()
 
     await signInAs(page, 'Tester A')
 
-    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBe('1')
+    expect(await page.evaluate(() => localStorage.getItem('runout.account'))).toBe('1')
 
     await page.goto('/settings')
     await page.getByRole('button', { name: 'Cerrar sesión' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: titles.opening })).toBeVisible()
-    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('runout.account'))).toBeNull()
   })
 })
 

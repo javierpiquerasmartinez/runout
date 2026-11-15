@@ -1,7 +1,9 @@
 // @vitest-environment node
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { es as firstMessages } from '../src/i18n/messages/first/es.ts'
 
 /*
  * What a Visitor downloads before the Landing's copy and its two ways on can
@@ -81,5 +83,28 @@ describe("a Visitor's first load", () => {
     const scene = chunks.find((chunk) => chunk.moduleIds.map(named).includes('landing/scene/LandingScene.ts'))
     expect(scene?.isEntry).toBe(false)
     expect(chunks.some((chunk) => chunk.dynamicImports.includes(scene!.fileName))).toBe(true)
+  })
+
+  it('holds no message catalogue: each language comes in chunks of its own, asked for as it is needed', () => {
+    expect(firstLoad().filter((id) => id.startsWith('i18n/messages/'))).toEqual([])
+  })
+
+  // The first load's messages are the Landing's and the few the app may show before any other screen has arrived
+  // (`i18n/messages/first`): a module of the first load that reads any other would find it not yet there.
+  it('reads no message but the ones that arrive with it', () => {
+    // What only an identity is shown, which `identity/SessionProvider` holds back until the whole catalogue is here.
+    const forAnIdentity = ['identity/ChooseDisplayName.tsx', 'identity/ImpersonationBanner.tsx']
+    const early: string[] = []
+    for (const id of firstLoad()) {
+      const file = `${web}src/${id}`
+      if (id.startsWith('/') || !existsSync(file) || forAnIdentity.includes(id)) continue
+      const source = readFileSync(file, 'utf8')
+      // A key written out, and one put together from a prefix, as `landing.${caption}.title` is.
+      for (const [, key] of source.matchAll(/\bt\(\s*'([^']+)'/g)) if (!(key in firstMessages)) early.push(`${id}: ${key}`)
+      for (const [, prefix] of source.matchAll(/\bt\(\s*`([^`$]*)\$\{/g)) {
+        if (!Object.keys(firstMessages).some((key) => key.startsWith(prefix)) || !prefix) early.push(`${id}: ${prefix}…`)
+      }
+    }
+    expect(early).toEqual([])
   })
 })

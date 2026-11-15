@@ -12,10 +12,3 @@ export function landingLocaleAt(path: string): Locale {
   const address = path.replace(/(.)\/$/, '$1')
   return (Object.keys(landingPaths) as Locale[]).find((locale) => landingPaths[locale] === address) ?? defaultLocale
 }
-
-/** The Landing in one language, as the build writes it into a document: its address, and the markup the app draws there for a Visitor before any effect has run. */
-export interface LandingDocument {
-  locale: Locale
-  path: string
-  markup: string
-}

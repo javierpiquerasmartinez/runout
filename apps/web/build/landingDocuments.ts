@@ -1,45 +1,20 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { createServer, type Plugin, type ResolvedConfig } from 'vite'
+import { preview, type LandingDocument } from '../src/landing/captures.ts'
+import { documentAt, type Rewrite } from '../src/landing/serving.ts'
 
 /** The document served at every path but the Landing's: the app, and nothing drawn ahead. */
 const APP_DOCUMENT = 'app.html'
 
-/** The Landing in one language, as `src/landing/prerender.tsx` answers it: its language, its address and the app's markup there. */
-interface LandingDocument {
-  locale: string
-  path: string
-  markup: string
-}
-
-/** The picture a link to Runout previews with: a capture of the scene, made with its stills by `pnpm capture:landing`, at the size a large preview expects. */
-const PREVIEW = { file: 'src/landing/preview.jpg', width: 1200, height: 630 }
-
 /** The variable the build reads the site's address from. */
 const SITE = 'VITE_SITE_URL'
 
-/**
- * What each language's document says of itself in its head, beyond what
- * `index.html` says for all of them: its title and description, which say
- * what Runout is to someone searching for it, the language as a link's
- * preview names it, and what its preview's picture shows.
- */
-const heads: Record<string, { title: string; description: string; locale: string; pictureSays: string }> = {
-  es: {
-    title: 'Runout: estudia tus manos de póker, a solas o con tu grupo',
-    description:
-      'Guarda los historiales de tu tracker, mira en tu gráfica si estás ganando y repasa cada mano, a solas o con tu grupo en una sala. Solo por invitación.',
-    locale: 'es_ES',
-    pictureSays: 'Una mesa de póker a oscuras, con el borde iluminado: as y rey de picas en mano y el color completo en el river.',
-  },
-  en: {
-    title: 'Runout: study your poker hands, alone or with your group',
-    description:
-      "Keep the hand histories from your tracker, see on your graph whether you're winning and go through every hand, alone or with your group in a room. Invitation only.",
-    locale: 'en_US',
-    pictureSays: 'A poker table in the dark, its rim lit: ace and king of spades in the hole and the flush made on the river.',
-  },
-}
+/** Each language as a link's preview names it. */
+const previewLocales: Record<string, string> = { es: 'es_ES', en: 'en_US' }
+
+/** Where the messages of a Visitor's first load are, in each language: a chunk of its own, which the document asks for ahead. */
+const firstMessages = (locale: string) => `/src/i18n/messages/first/${locale}.ts`
 
 /**
  * Writes the Landing into the documents the build produces. `index.html` is
@@ -67,35 +42,45 @@ export function landingDocuments(): Plugin {
       const app = String(built.source)
       const site = siteAddress(config.env[SITE])
       const landings = await renderLandings(config.root)
-      const picture = this.emitFile({ type: 'asset', name: 'landing-preview.jpg', source: readFileSync(join(config.root, PREVIEW.file)) })
+      const picture = this.emitFile({ type: 'asset', name: 'landing-preview.jpg', source: readFileSync(join(config.root, preview.file)) })
       const found = { site, landings, picture: `${site}/${this.getFileName(picture)}` }
+      /** The app's document, asking ahead for the messages of the language it opens in, so they arrive beside the app and not after it. */
+      const speaking = (locale: string) => {
+        const messages = Object.values(bundle).find((file) => file.type === 'chunk' && file.moduleIds.some((id) => id.endsWith(firstMessages(locale))))
+        if (!messages) throw new Error(`The build has no chunk of the first load's messages in "${locale}": ${firstMessages(locale)}`)
+        return app.replace('</head>', () => `<link rel="modulepreload" crossorigin href="${config.base}${messages.fileName}"></head>`)
+      }
       for (const landing of landings) {
-        const source = documentFor(app, landing, found)
+        const source = documentFor(speaking(landing.locale), landing, found)
         if (landing.path === '/') built.source = source
         else this.emitFile({ type: 'asset', fileName: `${landing.path.slice(1)}/index.html`, source })
       }
-      // The app is behind the Sign-in: nothing of it is for a search engine's results.
-      this.emitFile({ type: 'asset', fileName: APP_DOCUMENT, source: app.replace('</head>', '<meta name="robots" content="noindex"></head>') })
+      // Any other path opens in the language of the Landing at `/`. The app is behind the Sign-in: nothing of it is for a search engine's results.
+      const spoken = landings.find(({ path }) => path === '/')?.locale
+      if (!spoken) throw new Error('No Landing is rendered at /')
+      this.emitFile({ type: 'asset', fileName: APP_DOCUMENT, source: speaking(spoken).replace('</head>', '<meta name="robots" content="noindex"></head>') })
       this.emitFile({ type: 'asset', fileName: 'robots.txt', source: crawlFile(found) })
       this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: map(found) })
     },
 
     configurePreviewServer(server) {
-      const { rewrites } = JSON.parse(readFileSync(join(server.config.root, 'vercel.json'), 'utf8')) as {
-        rewrites: { source: string; destination: string }[]
-      }
+      const { rewrites } = JSON.parse(readFileSync(join(server.config.root, 'vercel.json'), 'utf8')) as { rewrites: Rewrite[] }
       const built = join(server.config.root, server.config.build.outDir)
-      // As Vercel does: a file that exists is served as itself, and any other path by the first rule it matches.
+      // As Vercel does: a file that exists is served as itself, any other path by the first rule it matches, and one that matches none is not found.
       server.middlewares.use((request, response, next) => {
         const path = new URL(request.url ?? '/', 'http://localhost').pathname
-        // What isn't a page (the API, the socket) is the proxy's, further on.
-        if (request.method !== 'GET' || !request.headers.accept?.includes('text/html')) return next()
+        if (request.method !== 'GET') return next()
         const file = join(built, path)
         if (existsSync(file) && statSync(file).isFile()) return next()
-        const rule = rewrites.find(({ source }) => new RegExp(`^${source}$`).test(path))
-        if (!rule) return next()
+        const document = documentAt(rewrites, path)
+        if (!document) {
+          response.statusCode = 404
+          return response.end('Not found')
+        }
+        // What isn't a page (the API, the socket) is the proxy's, further on.
+        if (!request.headers.accept?.includes('text/html')) return next()
         response.setHeader('Content-Type', 'text/html; charset=utf-8')
-        response.end(readFileSync(join(built, rule.destination)))
+        response.end(readFileSync(join(built, document)))
       })
     },
   }
@@ -135,26 +120,26 @@ function alternates({ site, landings }: Found, link: (language: string, address:
 }
 
 /** What one language's document says of itself in its head. */
-function headFor({ locale, path }: LandingDocument, found: Found): string {
-  const head = heads[locale]
-  if (!head) throw new Error(`The Landing in "${locale}" has no title or description: build/landingDocuments.ts`)
+function headFor({ locale, path, title, description, pictureSays }: LandingDocument, found: Found): string {
+  const previewLocale = previewLocales[locale]
+  if (!previewLocale) throw new Error(`The Landing in "${locale}" has no name for a link's preview: build/landingDocuments.ts`)
   const address = found.site + path
   const meta = (key: 'name' | 'property', name: string, content: string | number) => `<meta ${key}="${name}" content="${escaped(String(content))}">`
   return [
-    `<title>${escaped(head.title)}</title>`,
-    meta('name', 'description', head.description),
+    `<title>${escaped(title)}</title>`,
+    meta('name', 'description', description),
     `<link rel="canonical" href="${address}">`,
     alternates(found, (language, href) => `<link rel="alternate" hreflang="${language}" href="${href}">`),
     meta('property', 'og:type', 'website'),
     meta('property', 'og:site_name', 'Runout'),
-    meta('property', 'og:locale', head.locale),
+    meta('property', 'og:locale', previewLocale),
     meta('property', 'og:url', address),
-    meta('property', 'og:title', head.title),
-    meta('property', 'og:description', head.description),
+    meta('property', 'og:title', title),
+    meta('property', 'og:description', description),
     meta('property', 'og:image', found.picture),
-    meta('property', 'og:image:width', PREVIEW.width),
-    meta('property', 'og:image:height', PREVIEW.height),
-    meta('property', 'og:image:alt', head.pictureSays),
+    meta('property', 'og:image:width', preview.width),
+    meta('property', 'og:image:height', preview.height),
+    meta('property', 'og:image:alt', pictureSays),
     // The large picture; the title, the description and the picture are read from the ones above.
     meta('name', 'twitter:card', 'summary_large_image'),
   ].join('')
@@ -218,8 +203,8 @@ async function renderLandings(root: string): Promise<LandingDocument[]> {
     cacheDir: join(root, 'node_modules/.vite-landing'),
   })
   try {
-    const { renderLandings } = (await server.ssrLoadModule('/src/landing/prerender.tsx')) as { renderLandings(): LandingDocument[] }
-    return renderLandings()
+    const { renderLandings } = (await server.ssrLoadModule('/src/landing/prerender.tsx')) as { renderLandings(): Promise<LandingDocument[]> }
+    return await renderLandings()
   } finally {
     await server.close()
   }

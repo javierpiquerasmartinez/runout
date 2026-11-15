@@ -2,12 +2,16 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- Before first paint: no Landing for a browser that holds a session, and `/en` for a Visitor who reads in English. See src/main.tsx. -->
+    <!--
+      Before first paint: no Landing for a browser signed in to an Account ("hidden"), and `/en` for a Visitor who reads in
+      English, who is shown nothing until it is there ("leaving"). See src/main.tsx. The storage keys are identity/identity.ts's
+      and the addresses landing/address.ts's: src/landing/firstDraw.test.ts runs this script against them.
+    -->
     <script>
       ;(function () {
         try {
           var page = document.documentElement
-          if (localStorage.getItem('runout.signedIn')) return void (page.dataset.landing = 'hidden')
+          if (localStorage.getItem('runout.account')) return void (page.dataset.landing = 'hidden')
           if (location.pathname !== '/' || /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp/i.test(navigator.userAgent)) return
           var asked = (navigator.languages || [navigator.language]).map(function (language) {
             return String(language).slice(0, 2).toLowerCase()
@@ -16,13 +20,13 @@
             return language === 'es' || language === 'en'
           })[0]
           if (language !== 'en') return
-          page.dataset.landing = 'hidden'
+          page.dataset.landing = 'leaving'
           location.replace('/en' + location.search + location.hash)
         } catch (error) {}
       })()
     </script>
     <style>
-      [data-landing='hidden'] #root {
+      [data-landing] #root {
         display: none;
       }
     </style>

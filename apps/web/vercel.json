@@ -3,6 +3,6 @@
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/en", "destination": "/en/index.html" },
-    { "source": "/(.*)", "destination": "/app.html" }
+    { "source": "/((?!assets/).*)", "destination": "/app.html" }
   ]
 }

@@ -255,9 +255,21 @@ describe.each(landings)("the Landing's document at $address", ({ language, local
     expect(documents.get(fileName)).toMatch(/<link rel="preload" as="font" type="font\/woff2" href="\/assets\/instrument-serif-latin-400-normal-[\w-]+\.woff2" crossorigin>/)
   })
 
-  it('asks for the same scripts and styles as the document of every other path', () => {
-    expect(askedBy(documents.get(fileName)!)).not.toEqual([])
-    expect(askedBy(documents.get(fileName)!)).toEqual(askedBy(documents.get('app.html')!))
+  it('asks for the same scripts and styles as the document of every other path, but for the messages, which are its own language\'s', () => {
+    const messages = (address: string) => [...files.keys()].some((name) => `/${name}` === address && /^assets\/(?:es|en)-/.test(name))
+    const asked = askedBy(documents.get(fileName)!)
+    expect(asked.filter((address) => !messages(address))).not.toEqual([])
+    expect(asked.filter((address) => !messages(address))).toEqual(askedBy(documents.get('app.html')!).filter((address) => !messages(address)))
+
+    // One chunk of messages, asked for ahead: the first load's, in this document's language and no other.
+    const [own, ...others] = asked.filter(messages)
+    expect(others).toEqual([])
+    const chunk = files.get(own.slice(1))!.toString()
+    expect(chunk).toContain(signIn)
+    expect(chunk).not.toContain(landings.find((other) => other.language !== language)!.haveCode)
+    // And not the rest of the catalogue, which arrives with the first screen that isn't the Landing.
+    expect(chunk.length).toBeLessThan(4000)
+    expect(documents.get(fileName)).toContain(`<link rel="modulepreload" crossorigin href="${own}">`)
   })
 })
 
