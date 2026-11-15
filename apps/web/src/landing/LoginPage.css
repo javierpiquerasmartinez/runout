@@ -1,4 +1,14 @@
-/* `/login`: the brand, Google's button and the way back, centred on the page. */
+/*
+ * `/login`: the brand, Google's button and the way back, centred on the page,
+ * over a still of the Landing's scene: the table before the Hand is dealt,
+ * dimmed so the form reads on it. Dark whatever the Theme, as the Landing is.
+ */
+
+:root:has(.login),
+:root:has(.login) body {
+  background: #050606;
+  color-scheme: dark;
+}
 
 .login {
   min-height: 100vh;
@@ -6,6 +16,17 @@
   align-items: center;
   justify-content: center;
   padding: 40px 16px;
+  color: var(--text-primary);
+  background:
+    linear-gradient(rgb(5 6 6 / 62%), rgb(5 6 6 / 62%)),
+    url('./stills/wide-1.webp') center / cover no-repeat;
+}
+
+/* A screen taller than wide has the table turned end-on, as the Landing does. */
+@media (orientation: portrait) {
+  .login {
+    background-image: linear-gradient(rgb(5 6 6 / 62%), rgb(5 6 6 / 62%)), url('./stills/tall-1.webp');
+  }
 }
 
 .login__card {

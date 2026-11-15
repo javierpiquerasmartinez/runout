@@ -193,12 +193,16 @@ export const potCentre: Point = [0, 0.15, -0.95]
 export const graphHeight = 1.9
 
 /**
- * What the page keeps over the scene, as shares of the screen's height from
- * its top: the bar ends above `bar` and no caption starts above `copy`. The
- * page's styles hold the copy to it; the shots that have something to read
- * fit it in between.
+ * What the page keeps over the scene in a layout, as shares of the screen's
+ * height from its top: what the bar holds ends above `bar` and no caption
+ * starts above `copy`. The page's styles hold the copy to it; the shots that
+ * have something to read fit it in between. On a narrow phone the bar wraps
+ * to two lines, the brand over the two ways on, so a tall screen keeps more
+ * for it.
  */
-export const clear = { bar: 0.13, copy: 0.6 }
+export function clearFor({ portrait }: Layout): { bar: number; copy: number } {
+  return { bar: portrait ? 0.15 : 0.13, copy: 0.6 }
+}
 
 /** How far beyond the rim the seats' discs reach. */
 const seatReach = 0.85
@@ -216,7 +220,6 @@ export const depthOfField = { strength: 0.012, most: 0.014 }
 type Band = { top: number; bottom: number }
 
 const wholeScreen: Band = { top: 0, bottom: 1 }
-const betweenBarAndCopy: Band = { top: clear.bar, bottom: clear.copy }
 
 /**
  * One view of the scene: what the camera looks at, from how high above the
@@ -235,7 +238,10 @@ type Shot = {
   focus?: Point
 }
 
-function shots({ table, waveWidth, graphWidth }: Layout): Shot[] {
+function shots(layout: Layout): Shot[] {
+  const { table, waveWidth, graphWidth } = layout
+  const clear = clearFor(layout)
+  const betweenBarAndCopy: Band = { top: clear.bar, bottom: clear.copy }
   const tilted = (elevation: number) => 2 * table.deep * Math.sin((elevation * Math.PI) / 180) + 1.2
   // From above, the table and its seats, with a little air round them.
   const overTableFrame = { width: 2 * (table.across + seatReach) + 0.3, height: 2 * (table.deep + seatReach) + 0.3 }

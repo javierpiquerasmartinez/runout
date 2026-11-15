@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { clearFor, layoutFor } from '../src/landing/scene/choreography'
 import { signInAs } from './seeded'
 
 /*
@@ -289,6 +290,137 @@ for (const [name, viewport] of [
   })
 }
 
+test.describe('a Visitor on a 360-pixel-wide phone', () => {
+  test.use({ viewport: PHONE })
+
+  test('has all the bar holds, wrapped to two lines, above what the scene keeps clear under it', async ({ page }) => {
+    await page.goto('/')
+    await rests(page, 0)
+
+    const brand = (await page.locator('header svg').first().boundingBox())!
+    const signIn = (await page.getByRole('link', { name: 'Iniciar sesión' }).boundingBox())!
+    // Wrapped: Sign in is under the brand, not beside it.
+    expect(signIn.y).toBeGreaterThanOrEqual(brand.y + brand.height)
+    const clear = clearFor(layoutFor(PHONE.width / PHONE.height)).bar * PHONE.height
+    for (const held of await page.locator('header *').all()) {
+      const box = (await held.boundingBox())!
+      expect(box.y + box.height).toBeLessThanOrEqual(clear)
+    }
+  })
+})
+
+test.describe('a Visitor whose device draws the scene', () => {
+  test.use({ viewport: WINDOW, reducedMotion: 'reduce' })
+
+  test('downloads no picture of it, at any stop', async ({ page }) => {
+    const pictures = picturesAskedFor(page)
+    await page.goto('/')
+    await expect(page.locator('canvas')).toHaveAttribute('data-ready', 'true')
+
+    for (let stop = 0; stop <= lastStop; stop++) {
+      if (stop > 0) await page.keyboard.press('ArrowDown')
+      await rests(page, stop)
+    }
+
+    await expect(page.getByRole('main').locator('img')).toBeHidden()
+    expect(pictures).toEqual([])
+  })
+})
+
+for (const [name, viewport, shape] of [
+  ['a desktop', WINDOW, 'wide'],
+  ['a phone held upright', PHONE, 'tall'],
+] as const) {
+  test.describe(`a Visitor on ${name} whose browser can't draw the scene`, () => {
+    test.use({ viewport })
+
+    test.beforeEach(async ({ page }) => {
+      // A browser with no WebGL hands out no context to draw with.
+      await page.addInitScript(() => {
+        const context = HTMLCanvasElement.prototype.getContext
+        HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, kind: string, ...rest: unknown[]) {
+          return kind.startsWith('webgl') ? null : context.call(this, kind, ...(rest as []))
+        } as typeof context
+      })
+    })
+
+    test(`sees a ${shape} picture of the scene at every stop, each its own, and steps without gliding`, async ({ page }) => {
+      const pictures = picturesAskedFor(page)
+      await page.goto('/')
+      const picture = page.getByRole('main').locator('img')
+      const seen: string[] = []
+
+      for (const [stop, caption] of captionAtStop.entries()) {
+        if (stop === 1) await recordScrolling(page)
+        if (stop > 0) await page.keyboard.press('ArrowDown')
+        await rests(page, stop)
+        await expect(picture).toBeVisible()
+        // The picture for this stop has arrived, in the screen's shape, and is the one showing.
+        await expect
+          .poll(() =>
+            picture.evaluate(
+              (img: HTMLImageElement, seen) => img.complete && img.naturalWidth > 0 && !seen.includes(img.currentSrc),
+              seen,
+            ),
+          )
+          .toBe(true)
+        const { src, width, height } = await picture.evaluate((img: HTMLImageElement) => ({
+          src: img.currentSrc,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        }))
+        expect(shape === 'wide' ? width > height : height > width, `at stop ${stop}: ${width}×${height}`).toBe(true)
+        expect(Math.max(width, height)).toBe(1600)
+        seen.push(src)
+        expect(await captionsShowing(page), `at stop ${stop}`).toEqual(caption ? [caption] : [])
+        if (stop === 1) expect(await scrolledThrough(page)).toEqual([viewport.height])
+      }
+
+      expect(new Set(seen).size).toBe(captionAtStop.length)
+      // One picture a stop, and none for a stop not yet reached.
+      expect(pictures.length).toBe(captionAtStop.length)
+      // Each a WebP, 1,600 px on its long side, well under 150 kB.
+      for (const address of pictures) {
+        const picture = await page.request.get(address)
+        expect(picture.headers()['content-type']).toBe('image/webp')
+        expect((await picture.body()).length, address).toBeLessThan(150_000)
+      }
+    })
+
+    test('still has both ways on', async ({ page }) => {
+      await page.goto('/')
+      await rests(page, 0)
+
+      await expect(page.getByRole('link', { name: '¿Tienes un código de sala?' })).toBeVisible()
+      await page.getByRole('link', { name: 'Iniciar sesión' }).click()
+      await expect(page).toHaveURL(/\/login$/)
+    })
+  })
+
+  test.describe(`someone signing in on ${name}`, () => {
+    test.use({ viewport })
+
+    test(`has a ${shape} still of the scene behind the form`, async ({ page }) => {
+      const pictures = picturesAskedFor(page)
+      await page.goto('/login')
+
+      await expect(page.getByRole('button', { name: 'Tester A' })).toBeVisible()
+      await expect.poll(() => pictures.length).toBe(1)
+      const size = await page.evaluate(async (src) => {
+        const picture = new Image()
+        picture.src = src
+        await picture.decode()
+        return { width: picture.naturalWidth, height: picture.naturalHeight }
+      }, pictures[0])
+      expect(shape === 'wide' ? size.width > size.height : size.height > size.width, JSON.stringify(size)).toBe(true)
+      // It is the page's background, behind everything on it.
+      expect(await page.getByRole('main').evaluate((main) => getComputedStyle(main).backgroundImage)).toContain(
+        new URL(pictures[0]).pathname,
+      )
+    })
+  })
+}
+
 test.describe('a Visitor with a finger on a phone', () => {
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true })
 
@@ -357,6 +489,16 @@ test.describe('signing in', () => {
     expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBeNull()
   })
 })
+
+/** The addresses of the pictures of the scene the page asks for, as it asks. */
+function picturesAskedFor(page: Page) {
+  const asked: string[] = []
+  page.on('request', (request) => {
+    // In development the page's scripts ask for a module that holds each picture's address: that isn't the picture.
+    if (request.resourceType() === 'image' && new URL(request.url()).pathname.endsWith('.webp')) asked.push(request.url())
+  })
+  return asked
+}
 
 /** Waits for the story to have played up to a stop and come to rest there. */
 async function rests(page: Page, stop: number) {

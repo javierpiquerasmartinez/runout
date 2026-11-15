@@ -7,7 +7,7 @@ import {
   captionAt,
   card,
   chip,
-  clear,
+  clearFor,
   figuresAt,
   graphHeight,
   layoutFor,
@@ -26,11 +26,12 @@ const wide = 16 / 9
 const tall = 9 / 19.5
 const fieldOfView = 40
 
-/** The windows the framing is held to: a short wide one, a large desktop one and a tall phone, in CSS pixels. */
+/** The windows the framing is held to: a short wide one, a large desktop one, a tall phone and a narrow one, in CSS pixels. */
 const windows = [
   { name: 'a short wide window', width: 1280, height: 600 },
   { name: 'a large desktop window', width: 1920, height: 1080 },
   { name: 'a tall phone', width: 390, height: 844 },
+  { name: 'a narrow phone', width: 360, height: 640 },
 ]
 
 /** Where a point of the scene is on screen at a progress: `x` across and `y` down, each from 0 to 1. */
@@ -101,6 +102,18 @@ describe('staggeredBeatAt', () => {
   })
 })
 
+describe('clearFor', () => {
+  it('keeps clear under the bar the two lines it wraps to on a 360-pixel-wide phone', () => {
+    // The brand over the two ways on: they end 87 px down, on a screen 640 px tall.
+    expect(clearFor(layoutFor(360 / 640)).bar * 640).toBeGreaterThanOrEqual(87)
+  })
+
+  it('keeps the copy to the same share of the screen, wide or tall', () => {
+    expect(clearFor(layoutFor(wide)).copy).toBe(0.6)
+    expect(clearFor(layoutFor(tall)).copy).toBe(0.6)
+  })
+})
+
 describe('cameraAt', () => {
   it.each([
     ['a wide screen', wide],
@@ -126,6 +139,7 @@ describe('cameraAt', () => {
   it.each(windows)('ends with the table and its seats under the bar and above the copy in $name', ({ width, height }) => {
     const aspect = width / height
     const { table } = layoutFor(aspect)
+    const clear = clearFor(layoutFor(aspect))
     // The seats' discs reach 0.85 beyond the rim.
     for (let degrees = 0; degrees < 360; degrees += 5) {
       const angle = (degrees * Math.PI) / 180
@@ -140,6 +154,7 @@ describe('cameraAt', () => {
   it.each(windows)("leaves the Results Graph's legend and its first and last Hand room round the graph in $name", ({ width, height }) => {
     const aspect = width / height
     const { graphWidth } = layoutFor(aspect)
+    const clear = clearFor(layoutFor(aspect))
     const stop = stops[5].at
     // The legend stands 20 px over the crest, on one line or wrapped to two on a phone; the Hands sit 8 px under the felt.
     const legend = aspect < 1 ? 60 : 40
@@ -155,6 +170,7 @@ describe('cameraAt', () => {
   it.each(windows)("keeps the board and the Hero's cards under the bar and above the copy in $name", ({ width, height }) => {
     const aspect = width / height
     const { board, hole } = placesFor(layoutFor(aspect))
+    const clear = clearFor(layoutFor(aspect))
     const corners = [...board, ...hole].flatMap(([x, , z]) =>
       [-card.width / 2, card.width / 2].flatMap((dx) => [-card.length / 2, card.length / 2].map((dz) => [x + dx, 0, z + dz] as const)),
     )
