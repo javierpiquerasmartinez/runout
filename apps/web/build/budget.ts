@@ -29,8 +29,8 @@ export type Weights = {
  * The ceilings, each a little above what the build of 2026-11-15 weighed
  * (gzip -9; 1 kB is 1000 bytes):
  *
- * - critical path 100.0 kB, for the Landing in Spanish, the heavier of the two
- *   by a tenth of a kB: entry script 82.4 kB, the chunks it imports outright
+ * - critical path 100.1 kB, for the Landing in Spanish, the heavier of the two
+ *   by a tenth of a kB: entry script 82.5 kB, the chunks it imports outright
  *   5.9 kB (the React runtime 3.4 kB, routing 2.4 kB), the Landing's messages
  *   in the document's language 0.9 kB, styles 8.1 kB, the document with the
  *   Landing in it 2.8 kB

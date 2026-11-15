@@ -25,8 +25,14 @@ const root = document.getElementById('root')!
 const locale = landingLocaleAt(window.location.pathname)
 const app = <Root locale={locale} />
 
-/** Draws the app in place of whatever the document holds, in one go: no frame shows the page empty in between. */
+/** Draws the app in place of whatever the document holds. */
 function drawAfresh() {
+  root.replaceChildren()
+  createRoot(root).render(app)
+}
+
+/** The same in one go, where the document's Landing was on screen: no frame shows the page empty in between. */
+function drawOver() {
   root.replaceChildren()
   flushSync(() => createRoot(root).render(app))
 }
@@ -63,7 +69,7 @@ if (first !== 'nothing') {
       else if (first === 'once-recognised') {
         void loadSession()
           .then((session) => session && wholeCatalogue())
-          .then(drawAfresh, drawAfresh)
+          .then(drawOver, drawOver)
       } else drawAfresh()
       delete page.dataset.landing
     },

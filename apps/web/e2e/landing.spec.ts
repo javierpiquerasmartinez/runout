@@ -111,12 +111,18 @@ test.describe('a Visitor', () => {
     await rests(page, 0)
     await page.mouse.move(500, 300)
 
-    // The fingers, then a glide that dies away over a second and a half, an event a frame.
-    for (const delta of [3, 12, 40, 85, 120, 110]) await page.mouse.wheel(0, delta)
-    for (let frame = 0; frame < 90; frame++) {
-      await page.mouse.wheel(0, Math.max(1, Math.round(100 * (1 - frame / 90) ** 2)))
-      await page.waitForTimeout(16)
-    }
+    // The fingers, then a glide that dies away over a second and a half, an event a frame. Each event says when the
+    // trackpad sent it, as a browser's own do however late the page gets to them: a test's are sent as it can.
+    await page.evaluate(async () => {
+      const glide = Array.from({ length: 90 }, (_, frame) => Math.max(1, Math.round(100 * (1 - frame / 90) ** 2)))
+      const began = performance.now()
+      for (const [frame, deltaY] of [3, 12, 40, 85, 120, 110, ...glide].entries()) {
+        const turn = new WheelEvent('wheel', { deltaY, cancelable: true, bubbles: true })
+        Object.defineProperty(turn, 'timeStamp', { value: began + frame * 16 })
+        document.body.dispatchEvent(turn)
+        await new Promise((next) => setTimeout(next, 16))
+      }
+    })
 
     await restsOnly(page, 1)
   })

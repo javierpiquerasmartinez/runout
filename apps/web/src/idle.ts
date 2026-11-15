@@ -4,14 +4,30 @@
  * simply never done.
  */
 
-/** Once the browser has painted what is in the page now: the frame after the next one. */
+/**
+ * Once the browser has painted what is in the page now: the frame after the
+ * next one, and not before the page's first text or picture has been
+ * painted at all, where the browser says when that is. Text can be a few
+ * frames behind the page's first paint, while its font is on its way.
+ */
 export function whenPainted(signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        if (!signal?.aborted) resolve()
-      }),
-    )
+    const frames = () =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!signal?.aborted) resolve()
+        }),
+      )
+    const painted = 'first-contentful-paint'
+    const told = typeof PerformanceObserver === 'function' && PerformanceObserver.supportedEntryTypes?.includes('paint')
+    if (!told || performance.getEntriesByName(painted).length) return frames()
+    const observer = new PerformanceObserver((paints) => {
+      if (!paints.getEntriesByName(painted).length) return
+      observer.disconnect()
+      frames()
+    })
+    observer.observe({ type: 'paint', buffered: true })
+    signal?.addEventListener('abort', () => observer.disconnect())
   })
 }
 
