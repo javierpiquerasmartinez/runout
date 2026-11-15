@@ -6,7 +6,7 @@
 
 /*
  * A finger's swipe moves on one stop instead of dragging the page: see the
- * page's `step`. Two fingers still pinch to zoom.
+ * gestures `story.ts` hears. Two fingers still pinch to zoom.
  */
 :root:has(.landing) {
   scroll-snap-type: y mandatory;

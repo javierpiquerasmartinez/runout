@@ -92,6 +92,56 @@ test.describe('a Visitor', () => {
     await rests(page, 0)
   })
 
+  test('goes one stop further with a second step in the middle of a stretch, and back to the stop just left with a step back', async ({ page }) => {
+    await page.goto('/')
+    await rests(page, 0)
+
+    // The second key comes while the page has barely left the first stop.
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await restsOnly(page, 2)
+
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowUp')
+    await restsOnly(page, 2)
+  })
+
+  test("moves one stop with a trackpad's swipe whose glide outlasts a second", async ({ page }) => {
+    await page.goto('/')
+    await rests(page, 0)
+    await page.mouse.move(500, 300)
+
+    // The fingers, then a glide that dies away over a second and a half, an event a frame.
+    for (const delta of [3, 12, 40, 85, 120, 110]) await page.mouse.wheel(0, delta)
+    for (let frame = 0; frame < 90; frame++) {
+      await page.mouse.wheel(0, Math.max(1, Math.round(100 * (1 - frame / 90) ** 2)))
+      await page.waitForTimeout(16)
+    }
+
+    await restsOnly(page, 1)
+  })
+
+  test('falls to pictures of the scene when the browser takes its graphics context back', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('canvas[data-ready]')).toBeAttached({ timeout: 60_000 })
+    await expect(page.getByRole('main').locator('img')).toBeHidden()
+
+    await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+      const context = canvas.getContext('webgl2')
+      const lose = context?.getExtension('WEBGL_lose_context')
+      // Where the context can't be taken away for real, the browser's own word that it has been.
+      if (lose) lose.loseContext()
+      else canvas.dispatchEvent(new Event('webglcontextlost'))
+    })
+
+    await expect(page.getByRole('main').locator('img')).toBeVisible()
+    await expect(page.locator('canvas[data-ready]')).toHaveCount(0)
+    // And the story still steps, a picture a stop.
+    await page.keyboard.press('ArrowDown')
+    await rests(page, 1)
+    await expect(page.getByRole('main').locator('img')).toHaveAttribute('src', /wide-1/)
+  })
+
   test('keeps the keys working once focus is on one of the two ways on', async ({ page }) => {
     await page.goto('/')
     await rests(page, 0)
