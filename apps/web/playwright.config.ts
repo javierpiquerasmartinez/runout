@@ -49,7 +49,8 @@ export default defineConfig({
     {
       command: `pnpm build && vite preview --host 127.0.0.1 --port ${BUILT_PORT} --strictPort`,
       url: BUILT_URL,
-      env: { RUNOUT_SERVER_URL: SERVER_URL, VITE_GOOGLE_CLIENT_ID: '' },
+      // A build must be told the site's address; the tests open it where it is served, not there.
+      env: { RUNOUT_SERVER_URL: SERVER_URL, VITE_GOOGLE_CLIENT_ID: '', VITE_SITE_URL: 'https://runout.test' },
       timeout: 180_000,
       reuseExistingServer: false,
     },

@@ -232,6 +232,31 @@ test.describe('an Account', () => {
   })
 })
 
+test.describe('what a crawler or a link preview asks for', () => {
+  test('is served as itself, not as the app: the crawl file, the map and the preview picture', async ({ page, request }) => {
+    const robots = await request.get('/robots.txt', { headers: { accept: 'text/html,*/*' } })
+    expect(robots.headers()['content-type']).toContain('text/plain')
+    expect(await robots.text()).toContain('Disallow: /')
+
+    const map = await request.get('/sitemap.xml', { headers: { accept: 'text/html,*/*' } })
+    expect(map.headers()['content-type']).toContain('xml')
+    expect(await map.text()).toContain('<urlset')
+
+    // The picture's address is on the site the build was told; here the build is served elsewhere.
+    await page.goto('/en')
+    const picture = await page.locator('meta[property="og:image"]').getAttribute('content')
+    const served = await request.get(new URL(picture!).pathname)
+    expect(served.headers()['content-type']).toBe('image/jpeg')
+  })
+
+  test('a page of the app asks not to be indexed, and the Landing does not', async ({ page }) => {
+    await page.goto('/login')
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
+    await page.goto('/')
+    await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
+  })
+})
+
 /** Waits for the app to be running the Landing, at rest on its first stop. */
 async function rests(page: Page) {
   await expect(page.getByRole('main')).toHaveAttribute('data-stop', '0', { timeout: 60_000 })

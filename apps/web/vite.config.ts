@@ -26,5 +26,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     // The browser tests in e2e/ run under Playwright (`pnpm test:e2e`).
     exclude: [...configDefaults.exclude, 'e2e/**'],
+    // The tests in build/ build the app, and a build must be told where the site is.
+    env: { VITE_SITE_URL: 'https://runout.test' },
   },
 })

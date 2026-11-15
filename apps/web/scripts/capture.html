@@ -40,15 +40,15 @@
           scene.setProgress(stops[stop].at)
           await frames(4)
         },
-        /** A PNG, scaled to `width` by `height` and encoded as WebP; both ends in base64. */
-        async encode(png, width, height, quality) {
+        /** A PNG, scaled to `width` by `height` and encoded as `type` (WebP, or JPEG for the link preview's picture); both ends in base64. */
+        async encode(png, width, height, quality, type = 'image/webp') {
           const picture = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
           const canvas = new OffscreenCanvas(width, height)
           const context = canvas.getContext('2d')
           context.imageSmoothingQuality = 'high'
           context.drawImage(picture, 0, 0, width, height)
-          const webp = await canvas.convertToBlob({ type: 'image/webp', quality })
-          const bytes = new Uint8Array(await webp.arrayBuffer())
+          const encoded = await canvas.convertToBlob({ type, quality })
+          const bytes = new Uint8Array(await encoded.arrayBuffer())
           let binary = ''
           for (const byte of bytes) binary += String.fromCharCode(byte)
           return btoa(binary)
