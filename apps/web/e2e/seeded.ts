@@ -4,6 +4,9 @@ import { expect, type Page } from '@playwright/test'
 export const SERVER_PORT = 3183
 export const WEB_PORT = 5183
 export const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`
+/** Where the app as built is served, by the rules it is served by once deployed: what the tests of its documents open. */
+export const BUILT_PORT = 4183
+export const BUILT_URL = `http://127.0.0.1:${BUILT_PORT}`
 
 /** The screens the replayer must fit without scrolling: a 13" laptop and around it. */
 export const VIEWPORTS = [

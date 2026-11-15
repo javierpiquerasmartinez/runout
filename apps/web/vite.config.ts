@@ -1,12 +1,13 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { configDefaults } from 'vitest/config'
+import { landingDocuments } from './build/landingDocuments.ts'
 
 const backend = process.env.RUNOUT_SERVER_URL ?? 'http://localhost:3000'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), landingDocuments()],
   server: {
     port: 5173,
     proxy: {

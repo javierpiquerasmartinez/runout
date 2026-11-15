@@ -1,11 +1,15 @@
 import { defineConfig, devices } from '@playwright/test'
-import { SERVER_PORT, SERVER_URL, WEB_PORT } from './e2e/seeded'
+import { BUILT_PORT, BUILT_URL, SERVER_PORT, SERVER_URL, WEB_PORT } from './e2e/seeded'
 
 /*
  * Browser tests: what jsdom can't check, such as whether the replayer's table
  * fits the screen without its pieces overlapping. Playwright starts its own
  * server (a throwaway Postgres, in Test mode) and its own Vite, on ports of
  * their own, so a `pnpm dev` already running is left alone. See the README.
+ *
+ * The Landing's documents exist only once the app is built, so it is built
+ * too and served as it is deployed, on a third port, in front of the same
+ * server.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -18,6 +22,8 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     baseURL: `http://127.0.0.1:${WEB_PORT}`,
+    // A browser that asks for English is taken from `/` to the Landing in English: the tests read Spanish.
+    locale: 'es-ES',
     trace: 'retain-on-failure',
   },
   webServer: [
@@ -38,6 +44,13 @@ export default defineConfig({
         // No Google button: Test mode is the way in, and nothing leaves the machine.
         VITE_GOOGLE_CLIENT_ID: '',
       },
+      reuseExistingServer: false,
+    },
+    {
+      command: `pnpm build && vite preview --host 127.0.0.1 --port ${BUILT_PORT} --strictPort`,
+      url: BUILT_URL,
+      env: { RUNOUT_SERVER_URL: SERVER_URL, VITE_GOOGLE_CLIENT_ID: '' },
+      timeout: 180_000,
       reuseExistingServer: false,
     },
   ],

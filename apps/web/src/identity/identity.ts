@@ -52,7 +52,33 @@ const TOKEN_KEY = 'runout.identityToken'
 /** The Administrator's own token, kept aside while they impersonate someone. */
 const ADMINISTRATOR_TOKEN_KEY = 'runout.administratorToken'
 
+/**
+ * A marker that this browser holds a session, and nothing about whose. The
+ * document's own script reads it before first paint, to keep the Landing
+ * rendered into it out of sight of someone who is on their way Home (see
+ * `index.html`, which names the same key). It is left and cleared with the
+ * token.
+ */
+const SIGNED_IN_KEY = 'runout.signedIn'
+
+/** The language last read in here by an identity, which the same script takes for the Landing's over the browser's. */
+const LANGUAGE_KEY = 'runout.language'
+
+/** Keeps the language an identity reads in, for the Landing this browser is shown once it has none. */
+export function rememberLanguage(language: Preferences['language'], storage: Storage = window.localStorage) {
+  writeKey(storage, LANGUAGE_KEY, language)
+}
+
 let loading: Promise<Session | null> | null = null
+
+/**
+ * Whether this browser holds a token, before the server has said whose it is
+ * or whether it still works. False where the app is rendered ahead, when it
+ * is built.
+ */
+export function holdsSession(): boolean {
+  return typeof window !== 'undefined' && readToken(window.localStorage) !== null
+}
 
 /**
  * Recognises this browser's identity from its stored token; null when it has
@@ -74,6 +100,8 @@ async function fetchSession(storage: Storage): Promise<Session | null> {
   try {
     // The first request of a visit may find the server asleep: it waits for it to wake.
     const identity = await untilAwake(() => api<Identity>('/identities/me', { token: stored }))
+    // A session from before the marker existed leaves it now.
+    writeKey(storage, SIGNED_IN_KEY, '1')
     return { token: stored, identity: withDefaultPreferences(identity) }
   } catch (error) {
     if (!(error instanceof ApiError && error.reason === 'unauthenticated')) throw error
@@ -220,10 +248,12 @@ function readToken(storage: Storage): string | null {
 
 function removeToken(storage: Storage) {
   removeKey(storage, TOKEN_KEY)
+  removeKey(storage, SIGNED_IN_KEY)
 }
 
 function writeToken(storage: Storage, token: string) {
   writeKey(storage, TOKEN_KEY, token)
+  writeKey(storage, SIGNED_IN_KEY, '1')
 }
 
 function readKey(storage: Storage, key: string): string | null {

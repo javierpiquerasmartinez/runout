@@ -2,10 +2,12 @@ import { Suspense, useEffect } from 'react'
 import { isCalendarPath } from '../calendar/paths'
 import { goalsPath } from '../goals/paths'
 import { homePath } from '../home/home'
+import { useI18n } from '../i18n'
 import { whenIdle } from '../idle'
 import { invitationTokenFromPath, loginPath, resetPasswordPath, resetTokenFromPath } from '../identity/accessPaths'
 import { useSession } from '../identity/context'
 import { isLabPath } from '../lab/paths'
+import { landingLocaleAt, landingPaths } from '../landing/address'
 import { Landing } from '../landing/Landing'
 import { libraryPath } from '../library/paths'
 import { enterRoomPath, roomCodeFromPath } from '../room/roomCode'
@@ -47,6 +49,7 @@ export function Routes() {
 function Route() {
   const path = usePath()
   const { identity } = useSession()
+  const { locale } = useI18n()
 
   const code = roomCodeFromPath(path)
   if (code) return <RoomPage code={code} />
@@ -67,6 +70,8 @@ function Route() {
   if (path === roomsPath || path === libraryPath || path.startsWith(`${libraryPath}/`) || isLabPath(path) || isCalendarPath(path) || path === goalsPath) {
     return <Redirect to={loginPath} />
   }
+  // The Landing's language is its address's: whoever reads in another is taken to the Landing in theirs.
+  if (landingLocaleAt(path) !== locale && Object.values(landingPaths).includes(path)) return <Redirect to={landingPaths[locale]} />
   return <VisitorLanding />
 }
 

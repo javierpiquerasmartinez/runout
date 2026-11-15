@@ -341,6 +341,23 @@ test.describe('an Account', () => {
   })
 })
 
+test.describe('signing in', () => {
+  test('leaves a marker in the browser that holds nothing about the Account, and signing out clears it', async ({ page }) => {
+    await page.goto('/')
+    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBeNull()
+
+    await signInAs(page, 'Tester A')
+
+    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBe('1')
+
+    await page.goto('/settings')
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click()
+
+    await expect(page.getByRole('heading', { level: 1, name: titles.opening })).toBeVisible()
+    expect(await page.evaluate(() => localStorage.getItem('runout.signedIn'))).toBeNull()
+  })
+})
+
 /** Waits for the story to have played up to a stop and come to rest there. */
 async function rests(page: Page, stop: number) {
   // A browser with no graphics card draws the scene slowly, and the story with it: it is given time.

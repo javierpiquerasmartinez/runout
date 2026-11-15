@@ -209,6 +209,11 @@
   opacity: 0;
 }
 
+/* Before the page's script has run, the story is at its opening. */
+.landing__caption[data-caption='opening'] {
+  opacity: 1;
+}
+
 .landing__title {
   margin: 0 auto;
   max-width: 18ch;
@@ -233,4 +238,44 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--brass-ink);
+}
+
+/*
+ * ---------- With scripts disabled ----------
+ * Nothing plays the story, so there are no stops to scroll through: every
+ * caption is on the page, one under another, below the bar.
+ */
+
+@media (scripting: none) {
+  :root:has(.landing) {
+    scroll-snap-type: none;
+    touch-action: auto;
+  }
+
+  .landing__stop {
+    display: none;
+  }
+
+  .landing__copy {
+    position: static;
+    height: auto;
+    padding: 30dvh 0 12dvh;
+    pointer-events: auto;
+    background: none;
+  }
+
+  .landing__caption {
+    position: static;
+    margin-top: 16dvh;
+    opacity: 1;
+  }
+
+  .landing__caption[data-caption='opening'] {
+    margin-top: 0;
+  }
+
+  /* There is nowhere to scroll on to in the way the hint says. */
+  .landing__caption[data-caption='opening'] .landing__hint {
+    display: none;
+  }
 }

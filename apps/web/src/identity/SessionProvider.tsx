@@ -11,9 +11,11 @@ import {
   endImpersonation,
   endSession,
   forgetSession,
+  holdsSession,
   joinAnonymously,
   keepSession,
   loadSession,
+  rememberLanguage,
   signInWithGoogle,
   signInWithPassword,
   startImpersonation,
@@ -30,7 +32,8 @@ type Loading = { state: 'loading' } | { state: 'ready'; session: Session | null 
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { t, setLocale } = useI18n()
-  const [loading, setLoading] = useState<Loading>({ state: 'loading' })
+  // A browser with no token has no identity, and that is known at once: a Visitor's first draw is the screen they came for.
+  const [loading, setLoading] = useState<Loading>(() => (holdsSession() ? { state: 'loading' } : { state: 'ready', session: null }))
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -151,7 +154,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useTheme(preferences.theme)
-  useEffect(() => setLocale(preferences.language), [preferences.language, setLocale])
+  // A Visitor has no Preferences: the language is the one of the address they came to (see `routes/Routes`).
+  const identified = session !== null
+  useEffect(() => {
+    if (!identified) return
+    setLocale(preferences.language)
+    rememberLanguage(preferences.language)
+  }, [identified, preferences.language, setLocale])
 
   const value = useMemo(
     () =>

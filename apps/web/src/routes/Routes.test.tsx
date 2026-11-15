@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { I18nProvider } from '../i18n'
+import { I18nProvider, type Locale } from '../i18n'
 import { SessionContext, type SessionContextValue } from '../identity/context'
 import { HeldRoomContext } from '../room/heldRoomContext'
 import { initialRoomView } from '../room/roomClient'
@@ -64,11 +64,11 @@ const anonymous = () => fakeSession({ account: null, room: { code: 'RNT4K9PX' } 
 const account = () => fakeSession()
 
 /** The app at `path`, as this session finds it, with the Room RNT4K9PX held as `App` holds it on a Room's paths. */
-function renderAt(path: string, session: SessionContextValue) {
+function renderAt(path: string, session: SessionContextValue, locale: Locale = 'en') {
   window.history.replaceState(null, '', path)
   const confirmDisplayName = vi.fn()
   render(
-    <I18nProvider initialLocale="en">
+    <I18nProvider initialLocale={locale}>
       <SessionContext.Provider value={session}>
         <HeldRoomContext
           value={{
@@ -149,6 +149,27 @@ describe('Routes · the landing, for visitors', () => {
     expect(await landing()).toBeTruthy()
     expect(document.querySelector('canvas')?.closest('[aria-hidden="true"]')).not.toBeNull()
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  })
+
+  it('is in English at /en, where someone reading in English at / is taken', async () => {
+    renderAt('/', visitor())
+
+    expect(await landing()).toBeTruthy()
+    expect(window.location.pathname).toBe('/en')
+  })
+
+  it('is in Spanish at /, where someone reading in Spanish at /en is taken', async () => {
+    renderAt('/en', visitor(), 'es')
+
+    expect(await screen.findByRole('heading', { name: 'Tus manos. Tus números. Tu mesa.' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('shows an Account its Home at /en too', async () => {
+    renderAt('/en', account())
+
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
   })
 
   it('is where an unknown path falls back to', async () => {
