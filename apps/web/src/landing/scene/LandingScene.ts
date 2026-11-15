@@ -30,10 +30,11 @@ import {
 } from './choreography'
 import { drawWhileVisible } from './frames'
 import { paceOf, tierBelow, type Tier } from './quality'
-import cardBackUrl from './textures/card-back.jpeg'
-import chipFaceUrl from './textures/chip-face.jpeg'
-import feltUrl from './textures/felt-3.jpeg'
-import studioUrl from './textures/studio-2.jpeg'
+// The textures are made from the originals in `build/textures`, by the script beside them.
+import cardBackUrl from './textures/card-back.webp'
+import chipFaceUrl from './textures/chip-face.webp'
+import feltUrl from './textures/felt-3.webp'
+import studioUrl from './textures/studio-2.webp'
 
 /*
  * The Landing's scene: brass on black. Matt, near-black things under one

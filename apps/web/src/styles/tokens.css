@@ -11,6 +11,26 @@
  * Dark is the default theme; [data-theme='light'] on <html> switches to the light counterpart.
  * [data-theme='dark'] on any element keeps that element dark whatever the theme.
  */
+/*
+ * What the copy is set in until its fonts arrive: faces the device already
+ * has, scaled to the fonts' widths so the lines break where they will and
+ * nothing moves when the fonts take over. Georgia is a third wider than
+ * Instrument Serif; Arial is within a hundredth of Instrument Sans. A device
+ * with neither falls through to the faces after them. IBM Plex Mono needs
+ * none: a monospace face is as wide as the next.
+ */
+@font-face {
+  font-family: 'Instrument Serif Fallback';
+  src: local('Georgia');
+  size-adjust: 76%;
+}
+
+@font-face {
+  font-family: 'Instrument Sans Fallback';
+  src: local('Arial');
+  size-adjust: 101%;
+}
+
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
@@ -144,8 +164,8 @@
   --shadow-pressed-brass: inset 0 2px 5px rgb(0 0 0 / 35%);
 
   /* Typography */
-  --font-serif: 'Instrument Serif', Georgia, serif;
-  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Instrument Serif Fallback', Georgia, serif;
+  --font-sans: 'Instrument Sans', 'Instrument Sans Fallback', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Rhythm */

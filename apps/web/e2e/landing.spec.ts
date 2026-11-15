@@ -268,6 +268,30 @@ for (const [name, viewport] of [
       }
     })
 
+    test('reads the copy in fallback faces until the fonts arrive, and it stays where it is when they do', async ({ page }) => {
+      // The fonts are held back, as a slow connection would.
+      let arrive = () => {}
+      const held = new Promise<void>((resolve) => (arrive = resolve))
+      await page.route(/\.woff2?(\?|$)/, async (route) => {
+        await held
+        await route.continue()
+      })
+      await page.goto('/')
+      await expect(page.getByRole('heading', { level: 1, name: titles.opening })).toBeVisible()
+      // The fallback faces are cut to the fonts' widths from Georgia and Arial; a machine without them has nothing to check.
+      test.skip(!(await hasFonts(page, ['Georgia', 'Arial'])), 'No Georgia or Arial on this machine')
+      expect(await page.evaluate(() => document.fonts.check('16px "Instrument Serif"'))).toBe(false)
+      const before = await copyBoxes(page)
+
+      arrive()
+      await page.evaluate(() =>
+        Promise.all(['"Instrument Serif"', '"Instrument Sans"', '"IBM Plex Mono"'].map((font) => document.fonts.load(`16px ${font}`))),
+      )
+      expect(await page.evaluate(() => document.fonts.check('16px "Instrument Serif"'))).toBe(true)
+
+      expect(await copyBoxes(page)).toEqual(before)
+    })
+
     test('is taken to the Room Code page by its link, from the last stop', async ({ page }) => {
       await page.goto('/')
       await page.keyboard.press('End')
@@ -495,7 +519,9 @@ function picturesAskedFor(page: Page) {
   const asked: string[] = []
   page.on('request', (request) => {
     // In development the page's scripts ask for a module that holds each picture's address: that isn't the picture.
-    if (request.resourceType() === 'image' && new URL(request.url()).pathname.endsWith('.webp')) asked.push(request.url())
+    // The scene's own textures are WebP too: a picture of the scene is named for its shape and its stop.
+    const picture = /\/(?:wide|tall)-\d+[\w.-]*\.webp$/.test(new URL(request.url()).pathname)
+    if (request.resourceType() === 'image' && picture) asked.push(request.url())
   })
   return asked
 }
@@ -529,6 +555,28 @@ function captionsShowing(page: Page) {
         return opacity === 1
       })
       .map((heading) => heading.textContent),
+  )
+}
+
+/** Whether the machine has each of `fonts`: text set in one it lacks comes out as wide as in the face after it. */
+function hasFonts(page: Page, fonts: string[]) {
+  return page.evaluate((fonts) => {
+    const context = document.createElement('canvas').getContext('2d')!
+    const width = (font: string) => {
+      context.font = `40px ${font}`
+      return context.measureText('Tus manos. Tus números.').width
+    }
+    return fonts.every((font) => width(`"${font}", monospace`) !== width('monospace'))
+  }, fonts)
+}
+
+/** Where every caption's title and line are, and how tall: a line more or less of text moves them. */
+function copyBoxes(page: Page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.landing__title, .landing__line')].map((element) => {
+      const box = element.getBoundingClientRect()
+      return { text: element.textContent, top: Math.round(box.top), height: Math.round(box.height) }
+    }),
   )
 }
 

@@ -118,6 +118,10 @@ describe.each(landings)("the Landing's document at $address", ({ language, fileN
     ])
   })
 
+  it("asks ahead for the headline's font", () => {
+    expect(documents.get(fileName)).toMatch(/<link rel="preload" as="font" type="font\/woff2" href="\/assets\/instrument-serif-latin-400-normal-[\w-]+\.woff2" crossorigin>/)
+  })
+
   it('asks for the same scripts and styles as the document of every other path', () => {
     expect(askedBy(documents.get(fileName)!)).not.toEqual([])
     expect(askedBy(documents.get(fileName)!)).toEqual(askedBy(documents.get('app.html')!))
