@@ -146,18 +146,16 @@ function headFor({ locale, path, title, description, pictureSays }: LandingDocum
 }
 
 /**
- * What crawlers are told: the Landing's addresses and what a browser needs
- * to draw them may be fetched, and nothing else, which is the app behind the
- * Sign-in and the API. The longest rule that matches a path decides, and `$`
- * ends a path, so `/en` is allowed and `/english` is not.
+ * What crawlers are told: everything but the API may be fetched. The app's
+ * pages are kept out of search results by their own `noindex`, which a
+ * crawler only reads if it may fetch them; shutting them out here instead
+ * would leave a linked one, a Room's say, listed as a bare address.
  */
-function crawlFile({ site, landings }: Found): string {
+function crawlFile({ site }: Found): string {
   return [
     'User-agent: *',
-    ...landings.map(({ path }) => `Allow: ${path}$`),
-    'Allow: /assets/',
-    'Allow: /favicon.svg',
-    'Disallow: /',
+    'Disallow: /api/',
+    'Disallow: /ws',
     '',
     `Sitemap: ${site}/sitemap.xml`,
     '',

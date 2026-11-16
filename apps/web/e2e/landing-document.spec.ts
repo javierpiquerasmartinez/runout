@@ -350,7 +350,7 @@ test.describe('what a crawler or a link preview asks for', () => {
   test('is served as itself, not as the app: the crawl file, the map and the preview picture', async ({ page, request }) => {
     const robots = await request.get('/robots.txt', { headers: { accept: 'text/html,*/*' } })
     expect(robots.headers()['content-type']).toContain('text/plain')
-    expect(await robots.text()).toContain('Disallow: /')
+    expect(await robots.text()).toContain('Disallow: /api/')
 
     const map = await request.get('/sitemap.xml', { headers: { accept: 'text/html,*/*' } })
     expect(map.headers()['content-type']).toContain('xml')

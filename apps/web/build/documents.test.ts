@@ -304,9 +304,13 @@ describe('the crawl file', () => {
     for (const path of ['/', '/en', picture, ...drawnWith]) expect([path, mayCrawl(robots(), path)]).toEqual([path, true])
   })
 
-  it("keeps them out of the app's pages and the API", () => {
-    const behind = ['/login', '/room', '/room/ABCD', '/library', '/library/hands/1', '/results', '/settings', '/admin', '/app.html', '/api/health', '/ws', '/english']
-    for (const path of behind) expect([path, mayCrawl(robots(), path)]).toEqual([path, false])
+  it("lets them reach the app's pages, so they read that those ask not to be indexed", () => {
+    const app = ['/login', '/room', '/room/ABCD', '/library', '/library/hands/1', '/results', '/settings', '/admin', '/app.html', '/english']
+    for (const path of app) expect([path, mayCrawl(robots(), path)]).toEqual([path, true])
+  })
+
+  it('keeps them out of the API', () => {
+    for (const path of ['/api/health', '/api/hands/1', '/ws']) expect([path, mayCrawl(robots(), path)]).toEqual([path, false])
   })
 
   it('points to the map, at its absolute address', () => {
