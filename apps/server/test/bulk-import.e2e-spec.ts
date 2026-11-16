@@ -7,7 +7,13 @@ import { startApp, type RunningApp } from './support/app.js';
 import { freshDatabase } from './support/fresh-database.js';
 import type { PlanCatalogue } from '../src/plans/plan-catalogue.js';
 import { newAccount } from './support/google.js';
-import { libraryLimitOf } from './support/plans.js';
+import { betaLimitOf, libraryLimitOf } from './support/plans.js';
+import {
+  ADMINISTRATOR_EMAIL,
+  invitedAccount,
+  signInAdministrator,
+  uniqueEmail,
+} from './support/admin.js';
 import { freshHandHistory, manyHands } from './support/hand-histories.js';
 import {
   startImportService,
@@ -31,6 +37,7 @@ describe('A Bulk Import (e2e)', () => {
       limit?: number;
       textLimit?: number;
       planCatalogue?: PlanCatalogue;
+      administratorEmails?: string[];
     } = {},
   ) {
     database = await freshDatabase();
@@ -48,6 +55,7 @@ describe('A Bulk Import (e2e)', () => {
       importService: { address: service.address, secret: SECRET },
       fileStore: store,
       planCatalogue: options.planCatalogue,
+      administratorEmails: options.administratorEmails,
     });
   }
 
@@ -614,6 +622,32 @@ describe('A Bulk Import (e2e)', () => {
       reason: 'library-full',
       imported: 1100,
       notImported: { 'library-full': 400 },
+    });
+  }, 30_000);
+
+  it('ends a Beta’s import at its Plan’s limit, counting the Hands that did not fit', async () => {
+    await start({
+      planCatalogue: betaLimitOf(1200),
+      administratorEmails: [ADMINISTRATOR_EMAIL],
+    });
+    const administrator = await signInAdministrator(api);
+    const { token } = await invitedAccount(
+      api,
+      administrator.token,
+      uniqueEmail('beta'),
+    );
+    const account = asAccount(token);
+
+    await upload(account, 'export.txt', manyHands(1500));
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(1200);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      reason: 'library-full',
+      imported: 1200,
+      notImported: { 'library-full': 300 },
     });
   }, 30_000);
 });

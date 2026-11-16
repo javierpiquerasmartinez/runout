@@ -181,12 +181,13 @@ export class LibraryService {
       .select({ held: count() })
       .from(libraryEntries)
       .where(eq(libraryEntries.identityId, account.id));
-    const limit = await this.plans.libraryLimit(account.id);
-    if (held + adding > limit) {
+    const limit = await this.plans.libraryLimit(tx, account.id);
+    if (held + adding > limit.hands) {
       throw new Rejected('library-full', {
         hands: adding,
         held,
-        limit,
+        limit: limit.hands,
+        plan: limit.plan,
       });
     }
   }

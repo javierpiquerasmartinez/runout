@@ -374,8 +374,8 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       .select({ held: count() })
       .from(libraryEntries)
       .where(eq(libraryEntries.identityId, accountId));
-    const limit = await this.plans.libraryLimit(accountId);
-    return Math.max(0, limit - held);
+    const limit = await this.plans.libraryLimit(tx, accountId);
+    return Math.max(0, limit.hands - held);
   }
 
   /** Ends an import short of adding its Hands, saying why, and lets its files go. */

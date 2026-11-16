@@ -39,6 +39,7 @@ describe('Accounts with Google (e2e)', () => {
       impersonation: null,
       // Test mode's personas are made on Pro.
       plan: 'pro',
+      libraryLimit: 10_000_000,
     });
   });
 
