@@ -7,6 +7,11 @@ import { identities, invitations } from '../database/schema.js';
 import { isUniqueViolation } from '../database/unique-violation.js';
 import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import {
+  INVITATION_DEFAULT_PLAN,
+  PLAN_KEYS,
+  type PlanKey,
+} from '../plans/plan-catalogue.js';
 import { Rejected } from '../rejection/rejection.js';
 import type { Identity } from './identity.service.js';
 import {
@@ -29,6 +34,8 @@ export interface InvitationView {
   id: string;
   email: string;
   language: 'es' | 'en';
+  /** The Plan its Account starts on. */
+  plan: PlanKey;
   status: InvitationStatus;
   sentBy: PersonView;
   sentAt: string;
@@ -77,7 +84,8 @@ export class InvitationsService {
   }
 
   /**
-   * Invites `email` in `language`. Refused with `account-exists` (saying
+   * Invites `email` in `language`, offering `plan` (Beta unless another is
+   * picked). Refused with `account-exists` (saying
    * whether that Account is suspended) or `invitation-pending`; an expired
    * one for the same email is sent again instead.
    */
@@ -85,6 +93,7 @@ export class InvitationsService {
     administrator: Identity,
     rawEmail: unknown,
     rawLanguage: unknown = 'es',
+    rawPlan: unknown = INVITATION_DEFAULT_PLAN,
   ): Promise<InvitationSent> {
     const email = normalEmail(rawEmail);
     if (!email) throw new Rejected('invalid-email');
@@ -92,6 +101,10 @@ export class InvitationsService {
       throw new Rejected('invalid-language');
     }
     const language = rawLanguage;
+    if (!PLAN_KEYS.includes(rawPlan as PlanKey)) {
+      throw new Rejected('invalid-plan');
+    }
+    const plan = rawPlan as PlanKey;
     const [existing] = await this.db
       .select({ id: identities.id, suspendedAt: identities.suspendedAt })
       .from(identities)
@@ -118,7 +131,7 @@ export class InvitationsService {
       }
       await this.db
         .update(invitations)
-        .set({ language })
+        .set({ language, plan })
         .where(eq(invitations.id, open.id));
       return this.resend(administrator, open.id);
     }
@@ -131,6 +144,7 @@ export class InvitationsService {
         .values({
           email,
           language,
+          plan,
           tokenHash: hashToken(token),
           sentBy: administrator.id,
           sentAt: now,
@@ -253,6 +267,7 @@ function toView(
     id: row.id,
     email: row.email,
     language: row.language,
+    plan: row.plan,
     status: invitationStatus(row, now),
     sentBy: person(sender),
     sentAt: row.sentAt.toISOString(),

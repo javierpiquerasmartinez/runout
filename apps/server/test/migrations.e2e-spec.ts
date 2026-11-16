@@ -356,6 +356,83 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
     }
   });
 
+  it('puts every Account and every pending Invitation on Pro, each Account with its first change recorded', async () => {
+    await migrateUpTo('0034_bulk_imports');
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    try {
+      const {
+        rows: [administrator],
+      } = await client.query<{ id: string }>(
+        `insert into identities (google_subject, email, created_at)
+         values ('admin-subject', 'admin@example.com', now()) returning id`,
+      );
+      const {
+        rows: [invitation],
+      } = await client.query<{ id: string }>(
+        `insert into invitations (email, language, token_hash, sent_by, sent_at, expires_at)
+         values ('bea@example.com', 'es', 'hash-bea', $1, now(), now() + interval '7 days')
+         returning id`,
+        [administrator.id],
+      );
+      const {
+        rows: [ana],
+      } = await client.query<{ id: string }>(
+        `insert into identities (password_hash, email, created_at)
+         values ('scrypt-hash', 'ana@example.com', now()) returning id`,
+      );
+      const {
+        rows: [guest],
+      } = await client.query<{ id: string }>(
+        `insert into identities (display_name, created_at)
+         values ('Guest', now()) returning id`,
+      );
+
+      await migrateWith(MIGRATIONS_FOLDER);
+
+      const { rows: plans } = await client.query<{
+        id: string;
+        plan: string | null;
+      }>('select id, plan from identities');
+      expect(
+        Object.fromEntries(plans.map((row) => [row.id, row.plan])),
+      ).toEqual({
+        [administrator.id]: 'pro',
+        [ana.id]: 'pro',
+        [guest.id]: null,
+      });
+      const { rows: changes } = await client.query(
+        `select account_id, plan_before, plan_after, how, administrator_id
+         from plan_changes order by account_id`,
+      );
+      expect(changes).toEqual(
+        [administrator.id, ana.id].sort().map((id) => ({
+          account_id: id,
+          plan_before: null,
+          plan_after: 'pro',
+          how: 'migration',
+          administrator_id: null,
+        })),
+      );
+      const { rows: offered } = await client.query(
+        'select id, plan from invitations',
+      );
+      expect(offered).toEqual([{ id: invitation.id, plan: 'pro' }]);
+      // From now on an Invitation offers Beta unless told otherwise.
+      const {
+        rows: [fresh],
+      } = await client.query<{ plan: string }>(
+        `insert into invitations (email, language, token_hash, sent_by, sent_at, expires_at)
+         values ('cleo@example.com', 'es', 'hash-cleo', $1, now(), now() + interval '7 days')
+         returning plan`,
+        [administrator.id],
+      );
+      expect(fresh.plan).toBe('beta');
+    } finally {
+      await client.end();
+    }
+  });
+
   /** Stores one Hand in a database at 0025, with the Rake and Rake Generated given. */
   async function storeHandAt0025(
     client: pg.Client,

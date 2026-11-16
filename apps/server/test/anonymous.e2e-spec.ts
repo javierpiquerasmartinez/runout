@@ -172,6 +172,7 @@ describe('Anonymous identities last one Room (e2e)', () => {
         room: { code },
         administrator: false,
         impersonation: null,
+        plan: null,
       });
       const { snapshot } = await enter(res.body.token, code, 'Marta');
       expect(snapshot.participants).toContainEqual(

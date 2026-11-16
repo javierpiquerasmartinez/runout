@@ -37,6 +37,8 @@ describe('Accounts with Google (e2e)', () => {
       room: null,
       administrator: false,
       impersonation: null,
+      // Test mode's personas are made on Pro.
+      plan: 'pro',
     });
   });
 

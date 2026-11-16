@@ -2,7 +2,25 @@
 export const RUNOUT_LIBRARY_HANDS = 10_000_000;
 
 /** The Plans an Account can be on. */
-export type PlanKey = 'pro';
+export const PLAN_KEYS = ['beta', 'pro'] as const;
+export type PlanKey = (typeof PLAN_KEYS)[number];
+
+/** The Plan an Invitation offers unless the Administrator picks another. */
+export const INVITATION_DEFAULT_PLAN: PlanKey = 'beta';
+
+/**
+ * How an Account's Plan came to change: an Administrator changed it, it was
+ * the one its Invitation offered, the migration that brought Plans gave it to
+ * an Account that already existed, or Test mode made a persona's Account on
+ * it. Subscriptions, codes and gifts will add more.
+ */
+export const PLAN_CHANGE_HOWS = [
+  'administrator',
+  'invitation',
+  'migration',
+  'test-mode',
+] as const;
+export type PlanChangeHow = (typeof PLAN_CHANGE_HOWS)[number];
 
 /** What a Plan allows. Every Plan defines every limit. */
 export interface PlanLimits {
@@ -18,5 +36,7 @@ export const PLAN_CATALOGUE = Symbol('PLAN_CATALOGUE');
 
 /** Runout's Plans in production. */
 export const DEFAULT_PLAN_CATALOGUE: PlanCatalogue = {
+  // No limit differs yet: Beta's own comes with the Library's usage.
+  beta: { libraryHands: RUNOUT_LIBRARY_HANDS },
   pro: { libraryHands: RUNOUT_LIBRARY_HANDS },
 };

@@ -23,6 +23,8 @@ import {
 import { isUniqueViolation } from '../database/unique-violation.js';
 import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import type { PlanKey } from '../plans/plan-catalogue.js';
+import { recordPlanChange } from '../plans/plan-changes.js';
 import { Rejected } from '../rejection/rejection.js';
 import {
   ADMINISTRATOR_EMAILS,
@@ -112,6 +114,8 @@ export interface Profile extends Omit<Identity, 'impersonation'> {
     administrator: { displayName: string | null; email: string | null };
     endsAt: string;
   } | null;
+  /** The Plan the Account is on (ADR 0011); null for an anonymous identity. */
+  plan: PlanKey | null;
 }
 
 /** A browser just given a token for an identity. */
@@ -261,17 +265,32 @@ export class IdentityService {
       return this.updateOrRefuse(byEmail.id, { googleSubject: google.subject });
     }
     if (!google.persona) throw new Rejected('invitation-required');
-    const [created] = await this.db
-      .insert(identities)
-      .values({
-        googleSubject: google.subject,
-        email: google.email,
-        createdAt: this.clock.now(),
-      })
-      // The same persona signing in twice at once: one creates it, the
-      // other finds it.
-      .onConflictDoNothing()
-      .returning();
+    const now = this.clock.now();
+    const created = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(identities)
+        .values({
+          googleSubject: google.subject,
+          email: google.email,
+          createdAt: now,
+          // A persona tries everything: it starts with no Plan limit.
+          plan: 'pro',
+        })
+        // The same persona signing in twice at once: one creates it, the
+        // other finds it.
+        .onConflictDoNothing()
+        .returning();
+      if (row) {
+        await recordPlanChange(tx, {
+          accountId: row.id,
+          before: null,
+          after: 'pro',
+          at: now,
+          how: 'test-mode',
+        });
+      }
+      return row;
+    });
     return created ?? this.accountForGoogle(google);
   }
 
@@ -349,8 +368,17 @@ export class IdentityService {
             email: invitation.email,
             invitationId: invitation.id,
             createdAt: now,
+            plan: invitation.plan,
           })
           .returning();
+        await recordPlanChange(tx, {
+          accountId: row.id,
+          before: null,
+          after: invitation.plan,
+          at: now,
+          how: 'invitation',
+          administratorId: invitation.sentBy,
+        });
         await tx.insert(preferences).values({
           ...DEFAULT_PREFERENCES,
           identityId: row.id,
@@ -865,6 +893,7 @@ export class IdentityService {
           googleSubject: identities.googleSubject,
           passwordHash: identities.passwordHash,
           email: identities.email,
+          plan: identities.plan,
           roomCode: rooms.code,
         })
         .from(identities)
@@ -904,6 +933,7 @@ export class IdentityService {
               endsAt: identity.impersonation.endsAt.toISOString(),
             }
           : null,
+      plan: stored?.plan ?? null,
     };
   }
 

@@ -1,3 +1,4 @@
+import pg from 'pg';
 import request from 'supertest';
 import { startApp, type RunningApp } from './support/app.js';
 import {
@@ -15,6 +16,7 @@ const DAY = 24 * 3_600_000;
 describe('Invitations (e2e)', () => {
   let running: RunningApp;
   let administrator: string;
+  let administratorId: string;
   let ana: string;
   let bea: string;
   let stranger: string;
@@ -25,7 +27,8 @@ describe('Invitations (e2e)', () => {
       uniqueEmail,
     );
     running = await startApp({ administratorEmails: [ADMINISTRATOR_EMAIL] });
-    administrator = (await signInAdministrator(running)).token;
+    ({ token: administrator, id: administratorId } =
+      await signInAdministrator(running));
   });
 
   afterEach(async () => {
@@ -49,6 +52,105 @@ describe('Invitations (e2e)', () => {
       (each) => each.email === email,
     ) as any;
   }
+
+  /** Every change of an Account's Plan: only the database keeps them so far. */
+  async function planChangesOf(accountId: string) {
+    const client = new pg.Client(running.databaseUrl);
+    await client.connect();
+    try {
+      const { rows } = await client.query(
+        `select plan_before, plan_after, changed_at, how, administrator_id
+         from plan_changes where account_id = $1 order by changed_at`,
+        [accountId],
+      );
+      return rows;
+    } finally {
+      await client.end();
+    }
+  }
+
+  describe('the Plan it offers', () => {
+    it('is Beta unless the Administrator picks another', async () => {
+      await panel().post('/invitations').send({ email: ana }).expect(201);
+      const res = await panel()
+        .post('/invitations')
+        .send({ email: bea, plan: 'pro' })
+        .expect(201);
+
+      expect(res.body.invitation.plan).toBe('pro');
+      expect((await invitationOf(ana)).plan).toBe('beta');
+      expect((await invitationOf(bea)).plan).toBe('pro');
+    });
+
+    it('refuses a Plan that does not exist, sending nothing', async () => {
+      const res = await panel()
+        .post('/invitations')
+        .send({ email: ana, plan: 'gold' })
+        .expect(400);
+
+      expect(res.body.reason).toBe('invalid-plan');
+      expect(running.inbox.to(ana)).toHaveLength(0);
+    });
+
+    it('stays the same when it is resent', async () => {
+      await invite(running, administrator, ana, 'es', 'pro');
+      await running.clock.advance(8 * DAY);
+      const { id } = await invitationOf(ana);
+
+      await panel().post(`/invitations/${id}/resend`).expect(200);
+
+      expect(await invitationOf(ana)).toMatchObject({
+        status: 'pending',
+        plan: 'pro',
+      });
+    });
+
+    it('is the Plan of the Account accepted with a password, its first change made by the Invitation', async () => {
+      const token = await invite(running, administrator, ana, 'es', 'pro');
+      await running.clock.advance(DAY);
+
+      const res = await request(running.httpServer)
+        .post(`/api/invitations/${token}/password`)
+        .send({ password: GOOD_PASSWORD })
+        .expect(201);
+
+      expect(res.body.identity.plan).toBe('pro');
+      const me = await request(running.httpServer)
+        .get('/api/identities/me')
+        .set('Authorization', `Bearer ${res.body.token}`)
+        .expect(200);
+      expect(me.body.plan).toBe('pro');
+      expect(await planChangesOf(res.body.identity.id)).toEqual([
+        {
+          plan_before: null,
+          plan_after: 'pro',
+          changed_at: new Date('2026-01-02T00:00:00.000Z'),
+          how: 'invitation',
+          administrator_id: administratorId,
+        },
+      ]);
+    });
+
+    it('is the Plan of the Account accepted with Google, its first change made by the Invitation', async () => {
+      const token = await invite(running, administrator, ana);
+
+      const res = await request(running.httpServer)
+        .post(`/api/invitations/${token}/google`)
+        .send({ idToken: googleIdToken(`g-${ana}`, ana) })
+        .expect(201);
+
+      expect(res.body.identity.plan).toBe('beta');
+      expect(await planChangesOf(res.body.identity.id)).toEqual([
+        {
+          plan_before: null,
+          plan_after: 'beta',
+          changed_at: new Date('2026-01-01T00:00:00.000Z'),
+          how: 'invitation',
+          administrator_id: administratorId,
+        },
+      ]);
+    });
+  });
 
   describe('sending', () => {
     it('emails a link with who invited them and when it expires, and lists it as pending', async () => {

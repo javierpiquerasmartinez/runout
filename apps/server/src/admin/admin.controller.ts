@@ -50,9 +50,14 @@ export class AdminController {
   @Post('invitations')
   async invite(
     @Administrator() administrator: Identity,
-    @Body() body: { email?: unknown; language?: unknown } = {},
+    @Body() body: { email?: unknown; language?: unknown; plan?: unknown } = {},
   ): Promise<InvitationSent> {
-    return this.invitations.invite(administrator, body.email, body.language);
+    return this.invitations.invite(
+      administrator,
+      body.email,
+      body.language,
+      body.plan,
+    );
   }
 
   @Post('invitations/:id/resend')

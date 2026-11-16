@@ -85,6 +85,7 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'not-found': HttpStatus.NOT_FOUND,
   'invalid-email': HttpStatus.BAD_REQUEST,
   'invalid-language': HttpStatus.BAD_REQUEST,
+  'invalid-plan': HttpStatus.BAD_REQUEST,
   'account-exists': HttpStatus.CONFLICT,
   'invitation-pending': HttpStatus.CONFLICT,
   'invitation-not-found': HttpStatus.NOT_FOUND,
