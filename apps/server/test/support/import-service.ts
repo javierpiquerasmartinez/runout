@@ -15,6 +15,8 @@ import {
 import {
   DEFAULT_PLAN_CATALOGUE,
   PLAN_CATALOGUE,
+  RUNOUT_LIBRARY_HANDS,
+  RUNOUT_LIBRARY_LIMIT,
   type PlanCatalogue,
 } from '../../src/plans/plan-catalogue.js';
 import { WAKE_SECRET } from '../../src/import-service/import-service-config.js';
@@ -64,6 +66,8 @@ export interface StartImportServiceOptions {
   textLimit?: number;
   /** The Plans and what each allows; Runout's own otherwise, as in production. */
   planCatalogue?: PlanCatalogue;
+  /** The most Hands any Library may hold, past every Plan; 10 million otherwise, as in production. */
+  runoutLibraryHands?: number;
   /** Where its emails go; a fresh one otherwise. */
   inbox?: FakeInbox;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
@@ -94,6 +98,8 @@ export async function startImportService(
     .useValue(options.textLimit ?? DEFAULT_BULK_IMPORT_TEXT_LIMIT)
     .overrideProvider(PLAN_CATALOGUE)
     .useValue(options.planCatalogue ?? DEFAULT_PLAN_CATALOGUE)
+    .overrideProvider(RUNOUT_LIBRARY_LIMIT)
+    .useValue(options.runoutLibraryHands ?? RUNOUT_LIBRARY_HANDS)
     .overrideProvider(MAILER)
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)

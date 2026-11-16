@@ -1037,6 +1037,8 @@ export const es = {
   'library.imports.reason.too-much-text': 'Los archivos tienen más de 5 GB de texto: no se ha importado ninguna mano.',
   'library.imports.reason.unreadable-file': 'No se ha podido abrir uno de los archivos.',
   'library.imports.reason.unrecognised-format': 'No hemos reconocido el formato de ninguna mano.',
+  'library.imports.reason.plan-limit.one': 'Límite de tu plan: {count} mano se quedó sin importar.',
+  'library.imports.reason.plan-limit.other': 'Límite de tu plan: {count} manos se quedaron sin importar.',
   'library.imports.reason.library-full.one': 'Biblioteca llena: {count} mano se quedó sin importar.',
   'library.imports.reason.library-full.other': 'Biblioteca llena: {count} manos se quedaron sin importar.',
   'library.imports.failed': 'Se interrumpió. Las manos importadas se conservan.',

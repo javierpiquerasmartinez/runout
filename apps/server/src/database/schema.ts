@@ -738,6 +738,7 @@ export const BULK_IMPORT_REASONS = [
   'unreadable-file',
   'unrecognised-format',
   'library-full',
+  'plan-limit',
 ] as const;
 export type BulkImportReason = (typeof BULK_IMPORT_REASONS)[number];
 
@@ -780,8 +781,9 @@ export const bulkImports = pgTable(
      * Why it ended short of adding its Hands, when it did: `too-many-hands`
      * past the limit, `too-much-text` when the files unpack to more text than
      * theirs, `unreadable-file` when a file is no text or zip,
-     * `unrecognised-format` when nothing in the files is a Hand, and
-     * `library-full` when the Library reached its capacity.
+     * `unrecognised-format` when nothing in the files is a Hand,
+     * `plan-limit` when the Library reached its Plan's limit, and
+     * `library-full` when it reached Runout's own.
      */
     reason: text('reason').$type<BulkImportReason>(),
     /**

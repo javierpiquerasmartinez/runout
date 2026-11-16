@@ -198,7 +198,7 @@ export interface EndedBulkImport {
   processed: number;
   imported: number;
   duplicates: number;
-  /** Hands not imported, per reason; `library-full` counts those left unimported when the Library filled up, read or not. */
+  /** Hands not imported, per reason; `plan-limit` and `library-full` count those left unimported when the Library reached its Plan's limit or Runout's own, read or not. */
   notImported: Record<string, number>;
 }
 
@@ -242,7 +242,10 @@ function bulkImportEnded(
   const { language, bulkImport } = input;
   const number = new Intl.NumberFormat(INTL[language]);
   const n = (count: number) => number.format(count);
-  const leftOut = bulkImport.notImported['library-full'] ?? 0;
+  const leftOut =
+    bulkImport.reason === 'plan-limit' || bulkImport.reason === 'library-full'
+      ? (bulkImport.notImported[bulkImport.reason] ?? 0)
+      : 0;
   const files = bulkImport.fileNames.join(', ');
   const failed = bulkImport.status === 'failed';
   const es = language === 'es';
@@ -261,9 +264,12 @@ function bulkImportEnded(
     : es
       ? `Ha terminado la importación de ${files}.`
       : `The import of ${files} has finished.`;
-  // Each reason a Hand was not imported, but the full Library's, said apart.
+  // Each reason a Hand was not imported, but the limit's, said apart.
   const notImported = Object.entries(bulkImport.notImported)
-    .filter(([reason, count]) => reason !== 'library-full' && count > 0)
+    .filter(
+      ([reason, count]) =>
+        reason !== 'plan-limit' && reason !== 'library-full' && count > 0,
+    )
     .map(
       ([reason, count]) =>
         `${NOT_IMPORTED[language][reason] ?? reason}: ${n(count)}`,
@@ -289,6 +295,7 @@ function bulkImportEnded(
         'unreadable-file': 'No se ha podido abrir uno de los archivos.',
         'unrecognised-format':
           'No hemos reconocido el formato de ninguna mano.',
+        'plan-limit': `Límite de tu plan: ${n(leftOut)} ${leftOut === 1 ? 'mano se quedó sin importar' : 'manos se quedaron sin importar'}.`,
         'library-full': `Biblioteca llena: ${n(leftOut)} ${leftOut === 1 ? 'mano se quedó sin importar' : 'manos se quedaron sin importar'}.`,
       }
     : {
@@ -298,6 +305,7 @@ function bulkImportEnded(
           'The files hold more than 5 GB of text: no hand was imported.',
         'unreadable-file': 'One of the files could not be opened.',
         'unrecognised-format': 'We did not recognise the format of any hand.',
+        'plan-limit': `Plan limit: ${n(leftOut)} ${leftOut === 1 ? 'hand was left unimported' : 'hands were left unimported'}.`,
         'library-full': `Library full: ${n(leftOut)} ${leftOut === 1 ? 'hand was left unimported' : 'hands were left unimported'}.`,
       };
   const reason = bulkImport.reason ? why[bulkImport.reason] : undefined;

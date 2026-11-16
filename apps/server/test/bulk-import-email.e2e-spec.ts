@@ -23,7 +23,11 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
 
   /** The API and the import service, on a database of their own. */
   async function start(
-    options: { planCatalogue?: PlanCatalogue; textLimit?: number } = {},
+    options: {
+      planCatalogue?: PlanCatalogue;
+      runoutLibraryHands?: number;
+      textLimit?: number;
+    } = {},
   ) {
     database = await freshDatabase();
     store = new HeldFileStore();
@@ -32,6 +36,7 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
       fileStore: store,
       databaseUrl: database.url,
       planCatalogue: options.planCatalogue,
+      runoutLibraryHands: options.runoutLibraryHands,
       textLimit: options.textLimit,
     });
     api = await startApp({
@@ -39,6 +44,7 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
       importService: { address: service.address, secret: SECRET },
       fileStore: store,
       planCatalogue: options.planCatalogue,
+      runoutLibraryHands: options.runoutLibraryHands,
       administratorEmails: [ADMINISTRATOR_EMAIL],
     });
   }
@@ -149,8 +155,8 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
     expect(email.text).toContain('Imported: 1,000');
   });
 
-  it('says the Library is full, and how many Hands were left unimported', async () => {
-    await start({ planCatalogue: libraryLimitOf(1200) });
+  it('says the Library is full at Runout’s own limit, and how many Hands were left unimported', async () => {
+    await start({ runoutLibraryHands: 1200 });
     const account = await importer();
 
     await account.upload(manyHands(1500));
@@ -162,6 +168,33 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
       'Biblioteca llena: 300 manos se quedaron sin importar.',
     );
     expect(email.text).toContain('Importadas: 1200');
+  });
+
+  it('says the Plan’s limit stopped it, and how many Hands were left unimported', async () => {
+    await start({ planCatalogue: libraryLimitOf(1200) });
+    const account = await importer();
+
+    await account.upload(manyHands(1500));
+    await service!.settled();
+
+    const [email] = service!.inbox.to(account.email);
+    expect(email.text).toContain(
+      'Límite de tu plan: 300 manos se quedaron sin importar.',
+    );
+    expect(email.text).not.toContain('Biblioteca llena');
+    expect(email.text).toContain('Importadas: 1200');
+  });
+
+  it('says the Plan’s limit stopped it in English', async () => {
+    await start({ planCatalogue: libraryLimitOf(1200) });
+    const account = await importer();
+    await account.speak('en');
+
+    await account.upload(manyHands(1201));
+    await service!.settled();
+
+    const [email] = service!.inbox.to(account.email);
+    expect(email.text).toContain('Plan limit: 1 hand was left unimported.');
   });
 
   it('says when the files hold too much text', async () => {

@@ -308,7 +308,10 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       }
       // Past what fits in the Library, nothing more is added: neither these
       // nor the Hands not yet gone through.
-      const spaceLeft = await this.spaceLeftIn(tx, record.identityId);
+      const { spaceLeft, limitedBy } = await this.spaceLeftIn(
+        tx,
+        record.identityId,
+      );
       const full = kept.length > spaceLeft;
       const notFit = full
         ? kept.length - spaceLeft + Math.max(0, (record.total ?? 0) - to)
@@ -329,13 +332,13 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
           duplicates: sql`${bulkImports.duplicates} + ${batch.length - added.length - (full ? kept.length - spaceLeft : 0)}`,
           notImported: plus(
             locked.notImported,
-            full ? { ...discarded, 'library-full': notFit } : discarded,
+            full ? { ...discarded, [limitedBy]: notFit } : discarded,
           ),
           lastAdvancedAt: now,
           // An advance: no longer stalled, and a later stall is told again.
           stalled: false,
           ...(full
-            ? { status: 'completed', reason: 'library-full', finishedAt: now }
+            ? { status: 'completed', reason: limitedBy, finishedAt: now }
             : done
               ? { status: 'completed', finishedAt: now }
               : {}),
@@ -357,14 +360,17 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * How many more Hands the Account's Library holds. Takes the Account's
-   * lock until the batch commits, as a small import does, so that the two
-   * cannot both fit at once.
+   * How many more Hands the Account's Library holds, and whose limit holds
+   * it: its Plan's, or Runout's own. Takes the Account's lock until the batch
+   * commits, as a small import does, so that the two cannot both fit at once.
    */
   private async spaceLeftIn(
     tx: Transaction,
     accountId: string,
-  ): Promise<number> {
+  ): Promise<{
+    spaceLeft: number;
+    limitedBy: Extract<BulkImportReason, 'plan-limit' | 'library-full'>;
+  }> {
     await tx
       .select({ id: identities.id })
       .from(identities)
@@ -375,7 +381,10 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       .from(libraryEntries)
       .where(eq(libraryEntries.identityId, accountId));
     const limit = await this.plans.libraryLimit(tx, accountId);
-    return Math.max(0, limit.hands - held);
+    return {
+      spaceLeft: Math.max(0, limit.hands - held),
+      limitedBy: limit.plan ? 'plan-limit' : 'library-full',
+    };
   }
 
   /** Ends an import short of adding its Hands, saying why, and lets its files go. */

@@ -37,6 +37,7 @@ describe('A Bulk Import (e2e)', () => {
       limit?: number;
       textLimit?: number;
       planCatalogue?: PlanCatalogue;
+      runoutLibraryHands?: number;
       administratorEmails?: string[];
     } = {},
   ) {
@@ -49,12 +50,14 @@ describe('A Bulk Import (e2e)', () => {
       limit: options.limit,
       textLimit: options.textLimit,
       planCatalogue: options.planCatalogue,
+      runoutLibraryHands: options.runoutLibraryHands,
     });
     api = await startApp({
       databaseUrl: database.url,
       importService: { address: service.address, secret: SECRET },
       fileStore: store,
       planCatalogue: options.planCatalogue,
+      runoutLibraryHands: options.runoutLibraryHands,
       administratorEmails: options.administratorEmails,
     });
   }
@@ -574,8 +577,8 @@ describe('A Bulk Import (e2e)', () => {
     expect(store.files()).toHaveLength(1);
   }, 30_000);
 
-  it('ends as a full Library once it reaches its capacity, counting the Hands left unimported', async () => {
-    await start({ planCatalogue: libraryLimitOf(1200) });
+  it('ends as a full Library once it reaches Runout’s own limit, counting the Hands left unimported', async () => {
+    await start({ runoutLibraryHands: 1200 });
     const { token } = await newAccount(api.httpServer);
     const account = asAccount(token);
     const session = freshHandHistory('pokerstars-session.txt');
@@ -619,9 +622,9 @@ describe('A Bulk Import (e2e)', () => {
     const [listed] = (await account.list().expect(200)).body;
     expect(listed).toMatchObject({
       status: 'completed',
-      reason: 'library-full',
+      reason: 'plan-limit',
       imported: 1100,
-      notImported: { 'library-full': 400 },
+      notImported: { 'plan-limit': 400 },
     });
   }, 30_000);
 
@@ -662,9 +665,9 @@ describe('A Bulk Import (e2e)', () => {
       const [listed] = (await account.list().expect(200)).body;
       expect(listed).toMatchObject({
         status: 'completed',
-        reason: 'library-full',
+        reason: 'plan-limit',
         imported: 1100,
-        notImported: { 'library-full': 400 },
+        notImported: { 'plan-limit': 400 },
       });
     }, 30_000);
 
@@ -697,7 +700,7 @@ describe('A Bulk Import (e2e)', () => {
     }, 30_000);
   });
 
-  it('ends a Beta’s import at its Plan’s limit, counting the Hands that did not fit', async () => {
+  it('ends a Beta’s import at its Plan’s limit, counting the Hands that did not fit as the Plan’s', async () => {
     await start({
       planCatalogue: betaLimitOf(1200),
       administratorEmails: [ADMINISTRATOR_EMAIL],
@@ -717,9 +720,9 @@ describe('A Bulk Import (e2e)', () => {
     const [listed] = (await account.list().expect(200)).body;
     expect(listed).toMatchObject({
       status: 'completed',
-      reason: 'library-full',
+      reason: 'plan-limit',
       imported: 1200,
-      notImported: { 'library-full': 300 },
+      notImported: { 'plan-limit': 300 },
     });
   }, 30_000);
 });

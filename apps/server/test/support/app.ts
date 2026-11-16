@@ -20,6 +20,7 @@ import {
 import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
 import {
   PLAN_CATALOGUE,
+  RUNOUT_LIBRARY_LIMIT,
   type PlanCatalogue,
 } from '../../src/plans/plan-catalogue.js';
 import { STORAGE_THRESHOLD } from '../../src/storage/storage.js';
@@ -61,6 +62,8 @@ export interface StartAppOptions {
   administratorEmails?: string[];
   /** The Plans and what each allows; Runout's own otherwise, as in production. */
   planCatalogue?: PlanCatalogue;
+  /** The most Hands any Library may hold, past every Plan; 10 million otherwise, as in production. */
+  runoutLibraryHands?: number;
   /** The import service it wakes, as `startImportService` gives it; none otherwise. */
   importService?: ImportServiceAddress;
   /** Where Bulk Imports' files go, shared with the import service; none otherwise. */
@@ -109,6 +112,11 @@ export async function startApp(
     .useValue(options.fileStore ?? null);
   if (options.planCatalogue !== undefined) {
     builder.overrideProvider(PLAN_CATALOGUE).useValue(options.planCatalogue);
+  }
+  if (options.runoutLibraryHands !== undefined) {
+    builder
+      .overrideProvider(RUNOUT_LIBRARY_LIMIT)
+      .useValue(options.runoutLibraryHands);
   }
   if (options.storageThreshold !== undefined) {
     builder

@@ -17,7 +17,13 @@ export type BulkImportStatus =
   | 'cancelled'
 
 /** Why a Bulk Import ended short of adding its Hands. */
-export type BulkImportReason = 'too-many-hands' | 'too-much-text' | 'unreadable-file' | 'unrecognised-format' | 'library-full'
+export type BulkImportReason =
+  | 'too-many-hands'
+  | 'too-much-text'
+  | 'unreadable-file'
+  | 'unrecognised-format'
+  | 'plan-limit'
+  | 'library-full'
 
 export interface BulkImport {
   id: string
@@ -31,8 +37,10 @@ export interface BulkImport {
   /** Hands not imported, per reason. */
   notImported: Record<string, number>
   /**
-   * Why it ended short of adding its Hands, when it did. A full Library
-   * counts the Hands left unimported, read or not, in `notImported['library-full']`.
+   * Why it ended short of adding its Hands, when it did. A Library held full
+   * by its Plan's limit, or by Runout's own, counts the Hands left
+   * unimported, read or not, in `notImported['plan-limit']` or
+   * `notImported['library-full']`.
    */
   reason: BulkImportReason | null
   createdAt: string

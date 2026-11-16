@@ -86,11 +86,12 @@ function Result({ bulkImport }: { bulkImport: BulkImport }) {
   const notAdded = useNotAdded()
   if (bulkImport.status === 'failed') return <>{t('library.imports.failed')}</>
   if (bulkImport.status === 'cancelled') return <>{t('library.imports.cancelled')}</>
-  if (bulkImport.reason === 'library-full') {
-    const leftOut = bulkImport.notImported['library-full'] ?? 0
+  // A Library its Plan or Runout's own limit held full says how many were left unimported.
+  if (bulkImport.reason === 'plan-limit' || bulkImport.reason === 'library-full') {
+    const leftOut = bulkImport.notImported[bulkImport.reason] ?? 0
     return (
       <>
-        {t(leftOut === 1 ? 'library.imports.reason.library-full.one' : 'library.imports.reason.library-full.other', {
+        {t(`library.imports.reason.${bulkImport.reason}.${leftOut === 1 ? 'one' : 'other'}`, {
           count: formatNumber(leftOut),
         })}
       </>

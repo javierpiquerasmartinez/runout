@@ -1,6 +1,9 @@
 /** The most Hands any Library may hold: Runout's own ceiling. */
 export const RUNOUT_LIBRARY_HANDS = 10_000_000;
 
+/** Runout's own ceiling in force, injected so that tests can give a small one. */
+export const RUNOUT_LIBRARY_LIMIT = Symbol('RUNOUT_LIBRARY_LIMIT');
+
 /** The Plans an Account can be on. */
 export const PLAN_KEYS = ['beta', 'pro'] as const;
 export type PlanKey = (typeof PLAN_KEYS)[number];

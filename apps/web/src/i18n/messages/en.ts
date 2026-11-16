@@ -1036,6 +1036,8 @@ export const en: Messages = {
   'library.imports.reason.too-much-text': 'The files hold more than 5 GB of text: no hand was imported.',
   'library.imports.reason.unreadable-file': 'One of the files could not be opened.',
   'library.imports.reason.unrecognised-format': 'We did not recognise the format of any hand.',
+  'library.imports.reason.plan-limit.one': 'Plan limit: {count} hand was left unimported.',
+  'library.imports.reason.plan-limit.other': 'Plan limit: {count} hands were left unimported.',
   'library.imports.reason.library-full.one': 'Library full: {count} hand was left unimported.',
   'library.imports.reason.library-full.other': 'Library full: {count} hands were left unimported.',
   'library.imports.failed': 'It was interrupted. The imported hands are kept.',

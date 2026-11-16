@@ -8,7 +8,7 @@ import {
 } from '../identity/administrators.js';
 import {
   PLAN_CATALOGUE,
-  RUNOUT_LIBRARY_HANDS,
+  RUNOUT_LIBRARY_LIMIT,
   type PlanCatalogue,
   type PlanKey,
 } from './plan-catalogue.js';
@@ -17,8 +17,9 @@ import {
 export interface LibraryLimit {
   hands: number;
   /**
-   * The Plan whose limit it is; null when no Plan limits the Library: an
-   * Administrator acting as themselves, held only to Runout's own.
+   * The Plan whose limit it is; null when it is Runout's own: for an
+   * Administrator acting as themselves, whom no Plan limits, or where a
+   * Plan would allow more than Runout's own.
    */
   plan: PlanKey | null;
 }
@@ -39,6 +40,7 @@ export class Plans {
     @Inject(PLAN_CATALOGUE) private readonly catalogue: PlanCatalogue,
     @Inject(ADMINISTRATOR_EMAILS)
     private readonly administrators: AdministratorEmails,
+    @Inject(RUNOUT_LIBRARY_LIMIT) private readonly runoutLibraryHands: number,
   ) {}
 
   /**
@@ -63,12 +65,13 @@ export class Plans {
    * acts as an Account that is never an Administrator, so its Plan applies.
    */
   libraryLimitOf(account: PlannedAccount): LibraryLimit {
+    const runouts: LibraryLimit = { hands: this.runoutLibraryHands, plan: null };
     if (account.plan === null || this.administrators.includes(account.email)) {
-      return { hands: RUNOUT_LIBRARY_HANDS, plan: null };
+      return runouts;
     }
-    return {
-      hands: this.catalogue[account.plan].libraryHands,
-      plan: account.plan,
-    };
+    const hands = this.catalogue[account.plan].libraryHands;
+    return hands > this.runoutLibraryHands
+      ? runouts
+      : { hands, plan: account.plan };
   }
 }
