@@ -97,7 +97,7 @@ Desktop software that records played hands and exports Hand Histories (PokerTrac
 
 **Hand**:
 One dealt hand as recorded from one Hero's seat. The same real-world hand seen from two different seats is two Hands.
-_Avoid_: Game, spot, deal
+_Avoid_: Game, spot (that is a Spot), deal
 
 **Hero**:
 The seat from whose point of view a Hand was recorded, as stated by the Hand History itself.
@@ -170,6 +170,20 @@ _Avoid_: bb/100 (as a name), winnings rate
 **Stat**:
 How often the Hero made one particular decision, over the Hands where they had the chance to make it: PFR is the times they raised preflop out of the times they could. A frequency, never a Result. Worked out after the session over a person's Library, filtered the same way as the Results Graph; never shown at a table while playing. The Library can also be filtered by one Stat: the Hands where the Hero had its chance, or those where they took it.
 _Avoid_: HUD, metric, KPI
+
+### Filters
+
+**Filter**:
+What narrows a person's Library to the Hands they want to look at: a period, and criteria on the table (Poker Site, Hero, Stake), on their own labels (Marks, Tags), on Stats and on Spots. One Filter applies at once to the list of Hands, the Results Graph and the Stats, so the three always describe the same Hands, and to the Library when picking Hands for a Room. A Hand must meet every criterion, and any one of the values picked within a criterion; a criterion can instead exclude the Hands that meet it.
+_Avoid_: Search, query, view
+
+**Saved Filter**:
+The part of a Filter about the Spot, the Hero's cards, the board, the Result and Stats, named and kept by a person to apply again. It leaves out the period, the Poker Sites, Heroes and Stakes, Marks and Tags, so the same Saved Filter is used over any stretch of any Library: today at one Stake, or all time at every Stake. Belongs to one Account and nobody else sees it.
+_Avoid_: Preset, favourite, filter set, view
+
+**Spot**:
+The situation the Hero was in at one point of a Hand, always seen from the Hero: what kind of pot it is, their Position against whoever is still in, who has the initiative, and what they faced or could do. A Hand goes through as many Spots as the Hero has decisions in it, and a Filter on a Spot keeps the Hands where the Hero was in it. Spots on several Streets in one Filter describe a single line through the same Hand. Never about a particular opponent.
+_Avoid_: Situation, scenario, node, Hand
 
 ### Room and queue
 
