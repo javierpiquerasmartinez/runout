@@ -65,7 +65,10 @@ export class Plans {
    * acts as an Account that is never an Administrator, so its Plan applies.
    */
   libraryLimitOf(account: PlannedAccount): LibraryLimit {
-    const runouts: LibraryLimit = { hands: this.runoutLibraryHands, plan: null };
+    const runouts: LibraryLimit = {
+      hands: this.runoutLibraryHands,
+      plan: null,
+    };
     if (account.plan === null || this.administrators.includes(account.email)) {
       return runouts;
     }
