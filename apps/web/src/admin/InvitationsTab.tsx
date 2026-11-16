@@ -5,7 +5,15 @@ import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
-import { nameOf, type Invitation, type InvitationSent, type InvitationStatus } from './admin'
+import {
+  nameOf,
+  PLAN_TONE,
+  PLANS,
+  type Invitation,
+  type InvitationSent,
+  type InvitationStatus,
+  type Plan,
+} from './admin'
 import { Badge } from './AdminPage'
 import { useAdminApi } from './useAdminApi'
 
@@ -32,6 +40,7 @@ export function InvitationsTab() {
   const [loadFailed, setLoadFailed] = useState<FailureReason | null>(null)
   const [email, setEmail] = useState('')
   const [language, setLanguage] = useState<'es' | 'en'>('es')
+  const [plan, setPlan] = useState<Plan>('beta')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [confirming, setConfirming] = useState<{ action: 'resend' | 'cancel'; invitation: Invitation } | null>(null)
@@ -61,7 +70,7 @@ export function InvitationsTab() {
     setBusy(true)
     setNotice(null)
     try {
-      reportSent(await admin<InvitationSent>('/invitations', { method: 'POST', body: { email, language } }))
+      reportSent(await admin<InvitationSent>('/invitations', { method: 'POST', body: { email, language, plan } }))
       setEmail('')
     } catch (error) {
       const reason = reasonOf(error)
@@ -128,6 +137,12 @@ export function InvitationsTab() {
           value={language}
           onChange={setLanguage}
         />
+        <SegmentedControl
+          label={t('admin.invitations.plan')}
+          options={PLANS.map((each) => ({ value: each, label: t(`plan.${each}`) }))}
+          value={plan}
+          onChange={setPlan}
+        />
         <Button type="submit" variant="primary" aria-busy={busy}>
           {t('admin.invitations.send')}
         </Button>
@@ -146,6 +161,7 @@ export function InvitationsTab() {
               <tr>
                 <th>{t('admin.invitations.email')}</th>
                 <th>{t('admin.invitations.status')}</th>
+                <th>{t('admin.invitations.plan')}</th>
                 <th>{t('admin.invitations.sentBy')}</th>
                 <th>{t('admin.invitations.sentAt')}</th>
                 <th>{t('admin.invitations.expiresAt')}</th>
@@ -161,6 +177,9 @@ export function InvitationsTab() {
                   <td>{invitation.email}</td>
                   <td>
                     <Badge tone={TONE[invitation.status]}>{t(`admin.invitations.status.${invitation.status}`)}</Badge>
+                  </td>
+                  <td>
+                    <Badge tone={PLAN_TONE[invitation.plan]}>{t(`plan.${invitation.plan}`)}</Badge>
                   </td>
                   <td>{nameOf(invitation.sentBy)}</td>
                   <td>{date(invitation.sentAt)}</td>

@@ -15,6 +15,7 @@ function invitation(id: string, email: string, status: string, extra: object = {
     id,
     email,
     language: 'es',
+    plan: 'beta',
     status,
     sentBy: administrator,
     sentAt: '2026-11-01T10:00:00Z',
@@ -91,7 +92,7 @@ describe('the Invitations tab', () => {
         account: { id: 'bea', displayName: 'Bea', email: 'bea@x.com' },
       }),
       invitation('3', 'carla@x.com', 'expired'),
-      invitation('4', 'dani@x.com', 'cancelled'),
+      invitation('4', 'dani@x.com', 'cancelled', { plan: 'pro' }),
     ]
     calls = fakeApi({
       'GET /admin/invitations': () => Response.json(list),
@@ -105,6 +106,37 @@ describe('the Invitations tab', () => {
       'POST /admin/invitations/1/cancel': () => Response.json(list[0]),
       'DELETE /admin/accounts/old/suspension': () => new Response(null, { status: 204 }),
     })
+  })
+
+  it('shows the Plan each Invitation offers, after its status', async () => {
+    renderTab('invitations')
+
+    const rows = await screen.findAllByRole('row')
+    const headers = within(rows[0])
+      .getAllByRole('columnheader')
+      .map((cell) => cell.textContent)
+    expect(headers.slice(0, 3)).toEqual(['Email', 'Status', 'Plan'])
+    expect(within(rows[1]).getAllByRole('cell')[2].textContent).toBe('Beta')
+    expect(within(rows[4]).getAllByRole('cell')[2].textContent).toBe('Pro')
+  })
+
+  it('offers Beta unless another Plan is picked', async () => {
+    renderTab('invitations')
+
+    expect((await screen.findByRole('radio', { name: 'Beta' })).getAttribute('aria-checked')).toBe('true')
+    await userEvent.type(screen.getByLabelText('Email'), 'eva@x.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+    await screen.findByRole('status')
+    await userEvent.type(screen.getByLabelText('Email'), 'fran@x.com')
+    await userEvent.click(screen.getByRole('radio', { name: 'Pro' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+
+    await waitFor(() =>
+      expect(calls.filter((call) => call.method === 'POST').map((call) => call.body)).toEqual([
+        { email: 'eva@x.com', language: 'es', plan: 'beta' },
+        { email: 'fran@x.com', language: 'es', plan: 'pro' },
+      ]),
+    )
   })
 
   it('lists every Invitation with its status, sender and resulting Account', async () => {
@@ -134,7 +166,7 @@ describe('the Invitations tab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     expect((await screen.findByRole('status')).textContent).toBe('Invitation sent to eva@x.com.')
-    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ email: 'eva@x.com', language: 'en' })
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ email: 'eva@x.com', language: 'en', plan: 'beta' })
   })
 
   it('points to resend when the email has one pending', async () => {
