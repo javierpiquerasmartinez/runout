@@ -31,7 +31,7 @@ import {
 } from '../hands/import/hand-reader.js';
 import { UnreadableUpload } from '../hands/import/upload.js';
 import { addToLibrary, inLibrary } from '../library/library-entries.js';
-import { LIBRARY_CAPACITY } from '../library/library-limits.js';
+import { Plans } from '../plans/plans.js';
 import { Storage } from '../storage/storage.js';
 import {
   BULK_IMPORT_LIMIT,
@@ -81,7 +81,7 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly heroResults: HeroResults,
     @Inject(BULK_IMPORT_LIMIT) private readonly limit: number,
     @Inject(BULK_IMPORT_TEXT_LIMIT) private readonly textLimit: number,
-    @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
+    private readonly plans: Plans,
     private readonly importerEmail: ImporterEmail,
     private readonly administratorsEmail: AdministratorsEmail,
     private readonly storage: Storage,
@@ -374,7 +374,8 @@ export class ImportEngine implements OnApplicationBootstrap, OnModuleDestroy {
       .select({ held: count() })
       .from(libraryEntries)
       .where(eq(libraryEntries.identityId, accountId));
-    return Math.max(0, this.capacity - held);
+    const limit = await this.plans.libraryLimit(accountId);
+    return Math.max(0, limit - held);
   }
 
   /** Ends an import short of adding its Hands, saying why, and lets its files go. */

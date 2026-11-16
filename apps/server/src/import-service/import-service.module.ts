@@ -5,14 +5,11 @@ import { FILE_STORE } from '../file-store/file-store.js';
 import { fileStoreFromEnv } from '../file-store/file-store.module.js';
 import { HeroResultsModule } from '../hands/hero-results.module.js';
 import {
-  DEFAULT_LIBRARY_CAPACITY,
-  LIBRARY_CAPACITY,
-} from '../library/library-limits.js';
-import {
   ADMINISTRATOR_EMAILS,
   administratorEmailsFromEnv,
 } from '../identity/administrators.js';
 import { MailModule } from '../mail/mail.module.js';
+import { PlansModule } from '../plans/plans.module.js';
 import { StorageModule } from '../storage/storage.js';
 import { RejectionFilter } from '../rejection/rejection.filter.js';
 import { WAKE_SECRET, wakeSecretFromEnv } from './import-service-config.js';
@@ -38,6 +35,7 @@ import { WakeController } from './wake.controller.js';
     DatabaseModule,
     HeroResultsModule,
     MailModule,
+    PlansModule,
     StorageModule,
   ],
   controllers: [WakeController],
@@ -53,7 +51,6 @@ import { WakeController } from './wake.controller.js';
       provide: BULK_IMPORT_TEXT_LIMIT,
       useValue: DEFAULT_BULK_IMPORT_TEXT_LIMIT,
     },
-    { provide: LIBRARY_CAPACITY, useValue: DEFAULT_LIBRARY_CAPACITY },
     {
       provide: ADMINISTRATOR_EMAILS,
       useFactory: () => administratorEmailsFromEnv(process.env),

@@ -2,10 +2,12 @@ import { strToU8, zipSync } from 'fflate';
 import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
-import { MemoryFileStore } from './support/memory-file-store.js';
+import { HeldFileStore, startOfHand } from './support/held-file-store.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { freshDatabase } from './support/fresh-database.js';
+import type { PlanCatalogue } from '../src/plans/plan-catalogue.js';
 import { newAccount } from './support/google.js';
+import { libraryLimitOf } from './support/plans.js';
 import { freshHandHistory, manyHands } from './support/hand-histories.js';
 import {
   startImportService,
@@ -15,7 +17,7 @@ import {
 const SECRET = 'a-shared-secret-for-tests';
 
 describe('A Bulk Import (e2e)', () => {
-  let store: MemoryFileStore;
+  let store: HeldFileStore;
   let service: RunningImportService | undefined;
   let api: RunningApp;
   let database: { url: string; drop(): Promise<void> };
@@ -28,24 +30,24 @@ describe('A Bulk Import (e2e)', () => {
     options: {
       limit?: number;
       textLimit?: number;
-      libraryCapacity?: number;
+      planCatalogue?: PlanCatalogue;
     } = {},
   ) {
     database = await freshDatabase();
-    store = new MemoryFileStore();
+    store = new HeldFileStore();
     service = await startImportService({
       secret: SECRET,
       fileStore: store,
       databaseUrl: database.url,
       limit: options.limit,
       textLimit: options.textLimit,
-      libraryCapacity: options.libraryCapacity,
+      planCatalogue: options.planCatalogue,
     });
     api = await startApp({
       databaseUrl: database.url,
       importService: { address: service.address, secret: SECRET },
       fileStore: store,
-      libraryCapacity: options.libraryCapacity,
+      planCatalogue: options.planCatalogue,
     });
   }
 
@@ -565,7 +567,7 @@ describe('A Bulk Import (e2e)', () => {
   }, 30_000);
 
   it('ends as a full Library once it reaches its capacity, counting the Hands left unimported', async () => {
-    await start({ libraryCapacity: 1200 });
+    await start({ planCatalogue: libraryLimitOf(1200) });
     const { token } = await newAccount(api.httpServer);
     const account = asAccount(token);
     const session = freshHandHistory('pokerstars-session.txt');
@@ -587,5 +589,31 @@ describe('A Bulk Import (e2e)', () => {
       finishedAt: expect.any(String),
     });
     expect(store.files()).toEqual([]);
+  }, 30_000);
+
+  it('holds each batch to the Library limit in force when it runs', async () => {
+    const catalogue = libraryLimitOf(10_000);
+    await start({ planCatalogue: catalogue });
+    const { token } = await newAccount(api.httpServer);
+    const account = asAccount(token);
+    const text = manyHands(1500);
+    store.letReadThrough();
+    // Its first batch of 1,000 Hands is in; the second is being read.
+    const adding = store.holdRead(startOfHand(text, 1200));
+    await upload(account, 'export.txt', text);
+    await adding.held;
+
+    catalogue.pro.libraryHands = 1100;
+    adding.release();
+    await service!.settled();
+
+    expect(await account.libraryTotal()).toBe(1100);
+    const [listed] = (await account.list().expect(200)).body;
+    expect(listed).toMatchObject({
+      status: 'completed',
+      reason: 'library-full',
+      imported: 1100,
+      notImported: { 'library-full': 400 },
+    });
   }, 30_000);
 });

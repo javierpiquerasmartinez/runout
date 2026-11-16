@@ -3,7 +3,9 @@ import request from 'supertest';
 import { ADMINISTRATOR_EMAIL, signInAdministrator } from './support/admin.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { freshDatabase } from './support/fresh-database.js';
+import type { PlanCatalogue } from '../src/plans/plan-catalogue.js';
 import { newAccount } from './support/google.js';
+import { libraryLimitOf } from './support/plans.js';
 import { freshHandHistory, manyHands } from './support/hand-histories.js';
 import { HeldFileStore, startOfHand } from './support/held-file-store.js';
 import {
@@ -21,7 +23,7 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
 
   /** The API and the import service, on a database of their own. */
   async function start(
-    options: { libraryCapacity?: number; textLimit?: number } = {},
+    options: { planCatalogue?: PlanCatalogue; textLimit?: number } = {},
   ) {
     database = await freshDatabase();
     store = new HeldFileStore();
@@ -29,14 +31,14 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
       secret: SECRET,
       fileStore: store,
       databaseUrl: database.url,
-      libraryCapacity: options.libraryCapacity,
+      planCatalogue: options.planCatalogue,
       textLimit: options.textLimit,
     });
     api = await startApp({
       databaseUrl: database.url,
       importService: { address: service.address, secret: SECRET },
       fileStore: store,
-      libraryCapacity: options.libraryCapacity,
+      planCatalogue: options.planCatalogue,
       administratorEmails: [ADMINISTRATOR_EMAIL],
     });
   }
@@ -148,7 +150,7 @@ describe('The email to the Importer when a Bulk Import ends (e2e)', () => {
   });
 
   it('says the Library is full, and how many Hands were left unimported', async () => {
-    await start({ libraryCapacity: 1200 });
+    await start({ planCatalogue: libraryLimitOf(1200) });
     const account = await importer();
 
     await account.upload(manyHands(1500));

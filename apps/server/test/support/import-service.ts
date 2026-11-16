@@ -13,9 +13,10 @@ import {
   DEFAULT_BULK_IMPORT_TEXT_LIMIT,
 } from '../../src/import-service/bulk-import-limit.js';
 import {
-  DEFAULT_LIBRARY_CAPACITY,
-  LIBRARY_CAPACITY,
-} from '../../src/library/library-limits.js';
+  DEFAULT_PLAN_CATALOGUE,
+  PLAN_CATALOGUE,
+  type PlanCatalogue,
+} from '../../src/plans/plan-catalogue.js';
 import { WAKE_SECRET } from '../../src/import-service/import-service-config.js';
 import { ImportEngine } from '../../src/import-service/import-engine.js';
 import {
@@ -61,8 +62,8 @@ export interface StartImportServiceOptions {
   limit?: number;
   /** The most characters of text one Bulk Import's files may hold; 5 GB otherwise, as in production. */
   textLimit?: number;
-  /** The most Hands a Library may hold; 10 million otherwise, as in production. */
-  libraryCapacity?: number;
+  /** The Plans and what each allows; Runout's own otherwise, as in production. */
+  planCatalogue?: PlanCatalogue;
   /** Where its emails go; a fresh one otherwise. */
   inbox?: FakeInbox;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
@@ -91,8 +92,8 @@ export async function startImportService(
     .useValue(options.limit ?? DEFAULT_BULK_IMPORT_LIMIT)
     .overrideProvider(BULK_IMPORT_TEXT_LIMIT)
     .useValue(options.textLimit ?? DEFAULT_BULK_IMPORT_TEXT_LIMIT)
-    .overrideProvider(LIBRARY_CAPACITY)
-    .useValue(options.libraryCapacity ?? DEFAULT_LIBRARY_CAPACITY)
+    .overrideProvider(PLAN_CATALOGUE)
+    .useValue(options.planCatalogue ?? DEFAULT_PLAN_CATALOGUE)
     .overrideProvider(MAILER)
     .useValue(inbox)
     .overrideProvider(ADMINISTRATOR_EMAILS)

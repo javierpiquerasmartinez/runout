@@ -18,7 +18,10 @@ import {
   type ImportServiceAddress,
 } from '../../src/import-service/import-service-config.js';
 import { FILE_STORE, type FileStore } from '../../src/file-store/file-store.js';
-import { LIBRARY_CAPACITY } from '../../src/library/library-limits.js';
+import {
+  PLAN_CATALOGUE,
+  type PlanCatalogue,
+} from '../../src/plans/plan-catalogue.js';
 import { STORAGE_THRESHOLD } from '../../src/storage/storage.js';
 import { PlaybackService } from '../../src/rooms/playback.service.js';
 import { FakeGoogleVerifier } from './google.js';
@@ -56,8 +59,8 @@ export interface StartAppOptions {
   ownDatabase?: boolean;
   /** The emails of the Administrators, as `ADMINISTRATOR_EMAILS` would list them. */
   administratorEmails?: string[];
-  /** How many Hands a Library may hold; 10 million otherwise, as in production. */
-  libraryCapacity?: number;
+  /** The Plans and what each allows; Runout's own otherwise, as in production. */
+  planCatalogue?: PlanCatalogue;
   /** The import service it wakes, as `startImportService` gives it; none otherwise. */
   importService?: ImportServiceAddress;
   /** Where Bulk Imports' files go, shared with the import service; none otherwise. */
@@ -104,10 +107,8 @@ export async function startApp(
     .useValue(options.importService ?? null)
     .overrideProvider(FILE_STORE)
     .useValue(options.fileStore ?? null);
-  if (options.libraryCapacity !== undefined) {
-    builder
-      .overrideProvider(LIBRARY_CAPACITY)
-      .useValue(options.libraryCapacity);
+  if (options.planCatalogue !== undefined) {
+    builder.overrideProvider(PLAN_CATALOGUE).useValue(options.planCatalogue);
   }
   if (options.storageThreshold !== undefined) {
     builder

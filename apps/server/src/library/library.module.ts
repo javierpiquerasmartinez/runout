@@ -1,11 +1,8 @@
 import { Module } from '@nestjs/common';
 import { HeroResultsModule } from '../hands/hero-results.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
+import { PlansModule } from '../plans/plans.module.js';
 import { RoomsModule } from '../rooms/rooms.module.js';
-import {
-  DEFAULT_LIBRARY_CAPACITY,
-  LIBRARY_CAPACITY,
-} from './library-limits.js';
 import { LibraryNotesController } from './library-notes.controller.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
@@ -15,15 +12,9 @@ import { TagsController } from './tags.controller.js';
 import { TagsService } from './tags.service.js';
 
 @Module({
-  imports: [HeroResultsModule, IdentityModule, RoomsModule],
+  imports: [HeroResultsModule, IdentityModule, PlansModule, RoomsModule],
   controllers: [LibraryController, LibraryNotesController, TagsController],
-  providers: [
-    LibraryService,
-    ResultsService,
-    StatsService,
-    TagsService,
-    { provide: LIBRARY_CAPACITY, useValue: DEFAULT_LIBRARY_CAPACITY },
-  ],
+  providers: [LibraryService, ResultsService, StatsService, TagsService],
   exports: [LibraryService],
 })
 export class LibraryModule {}
