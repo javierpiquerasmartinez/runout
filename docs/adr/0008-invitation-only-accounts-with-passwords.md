@@ -1,6 +1,6 @@
 # 0008 · Accounts by Invitation only, signed in with Google or a password
 
-Date: 2026-11-04 · Status: accepted · Amends ADR 0005
+Date: 2026-11-04 · Status: accepted (amended by ADR 0011: Plans) · Amends ADR 0005
 
 While Runout is offered as a free trial, who gets an Account has to be decided by someone. A new Account is only created by accepting an Invitation: an Administrator sends it to one email address as a single-use link that expires after 7 days, and only that address can accept it, with Google or by choosing a password. The link proves the address is theirs, so there is no separate verification step. Accounts that existed before this keep working without one.
 

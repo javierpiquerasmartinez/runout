@@ -1,6 +1,6 @@
 # 0010 · Bulk Imports run apart from the server, in batches
 
-Date: 2026-11-09 · Status: accepted · Amends ADR 0004
+Date: 2026-11-09 · Status: accepted (amended by ADR 0011: Plans) · Amends ADR 0004
 
 A Tracker database can hold millions of Hands, and importing one cannot work like importing a day's session. Measured locally against the real server, confirming 50,000 Hands blocked every Room for about three minutes and then failed, and with a 400 MB heap the process died. Closing the browser would not stop it, but a person cannot be asked to keep a tab open for hours either: 2 million Hands is an estimated 4 to 8 hours at 0.5 CPU.
 
