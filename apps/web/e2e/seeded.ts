@@ -18,6 +18,12 @@ export const VIEWPORTS = [
   { name: '1000x900', width: 1000, height: 900 },
 ] as const
 
+/** Phones, upright: the replayer draws its table standing up, and must fit them without scrolling too. */
+export const PHONES = [
+  { name: 'phone 390x844', width: 390, height: 844 },
+  { name: 'phone 375x667', width: 375, height: 667 },
+] as const
+
 /** Rooms for the tests where a second Participant comes in, and may be handed the Master role. */
 export const ROOMS_FOR_TWO = ['keyboard-kick', 'keyboard-hand-over'] as const
 

@@ -276,6 +276,11 @@ export const es = {
   'room.side.label': 'Panel de la mano',
   'room.side.tab.details': 'Detalles',
   'room.side.tab.notes': 'Notas',
+  // On a phone, the bar under the table that opens a panel as a sheet.
+  'room.sheet.queue': 'Cola',
+  'room.sheet.close': 'Cerrar',
+  'room.sheet.label': 'Paneles de la sala',
+  'library.hand.sheet.label': 'Más sobre la mano',
   'room.side.empty': 'Todavía no hay una mano cargada.',
   'room.participants.title': 'En la sala',
   'room.participants.trigger': '{count} en la sala, ver quién está',

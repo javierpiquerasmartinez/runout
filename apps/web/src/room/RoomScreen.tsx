@@ -44,6 +44,7 @@ import {
 } from './queueEntryView'
 import { NoteEditor } from './NoteEditor'
 import { usePendingUndo } from './pendingUndo'
+import { PhoneSheetBar } from './PhoneSheet'
 import { PlaybackBar } from './PlaybackBar'
 import { PokerTable } from './PokerTable'
 import { SyncIndicator } from './SyncIndicator'
@@ -109,6 +110,15 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
   const [leavingTo, setLeavingTo] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [sideTab, setSideTab] = useState<SideTab>('notes')
+  // On a phone the Queue, Notes and Details are a sheet over the table, opened from the bar under it.
+  const [sheet, setSheet] = useState<RoomSheet | null>(null)
+  const openSheet = useCallback(
+    (next: RoomSheet | null) => {
+      if (next === 'notes' || next === 'details') setSideTab(next)
+      setSheet(next)
+    },
+    [],
+  )
   const [importOutcome, reportImport] = useImportOutcome()
   // While the dialog is open, pasting goes to its own paste tab.
   usePasteToImport(view.room.code, !importing, reportImport)
@@ -173,6 +183,8 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
           i18n={i18n}
           onImport={() => setImporting(true)}
           importOutcome={importOutcome}
+          sheetOpen={sheet === 'queue'}
+          onLoaded={() => setSheet((open) => (open === 'queue' ? null : open))}
         />
 
         <main className="room-stage" data-sync={view.sync.state}>
@@ -190,8 +202,8 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               onHideOpponentNames={commands.hideOpponentNames}
               onSetMark={(marked) => commands.setMark(shown.handId, marked)}
               onJumpToNote={() => {
-                // A hidden field cannot take focus, so Notas has to be showing first.
-                flushSync(() => setSideTab('notes'))
+                // A hidden field cannot take focus, so Notas has to be showing first (in its sheet, on a phone).
+                flushSync(() => openSheet('notes'))
                 document.getElementById(NOTE_FIELD_ID)?.focus()
               }}
             />
@@ -215,9 +227,24 @@ export function RoomScreen({ view, commands }: { view: InRoom; commands: RoomCom
               )}
             </>
           )}
+          <PhoneSheetBar
+            label={t('room.sheet.label')}
+            tabs={[
+              { id: 'queue', label: t('room.sheet.queue'), count: view.queue.length, controls: 'room-queue' },
+              { id: 'notes', label: t('room.side.tab.notes'), count: noteCount, controls: 'room-side' },
+              { id: 'details', label: t('room.side.tab.details'), controls: 'room-side' },
+            ]}
+            open={sheet}
+            onOpen={openSheet}
+          />
         </main>
 
-        <aside className="room-side" aria-label={t('room.side.label')}>
+        <aside
+          id="room-side"
+          className="room-side phone-sheet"
+          data-open={sheet === 'notes' || sheet === 'details' || undefined}
+          aria-label={t('room.side.label')}
+        >
           <AnonymousNotice />
           <div className="room-side__tabs" role="tablist">
             {SIDE_TABS.map((name) => (
@@ -413,6 +440,8 @@ const NOTE_FIELD_ID = 'room-note-field'
 
 const SIDE_TABS = ['details', 'notes'] as const
 type SideTab = (typeof SIDE_TABS)[number]
+/** What a phone's sheet shows over the table: the Queue, or one of the side panel's tabs. */
+type RoomSheet = 'queue' | SideTab
 
 /**
  * The Queue panel, from the "Sala" boards: Author, date, Positions, Stake,
@@ -429,6 +458,8 @@ function QueuePanel({
   i18n,
   onImport,
   importOutcome,
+  sheetOpen,
+  onLoaded,
 }: {
   view: InRoom
   isMaster: boolean
@@ -440,6 +471,10 @@ function QueuePanel({
   i18n: Translator
   onImport: () => void
   importOutcome: string | null
+  /** On a phone, whether the Queue is the sheet open over the table. */
+  sheetOpen: boolean
+  /** A Hand was loaded from the Queue: on a phone its sheet closes, so the table shows it. */
+  onLoaded: () => void
 }) {
   const { t } = i18n
   const [collapsed, setCollapsed] = useState(false)
@@ -474,7 +509,13 @@ function QueuePanel({
 
 
   return (
-    <aside className="room-queue" data-collapsed={collapsed || undefined} aria-labelledby="room-queue-title">
+    <aside
+      id="room-queue"
+      className="room-queue phone-sheet"
+      data-collapsed={collapsed || undefined}
+      data-open={sheetOpen || undefined}
+      aria-labelledby="room-queue-title"
+    >
       {collapsed ? (
         <div className="room-panel__header room-panel__header--collapsed">
           <IconButton
@@ -612,7 +653,14 @@ function QueuePanel({
                     noteCount={view.notes.filter((note) => note.handId === entry.handId).length}
                     i18n={i18n}
                     loaded={entry.handId === shownHandId}
-                    onLoad={drives ? () => commands.loadHand(entry.handId) : undefined}
+                    onLoad={
+                      drives
+                        ? () => {
+                            commands.loadHand(entry.handId)
+                            onLoaded()
+                          }
+                        : undefined
+                    }
                     onMoveUp={isMaster && fullIndex > 0 ? () => move(entry, -1) : undefined}
                     onMoveDown={isMaster && fullIndex < view.queue.length - 1 ? () => move(entry, 1) : undefined}
                     onRemove={isMaster ? () => removal.remove(entry.id, commands.removeQueueEntry) : undefined}
@@ -673,7 +721,7 @@ function RoomHeader({
           onClick={() => copy('link', roomLink(view.room.code))}
         >
           <Icon name={copied === 'link' ? 'success' : 'link'} size={14} />
-          {t(copied === 'link' ? 'room.linkCopied' : 'room.copyLink')}
+          <span className="room-header__label">{t(copied === 'link' ? 'room.linkCopied' : 'room.copyLink')}</span>
         </Button>
       )}
       <span className="ro-visually-hidden" role="status">
@@ -705,11 +753,11 @@ function RoomHeader({
       <RoomParticipants view={view} isMaster={isMaster} notice={masterNotice} onHandOver={onHandOver} onKick={onKick} />
       <span className="room-header__role" data-role={isMaster ? 'master' : 'guest'}>
         <Icon name={isMaster ? 'master' : 'profile'} size={14} />
-        {t(isMaster ? 'room.master' : 'room.guest')}
+        <span className="room-header__label">{t(isMaster ? 'room.master' : 'room.guest')}</span>
       </span>
       <Button variant="ghost" size="compact" className="room-header__leave" onClick={onLeave}>
         <Icon name="close" size={14} />
-        {t('room.leave')}
+        <span className="room-header__label">{t('room.leave')}</span>
       </Button>
       <a href={settingsPath} className="room-header__nav" aria-label={t('room.settings')} onClick={followLink}>
         <Icon name="settings" size={17} />
@@ -793,7 +841,7 @@ function LoadedHand({
               onClick={() => onSetMark(!marked)}
             >
               <Icon name="mark" size={14} />
-              {t(marked ? 'room.mark.marked' : 'room.mark.add')}
+              <span className="room-stage__label">{t(marked ? 'room.mark.marked' : 'room.mark.add')}</span>
             </Button>
             <Button
               variant="ghost"
@@ -802,7 +850,7 @@ function LoadedHand({
               onClick={onJumpToNote}
             >
               <Icon name="note" size={14} />
-              {t('room.notes.jump')}
+              <span className="room-stage__label">{t('room.notes.jump')}</span>
             </Button>
           </>
         )}

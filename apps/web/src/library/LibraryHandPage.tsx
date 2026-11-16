@@ -6,6 +6,7 @@ import { usePreferences } from '../preferences/context'
 import { CopyHand } from '../room/CopyHand'
 import { NoteEditor } from '../room/NoteEditor'
 import { usePendingUndo } from '../room/pendingUndo'
+import { PhoneSheetBar } from '../room/PhoneSheet'
 import { PlaybackBar } from '../room/PlaybackBar'
 import { PokerTable } from '../room/PokerTable'
 import { dateTimeLabel } from '../room/queueEntryView'
@@ -44,6 +45,8 @@ export function LibraryHandPage({ handId }: { handId: string }) {
     window.history.back()
   }
   const [actionIndex, setActionIndex] = useState(0)
+  // On a phone the Notes are a sheet over the table, opened from the bar under it.
+  const [sheet, setSheet] = useState<'notes' | null>(null)
   const table = load.state === 'loaded' ? tableView(load.hand, actionIndex, i18n, undefined, preferences) : null
   const goTo = (index: number | null) => (index === null ? undefined : () => setActionIndex(index))
   useShortcuts(table !== null, {
@@ -91,8 +94,14 @@ export function LibraryHandPage({ handId }: { handId: string }) {
               </div>
             </div>
           )}
+          <PhoneSheetBar
+            label={t('library.hand.sheet.label')}
+            tabs={[{ id: 'notes', label: t('library.notes.title'), controls: 'library-hand-notes' }]}
+            open={sheet}
+            onOpen={setSheet}
+          />
         </main>
-        <aside className="library-hand__side">
+        <aside id="library-hand-notes" className="library-hand__side phone-sheet" data-open={sheet !== null || undefined}>
           {/* Keyed: a draft, an edit and an undo belong to the Hand they were about. */}
           <HandNotes key={handId} handId={handId} />
         </aside>

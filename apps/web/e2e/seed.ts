@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { ROOMS_FOR_TWO, SERVER_URL, VIEWPORTS, type Seed } from './seeded'
+import { PHONES, ROOMS_FOR_TWO, SERVER_URL, VIEWPORTS, type Seed } from './seeded'
 
 /*
  * Gives Tester A, on the throwaway server, the Hands the tests replay: a few
@@ -36,7 +36,7 @@ export default async function seed() {
   await call('PUT', '/identities/me/display-name', testerB.token, { displayName: 'Tester B' })
 
   const rooms: Record<string, string> = {}
-  for (const name of [...VIEWPORTS.map((viewport) => viewport.name), ...ROOMS_FOR_TWO]) {
+  for (const name of [...[...VIEWPORTS, ...PHONES].map((viewport) => viewport.name), ...ROOMS_FOR_TWO]) {
     const { code } = await call<{ code: string }>('POST', '/rooms', token, {
       name: `Layout ${name}`,
       displayName: 'Tester A',

@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seeded, signInAs, VIEWPORTS } from './seeded'
+import { PHONES, seeded, signInAs, VIEWPORTS } from './seeded'
 
 /*
- * The replayer fits a laptop screen as one picture: the page never scrolls,
+ * The replayer fits a laptop screen, or a phone held upright, as one picture: the page never scrolls,
  * the transport bar stays on screen, and at every Action of every Hand nothing
  * on the table covers anything else (bets over board cards or seats, the pot
  * over the dealer button...). jsdom lays nothing out, so only a real browser
@@ -30,7 +30,8 @@ const PIECES = [
 /** Overlaps up to this many px a side are antialiasing and rounding, not a collision. */
 const TOLERANCE = 1
 
-for (const viewport of VIEWPORTS) {
+for (const viewport of [...VIEWPORTS, ...PHONES]) {
+  const phone = viewport.width < 761
   test.describe(`at ${viewport.name}`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
 
@@ -49,8 +50,14 @@ for (const viewport of VIEWPORTS) {
       const { rooms, handIds } = seeded()
       await page.goto(`/room/${rooms[viewport.name]}`)
       const entries = page.locator('.queue-entry__load')
+      // On a phone the Queue is a sheet the bar under the table opens, and loading a Hand closes it.
+      const openQueue = async () => {
+        if (phone) await page.getByRole('button', { name: /^Cola/ }).click()
+      }
+      await openQueue()
       await expect(entries).toHaveCount(handIds.length)
       for (let i = 0; i < handIds.length; i++) {
+        if (i > 0) await openQueue()
         await entries.nth(i).click()
         await expect(page.locator('.queue-entry').nth(i)).toHaveAttribute('aria-current', 'true')
         // The click leaves focus on the entry; the shortcuts listen on the page.

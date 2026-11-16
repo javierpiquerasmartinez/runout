@@ -1134,6 +1134,141 @@
 }
 
 /*
+ * The phone's table (boards "Biblioteca · Una mano en el móvil" and "Sala ·
+ * En el móvil"): the felt on its end, 390 px wide and --table-h tall, the
+ * Hero at the bottom with their cards in the plate. Every size here is the
+ * one tableLayout.ts's portrait drawing places things by.
+ */
+.poker-table[data-shape='portrait'] {
+  width: 390px;
+  height: var(--table-h);
+  aspect-ratio: auto;
+}
+.poker-table[data-shape='portrait'] .poker-table__felt {
+  left: 65px;
+  top: 48px;
+  width: 260px;
+  height: calc(var(--table-h) - 128px);
+}
+/* The pot above the board, the board's middle at --table-mid. */
+.poker-table[data-shape='portrait'] .poker-table__middle {
+  top: auto;
+  bottom: calc(var(--table-h) - var(--table-mid) - 28px);
+  flex-direction: column-reverse;
+  gap: 4px;
+}
+.poker-table[data-shape='portrait'] .poker-table__board {
+  gap: 5px;
+}
+.poker-table[data-shape='portrait'] .poker-table__board .ro-card {
+  --card-w: 40px;
+  --card-h: 56px;
+  --card-pad: 3px;
+  --card-rank: 20px;
+  --card-ten: 16px;
+  --card-suit: 15px;
+}
+.poker-table[data-shape='portrait'] .poker-table__pot {
+  gap: 2px;
+  max-width: 130px;
+}
+.poker-table[data-shape='portrait'] .poker-table__pot-label {
+  font-size: 9.5px;
+}
+.poker-table[data-shape='portrait'] .poker-table__pot-value {
+  font-size: 22px;
+}
+.poker-table[data-shape='portrait'] .poker-table__pot-detail {
+  font-size: 10.5px;
+}
+.poker-table[data-shape='portrait'] .poker-table__pots {
+  max-width: 130px;
+}
+.poker-table[data-shape='portrait'] .seat {
+  width: 124px;
+}
+.poker-table[data-shape='portrait'] .seat__plate {
+  box-sizing: border-box;
+  height: 46px;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 8px;
+}
+.poker-table[data-shape='portrait'] .seat__name {
+  font-size: 11.5px;
+}
+.poker-table[data-shape='portrait'] .seat__stack {
+  font-size: 12px;
+}
+.poker-table[data-shape='portrait'] .seat__cards {
+  gap: 3px;
+}
+.poker-table[data-shape='portrait'] .seat__cards .ro-card {
+  --card-w: 24px;
+  --card-h: 34px;
+  --card-radius: 3px;
+  --card-pad: 2px;
+  --card-rank: 13px;
+  --card-ten: 10px;
+  --card-suit: 10px;
+}
+/* No status line under a plate: its border says whose turn it is, the bet what they did. */
+.poker-table[data-shape='portrait'] .seat:not([data-hero]) > .seat__status {
+  display: none;
+}
+/* How the Hand ended for anyone else: under their plate and no wider, on a second line if need be. */
+.poker-table[data-shape='portrait'] .seat:not([data-hero]) > .seat__outcome {
+  left: 0;
+  right: 0;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  transform: none;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+/* The Hero: a wider, taller plate holding their cards on its left; how the Hand ended below it. */
+.poker-table[data-shape='portrait'] .seat[data-hero] {
+  width: 252px;
+}
+.poker-table[data-shape='portrait'] .seat[data-hero] .seat__plate {
+  height: 64px;
+  padding: 6px 10px 6px 87px;
+}
+.poker-table[data-shape='portrait'] .seat[data-hero] .seat__name {
+  font-size: 12.5px;
+}
+.poker-table[data-shape='portrait'] .seat[data-hero] .seat__stack {
+  font-size: 13px;
+}
+.poker-table[data-shape='portrait'] .seat__below {
+  display: contents;
+}
+.poker-table[data-shape='portrait'] .seat[data-hero] .seat__cards {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+.poker-table[data-shape='portrait'] .seat[data-hero] .seat__cards .ro-card {
+  --card-w: 34px;
+  --card-h: 48px;
+  --card-radius: 4px;
+  --card-pad: 3px;
+  --card-rank: 18px;
+  --card-ten: 14px;
+  --card-suit: 13px;
+}
+.poker-table[data-shape='portrait'] .seat[data-hero] .seat__outcome {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/*
  * The transport bar, without play/pause or speed. It keeps the board's 148 px:
  * the Street progress bar on top, the controls at the bottom.
  */
@@ -1599,8 +1734,11 @@
 }
 
 @media (max-width: 760px) {
+  /* Exactly the screen, as on a laptop: the table scales to what the header and transport leave. */
   .room {
-    height: auto;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
   }
   .room-header {
     flex-wrap: wrap;
@@ -2005,4 +2143,230 @@
 
 .room-stage__mark[data-marked] .ro-icon {
   fill: currentColor;
+}
+
+/* ---------- On a phone ---------- */
+
+/*
+ * Boards "Biblioteca · Una mano en el móvil", "Sala · En el móvil" and "Sala
+ * · La cola en el móvil": the page is exactly the screen and never scrolls.
+ * The table stands up (tableLayout.ts) and scales as one picture to what the
+ * header, the Street log and the transport leave; the panels beside it on a
+ * wider screen open as a sheet from the bar under the transport
+ * (PhoneSheet.tsx). Over 760 px none of this is drawn.
+ */
+.phone-sheet-bar,
+.phone-sheet__backdrop {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .room-stage__play {
+    container-type: size;
+  }
+  .poker-table[data-shape='portrait'] {
+    zoom: min(1.15, tan(atan2(100cqw, 390px)), tan(atan2(100cqh, var(--table-h))));
+  }
+
+  .street-log {
+    padding: 0 16px;
+  }
+
+  .playback-bar {
+    min-height: 0;
+    gap: 10px;
+    padding: 10px 16px 12px;
+  }
+  .playback-bar__row {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .playback-bar__where {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    gap: 6px;
+  }
+  .playback-bar__action {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .playback-bar__controls {
+    flex-grow: 0;
+    gap: 6px;
+  }
+  .playback-bar__who {
+    flex-basis: 100%;
+    width: auto;
+    align-items: flex-start;
+  }
+  .playback-bar__who:empty {
+    display: none;
+  }
+
+  /*
+   * The header in two rows, as board "Sala · En el móvil" draws it: the Room's
+   * name and the ways out, then its code, the link, Live, the role and who is
+   * in it. Buttons keep their icon; their words stay for screen readers.
+   */
+  .room-header {
+    gap: 8px;
+    row-gap: 3px;
+    padding: 6px 12px 8px;
+  }
+  .room-header__divider,
+  .room-header__spacer {
+    display: none;
+  }
+  /* The logo alone, and the avatars without the count: both keep their names for screen readers. */
+  .room-header .ro-brand .ro-serif,
+  .room-header__count {
+    display: none;
+  }
+  .room-header__name {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .room-header__leave {
+    order: 3;
+  }
+  .room-header__nav {
+    order: 4;
+  }
+  /* What the avatars open spans the screen from the header's foot, so they stay on its last row, at its end. */
+  .room-header__people {
+    order: 7;
+    margin-left: auto;
+  }
+  /* Where the first row ends. */
+  .room-header::after {
+    content: '';
+    order: 5;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .room-header__code,
+  .room-header__copy-link,
+  .room-header__start-live,
+  .room-header__live,
+  .room-header__master,
+  .room-header__role {
+    order: 6;
+  }
+  .room-header__label,
+  .room-stage__label,
+  .room-stage .copy-hand__label,
+  .library-hand .copy-hand__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Which Hand it is, on one line: who loaded it is in Detalles. */
+  .room-stage__header {
+    flex-wrap: nowrap;
+    min-height: 48px;
+    gap: 8px;
+    padding: 6px 12px;
+  }
+  .room-stage__by {
+    display: none;
+  }
+  .room-stage__spacer {
+    flex-grow: 1;
+  }
+
+  /* The bar: one button per panel, the open one's closes it. It stays above the sheet. */
+  .phone-sheet-bar {
+    position: relative;
+    z-index: 31;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 52px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    border-top: 1px solid var(--color-panel-border);
+    background: var(--color-elevated);
+  }
+  .phone-sheet-bar__tab {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .phone-sheet-bar__tab[aria-expanded='true'] {
+    background: var(--color-selected);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .phone-sheet-bar__tab:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
+  }
+  .phone-sheet-bar__count {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .phone-sheet__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    padding: 0;
+    border: 0;
+    background: rgb(5 8 7 / 62%);
+  }
+
+  /* A panel as the sheet: over the table, up to the bar. */
+  .phone-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 52px;
+    z-index: 30;
+    width: auto;
+    height: min(72dvh, 600px);
+    box-sizing: border-box;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--color-panel-border);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    background: var(--color-elevated);
+    box-shadow: 0 -12px 32px rgb(0 0 0 / 40%);
+  }
+  .phone-sheet:not([data-open]) {
+    display: none;
+  }
+  /* The bar switches between the side panel's tabs, and a sheet is never collapsed. */
+  .room-side__tabs,
+  .room-queue__toggle {
+    display: none;
+  }
+  .room-side.phone-sheet,
+  .room-queue.phone-sheet {
+    border-top: 1px solid var(--color-panel-border);
+  }
 }
