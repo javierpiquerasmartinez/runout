@@ -306,9 +306,9 @@ describe('the Accounts tab', () => {
     await userEvent.click(within(ana).getByRole('button', { name: 'Change plan' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('heading').textContent).toBe('Change the plan of ana?')
-    expect(dialog.textContent).toContain('It is on Beta now: its library holds up to 20,000 Hands.')
+    expect(dialog.textContent).toContain('It is on Beta now: its library holds up to 20,000 hands.')
     expect(dialog.textContent).toContain(
-      'With Pro, the limit becomes 10 million Hands from its next import. Its Hands do not change.',
+      'With Pro, the limit becomes 10 million hands from its next import. Its hands do not change.',
     )
     expect(calls.some((call) => call.method === 'PUT')).toBe(false)
 
