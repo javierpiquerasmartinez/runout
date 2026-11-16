@@ -20,6 +20,7 @@ import {
   labTags,
   libraryEntries,
   notes,
+  planChanges,
   ranges,
   roomMemberships,
   rooms,
@@ -35,6 +36,14 @@ import {
 } from '../identity/identity.service.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { invitationStatus } from '../identity/invitations.js';
+import {
+  PLAN_CATALOGUE,
+  PLAN_KEYS,
+  type PlanCatalogue,
+  type PlanChangeHow,
+  type PlanKey,
+} from '../plans/plan-catalogue.js';
+import { recordPlanChange } from '../plans/plan-changes.js';
 import { Rejected } from '../rejection/rejection.js';
 import { RoomGateway } from '../rooms/room.gateway.js';
 import { RoomsService } from '../rooms/rooms.service.js';
@@ -64,6 +73,14 @@ export interface AccountView {
   lastSignedInAt: string | null;
   lastActiveAt: string | null;
   administrator: boolean;
+  plan: PlanKey;
+  /** The latest change of its Plan; every Account has at least its first. */
+  planChange: {
+    at: string;
+    how: PlanChangeHow;
+    /** The Administrator who made it, or sent the Invitation that did. */
+    administrator: PersonView | null;
+  } | null;
   suspension: { at: string; by: PersonView | null } | null;
   counts: AccountCounts;
   /** Every Impersonation of it, the latest first. */
@@ -80,6 +97,8 @@ export interface AccountsPage {
   page: number;
   pageSize: number;
   accounts: AccountView[];
+  /** What each Plan allows, for a change of Plan to say what changes. */
+  plans: PlanCatalogue;
 }
 
 export interface Totals {
@@ -139,11 +158,13 @@ export class AccountsService {
     private readonly identityService: IdentityService,
     private readonly rooms: RoomsService,
     private readonly gateway: RoomGateway,
+    @Inject(PLAN_CATALOGUE) private readonly catalogue: PlanCatalogue,
   ) {}
 
-  /** Every Account with its statistics, sorted, searched and a page at a time. */
+  /** Every Account with its statistics and Plan, sorted, searched, filtered by Plan and a page at a time. */
   async list(query: {
     search?: unknown;
+    plan?: unknown;
     sort?: unknown;
     direction?: unknown;
     page?: unknown;
@@ -154,15 +175,18 @@ export class AccountsService {
     const { page, pageSize } = adminPage(query);
     const search = typeof query.search === 'string' ? query.search.trim() : '';
     const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
-    const where = search
-      ? and(
-          isAccount,
-          or(
+    const plan =
+      query.plan === undefined ? undefined : oneOf(query.plan, PLAN_KEYS);
+    const where = and(
+      isAccount,
+      search
+        ? or(
             sql`${identities.email} ilike ${pattern}`,
             sql`${identities.displayName} ilike ${pattern}`,
-          ),
-        )
-      : isAccount;
+          )
+        : undefined,
+      plan ? eq(identities.plan, plan) : undefined,
+    );
     const sortBy: SQL =
       sort in COUNTS
         ? COUNTS[sort as keyof AccountCounts]
@@ -197,6 +221,28 @@ export class AccountsService {
         .offset((page - 1) * pageSize),
     ]);
     const administrator = alias(identities, 'administrator');
+    const ids = rows.map((row) => row.account.id);
+    const latestChanges =
+      rows.length === 0
+        ? []
+        : await this.db
+            .selectDistinctOn([planChanges.accountId], {
+              change: planChanges,
+              administrator,
+            })
+            .from(planChanges)
+            .innerJoin(identities, eq(identities.id, planChanges.accountId))
+            .leftJoin(
+              administrator,
+              eq(administrator.id, planChanges.administratorId),
+            )
+            .where(inArray(planChanges.accountId, ids))
+            // Changes at one instant: the one that left the Plan it is on.
+            .orderBy(
+              planChanges.accountId,
+              sql`${planChanges.changedAt} desc`,
+              sql`(${planChanges.planAfter} = ${identities.plan}) desc`,
+            );
     const impersonated =
       rows.length === 0
         ? []
@@ -207,17 +253,13 @@ export class AccountsService {
               administrator,
               eq(administrator.id, impersonations.administratorId),
             )
-            .where(
-              inArray(
-                impersonations.accountId,
-                rows.map((row) => row.account.id),
-              ),
-            )
+            .where(inArray(impersonations.accountId, ids))
             .orderBy(sql`${impersonations.startedAt} desc`);
     return {
       total,
       page,
       pageSize,
+      plans: this.catalogue,
       accounts: rows.map((row) => {
         const { account, invitation, sender: sentBy, suspender: by } = row;
         const methods: SignInMethod[] = [];
@@ -240,6 +282,11 @@ export class AccountsService {
           lastSignedInAt: account.lastSignedInAt?.toISOString() ?? null,
           lastActiveAt: account.lastActiveAt?.toISOString() ?? null,
           administrator: this.identityService.isAdministrator(account.email),
+          // An Account always has a Plan (identities_account_plan_check).
+          plan: account.plan as PlanKey,
+          planChange: planChangeView(
+            latestChanges.find((each) => each.change.accountId === account.id),
+          ),
           suspension: account.suspendedAt
             ? {
                 at: account.suspendedAt.toISOString(),
@@ -351,6 +398,45 @@ export class AccountsService {
   }
 
   /**
+   * Moves an Account to another Plan, recorded as made by this Administrator.
+   * Any Account, an Administrator's or a suspended one included; the Plan it
+   * is already on changes and records nothing. Its new limit applies from
+   * its next import, or the next batch of a Bulk Import already running.
+   */
+  async setPlan(
+    administrator: Identity,
+    accountId: unknown,
+    plan: unknown,
+  ): Promise<void> {
+    if (!PLAN_KEYS.includes(plan as PlanKey)) {
+      throw new Rejected('invalid-plan');
+    }
+    const after = plan as PlanKey;
+    const account = await this.account(accountId);
+    await this.db.transaction(async (tx) => {
+      // Held so that two changes at once each record the Plan it really left.
+      const [{ plan: before }] = await tx
+        .select({ plan: identities.plan })
+        .from(identities)
+        .where(eq(identities.id, account.id))
+        .for('update');
+      if (before === after) return;
+      await tx
+        .update(identities)
+        .set({ plan: after })
+        .where(eq(identities.id, account.id));
+      await recordPlanChange(tx, {
+        accountId: account.id,
+        before,
+        after,
+        at: this.clock.now(),
+        how: 'administrator',
+        administratorId: administrator.id,
+      });
+    });
+  }
+
+  /**
    * Starts an Impersonation of an Account: a Sign-in of its own for the
    * Administrator, which lasts an hour. Never of an Administrator
    * (`cannot-impersonate-administrator`) or a suspended Account.
@@ -409,6 +495,22 @@ export class AccountsService {
     if (!row) throw new Rejected('not-found');
     return row;
   }
+}
+
+function planChangeView(
+  latest:
+    | {
+        change: typeof planChanges.$inferSelect;
+        administrator: typeof identities.$inferSelect | null;
+      }
+    | undefined,
+): AccountView['planChange'] {
+  if (!latest) return null;
+  return {
+    at: latest.change.changedAt.toISOString(),
+    how: latest.change.how,
+    administrator: latest.administrator ? person(latest.administrator) : null,
+  };
 }
 
 export function person(row: typeof identities.$inferSelect): PersonView {

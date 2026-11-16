@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -100,6 +101,17 @@ export class AdminController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async lift(@Param('id') id: string): Promise<void> {
     await this.accounts.lift(id);
+  }
+
+  /** Moves an Account to another Plan; the one it is on already changes nothing. */
+  @Put('accounts/:id/plan')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async setPlan(
+    @Administrator() administrator: Identity,
+    @Param('id') id: string,
+    @Body() body: { plan?: unknown } = {},
+  ): Promise<void> {
+    await this.accounts.setPlan(administrator, id, body.plan);
   }
 
   /** Starts an Impersonation: a Sign-in as that Account, for this Administrator. */

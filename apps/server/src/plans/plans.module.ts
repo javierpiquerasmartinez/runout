@@ -16,6 +16,6 @@ import { Plans } from './plans.js';
     },
     Plans,
   ],
-  exports: [Plans],
+  exports: [PLAN_CATALOGUE, Plans],
 })
 export class PlansModule {}
