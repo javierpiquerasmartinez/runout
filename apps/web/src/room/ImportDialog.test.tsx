@@ -306,8 +306,23 @@ describe('ImportDialog', () => {
       expect(requests.at(-1)!.url).toBe('/api/rooms/ABCD2345/imports')
     })
 
-    it('explains a Library that cannot hold the Hands', async () => {
-      confirmed = async () => Response.json({ reason: 'library-full', hands: 3, held: 9_999_999, limit: 10_000_000 }, { status: 409 })
+    it('explains a Library its Plan cannot let hold the Hands, with how many it holds and how many it adds', async () => {
+      confirmed = async () =>
+        Response.json({ reason: 'library-full', hands: 1_500, held: 19_200, limit: 20_000, plan: 'beta' }, { status: 409 })
+      renderDialog({ kind: 'library' })
+
+      await choose('mine.txt')
+      await userEvent.click(await screen.findByRole('button', { name: 'Add 1 hand to your library' }))
+
+      expect(await screen.findByRole('alert')).toHaveProperty(
+        'textContent',
+        'Your Beta plan holds up to 20,000 hands in your library. You have 19,200 and this import adds 1,500.',
+      )
+    })
+
+    it('explains a Library no Plan limits that cannot hold the Hands', async () => {
+      confirmed = async () =>
+        Response.json({ reason: 'library-full', hands: 3, held: 9_999_999, limit: 10_000_000, plan: null }, { status: 409 })
       renderDialog({ kind: 'library' })
 
       await choose('mine.txt')
