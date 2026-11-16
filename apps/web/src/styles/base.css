@@ -27,6 +27,21 @@ textarea {
   color: inherit;
 }
 
+/*
+ * Safari on an iPhone zooms the page in on a field whose text is under 16px
+ * as soon as it is tapped, and leaves it zoomed. On a touch screen the fields
+ * the keyboard types into are 16px, whatever size their own rules give them
+ * (hence the !important). e2e/phone-fields.spec.ts checks it.
+ */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden']),
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: 16px !important;
+  }
+}
+
 a {
   color: var(--brass-ink);
   text-decoration: none;
