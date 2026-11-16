@@ -343,6 +343,177 @@ describe('The Accounts tab (e2e)', () => {
     });
   });
 
+  describe('Plans', () => {
+    const setPlan = (token: string, accountId: string, plan: unknown) =>
+      as(token).put(`/admin/accounts/${accountId}/plan`).send({ plan });
+
+    it('shows each Account’s Plan and its latest change, by whom and how', async () => {
+      const invitedEmail = uniqueEmail('ana');
+      await invitedAccount(running, administrator.token, invitedEmail);
+      const testModeEmail = uniqueEmail('bea');
+      await newAccount(running.httpServer, 'bea', testModeEmail);
+
+      expect(await row(invitedEmail)).toMatchObject({
+        plan: 'beta',
+        planChange: {
+          at: '2026-01-01T00:00:00.000Z',
+          how: 'invitation',
+          administrator: {
+            id: administrator.id,
+            email: ADMINISTRATOR_EMAIL,
+            displayName: expect.toBeOneOf([expect.any(String), null]),
+          },
+        },
+      });
+      expect(await row(testModeEmail)).toMatchObject({
+        plan: 'pro',
+        planChange: {
+          at: '2026-01-01T00:00:00.000Z',
+          how: 'test-mode',
+          administrator: null,
+        },
+      });
+    });
+
+    it('gives what each Plan allows, for the confirmation to say what changes', async () => {
+      await running.close();
+      running = await startApp({
+        administratorEmails: [ADMINISTRATOR_EMAIL],
+        planCatalogue: {
+          beta: { libraryHands: 20_000 },
+          pro: { libraryHands: 10_000_000 },
+        },
+      });
+      administrator = await signInAdministrator(running);
+
+      const { body } = await as(administrator.token)
+        .get('/admin/accounts?pageSize=1')
+        .expect(200);
+      expect(body.plans).toEqual({
+        beta: { libraryHands: 20_000 },
+        pro: { libraryHands: 10_000_000 },
+      });
+    });
+
+    it('filters the list by Plan', async () => {
+      const tag = uniqueEmail('plans').split('@')[0];
+      const beta = await invitedAccount(
+        running,
+        administrator.token,
+        `beta-${tag}@example.com`,
+      );
+      const pro = await newAccount(
+        running.httpServer,
+        'pro',
+        `pro-${tag}@example.com`,
+      );
+      const ids = async (plan: string) => {
+        const { body } = await as(administrator.token)
+          .get(`/admin/accounts?search=${tag}&plan=${plan}`)
+          .expect(200);
+        return body.accounts.map((each: { id: string }) => each.id);
+      };
+
+      expect(await ids('beta')).toEqual([beta.id]);
+      expect(await ids('pro')).toEqual([pro.id]);
+      await as(administrator.token)
+        .get('/admin/accounts?plan=gold')
+        .expect(400);
+    });
+
+    it('moves an Account to another Plan, recorded as made by the Administrator', async () => {
+      const email = uniqueEmail('ana');
+      const ana = await invitedAccount(running, administrator.token, email);
+      await running.clock.advance(DAY);
+
+      await setPlan(administrator.token, ana.id, 'pro').expect(204);
+
+      expect(await row(email)).toMatchObject({
+        plan: 'pro',
+        planChange: {
+          at: '2026-01-02T00:00:00.000Z',
+          how: 'administrator',
+          administrator: { id: administrator.id, email: ADMINISTRATOR_EMAIL },
+        },
+      });
+      await as(ana.token)
+        .get('/identities/me')
+        .expect(200)
+        .expect((res) => expect(res.body.plan).toBe('pro'));
+    });
+
+    it('changes and records nothing for the Plan the Account is already on', async () => {
+      const email = uniqueEmail('ana');
+      const ana = await invitedAccount(running, administrator.token, email);
+      await running.clock.advance(DAY);
+
+      await setPlan(administrator.token, ana.id, 'beta').expect(204);
+
+      expect(await row(email)).toMatchObject({
+        plan: 'beta',
+        planChange: { at: '2026-01-01T00:00:00.000Z', how: 'invitation' },
+      });
+    });
+
+    it('works on a Suspended Account and on an Administrator’s, one’s own included', async () => {
+      const email = uniqueEmail('ana');
+      const ana = await invitedAccount(running, administrator.token, email);
+      await as(administrator.token)
+        .post(`/admin/accounts/${ana.id}/suspension`)
+        .expect(204);
+
+      await setPlan(administrator.token, ana.id, 'pro').expect(204);
+      await setPlan(administrator.token, administrator.id, 'beta').expect(204);
+
+      // At the very instant of its Invitation: still the latest change.
+      expect(await row(email)).toMatchObject({
+        plan: 'pro',
+        planChange: { how: 'administrator' },
+      });
+      expect((await row(ADMINISTRATOR_EMAIL)).plan).toBe('beta');
+      // Every e2e file shares the Administrator's Account: back as it was.
+      await setPlan(administrator.token, administrator.id, 'pro').expect(204);
+    });
+
+    it('refuses a Plan that does not exist and an Account that does not', async () => {
+      const ana = await invitedAccount(
+        running,
+        administrator.token,
+        uniqueEmail('ana'),
+      );
+      const bad = await setPlan(administrator.token, ana.id, 'gold').expect(
+        400,
+      );
+      expect(bad.body.reason).toBe('invalid-plan');
+      await setPlan(administrator.token, ana.id, undefined).expect(400);
+      await setPlan(
+        administrator.token,
+        '00000000-0000-4000-8000-000000000000',
+        'pro',
+      ).expect(404);
+    });
+
+    it('is not there for anyone but an Administrator, nor during an Impersonation', async () => {
+      const email = uniqueEmail('ana');
+      const ana = await invitedAccount(running, administrator.token, email);
+
+      const stranger = await setPlan(ana.token, ana.id, 'pro').expect(404);
+      expect(stranger.body.reason).toBe('not-found');
+
+      const { body: impersonation } = await as(administrator.token)
+        .post(`/admin/accounts/${ana.id}/impersonations`)
+        .expect(201);
+      const impersonating = await setPlan(
+        impersonation.token,
+        ana.id,
+        'pro',
+      ).expect(403);
+      expect(impersonating.body.reason).toBe('impersonation-not-allowed');
+
+      expect((await row(email)).plan).toBe('beta');
+    });
+  });
+
   describe('totals', () => {
     let database: { url: string; drop(): Promise<void> };
 

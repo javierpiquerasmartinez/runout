@@ -7,6 +7,6 @@ import { Plans } from './plans.js';
     { provide: PLAN_CATALOGUE, useValue: DEFAULT_PLAN_CATALOGUE },
     Plans,
   ],
-  exports: [Plans],
+  exports: [PLAN_CATALOGUE, Plans],
 })
 export class PlansModule {}
