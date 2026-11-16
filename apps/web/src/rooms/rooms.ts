@@ -1,7 +1,7 @@
 import { navigate, useHistoryState } from '../routing'
+import { roomsPath } from './paths'
 
-/** The Rooms screen ("Salas"): an Account's Rooms, to create one, join one by code or go back to one. */
-export const roomsPath = '/rooms'
+export { roomsPath } from './paths'
 
 /** What "Nueva sala" leaves in the history entry it opens: a fresh mark each time. */
 interface NewRoomRequest {

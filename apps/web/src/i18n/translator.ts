@@ -1,4 +1,4 @@
-import { catalogues, type Locale, type MessageKey } from './catalogue'
+import { messagesOf, type Locale, type MessageKey } from './catalogue'
 
 export type MessageParams = Record<string, string | number>
 
@@ -16,7 +16,7 @@ const TICKERS: Record<string, { sign: string; writtenLike: string }> = {
 export type Translator = ReturnType<typeof createTranslator>
 
 export function createTranslator(locale: Locale) {
-  const messages = catalogues[locale]
+  const messages = messagesOf(locale)
   const intlLocale = intlLocales[locale]
   const numberFormat = new Intl.NumberFormat(intlLocale)
   const listFormat = new Intl.ListFormat(intlLocale, { type: 'conjunction' })
@@ -24,10 +24,12 @@ export function createTranslator(locale: Locale) {
 
   return {
     locale,
-    t: (key: MessageKey, params?: MessageParams) =>
-      messages[key].replace(/\{(\w+)\}/g, (placeholder, name: string) =>
-        params && name in params ? String(params[name]) : placeholder,
-      ),
+    t: (key: MessageKey, params?: MessageParams) => {
+      const message = messages[key]
+      // Never shown as nothing: a screen that reads a message waits for its catalogue first (see `catalogue`).
+      if (message === undefined) throw new Error(`The message "${key}" was asked for before its catalogue arrived, in "${locale}"`)
+      return message.replace(/\{(\w+)\}/g, (placeholder, name: string) => (params && name in params ? String(params[name]) : placeholder))
+    },
     formatNumber: (value: number, options?: Intl.NumberFormatOptions) =>
       options ? new Intl.NumberFormat(intlLocale, options).format(value) : numberFormat.format(value),
     formatCurrency: (amount: number, currency: string, options?: Intl.NumberFormatOptions) => {

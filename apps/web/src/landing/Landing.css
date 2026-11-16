@@ -1,0 +1,296 @@
+/*
+ * The Landing: a 3D scene held behind the copy. Always dark,
+ * whatever the theme. The page is one screen per stop of the story and snaps
+ * to them, one at a time; the scene, the bar and the copy never move.
+ */
+
+/*
+ * A finger's swipe moves on one stop instead of dragging the page: see the
+ * gestures `story.ts` hears. Two fingers still pinch to zoom.
+ */
+:root:has(.landing) {
+  scroll-snap-type: y mandatory;
+  touch-action: pinch-zoom;
+  overscroll-behavior: none;
+}
+
+.landing__stop {
+  height: 100svh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+:root:has(.landing),
+:root:has(.landing) body {
+  background: #050606;
+  color-scheme: dark;
+}
+
+.landing {
+  position: relative;
+  color: var(--text-primary);
+}
+
+.landing__scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.landing__scene[data-ready] {
+  opacity: 1;
+}
+
+/*
+ * A picture of the scene in its place, where it can't be drawn: it fills the
+ * screen as the scene would, cut at the sides or at top and bottom where the
+ * screen isn't the picture's shape.
+ */
+.landing__still {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  object-fit: cover;
+}
+
+/* ---------- The Results Graph's figures, round the graph of chips ---------- */
+
+.landing__figures {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* A rule across the graph at a figure, the figure sitting on its left end. */
+.landing__rule {
+  position: absolute;
+  left: var(--left);
+  width: var(--width);
+  top: calc(var(--zero) - (var(--zero) - var(--crest)) * var(--up));
+  padding: 0 0 3px 2px;
+  transform: translateY(-100%);
+  border-bottom: 1px solid rgb(255 255 255 / 9%);
+  line-height: 1;
+}
+
+.landing__ev {
+  position: absolute;
+  left: var(--left);
+  top: var(--crest);
+  width: var(--width);
+  height: calc(var(--zero) - var(--crest));
+  overflow: visible;
+  fill: none;
+  stroke: var(--graph-teal);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.landing__hands {
+  position: absolute;
+  left: var(--left);
+  top: calc(var(--floor) + 8px);
+  line-height: 1;
+}
+
+.landing__hands--last {
+  left: auto;
+  right: calc(100% - var(--left) - var(--width));
+}
+
+.landing__legend {
+  position: absolute;
+  left: var(--left);
+  width: var(--width);
+  top: calc(var(--crest) - 20px);
+  transform: translateY(-100%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.landing__legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.landing__legend b {
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.landing__swatch {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.landing__swatch--result {
+  background: var(--brass);
+}
+
+.landing__swatch--ev {
+  background: var(--graph-teal);
+}
+
+/* ---------- The two ways on, always in reach ---------- */
+
+.landing__bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Where the bar is too narrow for all of it, the two ways on go under the brand rather than away. */
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: max(14px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 14px
+    max(18px, env(safe-area-inset-left));
+}
+
+.landing__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing__beta {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--brass-ink);
+}
+
+.landing__doors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 18px;
+  margin-left: auto;
+}
+
+.landing__code {
+  font-size: 14px;
+  color: var(--text-secondary, inherit);
+}
+
+/*
+ * ---------- The copy, held in the lower two fifths ----------
+ * No caption starts higher than 60% of the way down the screen, which the
+ * scene's shots count on (`clearFor` in the choreography): the type shrinks
+ * with the window's height as well as its width, down to three lines of
+ * title, two of text and the hint in a window 600 px tall.
+ */
+
+.landing__copy {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 42dvh;
+  pointer-events: none;
+  background: linear-gradient(to top, rgb(5 6 6 / 82%), rgb(5 6 6 / 0%));
+}
+
+.landing__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(7dvh, env(safe-area-inset-bottom));
+  padding: 0 24px;
+  text-align: center;
+  opacity: 0;
+}
+
+/* Before the page's script has run, the story is at its opening. */
+.landing__caption[data-caption='opening'] {
+  opacity: 1;
+}
+
+.landing__title {
+  margin: 0 auto;
+  /* 18 of Instrument Serif's zeros, in ems: a fallback face's zero is not as wide, and the lines must break where they will. */
+  max-width: 8.28em;
+  font-size: clamp(30px, min(5.2vw, 10.4dvh - 34px), 62px);
+  font-weight: 400;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.landing__line {
+  margin: 14px auto 0;
+  /* 44 of Instrument Sans's zeros, in ems, as the title's. */
+  max-width: 29.3em;
+  font-size: clamp(15px, min(1.5vw, 2.8dvh), 19px);
+  line-height: 1.45;
+  color: var(--text-secondary, inherit);
+  text-wrap: pretty;
+}
+
+.landing__hint {
+  margin: 22px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-ink);
+}
+
+/*
+ * ---------- With scripts disabled ----------
+ * Nothing plays the story, so there are no stops to scroll through: every
+ * caption is on the page, one under another, below the bar.
+ */
+
+@media (scripting: none) {
+  :root:has(.landing) {
+    scroll-snap-type: none;
+    touch-action: auto;
+  }
+
+  .landing__stop {
+    display: none;
+  }
+
+  .landing__copy {
+    position: static;
+    height: auto;
+    padding: 30dvh 0 12dvh;
+    pointer-events: auto;
+    background: none;
+  }
+
+  .landing__caption {
+    position: static;
+    margin-top: 16dvh;
+    opacity: 1;
+  }
+
+  .landing__caption[data-caption='opening'] {
+    margin-top: 0;
+  }
+
+  /* There is nowhere to scroll on to in the way the hint says. */
+  .landing__caption[data-caption='opening'] .landing__hint {
+    display: none;
+  }
+}

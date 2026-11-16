@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   const stored = new Map([['runout.identityToken', 'token']])
   vi.stubGlobal('localStorage', { getItem: (key: string) => stored.get(key) ?? null } as Partial<Storage>)
-  // A server waking up: it holds every request. The language is the default preferences', Spanish.
+  // A server waking up: it holds every request. The language stays the one the page was opened in, until an identity's is known.
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))
 })
 
@@ -40,11 +40,52 @@ describe('SessionProvider while the server wakes up', () => {
     await renderProvider()
 
     await act(() => vi.advanceTimersByTimeAsync(300))
-    expect(screen.getByRole('progressbar', { name: 'Cargando' })).toBeTruthy()
-    expect(screen.queryByText('Conectando con el servidor…')).toBeNull()
+    expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeTruthy()
+    expect(screen.queryByText('Connecting to the server…')).toBeNull()
 
     await act(() => vi.advanceTimersByTimeAsync(4700))
-    expect(screen.getByText('Conectando con el servidor…')).toBeTruthy()
+    expect(screen.getByText('Connecting to the server…')).toBeTruthy()
+  })
+})
+
+describe('SessionProvider in a browser that holds no token', () => {
+  it('shows the app at once, in the language it was opened in: there is no identity to wait for', async () => {
+    vi.stubGlobal('localStorage', { getItem: () => null } as Partial<Storage>)
+    const { I18nProvider, useI18n } = await import('../i18n')
+    const { SessionProvider } = await import('./SessionProvider')
+    function Language() {
+      return <p>{useI18n().locale}</p>
+    }
+
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionProvider>
+          <Language />
+        </SessionProvider>
+      </I18nProvider>,
+    )
+
+    expect(document.body.textContent).toBe('en')
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    expect(document.body.textContent).toBe('en')
+  })
+})
+
+describe('SessionProvider in a browser the server has recognised already', () => {
+  // The page kept what the document held on screen while it asked whose the token was: the app's first draw is the screen itself.
+  it('shows the app in its first draw, with no loader in between', async () => {
+    const { loadSession } = await import('./identity')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ id: 'guest', displayName: 'Marta', screenNames: [], preferences: { language: 'en' }, account: null, room: { code: 'ABCDEF' } }),
+      ),
+    )
+    await loadSession()
+
+    await renderProvider()
+
+    expect(document.body.textContent).toBe('The app')
   })
 })
 

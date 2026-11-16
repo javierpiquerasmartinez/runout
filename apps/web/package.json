@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "capture:landing": "node scripts/capture-landing.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -18,7 +19,8 @@
     "@runout/poker": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
@@ -27,6 +29,7 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^30.1.0",
     "oxlint": "^1.81.0",

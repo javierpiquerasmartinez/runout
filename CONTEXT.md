@@ -10,7 +10,17 @@ Where a poker player keeps their own Hands, sees how they are doing and studies 
 The screen an Account opens on, where they see at a glance how each section of Runout is going and go into any of them, with a few quick actions. It holds nothing of its own: all it shows belongs to its section. The UI calls it "Inicio".
 _Avoid_: Dashboard, overview, tablero, landing
 
+### Landing
+
+**Landing**:
+What a Visitor sees where an Account would see Home: what Runout is, and the two ways on from there, signing in or bringing a Room Code. It creates no Account and takes no one's details.
+_Avoid_: Home, homepage, portada, marketing site
+
 ### People and roles
+
+**Visitor**:
+A person looking at Runout with no Sign-in and in no Room. They stop being one by signing in or by entering a Room, with their Account or anonymously.
+_Avoid_: User, guest, anonymous user, lead
 
 **Account**:
 A person's lasting identity in Runout, signed in with Google or with their email and a password. Everything that outlives a Room belongs to one: their Library, Screen Names, Display Name, Preferences, Marks and Tags. A new one is only created from an Invitation.

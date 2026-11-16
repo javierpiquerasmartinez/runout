@@ -2,12 +2,38 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Before first paint: no Landing for a browser signed in to an Account ("hidden"), and `/en` for a Visitor who reads in
+      English, who is shown nothing until it is there ("leaving"). See src/main.tsx. The storage keys are identity/identity.ts's
+      and the addresses landing/address.ts's: src/landing/firstDraw.test.ts runs this script against them.
+    -->
+    <script>
+      ;(function () {
+        try {
+          var page = document.documentElement
+          if (localStorage.getItem('runout.account')) return void (page.dataset.landing = 'hidden')
+          if (location.pathname !== '/' || /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp/i.test(navigator.userAgent)) return
+          var asked = (navigator.languages || [navigator.language]).map(function (language) {
+            return String(language).slice(0, 2).toLowerCase()
+          })
+          var language = localStorage.getItem('runout.language') || asked.filter(function (language) {
+            return language === 'es' || language === 'en'
+          })[0]
+          if (language !== 'en') return
+          page.dataset.landing = 'leaving'
+          location.replace('/en' + location.search + location.hash)
+        } catch (error) {}
+      })()
+    </script>
+    <style>
+      [data-landing] #root {
+        display: none;
+      }
+    </style>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The app's title. The build gives each language's Landing its own, with its description and its link preview: build/landingDocuments.ts. -->
     <title>Runout</title>
-    <meta name="description" content="Importa tus historiales, mira cómo vas y repasa cualquier mano calle a calle: a solas o con tu grupo, todos sincronizados en una sala." />
-    <meta property="og:title" content="Runout" />
-    <meta property="og:description" content="Importa tus historiales, mira cómo vas y repasa cualquier mano calle a calle: a solas o con tu grupo, todos sincronizados en una sala." />
   </head>
   <body>
     <div id="root"></div>

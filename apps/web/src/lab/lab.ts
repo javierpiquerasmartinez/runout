@@ -3,8 +3,7 @@ import type { I18n } from '../i18n/context'
 import { CATEGORIES, FLOP_CARDS, formatBoard, readBoardCards, readDeadCards, streetsBefore, type Narrowing, type Selection } from './board'
 import { EMPTY_RANGE, formatRange, parseRange, type Range } from './range'
 
-/** The Lab ("Laboratorio"): an Account's study tools. It opens on the Analysis. */
-export const labPath = '/lab'
+export { isLabPath, labPath } from './paths'
 
 /** The Lab's Analysis: a Range studied without touching the saved one. */
 export const labAnalysisPath = '/lab/analysis'
@@ -21,11 +20,6 @@ export function rangeSaveFailure(t: I18n['t'], reason: FailureReason, name: stri
 
 /** The Lab's Ranges: the matrix, its stats and the Account's saved Ranges. */
 export const labRangesPath = '/lab/ranges'
-
-/** Whether this path is the Lab's or one of its tools'. */
-export function isLabPath(path: string): boolean {
-  return path === labPath || path.startsWith(`${labPath}/`)
-}
 
 /** A saved Range's own address, which survives a reload and going back. */
 export function labRangePath(id: string): string {

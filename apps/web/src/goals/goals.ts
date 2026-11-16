@@ -27,8 +27,7 @@ export type GoalStatus = 'notStarted' | 'inProgress' | 'achieved' | 'expired'
 /** How much time a Goal has, for the screen to put into words; a Goal that is Achieved has none. */
 export type Countdown = { kind: 'startsIn' | 'daysLeft' | 'expiredAgo'; days: number } | { kind: 'lastDay' } | null
 
-/** The section's address. */
-export const goalsPath = '/goals'
+export { goalsPath } from './paths'
 
 /** How long a Goal's name may be, in characters. */
 export const MAX_GOAL_NAME_LENGTH = 80

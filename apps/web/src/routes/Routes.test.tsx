@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { I18nProvider } from '../i18n'
+import { I18nProvider, type Locale } from '../i18n'
 import { SessionContext, type SessionContextValue } from '../identity/context'
 import { HeldRoomContext } from '../room/heldRoomContext'
 import { initialRoomView } from '../room/roomClient'
@@ -64,11 +64,11 @@ const anonymous = () => fakeSession({ account: null, room: { code: 'RNT4K9PX' } 
 const account = () => fakeSession()
 
 /** The app at `path`, as this session finds it, with the Room RNT4K9PX held as `App` holds it on a Room's paths. */
-function renderAt(path: string, session: SessionContextValue) {
+function renderAt(path: string, session: SessionContextValue, locale: Locale = 'en') {
   window.history.replaceState(null, '', path)
   const confirmDisplayName = vi.fn()
   render(
-    <I18nProvider initialLocale="en">
+    <I18nProvider initialLocale={locale}>
       <SessionContext.Provider value={session}>
         <HeldRoomContext
           value={{
@@ -132,25 +132,44 @@ describe('Routes · the landing, for visitors', () => {
       "Your graph doesn't lie.",
       'It all ends up here.',
       'One table. The whole group. The same hand.',
-      'Invitation only.',
     ]) {
       expect(screen.getByRole('heading', { name: headline })).toBeTruthy()
     }
+    // Under the Rooms, where the story ends.
+    expect(screen.getByText('Invitation only.')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
     expect(screen.getByRole('link', { name: 'Have a room code?' }).getAttribute('href')).toBe('/room')
     expect(screen.queryByRole('heading', { name: 'Create a room' })).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('keeps its background video away from assistive technology', async () => {
+  it('keeps its scene away from assistive technology, and has one top-level heading', async () => {
     renderAt('/', visitor())
 
     expect(await landing()).toBeTruthy()
-    const videos = document.querySelectorAll('video')
-    expect(videos.length).toBeGreaterThan(0)
-    for (const video of videos) {
-      expect(video.closest('[aria-hidden="true"]')).not.toBeNull()
-    }
+    expect(document.querySelector('canvas')?.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  })
+
+  it('is in English at /en, where someone reading in English at / is taken', async () => {
+    renderAt('/', visitor())
+
+    expect(await landing()).toBeTruthy()
+    expect(window.location.pathname).toBe('/en')
+  })
+
+  it('is in Spanish at /, where someone reading in Spanish at /en is taken', async () => {
+    renderAt('/en', visitor(), 'es')
+
+    expect(await screen.findByRole('heading', { name: 'Tus manos. Tus números. Tu mesa.' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('shows an Account its Home at /en too', async () => {
+    renderAt('/en', account())
+
+    expect(await home()).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
   })
 
   it('is where an unknown path falls back to', async () => {
@@ -542,7 +561,7 @@ describe('Routes · the Administrator panel, only for an Administrator', () => {
   it('opens on Invitations, with each tab a route of its own', async () => {
     renderAt('/admin', fakeSession({ administrator: true }))
 
-    expect(screen.getByRole('heading', { name: 'Administration' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Administration' })).toBeTruthy()
     const tabs = screen.getByRole('navigation', { name: 'Administration sections' })
     expect(within(tabs).getByRole('link', { name: 'Invitations' }).getAttribute('aria-current')).toBe('page')
 
@@ -570,11 +589,11 @@ describe('Routes · the Administrator panel, only for an Administrator', () => {
 describe('Routes · getting in, for anyone', () => {
   it('opens the page to ask for a reset link without an identity', async () => {
     renderAt('/reset-password', visitor())
-    expect(screen.getByRole('heading', { name: 'Change your password' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Change your password' })).toBeTruthy()
   })
 
-  it('lets an Account signed in on this browser finish a reset link too', () => {
+  it('lets an Account signed in on this browser finish a reset link too', async () => {
     renderAt('/reset-password/some-token', account())
-    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Choose a new password' })).toBeTruthy()
   })
 })
