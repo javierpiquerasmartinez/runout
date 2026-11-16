@@ -4,10 +4,7 @@ import { DatabaseModule } from '../database/database.module.js';
 import { FILE_STORE } from '../file-store/file-store.js';
 import { fileStoreFromEnv } from '../file-store/file-store.module.js';
 import { HeroResultsModule } from '../hands/hero-results.module.js';
-import {
-  ADMINISTRATOR_EMAILS,
-  administratorEmailsFromEnv,
-} from '../identity/administrators.js';
+import { AdministratorsModule } from '../identity/administrators.module.js';
 import { MailModule } from '../mail/mail.module.js';
 import { PlansModule } from '../plans/plans.module.js';
 import { StorageModule } from '../storage/storage.js';
@@ -31,6 +28,7 @@ import { WakeController } from './wake.controller.js';
  */
 @Module({
   imports: [
+    AdministratorsModule,
     ClockModule,
     DatabaseModule,
     HeroResultsModule,
@@ -50,10 +48,6 @@ import { WakeController } from './wake.controller.js';
     {
       provide: BULK_IMPORT_TEXT_LIMIT,
       useValue: DEFAULT_BULK_IMPORT_TEXT_LIMIT,
-    },
-    {
-      provide: ADMINISTRATOR_EMAILS,
-      useFactory: () => administratorEmailsFromEnv(process.env),
     },
     ImportEngine,
     ImporterEmail,

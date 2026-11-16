@@ -1,9 +1,5 @@
 import { Module } from '@nestjs/common';
-import {
-  ADMINISTRATOR_EMAILS,
-  administratorEmailsFromEnv,
-  type AdministratorEmails,
-} from './administrators.js';
+import { AdministratorsModule } from './administrators.module.js';
 import { googleVerifierFromEnv } from './dev-sign-in.js';
 import { GOOGLE_VERIFIER, type GoogleVerifier } from './google-verifier.js';
 import { IdentityController } from './identity.controller.js';
@@ -18,7 +14,7 @@ import {
 } from './sessions.controller.js';
 
 @Module({
-  imports: [PlansModule],
+  imports: [AdministratorsModule, PlansModule],
   controllers: [
     IdentityController,
     SessionsController,
@@ -31,14 +27,9 @@ import {
       provide: GOOGLE_VERIFIER,
       useFactory: (): GoogleVerifier => googleVerifierFromEnv(process.env),
     },
-    {
-      provide: ADMINISTRATOR_EMAILS,
-      useFactory: (): AdministratorEmails =>
-        administratorEmailsFromEnv(process.env),
-    },
     IdentityService,
     InvitationsService,
   ],
-  exports: [IdentityService, InvitationsService, ADMINISTRATOR_EMAILS],
+  exports: [IdentityService, InvitationsService, AdministratorsModule],
 })
 export class IdentityModule {}
