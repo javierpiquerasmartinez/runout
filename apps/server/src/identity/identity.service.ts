@@ -25,6 +25,7 @@ import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
 import type { PlanKey } from '../plans/plan-catalogue.js';
 import { recordPlanChange } from '../plans/plan-changes.js';
+import { Plans } from '../plans/plans.js';
 import { Rejected } from '../rejection/rejection.js';
 import {
   ADMINISTRATOR_EMAILS,
@@ -116,6 +117,12 @@ export interface Profile extends Omit<Identity, 'impersonation'> {
   } | null;
   /** The Plan the Account is on (ADR 0011); null for an anonymous identity. */
   plan: PlanKey | null;
+  /**
+   * The most Hands the Account's Library may hold; absent for an
+   * Administrator acting as themselves, whom no Plan limits, and for an
+   * anonymous identity.
+   */
+  libraryLimit?: number;
 }
 
 /** A browser just given a token for an identity. */
@@ -183,6 +190,7 @@ export class IdentityService {
     private readonly administrators: AdministratorEmails,
     @Inject(MAILER) private readonly mailer: Mailer,
     private readonly emails: EmailWriter,
+    private readonly plans: Plans,
   ) {}
 
   /**
@@ -910,6 +918,9 @@ export class IdentityService {
         : Promise.resolve([]),
     ]);
     const account = stored !== undefined && isAccount(stored);
+    const libraryLimit = account
+      ? this.plans.libraryLimitOf({ email: stored.email, plan: stored.plan })
+      : null;
     const methods: SignInMethod[] = [];
     if (stored?.googleSubject != null) methods.push('google');
     if (stored?.passwordHash != null) methods.push('password');
@@ -934,6 +945,7 @@ export class IdentityService {
             }
           : null,
       plan: stored?.plan ?? null,
+      ...(libraryLimit?.plan ? { libraryLimit: libraryLimit.hands } : {}),
     };
   }
 

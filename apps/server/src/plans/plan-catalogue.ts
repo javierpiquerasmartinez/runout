@@ -36,7 +36,6 @@ export const PLAN_CATALOGUE = Symbol('PLAN_CATALOGUE');
 
 /** Runout's Plans in production. */
 export const DEFAULT_PLAN_CATALOGUE: PlanCatalogue = {
-  // No limit differs yet: Beta's own comes with the Library's usage.
-  beta: { libraryHands: RUNOUT_LIBRARY_HANDS },
+  beta: { libraryHands: 20_000 },
   pro: { libraryHands: RUNOUT_LIBRARY_HANDS },
 };
