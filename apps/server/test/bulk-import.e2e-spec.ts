@@ -625,6 +625,78 @@ describe('A Bulk Import (e2e)', () => {
     });
   }, 30_000);
 
+  describe('when an Administrator changes the Account’s Plan between batches', () => {
+    async function changePlan(
+      administratorToken: string,
+      accountId: string,
+      plan: 'beta' | 'pro',
+    ) {
+      await request(api.httpServer)
+        .put(`/api/admin/accounts/${accountId}/plan`)
+        .set('Authorization', `Bearer ${administratorToken}`)
+        .send({ plan })
+        .expect(204);
+    }
+
+    it('ends it at the next batch when the Plan’s limit is lowered', async () => {
+      await start({
+        planCatalogue: betaLimitOf(1100),
+        administratorEmails: [ADMINISTRATOR_EMAIL],
+      });
+      const administrator = await signInAdministrator(api);
+      // Made the Test mode way: on Pro.
+      const { token, id } = await newAccount(api.httpServer);
+      const account = asAccount(token);
+      const text = manyHands(1500);
+      store.letReadThrough();
+      // Its first batch of 1,000 Hands is in; the second is being read.
+      const adding = store.holdRead(startOfHand(text, 1200));
+      await upload(account, 'export.txt', text);
+      await adding.held;
+
+      await changePlan(administrator.token, id, 'beta');
+      adding.release();
+      await service!.settled();
+
+      expect(await account.libraryTotal()).toBe(1100);
+      const [listed] = (await account.list().expect(200)).body;
+      expect(listed).toMatchObject({
+        status: 'completed',
+        reason: 'library-full',
+        imported: 1100,
+        notImported: { 'library-full': 400 },
+      });
+    }, 30_000);
+
+    it('lets later batches add more when the Plan’s limit is raised', async () => {
+      await start({
+        planCatalogue: betaLimitOf(1100),
+        administratorEmails: [ADMINISTRATOR_EMAIL],
+      });
+      const administrator = await signInAdministrator(api);
+      const { token, id } = await invitedAccount(
+        api,
+        administrator.token,
+        uniqueEmail('beta'),
+      );
+      const account = asAccount(token);
+      const text = manyHands(1500);
+      store.letReadThrough();
+      const adding = store.holdRead(startOfHand(text, 1200));
+      await upload(account, 'export.txt', text);
+      await adding.held;
+
+      await changePlan(administrator.token, id, 'pro');
+      adding.release();
+      await service!.settled();
+
+      expect(await account.libraryTotal()).toBe(1500);
+      const [listed] = (await account.list().expect(200)).body;
+      expect(listed).toMatchObject({ status: 'completed', imported: 1500 });
+      expect(listed.reason).toBeNull();
+    }, 30_000);
+  });
+
   it('ends a Beta’s import at its Plan’s limit, counting the Hands that did not fit', async () => {
     await start({
       planCatalogue: betaLimitOf(1200),
