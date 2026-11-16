@@ -39,6 +39,7 @@ import { invitationStatus } from '../identity/invitations.js';
 import {
   PLAN_CATALOGUE,
   PLAN_KEYS,
+  planOf,
   type PlanCatalogue,
   type PlanChangeHow,
   type PlanKey,
@@ -237,7 +238,7 @@ export class AccountsService {
               eq(administrator.id, planChanges.administratorId),
             )
             .where(inArray(planChanges.accountId, ids))
-            // Changes at one instant: the one that left the Plan it is on.
+            // Changes at one instant: the one that arrived at the Plan it is on.
             .orderBy(
               planChanges.accountId,
               sql`${planChanges.changedAt} desc`,
@@ -408,10 +409,7 @@ export class AccountsService {
     accountId: unknown,
     plan: unknown,
   ): Promise<void> {
-    if (!PLAN_KEYS.includes(plan as PlanKey)) {
-      throw new Rejected('invalid-plan');
-    }
-    const after = plan as PlanKey;
+    const after = planOf(plan);
     const account = await this.account(accountId);
     await this.db.transaction(async (tx) => {
       // Held so that two changes at once each record the Plan it really left.

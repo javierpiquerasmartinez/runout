@@ -1,3 +1,5 @@
+import { Rejected } from '../rejection/rejection.js';
+
 /** The most Hands any Library may hold: Runout's own ceiling. */
 export const RUNOUT_LIBRARY_HANDS = 10_000_000;
 
@@ -7,6 +9,12 @@ export const RUNOUT_LIBRARY_LIMIT = Symbol('RUNOUT_LIBRARY_LIMIT');
 /** The Plans an Account can be on. */
 export const PLAN_KEYS = ['beta', 'pro'] as const;
 export type PlanKey = (typeof PLAN_KEYS)[number];
+
+/** The Plan `raw` names, as a request gives it; refused with `invalid-plan` when it names none. */
+export function planOf(raw: unknown): PlanKey {
+  if (!PLAN_KEYS.includes(raw as PlanKey)) throw new Rejected('invalid-plan');
+  return raw as PlanKey;
+}
 
 /** The Plan an Invitation offers unless the Administrator picks another. */
 export const INVITATION_DEFAULT_PLAN: PlanKey = 'beta';

@@ -9,7 +9,7 @@ import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
 import {
   INVITATION_DEFAULT_PLAN,
-  PLAN_KEYS,
+  planOf,
   type PlanKey,
 } from '../plans/plan-catalogue.js';
 import { Rejected } from '../rejection/rejection.js';
@@ -101,10 +101,7 @@ export class InvitationsService {
       throw new Rejected('invalid-language');
     }
     const language = rawLanguage;
-    if (!PLAN_KEYS.includes(rawPlan as PlanKey)) {
-      throw new Rejected('invalid-plan');
-    }
-    const plan = rawPlan as PlanKey;
+    const plan = planOf(rawPlan);
     const [existing] = await this.db
       .select({ id: identities.id, suspendedAt: identities.suspendedAt })
       .from(identities)
