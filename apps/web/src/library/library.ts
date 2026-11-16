@@ -176,8 +176,5 @@ export interface LibraryPage {
   counts: { all: number; marked: number }
 }
 
-/** The most Hands any Library holds: Runout's own limit, past any Plan's. Mirrors the server's. */
-export const RUNOUT_LIBRARY_HANDS = 10_000_000
-
 /** How many Hands one Library page shows. */
 export const LIBRARY_PAGE_SIZE = 50

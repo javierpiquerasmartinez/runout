@@ -173,7 +173,7 @@ describe('A Library holds at most its Plan’s Hands (e2e)', () => {
       expect((await libraryOf(ana.token)).total).toBe(6);
     });
 
-    it('says in the current identity how many Hands each Library may hold', async () => {
+    it('says in the current identity how many Hands a Library its Plan holds below Runout’s own limit may hold', async () => {
       const ana = await betaAccount();
       const pro = await newAccount(running.httpServer);
       const impersonation = await as(administrator.token)
@@ -186,7 +186,7 @@ describe('A Library holds at most its Plan’s Hands (e2e)', () => {
         };
 
       expect((await me(ana.token)).libraryLimit).toBe(6);
-      expect((await me(pro.token)).libraryLimit).toBe(10_000_000);
+      expect(await me(pro.token)).not.toHaveProperty('libraryLimit');
       expect((await me(impersonation.body.token as string)).libraryLimit).toBe(
         6,
       );
@@ -202,7 +202,7 @@ describe('A Library holds at most its Plan’s Hands (e2e)', () => {
     expect((await libraryOf(administrator.token)).total).toBe(7);
   });
 
-  it('gives a Beta’s Library 20,000 Hands and a Pro’s 10 million', async () => {
+  it('gives a Beta’s Library 20,000 Hands, and a Pro’s only Runout’s own limit, which the current identity leaves out', async () => {
     await start();
     const beta = await betaAccount();
     const pro = await newAccount(running.httpServer);
@@ -213,6 +213,6 @@ describe('A Library holds at most its Plan’s Hands (e2e)', () => {
       };
 
     expect((await me(beta.token)).libraryLimit).toBe(20_000);
-    expect((await me(pro.token)).libraryLimit).toBe(10_000_000);
+    expect(await me(pro.token)).not.toHaveProperty('libraryLimit');
   });
 });

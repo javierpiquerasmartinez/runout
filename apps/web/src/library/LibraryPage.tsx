@@ -27,7 +27,6 @@ import {
   libraryViewPath,
   libraryZoomFromSearch,
   openedFromLibrary,
-  RUNOUT_LIBRARY_HANDS,
   withLibraryPage,
   withLibraryScroll,
   withLibraryZoom,
@@ -530,7 +529,8 @@ function PlanUsage({ held }: { held: number }) {
   const { t, formatNumber } = useI18n()
   const { identity } = useIdentity()
   const { plan, libraryLimit: limit } = identity
-  if (!plan || limit === undefined || limit >= RUNOUT_LIBRARY_HANDS) return null
+  // The server gives a limit only where a Plan holds the Library below Runout's own.
+  if (!plan || limit === undefined) return null
   return (
     <div
       className="library__plan"

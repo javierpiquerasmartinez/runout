@@ -21,7 +21,8 @@ export interface Identity {
   /** The Account's Plan; null for an anonymous identity. */
   plan?: Plan | null
   /**
-   * The most Hands the Library may hold. Left out where no Plan limits it: an
+   * The most Hands the Library may hold, given only where the Plan holds it
+   * below Runout's own limit, as a Beta's: left out for a Pro, an
    * Administrator acting as themselves, or an anonymous identity.
    */
   libraryLimit?: number

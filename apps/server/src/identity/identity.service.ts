@@ -118,9 +118,10 @@ export interface Profile extends Omit<Identity, 'impersonation'> {
   /** The Plan the Account is on (ADR 0011); null for an anonymous identity. */
   plan: PlanKey | null;
   /**
-   * The most Hands the Account's Library may hold; absent for an
-   * Administrator acting as themselves, whom no Plan limits, and for an
-   * anonymous identity.
+   * The most Hands the Account's Library may hold, given only where its
+   * Plan holds it below Runout's own limit, as a Beta's: absent for a Pro,
+   * for an Administrator acting as themselves, whom no Plan limits, and for
+   * an anonymous identity.
    */
   libraryLimit?: number;
 }
@@ -919,7 +920,10 @@ export class IdentityService {
     ]);
     const account = stored !== undefined && isAccount(stored);
     const libraryLimit = account
-      ? this.plans.libraryLimitOf({ email: stored.email, plan: stored.plan })
+      ? this.plans.libraryLimitBelowRunoutsOf({
+          email: stored.email,
+          plan: stored.plan,
+        })
       : null;
     const methods: SignInMethod[] = [];
     if (stored?.googleSubject != null) methods.push('google');
@@ -945,7 +949,7 @@ export class IdentityService {
             }
           : null,
       plan: stored?.plan ?? null,
-      ...(libraryLimit?.plan ? { libraryLimit: libraryLimit.hands } : {}),
+      ...(libraryLimit !== null ? { libraryLimit } : {}),
     };
   }
 

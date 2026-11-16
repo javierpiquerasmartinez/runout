@@ -37,9 +37,9 @@ describe('Accounts with Google (e2e)', () => {
       room: null,
       administrator: false,
       impersonation: null,
-      // Test mode's personas are made on Pro.
+      // Test mode's personas are made on Pro, which holds the Library to
+      // Runout's own limit only: no limit to show.
       plan: 'pro',
-      libraryLimit: 10_000_000,
     });
   });
 

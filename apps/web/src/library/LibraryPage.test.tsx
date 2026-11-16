@@ -1473,7 +1473,7 @@ describe('LibraryPage \u00b7 a Plan\'s limit', () => {
   })
 
   it('shows nothing new to a Pro, nor to an Administrator acting as themselves', async () => {
-    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, { plan: 'pro', libraryLimit: 10_000_000 })
+    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, { plan: 'pro' })
     await screen.findByRole('table', { name: 'All hands' })
     expect(libraryMeter()).toBeNull()
     cleanup()

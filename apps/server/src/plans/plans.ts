@@ -74,4 +74,14 @@ export class Plans {
       ? runouts
       : { hands, plan: account.plan };
   }
+
+  /**
+   * The most Hands this Account's Library may hold where its Plan holds it
+   * below Runout's own limit, as a Beta's; null where nothing below Runout's
+   * own does, so that there is no limit worth showing.
+   */
+  libraryLimitBelowRunoutsOf(account: PlannedAccount): number | null {
+    const limit = this.libraryLimitOf(account);
+    return limit.hands < this.runoutLibraryHands ? limit.hands : null;
+  }
 }
