@@ -1,6 +1,6 @@
 import { api, ApiError } from '../backend/api'
 import { untilAwake } from '../backend/untilAwake'
-import type { Plan } from '../admin/admin'
+import type { Plan } from '../plans/plans'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 
 export interface Identity {

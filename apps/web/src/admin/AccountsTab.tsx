@@ -8,16 +8,8 @@ import { navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
-import {
-  nameOf,
-  PLAN_TONE,
-  PLANS,
-  type AccountCounts,
-  type AccountsPage,
-  type AdminAccount,
-  type Plan,
-  type Totals,
-} from './admin'
+import { PLAN_TONE, PLANS, type Plan } from '../plans/plans'
+import { nameOf, type AccountCounts, type AccountsPage, type AdminAccount, type Totals } from './admin'
 import { Badge } from './AdminPage'
 import { AdminPagination } from './AdminPagination'
 import { useAdminApi } from './useAdminApi'

@@ -5,15 +5,8 @@ import { RoomDialog } from '../room/RoomDialog'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
-import {
-  nameOf,
-  PLAN_TONE,
-  PLANS,
-  type Invitation,
-  type InvitationSent,
-  type InvitationStatus,
-  type Plan,
-} from './admin'
+import { PLAN_TONE, PLANS, type Plan } from '../plans/plans'
+import { nameOf, type Invitation, type InvitationSent, type InvitationStatus } from './admin'
 import { Badge } from './AdminPage'
 import { useAdminApi } from './useAdminApi'
 

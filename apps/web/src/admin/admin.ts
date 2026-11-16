@@ -1,4 +1,5 @@
 import type { BulkImportReason, BulkImportStatus } from '../library/bulkImports'
+import type { Plan } from '../plans/plans'
 
 /** The Administrator panel (ADR 0008): only routed for Administrators, a path like any other for everyone else. */
 export const adminPath = '/admin'
@@ -24,13 +25,6 @@ export interface Person {
 }
 
 export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled'
-
-/** The Plans an Account can be on (ADR 0011). */
-export const PLANS = ['beta', 'pro'] as const
-export type Plan = (typeof PLANS)[number]
-
-/** How each Plan's badge is coloured: Beta in brass, Pro in green. */
-export const PLAN_TONE: Record<Plan, 'brass' | 'sync'> = { beta: 'brass', pro: 'sync' }
 
 export interface Invitation {
   id: string
