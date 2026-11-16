@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BulkImportsModule } from '../bulk-imports/bulk-imports.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
+import { PlansModule } from '../plans/plans.module.js';
 import { RoomsModule } from '../rooms/rooms.module.js';
 import { StorageModule } from '../storage/storage.js';
 import { AccountsService } from './accounts.service.js';
@@ -10,7 +11,13 @@ import { RoomsAdminService } from './rooms-admin.service.js';
 
 /** The Administrator panel (ADR 0008). */
 @Module({
-  imports: [IdentityModule, RoomsModule, BulkImportsModule, StorageModule],
+  imports: [
+    IdentityModule,
+    RoomsModule,
+    BulkImportsModule,
+    StorageModule,
+    PlansModule,
+  ],
   controllers: [AdminController],
   providers: [AccountsService, RoomsAdminService, BulkImportsAdminService],
 })

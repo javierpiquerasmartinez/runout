@@ -1,8 +1,9 @@
 import { useEffect, useReducer, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
-import { api, reasonOf, type FailureReason } from '../backend/api'
+import { api, ApiError, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import { useIdentity } from '../identity/context'
+import { PLANS, type Plan } from '../plans/plans'
 import { percentOf, UploadFailed, uploadBulkImport } from '../library/bulkUpload'
 import { roomLibraryPath } from '../library/library'
 import { navigate } from '../routing'
@@ -73,7 +74,8 @@ export function ImportDialog({
   const [previewIndex, setPreviewIndex] = useState(0)
   const [discardedOf, setDiscardedOf] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
-  const [confirmFailure, setConfirmFailure] = useState<FailureReason | null>(null)
+  // The refusal of the import confirmed, kept whole: a full Library's says by how much.
+  const [confirmFailure, setConfirmFailure] = useState<{ refusal: unknown } | null>(null)
   const [bulk, setBulk] = useState<Bulk | null>(null)
   const uploading = bulk?.phase === 'uploading'
   const totals = batchTotals(batch)
@@ -210,7 +212,7 @@ export function ImportDialog({
         onClose()
       })
       .catch((error: unknown) => {
-        setConfirmFailure(reasonOf(error))
+        setConfirmFailure({ refusal: error })
         setConfirming(false)
       })
   }
@@ -414,7 +416,7 @@ export function ImportDialog({
           {overLimit && !confirmFailure && <p className="import-dialog__failure">{overLimit}</p>}
           {confirmFailure && (
             <p className="import-dialog__failure" role="alert">
-              {t(`reason.${confirmFailure}`)}
+              {refusalText(i18n, confirmFailure.refusal)}
             </p>
           )}
           <span className="import-dialog__spacer" />
@@ -711,4 +713,24 @@ function DiscardedPanel({
       </Button>
     </section>
   )
+}
+
+/**
+ * What a refused import says. A Library its Plan holds full names the Plan's
+ * limit, the Hands it holds and the Hands the import adds; one no Plan limits
+ * says Runout's own limit.
+ */
+function refusalText({ t, formatNumber }: Translator, refusal: unknown): string {
+  const reason = reasonOf(refusal)
+  const details = refusal instanceof ApiError ? refusal.details : {}
+  const { plan, limit, held, hands } = details
+  if (reason === 'library-full' && PLANS.includes(plan as Plan) && [limit, held, hands].every((n) => typeof n === 'number')) {
+    return t('reason.library-full.plan', {
+      plan: t(`plan.${plan as Plan}`),
+      limit: formatNumber(limit as number),
+      held: formatNumber(held as number),
+      hands: formatNumber(hands as number),
+    })
+  }
+  return t(`reason.${reason}`)
 }

@@ -382,6 +382,9 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - The preview marks each Hand as new, already in my Library, or discarded with its reason. Hands already in my Library are not added twice, so my Results are not inflated.
 - Hands whose Hero is not me (a friend's export, a forum Hand) are accepted, as are CoinPoker Hands whose Hero is written `Hero`.
 - If someone else already imported the same Hand from the same seat, my import still succeeds: we share the Hand, and I see the Notes already written on it.
+- My Library holds at most what my Plan allows (ADR 0011): 20,000 Hands on Beta, Runout's own 10 million on Pro. Hands already in it, and Hands removed from it, count as they stand now. An import that would take it past that is refused whole, saying so: "Tu plan Beta admite hasta 20.000 manos en la biblioteca. Tienes 19.200 y esta importación añade 1.500." A Library already over its limit, after a move to a smaller Plan, keeps every Hand and takes no more until it is under it.
+- A Bulk Import that reaches the limit ends there, adding what fitted, and says how many Hands were left out, in the Library's Importaciones view and in its email: "Límite de tu plan: 830 manos se quedaron sin importar." Only Runout's own 10 million, which holds an Administrator acting as themselves, says "Biblioteca llena" instead. A change of Plan during a Bulk Import applies from its next batch.
+- An Administrator acting as themselves is never limited by their own Plan, only by Runout's own; while Impersonating (H10.5), the Plan of the Account they act as applies.
 
 **H7.2 — See my Library.** As a player, I want my Library always within reach, so I can go to my Hands without being in a Room.
 
@@ -389,6 +392,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - The list view, at `/library`, lists my Hands newest first, paginated, so it stays fast with tens of thousands of Hands. Its headers sort it another way (H7.10).
 - Each row shows the hole cards, the Positions involved, Hero, Poker Site, Stake, final pot, Final Street, Showdown, my Result, the date and my Tags.
 - The title row says how many Hands match the current filters. With Hands selected, the selection actions (tag, remove, add to the Room) appear in it next to **Importar manos**.
+- On Beta, a meter beside **Reproducir** and **Importar manos** says how many Hands my Library holds of the most my Plan allows ("Plan Beta · 12.340 / 20.000"), in green, and red once at or past it. It follows the Library as Hands come and go. A Pro, and an Administrator acting as themselves, see nothing of it.
 - A **Manos | Gráfica | Estadísticas** switch below the filters moves between the list, the Results Graph (H7.5) and the Stats (H7.11). Each view has its own address, so the back button and links return to the view I was on.
 - An empty Library, or filters that match nothing, show an empty state that invites me to import, whichever view I'm on.
 - Anonymous Participants cannot reach a Library: without an Account, its addresses send me to `/login`.
@@ -905,17 +909,19 @@ Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administ
 
 **H10.1 — Invitations.** As an Administrator, I want to choose who can create an Account.
 
-- I type an email and pick the language of its email (Spanish by default, or English), and the Invitation is sent.
-- The tab lists every Invitation with its email, who sent it, when, when it expires and its status: pending, accepted (with the Account it became and when), expired or cancelled.
-- A pending or expired one can be resent: a new link with a fresh 7 days, and the old link stops working. A pending one can be cancelled. Both ask for confirmation.
+- I type an email and pick the language of its email (Spanish by default, or English) and the Plan its Account starts on (Beta by default, or Pro), and the Invitation is sent.
+- The tab lists every Invitation with its email, who sent it, when, when it expires and its status: pending, accepted (with the Account it became and when), expired or cancelled. Each shows its Plan after its status, Beta in brass and Pro in green.
+- A pending or expired one can be resent: a new link with a fresh 7 days, and the old link stops working; it keeps its Plan. A pending one can be cancelled. Both ask for confirmation.
 - Inviting an email with a pending Invitation is refused, pointing to resend. Inviting one that already has an Account is refused; if that Account is suspended, the tab offers lifting the Suspension instead.
 - If the email fails to go out, I'm told and the Invitation stays pending to be resent.
 
 **H10.2 — Accounts and their statistics.** As an Administrator, I want to see who uses Runout and how.
 
 - Above the list, totals: Accounts, active in the last 7 and 30 days, suspended, pending Invitations, Hands, Ranges, and open and closed Rooms.
-- Each Account with its email, Display Name, sign-up date, the Invitation it came from, sign-in methods, last sign-in, last activity, and counts: Hands in its Library, imports, Ranges, Library Tags, Lab Tags, Notes written, Rooms created and Rooms taken part in. Last activity is recorded from now on, to within a few minutes.
-- The list sorts by email, Display Name, last activity and the counts, searches by email and Display Name, and pages like the Library.
+- Each Account with its email, Display Name, its Plan, sign-up date, the Invitation it came from, sign-in methods, last sign-in, last activity, and counts: Hands in its Library, imports, Ranges, Library Tags, Lab Tags, Notes written, Rooms created and Rooms taken part in. Last activity is recorded from now on, to within a few minutes.
+- The Plan column, after the name, shows the Plan's badge with its latest change beside it: who changed it and when ("Tester A · 16 nov 2026"), "Invitación" with the date its Invitation was accepted, or "Inicial" for an Account from before Plans.
+- The list sorts by email, Display Name, last activity and the counts, searches by email and Display Name, filters by Plan beside the search, and pages like the Library.
+- **Cambiar plan**, first among each row's actions, moves any Account to another Plan, mine and another Administrator's included. Its confirmation says the Plan it is on and what its Library may hold, and what changes with the new one, from its next import; its Hands never change. The button reads "Pasar a Pro". Every change is recorded with when, by whom and how.
 
 **H10.3 — Suspension.** As an Administrator, I want to withdraw someone's access when their trial ends, and give it back.
 

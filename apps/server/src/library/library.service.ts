@@ -23,7 +23,8 @@ import { HeroResults } from '../hands/hero-results.js';
 import { Rejected } from '../rejection/rejection.js';
 import { addToLibrary, inLibrary } from './library-entries.js';
 import { handSelection, requireInLibrary } from './library-hand.js';
-import { LIBRARY_CAPACITY, LIBRARY_IMPORT_LIMIT } from './library-limits.js';
+import { Plans } from '../plans/plans.js';
+import { LIBRARY_IMPORT_LIMIT } from './library-limits.js';
 import { boundedInt } from './query.js';
 import { TagsService, type Tag } from './tags.service.js';
 import {
@@ -101,7 +102,7 @@ export class LibraryService {
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly heroResults: HeroResults,
     private readonly tagsService: TagsService,
-    @Inject(LIBRARY_CAPACITY) private readonly capacity: number,
+    private readonly plans: Plans,
   ) {}
 
   /**
@@ -136,7 +137,7 @@ export class LibraryService {
    * from. Returns the ids of the Hands added: one added since it was
    * previewed is skipped. Refuses with `too-many-hands` above
    * `LIBRARY_IMPORT_LIMIT` Hands to add, and with `library-full` when they
-   * would take the Library past its capacity.
+   * would take the Library past its Plan's limit.
    */
   async add(
     tx: Transaction,
@@ -163,7 +164,7 @@ export class LibraryService {
 
   /**
    * Refuses with `library-full` when `adding` more Hands would take the
-   * Library past its capacity. Holds the Account's lock until the caller's
+   * Library past its Plan's limit. Holds the Account's lock until the caller's
    * transaction ends, so that two imports at once cannot both fit.
    */
   private async requireRoomFor(
@@ -180,11 +181,13 @@ export class LibraryService {
       .select({ held: count() })
       .from(libraryEntries)
       .where(eq(libraryEntries.identityId, account.id));
-    if (held + adding > this.capacity) {
+    const limit = await this.plans.libraryLimit(tx, account.id);
+    if (held + adding > limit.hands) {
       throw new Rejected('library-full', {
         hands: adding,
         held,
-        limit: this.capacity,
+        limit: limit.hands,
+        plan: limit.plan,
       });
     }
   }

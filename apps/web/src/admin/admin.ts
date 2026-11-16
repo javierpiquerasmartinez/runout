@@ -1,4 +1,5 @@
 import type { BulkImportReason, BulkImportStatus } from '../library/bulkImports'
+import type { Plan } from '../plans/plans'
 
 /** The Administrator panel (ADR 0008): only routed for Administrators, a path like any other for everyone else. */
 export const adminPath = '/admin'
@@ -29,6 +30,8 @@ export interface Invitation {
   id: string
   email: string
   language: 'es' | 'en'
+  /** The Plan its Account starts on. */
+  plan: Plan
   status: InvitationStatus
   sentBy: Person
   sentAt: string
@@ -64,16 +67,23 @@ export interface AdminAccount {
   lastSignedInAt: string | null
   lastActiveAt: string | null
   administrator: boolean
+  plan: Plan
+  /** The latest change of its Plan: by an Administrator, its Invitation, Test mode, or the migration that brought Plans. */
+  planChange: { at: string; how: PlanChangeHow; administrator: Person | null } | null
   suspension: { at: string; by: Person | null } | null
   counts: AccountCounts
   impersonations: { administrator: Person; startedAt: string; endedAt: string }[]
 }
+
+export type PlanChangeHow = 'administrator' | 'invitation' | 'migration' | 'test-mode'
 
 export interface AccountsPage {
   total: number
   page: number
   pageSize: number
   accounts: AdminAccount[]
+  /** What each Plan allows, for a change of Plan to say what changes. */
+  plans: Record<Plan, { libraryHands: number }>
 }
 
 export interface Totals {

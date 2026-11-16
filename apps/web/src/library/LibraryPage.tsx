@@ -371,6 +371,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
                 </span>
               )}
             </div>
+            {page && <PlanUsage held={page.counts.all} />}
             {page && page.total > 0 && !room && (
               <Button variant="secondary" onClick={selectedHands.length > 0 ? playSelected : playFiltered}>
                 <Icon name="play" size={16} />
@@ -516,6 +517,40 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
         />
       )}
     </LibraryFrame>
+  )
+}
+
+/**
+ * How many Hands the Library holds of the most its Plan allows, shown only
+ * where the Plan limits it below Runout's own limit: a Beta's. At or past it,
+ * as an Account moved down a Plan can be, in the alert colour.
+ */
+function PlanUsage({ held }: { held: number }) {
+  const { t, formatNumber } = useI18n()
+  const { identity } = useIdentity()
+  const { plan, libraryLimit: limit } = identity
+  // The server gives a limit only where a Plan holds the Library below Runout's own.
+  if (!plan || limit === undefined) return null
+  return (
+    <div
+      className="library__plan"
+      role="meter"
+      aria-label={t('library.plan', { plan: t(`plan.${plan}`) })}
+      aria-valuemin={0}
+      aria-valuemax={limit}
+      aria-valuenow={held}
+      aria-valuetext={t('library.plan.usageOf', { held: formatNumber(held), limit: formatNumber(limit) })}
+    >
+      <span className="library__plan-label">
+        <span>{t('library.plan', { plan: t(`plan.${plan}`) })}</span>
+        <span className="ro-mono library__plan-usage">
+          {t('library.plan.usage', { held: formatNumber(held), limit: formatNumber(limit) })}
+        </span>
+      </span>
+      <span className="library__plan-bar" data-reached={held >= limit || undefined}>
+        <span className="library__plan-fill" style={{ width: `${Math.min(100, (100 * held) / limit)}%` }} />
+      </span>
+    </div>
   )
 }
 

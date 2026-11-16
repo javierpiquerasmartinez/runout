@@ -19,11 +19,12 @@ export async function invite(
   administratorToken: string,
   email: string,
   language: 'es' | 'en' = 'es',
+  plan?: 'beta' | 'pro',
 ): Promise<string> {
   await request(running.httpServer)
     .post('/api/admin/invitations')
     .set('Authorization', `Bearer ${administratorToken}`)
-    .send({ email, language })
+    .send({ email, language, plan })
     .expect(201);
   return running.inbox.token(email, 'invitation');
 }

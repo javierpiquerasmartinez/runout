@@ -22,6 +22,11 @@ import {
 import { sql } from 'drizzle-orm';
 import { fromStored, type Hand, type StoredHand } from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
+import {
+  INVITATION_DEFAULT_PLAN,
+  PLAN_CHANGE_HOWS,
+  PLAN_KEYS,
+} from '../plans/plan-catalogue.js';
 
 /** JSON as node-postgres hands it over: already parsed, or as text. */
 function parsed<T>(value: T | string): T {
@@ -81,8 +86,17 @@ export const identities = pgTable(
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
     /** When it last signed in, by any method; null until it does. */
     lastSignedInAt: timestamp('last_signed_in_at', { withTimezone: true }),
+    /** The Plan an Account is on (ADR 0011); null for an anonymous identity, which has none. */
+    plan: text('plan', { enum: PLAN_KEYS }),
   },
-  (table) => [uniqueIndex('identities_email_idx').on(table.email)],
+  (table) => [
+    uniqueIndex('identities_email_idx').on(table.email),
+    // An Account, signing in with Google or a password, is always on a Plan.
+    check(
+      'identities_account_plan_check',
+      sql`(${table.googleSubject} is null and ${table.passwordHash} is null) = (${table.plan} is null)`,
+    ),
+  ],
 );
 
 /**
@@ -110,12 +124,54 @@ export const invitations = pgTable(
     /** The Account it became. */
     accountId: uuid('account_id').references((): AnyPgColumn => identities.id),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    /** The Plan the Account starts on; resending keeps it. */
+    plan: text('plan', { enum: PLAN_KEYS })
+      .notNull()
+      .default(INVITATION_DEFAULT_PLAN),
   },
   (table) => [
     // One live link per person: an unaccepted, uncancelled one is resent, never doubled.
     uniqueIndex('invitations_open_email_idx')
       .on(table.email)
       .where(sql`${table.acceptedAt} is null and ${table.cancelledAt} is null`),
+  ],
+);
+
+/**
+ * Every change of an Account's Plan, its first one included, so that its
+ * history never starts empty (ADR 0011).
+ */
+export const planChanges = pgTable(
+  'plan_changes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references((): AnyPgColumn => identities.id),
+    /** Null for the Account's first Plan. */
+    planBefore: text('plan_before', { enum: PLAN_KEYS }),
+    planAfter: text('plan_after', { enum: PLAN_KEYS }).notNull(),
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull(),
+    how: text('how', { enum: PLAN_CHANGE_HOWS }).notNull(),
+    /** The Administrator who made it: who changed it, or who sent the Invitation. */
+    administratorId: uuid('administrator_id').references(
+      (): AnyPgColumn => identities.id,
+    ),
+  },
+  (table) => [
+    index('plan_changes_account_id_changed_at_idx').on(
+      table.accountId,
+      table.changedAt,
+    ),
+    check(
+      'plan_changes_how_check',
+      sql`${table.how} in (${sql.raw(PLAN_CHANGE_HOWS.map((how) => `'${how}'`).join(', '))})`,
+    ),
+    // A change an Administrator made always says which one.
+    check(
+      'plan_changes_administrator_check',
+      sql`${table.how} <> 'administrator' or ${table.administratorId} is not null`,
+    ),
   ],
 );
 
@@ -691,6 +747,7 @@ export const BULK_IMPORT_REASONS = [
   'unreadable-file',
   'unrecognised-format',
   'library-full',
+  'plan-limit',
 ] as const;
 export type BulkImportReason = (typeof BULK_IMPORT_REASONS)[number];
 
@@ -733,8 +790,9 @@ export const bulkImports = pgTable(
      * Why it ended short of adding its Hands, when it did: `too-many-hands`
      * past the limit, `too-much-text` when the files unpack to more text than
      * theirs, `unreadable-file` when a file is no text or zip,
-     * `unrecognised-format` when nothing in the files is a Hand, and
-     * `library-full` when the Library reached its capacity.
+     * `unrecognised-format` when nothing in the files is a Hand,
+     * `plan-limit` when the Library reached its Plan's limit, and
+     * `library-full` when it reached Runout's own.
      */
     reason: text('reason').$type<BulkImportReason>(),
     /**

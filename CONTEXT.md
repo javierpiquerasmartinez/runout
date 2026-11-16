@@ -27,12 +27,24 @@ A person's lasting identity in Runout, signed in with Google or with their email
 _Avoid_: User, profile, login
 
 **Invitation**:
-An Administrator's offer to one email address to create an Account, sent to it as a single-use link. Pending until it is accepted, expires or is cancelled; resending it replaces the link. Only that email address can accept it. Unrelated to a Room Code, which lets people into a Room, not into Runout.
+An Administrator's offer to one email address to create an Account, sent to it as a single-use link. Pending until it is accepted, expires or is cancelled; resending it replaces the link. Only that email address can accept it, and it names the Plan the Account starts on. Unrelated to a Room Code, which lets people into a Room, not into Runout.
 _Avoid_: Invite code, registration code, invitación (UI only)
 
 **Administrator**:
-An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms, ends Live in them, watches over every Bulk Import and Impersonates people. A role of the Account, not of any Room; it has nothing to do with being Master.
+An Account that also runs Runout itself: sends Invitations, Suspends Accounts, sees how Runout is used, closes Rooms, ends Live in them, watches over every Bulk Import and Impersonates people, and changes Accounts' Plans. A role of the Account, not of any Room; it has nothing to do with being Master, nor with any Plan: whatever their Plan, nothing they do as themselves is limited. Only Runout's configuration makes an Account one.
 _Avoid_: Admin, superuser, owner, Master
+
+**Plan**:
+What an Account may do in Runout and how much: which parts it can use and with what limits. Every Account is on exactly one at a time, and every change of it is recorded with who or what made it. Unrelated to being an Administrator. Today's Plans are Beta and Pro.
+_Avoid_: Role, tier, account type, subscription, licence
+
+**Beta**:
+The Plan of the people invited to try Runout before it is sold: everything Pro has, except that their Library holds at most 20,000 Hands. The Plan an Invitation offers unless the Administrator picks another. The UI calls it "Beta" too.
+_Avoid_: Invitado, Guest, Trial, tester
+
+**Pro**:
+The Plan with everything in Runout and no limits beyond Runout's own, such as a Library's 10 million Hands.
+_Avoid_: Unlimited, ilimitado, premium
 
 **Suspension**:
 An Administrator's withdrawal of an Account's access: it can no longer sign in, every Sign-in it held ends, and it leaves any Room it is in as if Kicked. Nothing it owns is touched, and lifting the Suspension gives it all back.
@@ -115,7 +127,7 @@ A private flag a person puts on a Hand to find it again. Only they see it.
 _Avoid_: Favourite, bookmark, star
 
 **Library**:
-A person's own repository: the Hands they imported into it, whatever their Hero, and nothing else, up to 10 million. Several Libraries can hold the same Hand. Hands seen in other people's Rooms are not in it.
+A person's own repository: the Hands they imported into it, whatever their Hero, and nothing else, up to the most its Plan allows. Removing Hands from it makes room again. Several Libraries can hold the same Hand. Hands seen in other people's Rooms are not in it.
 _Avoid_: Shared with me, collection, archive, database
 
 **Room Hand**:

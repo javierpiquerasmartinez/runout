@@ -3,6 +3,7 @@ import request from 'supertest';
 import { freshHandHistory, manyHands } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
+import { libraryLimitOf } from './support/plans.js';
 
 interface Stats {
   hands: number;
@@ -115,7 +116,7 @@ describe('How many Hands one import adds to a Library (e2e)', () => {
 
     beforeEach(async () => {
       main = running;
-      small = await startApp({ libraryCapacity: 6 });
+      small = await startApp({ planCatalogue: libraryLimitOf(6) });
       running = small;
     });
 

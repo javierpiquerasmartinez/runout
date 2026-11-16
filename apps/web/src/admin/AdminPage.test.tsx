@@ -15,6 +15,7 @@ function invitation(id: string, email: string, status: string, extra: object = {
     id,
     email,
     language: 'es',
+    plan: 'beta',
     status,
     sentBy: administrator,
     sentAt: '2026-11-01T10:00:00Z',
@@ -40,6 +41,8 @@ function account(id: string, email: string, extra: object = {}) {
     lastSignedInAt: null,
     lastActiveAt: null,
     administrator: false,
+    plan: 'pro',
+    planChange: { at: '2026-11-01T10:00:00Z', how: 'migration', administrator: null },
     suspension: null,
     counts,
     impersonations: [],
@@ -91,7 +94,7 @@ describe('the Invitations tab', () => {
         account: { id: 'bea', displayName: 'Bea', email: 'bea@x.com' },
       }),
       invitation('3', 'carla@x.com', 'expired'),
-      invitation('4', 'dani@x.com', 'cancelled'),
+      invitation('4', 'dani@x.com', 'cancelled', { plan: 'pro' }),
     ]
     calls = fakeApi({
       'GET /admin/invitations': () => Response.json(list),
@@ -105,6 +108,37 @@ describe('the Invitations tab', () => {
       'POST /admin/invitations/1/cancel': () => Response.json(list[0]),
       'DELETE /admin/accounts/old/suspension': () => new Response(null, { status: 204 }),
     })
+  })
+
+  it('shows the Plan each Invitation offers, after its status', async () => {
+    renderTab('invitations')
+
+    const rows = await screen.findAllByRole('row')
+    const headers = within(rows[0])
+      .getAllByRole('columnheader')
+      .map((cell) => cell.textContent)
+    expect(headers.slice(0, 3)).toEqual(['Email', 'Status', 'Plan'])
+    expect(within(rows[1]).getAllByRole('cell')[2].textContent).toBe('Beta')
+    expect(within(rows[4]).getAllByRole('cell')[2].textContent).toBe('Pro')
+  })
+
+  it('offers Beta unless another Plan is picked', async () => {
+    renderTab('invitations')
+
+    expect((await screen.findByRole('radio', { name: 'Beta' })).getAttribute('aria-checked')).toBe('true')
+    await userEvent.type(screen.getByLabelText('Email'), 'eva@x.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+    await screen.findByRole('status')
+    await userEvent.type(screen.getByLabelText('Email'), 'fran@x.com')
+    await userEvent.click(screen.getByRole('radio', { name: 'Pro' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+
+    await waitFor(() =>
+      expect(calls.filter((call) => call.method === 'POST').map((call) => call.body)).toEqual([
+        { email: 'eva@x.com', language: 'es', plan: 'beta' },
+        { email: 'fran@x.com', language: 'es', plan: 'pro' },
+      ]),
+    )
   })
 
   it('lists every Invitation with its status, sender and resulting Account', async () => {
@@ -134,7 +168,7 @@ describe('the Invitations tab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     expect((await screen.findByRole('status')).textContent).toBe('Invitation sent to eva@x.com.')
-    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ email: 'eva@x.com', language: 'en' })
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ email: 'eva@x.com', language: 'en', plan: 'beta' })
   })
 
   it('points to resend when the email has one pending', async () => {
@@ -185,16 +219,33 @@ describe('the Accounts tab', () => {
     calls = fakeApi({
       'GET /admin/totals': () => Response.json(totals),
       'GET /admin/accounts': (call) => {
-        const search = new URLSearchParams(call.search).get('search')
+        const query = new URLSearchParams(call.search)
+        const search = query.get('search')
+        const plan = query.get('plan')
         const accounts = [
-          account('ana', 'ana@x.com', { counts: { ...counts, libraryHands: 320, notes: 4 } }),
+          account('ana', 'ana@x.com', {
+            counts: { ...counts, libraryHands: 320, notes: 4 },
+            plan: 'beta',
+            planChange: { at: '2026-11-07T10:00:00Z', how: 'invitation', administrator },
+          }),
           account('bea', 'bea@x.com', {
             suspension: { at: '2026-11-03T10:00:00Z', by: administrator },
             signInMethods: ['google', 'password'],
+            planChange: { at: '2026-11-16T10:00:00Z', how: 'administrator', administrator },
           }),
-        ].filter((each) => !search || each.email.includes(search))
-        return Response.json({ total: accounts.length, page: 1, pageSize: 50, accounts })
+          account('admin', 'javier@example.com', { administrator: true }),
+        ]
+          .filter((each) => !search || each.email.includes(search))
+          .filter((each) => !plan || each.plan === plan)
+        return Response.json({
+          total: accounts.length,
+          page: 1,
+          pageSize: 50,
+          accounts,
+          plans: { beta: { libraryHands: 20_000 }, pro: { libraryHands: 10_000_000 } },
+        })
       },
+      'PUT /admin/accounts/ana/plan': () => new Response(null, { status: 204 }),
       'POST /admin/accounts/ana/suspension': () => new Response(null, { status: 204 }),
       'DELETE /admin/accounts/bea/suspension': () => new Response(null, { status: 204 }),
     })
@@ -209,6 +260,67 @@ describe('the Accounts tab', () => {
     expect(ana.textContent).toMatch(/ana@x\.com.*320/)
     expect(bea.textContent).toMatch(/Google · Password/)
     expect(within(bea).getByText('Suspended')).toBeTruthy()
+  })
+
+  it('shows each Account\'s Plan after its name, with its latest change beside it', async () => {
+    renderTab('accounts')
+    const [header, ana, bea, admin] = await screen.findAllByRole('row')
+
+    expect(within(header).getAllByRole('columnheader').map((each) => each.textContent).slice(1, 3)).toEqual([
+      'Name',
+      'Plan',
+    ])
+    const planOf = (row: HTMLElement) => within(row).getAllByRole('cell')[2].textContent
+    expect(planOf(ana)).toBe('BetaInvitation · Nov 7, 2026')
+    expect(planOf(bea)).toBe('ProJavier · Nov 16, 2026')
+    expect(planOf(admin)).toBe('ProInitial')
+  })
+
+  it('filters by Plan beside the search', async () => {
+    renderTab('accounts')
+    await screen.findAllByRole('row')
+
+    await userEvent.click(within(screen.getByRole('radiogroup', { name: 'Plan' })).getByRole('radio', { name: 'Beta' }))
+
+    await waitFor(() => expect(calls.at(-1)?.search).toContain('plan=beta'))
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
+    await userEvent.click(screen.getByRole('radio', { name: 'All plans' }))
+    await waitFor(() => expect(calls.at(-1)?.search).not.toContain('plan='))
+  })
+
+  it('offers changing the Plan first, on every Account, the Administrators\' and one\'s own included', async () => {
+    renderTab('accounts')
+    const [, ana, bea, admin] = await screen.findAllByRole('row')
+
+    for (const row of [ana, bea, admin]) {
+      const actions = within(row).getAllByRole('button')
+      expect(actions[0].textContent).toBe('Change plan')
+    }
+    expect(within(admin).getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('changes the Plan after a confirmation that says what changes', async () => {
+    renderTab('accounts')
+    const [, ana] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(ana).getByRole('button', { name: 'Change plan' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading').textContent).toBe('Change the plan of ana?')
+    expect(dialog.textContent).toContain('It is on Beta now: its library holds up to 20,000 hands.')
+    expect(dialog.textContent).toContain(
+      'With Pro, the limit becomes 10 million hands from its next import. Its hands do not change.',
+    )
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Move to Pro' }))
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'PUT')).toMatchObject({
+        path: '/admin/accounts/ana/plan',
+        body: { plan: 'pro' },
+      }),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('sorts by a column, and the other way on a second press', async () => {

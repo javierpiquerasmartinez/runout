@@ -204,6 +204,28 @@ describe('ImportsView', () => {
     expect(rowOf(table, 'one-more.txt')[4]).toBe('Biblioteca llena: 1 mano se quedó sin importar.')
   })
 
+  it('says the Plan’s limit stopped it, and how many Hands were left unimported', () => {
+    const table = renderImports([
+      bulkImport({
+        files: [{ name: 'beta.zip', size: 1 }],
+        imported: 1200,
+        duplicates: 0,
+        notImported: { 'plan-limit': 830 },
+        reason: 'plan-limit',
+      }),
+      bulkImport({
+        files: [{ name: 'last.txt', size: 1 }],
+        imported: 0,
+        duplicates: 0,
+        notImported: { 'plan-limit': 1 },
+        reason: 'plan-limit',
+      }),
+    ])
+
+    expect(rowOf(table, 'beta.zip')[4]).toBe('Límite de tu plan: 830 manos se quedaron sin importar.')
+    expect(rowOf(table, 'last.txt')[4]).toBe('Límite de tu plan: 1 mano se quedó sin importar.')
+  })
+
   it('says why an import ended adding none of its Hands', () => {
     const table = renderImports([
       bulkImport({ files: [{ name: 'huge.zip', size: 1 }], total: null, processed: 0, imported: 0, duplicates: 0, notImported: {}, reason: 'too-many-hands' }),

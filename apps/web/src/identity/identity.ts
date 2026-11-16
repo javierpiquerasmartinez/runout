@@ -1,5 +1,6 @@
 import { api, ApiError } from '../backend/api'
 import { untilAwake } from '../backend/untilAwake'
+import type { Plan } from '../plans/plans'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 
 export interface Identity {
@@ -17,6 +18,14 @@ export interface Identity {
   administrator?: boolean
   /** Who is using this Account through an Impersonation, and until when; null for its owner. */
   impersonation?: Impersonation | null
+  /** The Account's Plan; null for an anonymous identity. */
+  plan?: Plan | null
+  /**
+   * The most Hands the Library may hold, given only where the Plan holds it
+   * below Runout's own limit, as a Beta's: left out for a Pro, an
+   * Administrator acting as themselves, or an anonymous identity.
+   */
+  libraryLimit?: number
 }
 
 export type SignInMethod = 'google' | 'password'

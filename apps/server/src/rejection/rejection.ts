@@ -80,6 +80,7 @@ export type RejectionReason =
   | 'not-found'
   | 'invalid-email'
   | 'invalid-language'
+  | 'invalid-plan'
   | 'account-exists'
   | 'invitation-pending'
   | 'invitation-not-found'

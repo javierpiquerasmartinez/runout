@@ -323,6 +323,44 @@
   align-items: flex-end;
   gap: 16px;
 }
+/* A Beta's Library against its Plan's limit, beside Reproducir and Importar manos: green, red once at or past it. */
+.library__plan {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* As tall as the buttons beside it, its bar level with their middle. */
+  height: 40px;
+  width: 200px;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.library__plan-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+.library__plan-usage {
+  color: var(--text-primary);
+}
+.library__plan-bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+}
+.library__plan-fill {
+  display: block;
+  height: 100%;
+  background: var(--sync);
+}
+.library__plan-bar[data-reached] .library__plan-fill {
+  background: var(--alert);
+}
 .library__intro {
   flex-grow: 1;
   display: flex;

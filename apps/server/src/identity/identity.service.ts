@@ -23,6 +23,9 @@ import {
 import { isUniqueViolation } from '../database/unique-violation.js';
 import { EmailWriter } from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import type { PlanKey } from '../plans/plan-catalogue.js';
+import { recordPlanChange } from '../plans/plan-changes.js';
+import { Plans } from '../plans/plans.js';
 import { Rejected } from '../rejection/rejection.js';
 import {
   ADMINISTRATOR_EMAILS,
@@ -112,6 +115,15 @@ export interface Profile extends Omit<Identity, 'impersonation'> {
     administrator: { displayName: string | null; email: string | null };
     endsAt: string;
   } | null;
+  /** The Plan the Account is on (ADR 0011); null for an anonymous identity. */
+  plan: PlanKey | null;
+  /**
+   * The most Hands the Account's Library may hold, given only where its
+   * Plan holds it below Runout's own limit, as a Beta's: absent for a Pro,
+   * for an Administrator acting as themselves, whom no Plan limits, and for
+   * an anonymous identity.
+   */
+  libraryLimit?: number;
 }
 
 /** A browser just given a token for an identity. */
@@ -179,6 +191,7 @@ export class IdentityService {
     private readonly administrators: AdministratorEmails,
     @Inject(MAILER) private readonly mailer: Mailer,
     private readonly emails: EmailWriter,
+    private readonly plans: Plans,
   ) {}
 
   /**
@@ -261,17 +274,32 @@ export class IdentityService {
       return this.updateOrRefuse(byEmail.id, { googleSubject: google.subject });
     }
     if (!google.persona) throw new Rejected('invitation-required');
-    const [created] = await this.db
-      .insert(identities)
-      .values({
-        googleSubject: google.subject,
-        email: google.email,
-        createdAt: this.clock.now(),
-      })
-      // The same persona signing in twice at once: one creates it, the
-      // other finds it.
-      .onConflictDoNothing()
-      .returning();
+    const now = this.clock.now();
+    const created = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(identities)
+        .values({
+          googleSubject: google.subject,
+          email: google.email,
+          createdAt: now,
+          // A persona tries everything: it starts with no Plan limit.
+          plan: 'pro',
+        })
+        // The same persona signing in twice at once: one creates it, the
+        // other finds it.
+        .onConflictDoNothing()
+        .returning();
+      if (row) {
+        await recordPlanChange(tx, {
+          accountId: row.id,
+          before: null,
+          after: 'pro',
+          at: now,
+          how: 'test-mode',
+        });
+      }
+      return row;
+    });
     return created ?? this.accountForGoogle(google);
   }
 
@@ -349,8 +377,17 @@ export class IdentityService {
             email: invitation.email,
             invitationId: invitation.id,
             createdAt: now,
+            plan: invitation.plan,
           })
           .returning();
+        await recordPlanChange(tx, {
+          accountId: row.id,
+          before: null,
+          after: invitation.plan,
+          at: now,
+          how: 'invitation',
+          administratorId: invitation.sentBy,
+        });
         await tx.insert(preferences).values({
           ...DEFAULT_PREFERENCES,
           identityId: row.id,
@@ -865,6 +902,7 @@ export class IdentityService {
           googleSubject: identities.googleSubject,
           passwordHash: identities.passwordHash,
           email: identities.email,
+          plan: identities.plan,
           roomCode: rooms.code,
         })
         .from(identities)
@@ -881,6 +919,12 @@ export class IdentityService {
         : Promise.resolve([]),
     ]);
     const account = stored !== undefined && isAccount(stored);
+    const libraryLimit = account
+      ? this.plans.libraryLimitBelowRunoutsOf({
+          email: stored.email,
+          plan: stored.plan,
+        })
+      : null;
     const methods: SignInMethod[] = [];
     if (stored?.googleSubject != null) methods.push('google');
     if (stored?.passwordHash != null) methods.push('password');
@@ -904,6 +948,8 @@ export class IdentityService {
               endsAt: identity.impersonation.endsAt.toISOString(),
             }
           : null,
+      plan: stored?.plan ?? null,
+      ...(libraryLimit !== null ? { libraryLimit } : {}),
     };
   }
 

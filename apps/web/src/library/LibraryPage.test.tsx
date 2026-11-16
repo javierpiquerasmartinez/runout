@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import { SessionContext } from '../identity/context'
+import type { Identity } from '../identity/identity'
 import { PreferencesContext } from '../preferences/context'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 import { fakeSession } from '../test/fakeSession'
@@ -224,11 +225,12 @@ function renderLibrary(
   preferences: Preferences = DEFAULT_PREFERENCES,
   room?: { code: string; name: string },
   path = `${room ? `/room/${room.code}/library` : '/library'}?period=all`,
+  identity: Partial<Identity> = {},
 ) {
   window.history.replaceState(null, '', path)
   render(
     <I18nProvider initialLocale="en">
-      <SessionContext.Provider value={fakeSession()}>
+      <SessionContext.Provider value={fakeSession(identity)}>
         <PreferencesContext.Provider value={preferences}>
           <LibraryPage room={room} />
         </PreferencesContext.Provider>
@@ -1444,5 +1446,52 @@ describe('LibraryPage \u00b7 replaying several Hands', () => {
     await vi.waitFor(() => expect(window.location.pathname).toBe('/library/hands/h1'))
     expect(window.location.search).toBe('?replay=filter&period=all&site=pokerstars')
     expect(new URL(handIdsRequests[0], 'http://localhost').searchParams.get('site')).toBe('pokerstars')
+  })
+})
+
+describe('LibraryPage \u00b7 a Plan\'s limit', () => {
+  const beta: Partial<Identity> = { plan: 'beta', libraryLimit: 20_000 }
+  const libraryMeter = () => screen.queryByRole('meter', { name: 'Beta plan' })
+
+  it('shows a Beta how many Hands its Library holds of the most its Plan allows', async () => {
+    pages['1'] = { ...pages['1'], counts: { all: 12_340, marked: 1 } }
+    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, beta)
+
+    const meter = await screen.findByRole('meter', { name: 'Beta plan' })
+    expect(meter.textContent).toBe('Beta plan12,340 / 20,000')
+    expect(meter.getAttribute('aria-valuetext')).toBe('12,340 of 20,000 hands')
+    expect(meter.querySelector('[data-reached]')).toBeNull()
+  })
+
+  it('shows a Library at or past its limit in the alert colour', async () => {
+    pages['1'] = { ...pages['1'], counts: { all: 21_400, marked: 1 } }
+    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, beta)
+
+    const meter = await screen.findByRole('meter', { name: 'Beta plan' })
+    expect(meter.textContent).toBe('Beta plan21,400 / 20,000')
+    expect(meter.querySelector('[data-reached]')).not.toBeNull()
+  })
+
+  it('shows nothing new to a Pro, nor to an Administrator acting as themselves', async () => {
+    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, { plan: 'pro' })
+    await screen.findByRole('table', { name: 'All hands' })
+    expect(libraryMeter()).toBeNull()
+    cleanup()
+
+    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, { plan: 'beta', administrator: true })
+    await screen.findByRole('table', { name: 'All hands' })
+    expect(screen.queryByRole('meter')).toBeNull()
+  })
+
+  it('follows the Library after Hands are removed', async () => {
+    pages['1'] = { ...pages['1'], counts: { all: 12_340, marked: 1 } }
+    renderLibrary(DEFAULT_PREFERENCES, undefined, undefined, beta)
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+    pages['1'] = { ...pages['1'], counts: { all: 12_339, marked: 1 } }
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove 1 hand' }))
+
+    await waitFor(() => expect(libraryMeter()?.textContent).toBe('Beta plan12,339 / 20,000'))
   })
 })

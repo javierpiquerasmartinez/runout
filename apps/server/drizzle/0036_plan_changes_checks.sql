@@ -1,0 +1,3 @@
+-- A change of Plan is made in a known way, and one by an Administrator always says which (ADR 0011).
+ALTER TABLE "plan_changes" ADD CONSTRAINT "plan_changes_how_check" CHECK ("plan_changes"."how" in ('administrator', 'invitation', 'migration', 'test-mode'));--> statement-breakpoint
+ALTER TABLE "plan_changes" ADD CONSTRAINT "plan_changes_administrator_check" CHECK ("plan_changes"."how" <> 'administrator' or "plan_changes"."administrator_id" is not null);
