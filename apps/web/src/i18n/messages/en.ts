@@ -275,6 +275,11 @@ export const en: Messages = {
   'room.side.label': 'Hand panel',
   'room.side.tab.details': 'Details',
   'room.side.tab.notes': 'Notes',
+  // On a phone, the bar under the table that opens a panel as a sheet.
+  'room.sheet.queue': 'Queue',
+  'room.sheet.close': 'Close',
+  'room.sheet.label': 'Room panels',
+  'library.hand.sheet.label': 'More about the Hand',
   'room.side.empty': 'No hand has been loaded yet.',
   'room.participants.title': 'In the room',
   'room.participants.trigger': '{count} in the room, see who',

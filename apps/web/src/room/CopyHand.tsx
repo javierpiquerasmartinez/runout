@@ -43,7 +43,8 @@ export function CopyHand({
         onClick={() => copy('summary')}
       >
         <Icon name={look.icon} size={14} />
-        {message ?? t('hand.copy')}
+        {/* On a phone only the icon shows; the words stay for screen readers (RoomPage.css). */}
+        <span className="copy-hand__label">{message ?? t('hand.copy')}</span>
       </Button>
       <button
         ref={arrow}

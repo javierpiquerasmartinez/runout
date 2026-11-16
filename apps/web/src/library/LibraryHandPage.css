@@ -104,3 +104,29 @@
   text-align: center;
   color: var(--text-secondary);
 }
+
+/*
+ * On a phone (board "Biblioteca · Una mano en el móvil") the page is exactly
+ * the screen, the table stands up and the Notes are a sheet over it, opened
+ * from the bar under the transport (RoomPage.css draws both).
+ */
+@media (max-width: 760px) {
+  .library:has(> .library-hand) {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+  .library-hand {
+    min-height: 0;
+  }
+  .library-hand__stage {
+    min-height: 0;
+  }
+  .library-hand__bar {
+    margin: 8px 12px 0;
+    gap: 8px;
+  }
+  .library-hand__side.phone-sheet {
+    padding: 16px;
+  }
+}

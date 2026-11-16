@@ -2,23 +2,29 @@ import type { CSSProperties } from 'react'
 import { useI18n } from '../i18n'
 import { Card, CardBack, CardSlot } from '../ui/Card'
 import { Icon } from '../ui/Icon'
-import { asPercent, betHeight, cachedPlaces, seatCentre } from './tableLayout'
+import { useNarrowScreen } from '../calendar/narrowScreen'
+import { asPercent, betHeight, cachedPlaces, LANDSCAPE, portrait } from './tableLayout'
 import { Secondary } from '../ui/Secondary'
 import type { SeatView, TableView } from './tableView'
 
 /*
- * The top-down table of the "Sala" boards, laid out at 820 × 606: the felt,
- * the board and pot in the middle, and the seats around it, with the dealer
- * button and each bet on the felt beside their seat, clear of everything
- * else. It doesn't scale as one drawing yet (issue 19).
+ * The top-down table: the felt, the board and pot in the middle, and the
+ * seats around it, with the dealer button and each bet beside their seat,
+ * clear of everything else. Laid out as the "Sala" boards draw it, at
+ * 820 × 606; on a phone the felt stands on its end with the Hero at the
+ * bottom, as the phone boards draw it (tableLayout.ts has both drawings).
+ * The page scales the drawing as one picture to fit (RoomPage.css).
  */
 
 export function PokerTable({ view }: { view: TableView }) {
   const { t } = useI18n()
-  const places = cachedPlaces(view.slots, view.seats, betHeight(view.betLines))
+  const shape = useNarrowScreen() ? portrait(view.slots) : LANDSCAPE
+  const places = cachedPlaces(view.slots, view.seats, betHeight(view.betLines), shape)
   const winning = new Set(view.winningCards)
+  // The drawing's height, and where its middle is, for the portrait felt and board (RoomPage.css).
+  const size = { '--table-h': `${shape.table.height}px`, '--table-mid': `${shape.middle[1].top + 28}px` } as CSSProperties
   return (
-    <div className="poker-table">
+    <div className="poker-table" data-shape={shape.name} style={size}>
       <div className="poker-table__felt" />
 
       <div className="poker-table__middle">
@@ -58,10 +64,10 @@ export function PokerTable({ view }: { view: TableView }) {
       </div>
 
       {view.seats.map((seat) => (
-        <Seat key={seat.screenName} seat={seat} winning={winning} style={asPercent(seatCentre(seat.slot, view.slots))} />
+        <Seat key={seat.screenName} seat={seat} winning={winning} style={asPercent(shape.seatCentre(seat.slot, view.slots), shape)} />
       ))}
       {places.dealer && (
-        <span className="poker-table__dealer ro-mono" role="img" aria-label={t('room.table.dealer')} style={asPercent(places.dealer)}>
+        <span className="poker-table__dealer ro-mono" role="img" aria-label={t('room.table.dealer')} style={asPercent(places.dealer, shape)}>
           D
         </span>
       )}
@@ -74,7 +80,7 @@ export function PokerTable({ view }: { view: TableView }) {
             key={seat.screenName}
             className="poker-table__bet ro-mono"
             data-kind={seat.chip.kind}
-            style={asPercent(places.bets.get(seat.slot)!)}
+            style={asPercent(places.bets.get(seat.slot)!, shape)}
           >
             <span className="poker-table__bet-chip" />
             <span className="poker-table__bet-text">
