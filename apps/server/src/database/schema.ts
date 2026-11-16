@@ -163,6 +163,15 @@ export const planChanges = pgTable(
       table.accountId,
       table.changedAt,
     ),
+    check(
+      'plan_changes_how_check',
+      sql`${table.how} in (${sql.raw(PLAN_CHANGE_HOWS.map((how) => `'${how}'`).join(', '))})`,
+    ),
+    // A change an Administrator made always says which one.
+    check(
+      'plan_changes_administrator_check',
+      sql`${table.how} <> 'administrator' or ${table.administratorId} is not null`,
+    ),
   ],
 );
 

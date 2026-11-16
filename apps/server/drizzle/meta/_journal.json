@@ -253,6 +253,13 @@
       "when": 1794824687028,
       "tag": "0035_account_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794835060336,
+      "tag": "0036_plan_changes_checks",
+      "breakpoints": true
     }
   ]
 }

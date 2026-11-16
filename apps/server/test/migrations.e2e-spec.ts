@@ -433,6 +433,39 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
     }
   });
 
+  it('records a change of Plan only in a known way, and one by an Administrator only with who made it', async () => {
+    await migrateWith(MIGRATIONS_FOLDER);
+    const client = new pg.Client(databaseUrl);
+    await client.connect();
+    try {
+      const {
+        rows: [account],
+      } = await client.query<{ id: string }>(
+        `insert into identities (google_subject, email, created_at, plan)
+         values ('ana-subject', 'ana@example.com', now(), 'beta') returning id`,
+      );
+      const change = (how: string, administratorId: string | null) =>
+        client.query(
+          `insert into plan_changes (account_id, plan_before, plan_after, changed_at, how, administrator_id)
+           values ($1, 'beta', 'pro', now(), $2, $3)`,
+          [account.id, how, administratorId],
+        );
+
+      await expect(change('gift', null)).rejects.toMatchObject({
+        code: '23514',
+      });
+      await expect(change('administrator', null)).rejects.toMatchObject({
+        code: '23514',
+      });
+      await change('administrator', account.id);
+      await change('invitation', null);
+      await change('migration', null);
+      await change('test-mode', null);
+    } finally {
+      await client.end();
+    }
+  });
+
   /** Stores one Hand in a database at 0025, with the Rake and Rake Generated given. */
   async function storeHandAt0025(
     client: pg.Client,
