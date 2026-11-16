@@ -6,8 +6,18 @@ import { homePath } from '../home/home'
 import { RoomDialog } from '../room/RoomDialog'
 import { navigate } from '../routing'
 import { Button } from '../ui/Button'
+import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
-import { nameOf, type AccountCounts, type AccountsPage, type AdminAccount, type Totals } from './admin'
+import {
+  nameOf,
+  PLAN_TONE,
+  PLANS,
+  type AccountCounts,
+  type AccountsPage,
+  type AdminAccount,
+  type Plan,
+  type Totals,
+} from './admin'
 import { Badge } from './AdminPage'
 import { AdminPagination } from './AdminPagination'
 import { useAdminApi } from './useAdminApi'
@@ -41,8 +51,9 @@ type Confirming = { action: 'suspend' | 'lift' | 'impersonate'; account: AdminAc
 
 /**
  * The Accounts tab: Runout at a glance, then every Account with what it has
- * and has done, sortable and searchable. Suspend, lift and Impersonate from
- * each row, each after a confirmation.
+ * and has done and its Plan, sortable, searchable and filtered by Plan.
+ * Change its Plan, suspend, lift and Impersonate from each row, each after a
+ * confirmation.
  */
 export function AccountsTab() {
   const { t, formatDate, formatNumber } = useI18n()
@@ -55,10 +66,13 @@ export function AccountsTab() {
   const [sort, setSort] = useState<{ by: Sort; dir: 'asc' | 'desc' }>({ by: 'lastActiveAt', dir: 'desc' })
   const [pageNumber, setPageNumber] = useState(1)
   const [confirming, setConfirming] = useState<Confirming | null>(null)
+  const [planFilter, setPlanFilter] = useState<Plan | 'all'>('all')
+  const [changingPlan, setChangingPlan] = useState<AdminAccount | null>(null)
 
   const reload = useCallback(() => {
     const query = new URLSearchParams({ sort: sort.by, direction: sort.dir, page: String(pageNumber) })
     if (search.trim()) query.set('search', search.trim())
+    if (planFilter !== 'all') query.set('plan', planFilter)
     Promise.all([admin<Totals>('/totals'), admin<AccountsPage>(`/accounts?${query}`)])
       .then(([foundTotals, foundPage]) => {
         setTotals(foundTotals)
@@ -66,7 +80,7 @@ export function AccountsTab() {
         setFailure(null)
       })
       .catch((error: unknown) => setFailure(reasonOf(error)))
-  }, [admin, search, sort, pageNumber])
+  }, [admin, search, sort, pageNumber, planFilter])
   useEffect(reload, [reload])
 
   function sortBy(by: Sort) {
@@ -91,6 +105,26 @@ export function AccountsTab() {
     } catch (error) {
       setFailure(reasonOf(error))
     }
+  }
+
+  async function changePlan(account: AdminAccount, plan: Plan) {
+    setChangingPlan(null)
+    try {
+      await admin(`/accounts/${account.id}/plan`, { method: 'PUT', body: { plan } })
+      reload()
+    } catch (error) {
+      setFailure(reasonOf(error))
+    }
+  }
+
+  const latestChange = (account: AdminAccount) => {
+    const change = account.planChange
+    if (!change) return null
+    if (change.how === 'migration') return t('admin.accounts.planChange.migration')
+    return t(`admin.accounts.planChange.${change.how}`, {
+      date: date(change.at),
+      name: change.administrator ? nameOf(change.administrator) : '—',
+    })
   }
 
   const date = (iso: string | null) =>
@@ -125,6 +159,18 @@ export function AccountsTab() {
             setPageNumber(1)
           }}
         />
+        <SegmentedControl
+          label={t('admin.accounts.plan')}
+          options={[
+            { value: 'all' as const, label: t('admin.accounts.plan.all') },
+            ...PLANS.map((each) => ({ value: each, label: t(`plan.${each}`) })),
+          ]}
+          value={planFilter}
+          onChange={(value) => {
+            setPlanFilter(value)
+            setPageNumber(1)
+          }}
+        />
       </div>
       {failure && (
         <p className="admin-notice" data-tone="alert" role="alert">
@@ -140,6 +186,7 @@ export function AccountsTab() {
                 <tr>
                   {header('email', t('admin.accounts.email'))}
                   {header('displayName', t('admin.accounts.displayName'))}
+                  <th>{t('admin.accounts.plan')}</th>
                   <th>{t('admin.accounts.signUp')}</th>
                   <th>{t('admin.accounts.methods')}</th>
                   <th>{t('admin.accounts.lastSignIn')}</th>
@@ -156,6 +203,12 @@ export function AccountsTab() {
                   <tr key={account.id}>
                     <td>{account.email ?? '—'}</td>
                     <td>{account.displayName ?? '—'}</td>
+                    <td>
+                      <div className="admin-plan">
+                        <Badge tone={PLAN_TONE[account.plan]}>{t(`plan.${account.plan}`)}</Badge>
+                        <span className="admin-plan__change">{latestChange(account)}</span>
+                      </div>
+                    </td>
                     <td>
                       {date(account.createdAt)}
                       <span className="admin-table__sub">
@@ -195,9 +248,11 @@ export function AccountsTab() {
                       ))}
                     </td>
                     <td>
-                      {!account.administrator && account.id !== identity.id && (
-                        <div className="admin-table__actions">
-                          {account.suspension ? (
+                      <div className="admin-table__actions">
+                        <Button size="compact" onClick={() => setChangingPlan(account)}>
+                          {t('admin.accounts.changePlan')}
+                        </Button>
+                        {!account.administrator && account.id !== identity.id && (account.suspension ? (
                             <Button size="compact" onClick={() => setConfirming({ action: 'lift', account })}>
                               {t('admin.accounts.lift')}
                             </Button>
@@ -214,9 +269,8 @@ export function AccountsTab() {
                                 {t('admin.accounts.suspend')}
                               </Button>
                             </>
-                          )}
-                        </div>
-                      )}
+                          ))}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -247,6 +301,68 @@ export function AccountsTab() {
           }
         />
       )}
+      {changingPlan && page && (
+        <PlanDialog
+          account={changingPlan}
+          plans={page.plans}
+          onClose={() => setChangingPlan(null)}
+          onChange={(plan) => void changePlan(changingPlan, plan)}
+        />
+      )}
     </section>
+  )
+}
+
+/** The confirmation of a change of Plan: the Plan it is on, the one picked and what changes. */
+function PlanDialog({
+  account,
+  plans,
+  onClose,
+  onChange,
+}: {
+  account: AdminAccount
+  plans: AccountsPage['plans']
+  onClose: () => void
+  onChange: (plan: Plan) => void
+}) {
+  const { t, formatNumber } = useI18n()
+  const [picked, setPicked] = useState<Plan>(PLANS.find((each) => each !== account.plan) ?? account.plan)
+  // Runout's own ceiling reads as "10 million", a Plan's own cap in full.
+  const hands = (plan: Plan) => {
+    const limit = plans[plan].libraryHands
+    return limit >= 1_000_000 && limit % 1_000_000 === 0
+      ? formatNumber(limit, { notation: 'compact', compactDisplay: 'long' })
+      : formatNumber(limit)
+  }
+  const planName = (plan: Plan) => t(`plan.${plan}`)
+  return (
+    <RoomDialog
+      title={t('admin.accounts.confirm.plan.title', { name: nameOf(account) })}
+      body={t('admin.accounts.confirm.plan.body', { plan: planName(account.plan), hands: hands(account.plan) })}
+      onClose={onClose}
+      actions={
+        <Button
+          variant="primary"
+          disabledReason={
+            picked === account.plan ? t('admin.accounts.confirm.plan.same', { plan: planName(picked) }) : undefined
+          }
+          onClick={() => onChange(picked)}
+        >
+          {t('admin.accounts.movePlan', { plan: planName(picked) })}
+        </Button>
+      }
+    >
+      <SegmentedControl
+        label={t('admin.accounts.plan')}
+        options={PLANS.map((each) => ({ value: each, label: planName(each) }))}
+        value={picked}
+        onChange={setPicked}
+      />
+      <p className="room-dialog__body">
+        {picked === account.plan
+          ? t('admin.accounts.confirm.plan.same', { plan: planName(picked) })
+          : t('admin.accounts.confirm.plan.change', { plan: planName(picked), hands: hands(picked) })}
+      </p>
+    </RoomDialog>
   )
 }

@@ -277,3 +277,21 @@
 .admin-imports__actions .admin-imports__retry {
   color: var(--brass-ink);
 }
+
+/* An Account's Plan, its latest change beside the badge. */
+.admin-plan {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.admin-plan__change {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+/* The Plan picked in the change-Plan confirmation, as wide as its options. */
+.room-dialog > .ro-segmented {
+  align-self: flex-start;
+}
