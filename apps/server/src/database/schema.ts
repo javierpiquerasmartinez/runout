@@ -446,6 +446,9 @@ export const handFacts = pgTable('hand_facts', {
   fourBettorPosition: text('four_bettor_position'),
   aggressorPosition: text('aggressor_position'),
   heroAggressor: boolean('hero_aggressor').notNull(),
+  ...streetFactColumns('flop'),
+  ...streetFactColumns('turn'),
+  ...streetFactColumns('river'),
   // The Board's texture on each Street, null when it wasn't dealt.
   flopSuits: text('flop_suits'),
   flopPairing: text('flop_pairing'),
@@ -491,6 +494,49 @@ export const handFacts = pgTable('hand_facts', {
   riverNuts: boolean('river_nuts'),
   riverKicker: text('river_kicker'),
 });
+
+/**
+ * One postflop Street's facts (`StreetFacts` in `hero-facts.ts`), each named
+ * after the Street: `flopIp` in `flop_ip`. Quantities in big blinds.
+ */
+function streetFactColumns<S extends 'flop' | 'turn' | 'river'>(street: S) {
+  const bigBlinds = (name: string) =>
+    numeric(`${street}_${name}`, { precision: 10, scale: 2, mode: 'number' });
+  const columns = {
+    // Rows from before the Street's facts read false until re-derived.
+    Saw: boolean(`${street}_saw`).notNull().default(false),
+    Players: smallint(`${street}_players`),
+    Ip: boolean(`${street}_ip`),
+    First: boolean(`${street}_first`),
+    Pot: bigBlinds('pot'),
+    EffectiveStack: bigBlinds('effective_stack'),
+    Spr: numeric(`${street}_spr`, { precision: 9, scale: 1, mode: 'number' }),
+    AllIn: boolean(`${street}_all_in`),
+    /** `XR`, `BC`: X check, B bet, C call, R raise, F fold. */
+    Line: text(`${street}_line`),
+    /** Whole % of the pot before the bet. */
+    BetSize: integer(`${street}_bet_size`),
+    /** Multiple of the bet raised. */
+    RaiseSize: numeric(`${street}_raise_size`, {
+      precision: 8,
+      scale: 2,
+      mode: 'number',
+    }),
+    BetSizeFaced: integer(`${street}_bet_size_faced`),
+    RaiseSizeFaced: numeric(`${street}_raise_size_faced`, {
+      precision: 8,
+      scale: 2,
+      mode: 'number',
+    }),
+    Bets: smallint(`${street}_bets`),
+    Raises: smallint(`${street}_raises`),
+    Calls: smallint(`${street}_calls`),
+    Folds: smallint(`${street}_folds`),
+  };
+  return Object.fromEntries(
+    Object.entries(columns).map(([key, column]) => [`${street}${key}`, column]),
+  ) as { [K in keyof typeof columns as `${S}${K}`]: (typeof columns)[K] };
+}
 
 /**
  * A Hand placed in a Room's Queue, with its Author in that Room. Removing it

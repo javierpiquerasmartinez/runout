@@ -24,6 +24,7 @@ import {
   POT_TYPES,
   STREET_DRAWS,
 } from '../hands/replay/hero-facts.js';
+import type { PostflopStreet } from '../hands/replay/street-situation.js';
 import { Rejected } from '../rejection/rejection.js';
 
 /**
@@ -34,7 +35,8 @@ import { Rejected } from '../rejection/rejection.js';
  * Query: `fact`, repeated for each criterion, written
  * `[!]<fact>:<value>[,<value>…]`, or `[!]<fact>:<min>..<max>` for a number,
  * where either end may be left out. `!` makes it an exclusion. For example
- * `fact=pot-type:3-bet,4-bet`, `fact=!hero-position:BB`, `fact=players:..4`.
+ * `fact=pot-type:3-bet,4-bet`, `fact=!hero-position:BB`, `fact=players:..4`,
+ * `fact=turn-line:XR`, `fact=flop-spr:1.5..4`.
  */
 export type FactCriterion = {
   fact: FactKey;
@@ -49,7 +51,10 @@ type Domain =
   /** A column holding several values: a criterion keeps any it overlaps. */
   | { kind: 'members'; values: ReadonlySet<string> }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number };
+  /** Values matching `pattern`, too many to list. */
+  | { kind: 'pattern'; pattern: RegExp }
+  /** Up to `decimals` decimal places on either end; none if left out. */
+  | { kind: 'range'; min: number; max: number; decimals?: number };
 
 interface FactEntry {
   column: PgColumn;
@@ -71,6 +76,55 @@ const anyOf = (values: readonly string[]): Domain => ({
   kind: 'members',
   values: new Set(values),
 });
+const BOOLEAN: Domain = { kind: 'boolean' };
+
+/**
+ * The facts of one postflop Street, named after it: `flop-ip`, `turn-line`,
+ * `river-spr`. Quantities are in big blinds, bet sizes a whole % of the pot
+ * before the bet, raise sizes a multiple of the bet raised.
+ */
+function streetFacts<S extends PostflopStreet>(street: S, since: number) {
+  const entry = (property: string, domain: Domain): FactEntry => ({
+    column: handFacts[
+      `${street}${property}` as keyof typeof handFacts
+    ] as PgColumn,
+    domain,
+    since,
+  });
+  const decimal = (max: number, decimals: number): Domain => ({
+    kind: 'range',
+    min: 0,
+    max,
+    decimals,
+  });
+  const count = (max: number): Domain => ({ kind: 'range', min: 0, max });
+  const entries = {
+    saw: entry('Saw', BOOLEAN),
+    players: entry('Players', { kind: 'range', min: 2, max: 10 }),
+    ip: entry('Ip', BOOLEAN),
+    first: entry('First', BOOLEAN),
+    pot: entry('Pot', decimal(99_999_999, 2)),
+    'effective-stack': entry('EffectiveStack', decimal(99_999_999, 2)),
+    spr: entry('Spr', decimal(99_999_999, 1)),
+    'all-in': entry('AllIn', BOOLEAN),
+    // X check, B bet, C call, R raise, F fold; a fold only last.
+    line: entry('Line', { kind: 'pattern', pattern: /^[XBCR]{0,30}[XBCRF]$/ }),
+    'bet-size': entry('BetSize', decimal(1_000_000, 0)),
+    'raise-size': entry('RaiseSize', decimal(999_999, 2)),
+    'bet-size-faced': entry('BetSizeFaced', decimal(1_000_000, 0)),
+    'raise-size-faced': entry('RaiseSizeFaced', decimal(999_999, 2)),
+    bets: entry('Bets', count(30)),
+    raises: entry('Raises', count(30)),
+    calls: entry('Calls', count(30)),
+    folds: entry('Folds', count(1)),
+  };
+  return Object.fromEntries(
+    Object.entries(entries).map(([name, value]) => [
+      `${street}-${name}`,
+      value,
+    ]),
+  ) as { [K in keyof typeof entries as `${S}-${K}`]: FactEntry };
+}
 
 /**
  * Every fact a criterion can name, by the name the query gives it. Adding
@@ -305,6 +359,10 @@ const FACTS = {
     domain: oneOf(KICKERS),
     since: 3,
   },
+  // The situation on each postflop Street (facts catalogue §3.1, §3.3, §5).
+  ...streetFacts('flop', 4),
+  ...streetFacts('turn', 4),
+  ...streetFacts('river', 4),
 } satisfies Record<string, FactEntry>;
 
 export type FactKey = keyof typeof FACTS;
@@ -327,22 +385,30 @@ export function parseFactCriterion(raw: string): FactCriterion {
     return { fact: key, exclude, range: rangeOf(written, domain) };
   }
   const values = written.split(',');
-  const allowed =
-    domain.kind === 'boolean' ? new Set(['true', 'false']) : domain.values;
-  if (!values.every((value) => allowed.has(value))) throw invalid();
+  const allowed = (value: string) =>
+    domain.kind === 'boolean'
+      ? value === 'true' || value === 'false'
+      : domain.kind === 'pattern'
+        ? domain.pattern.test(value)
+        : domain.values.has(value);
+  if (!values.every(allowed)) throw invalid();
   return { fact: key, exclude, values: [...new Set(values)] };
 }
 
-/** `2..6`, `..4` or `6..` within the domain's bounds. */
+/** `2..6`, `..4`, `6..` or `1.5..3` within the domain's bounds. */
 function rangeOf(
   written: string,
-  domain: { min: number; max: number },
+  domain: { min: number; max: number; decimals?: number },
 ): { min: number | null; max: number | null } {
   const ends = written.split('..');
   if (ends.length !== 2) throw invalid();
+  const decimals = domain.decimals ?? 0;
+  const number = new RegExp(
+    decimals > 0 ? `^\\d+(\\.\\d{1,${decimals}})?$` : '^\\d+$',
+  );
   const [min, max] = ends.map((end) => {
     if (end === '') return null;
-    if (!/^\d+$/.test(end)) throw invalid();
+    if (!number.test(end)) throw invalid();
     const value = Number(end);
     if (value < domain.min || value > domain.max) throw invalid();
     return value;

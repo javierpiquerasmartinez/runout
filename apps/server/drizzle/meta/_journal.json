@@ -281,6 +281,13 @@
       "when": 1794921136632,
       "tag": "0039_hero_cards_per_street",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794923828726,
+      "tag": "0040_postflop_street_facts",
+      "breakpoints": true
     }
   ]
 }
