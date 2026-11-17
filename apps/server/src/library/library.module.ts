@@ -7,14 +7,27 @@ import { LibraryNotesController } from './library-notes.controller.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
 import { ResultsService } from './results.service.js';
+import { SavedFiltersController } from './saved-filters.controller.js';
+import { SavedFiltersService } from './saved-filters.service.js';
 import { StatsService } from './stats.service.js';
 import { TagsController } from './tags.controller.js';
 import { TagsService } from './tags.service.js';
 
 @Module({
   imports: [HeroResultsModule, IdentityModule, PlansModule, RoomsModule],
-  controllers: [LibraryController, LibraryNotesController, TagsController],
-  providers: [LibraryService, ResultsService, StatsService, TagsService],
+  controllers: [
+    LibraryController,
+    LibraryNotesController,
+    SavedFiltersController,
+    TagsController,
+  ],
+  providers: [
+    LibraryService,
+    ResultsService,
+    SavedFiltersService,
+    StatsService,
+    TagsService,
+  ],
   exports: [LibraryService],
 })
 export class LibraryModule {}

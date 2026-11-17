@@ -23,6 +23,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { fromStored, type Hand, type StoredHand } from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
+import type { StoredCriteria } from '../library/saved-filter-criteria.js';
 import {
   INVITATION_DEFAULT_PLAN,
   PLAN_CHANGE_HOWS,
@@ -658,6 +659,32 @@ export const tagLinks = pgTable(
     index('tag_links_identity_id_hand_id_idx').on(
       table.identityId,
       table.handId,
+    ),
+  ],
+);
+
+/**
+ * A Saved Filter: the Más filtros part of a Filter an Account named to apply
+ * again over any period, Poker Site, Hero or Stake. Its criteria are one JSON
+ * document with its own format, which nothing queries inside. Only its owner
+ * sees it. Its name is unique within the Account, ignoring case.
+ */
+export const savedFilters = pgTable(
+  'saved_filters',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    name: text('name').notNull(),
+    criteria: jsonb('criteria').$type<StoredCriteria>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('saved_filters_identity_id_name_idx').on(
+      table.identityId,
+      sql`lower(${table.name})`,
     ),
   ],
 );
