@@ -202,4 +202,14 @@ describe('Más filtros criteria in the query and the address', () => {
 
     expect(libraryFilterFromSearch(search, now).facts).toEqual([{ fact: 'opener-position', exclude: false, values: ['BTN', 'CO'] }])
   })
+
+  it('reads sizes to two decimals and any line, as the server does, and drops the rest', () => {
+    const search =
+      '?period=all&fact=open-size:2.25..3&fact=limpers:1.5..&fact=three-bet-size:3.125..&fact=preflop-line:RC,RRC&fact=preflop-line:RZ'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([
+      { fact: 'open-size', exclude: false, range: { min: 2.25, max: 3 } },
+      { fact: 'preflop-line', exclude: false, values: ['RC', 'RRC'] },
+    ])
+  })
 })

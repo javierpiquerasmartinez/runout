@@ -92,3 +92,54 @@ describe('inapplicableReason', () => {
     expect(inapplicableReason(opener, [opener])).toBeNull()
   })
 })
+
+describe('criterionSummaries on preflop', () => {
+  it('names a named Action by what the Hero did with it, and the answer to one faced', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'three-bet-answer', exclude: false, values: ['fold'] },
+      { fact: 'steal-did', exclude: false, values: ['true'] },
+      { fact: 'squeeze-chance', exclude: true, values: ['true'] },
+      { fact: 'four-bet-faced', exclude: false, values: ['true'] },
+    ]
+
+    expect(criterionSummaries(criteria, t)).toEqual([
+      'Hice steal',
+      'Me enfrenté a un 3-bet → fold',
+      'Excepto Pude hacer squeeze',
+      'Me enfrenté a un 4-bet',
+    ])
+    expect(criterionSummaries(criteria, en)).toEqual(['Steal made', 'Faced a 3-bet → fold', 'Not Squeeze chance', 'Faced a 4-bet'])
+  })
+
+  it('reads sizes and stacks with their unit, and the role and the line as players say them', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'starting-stack', exclude: false, range: { min: 20, max: 40.5 } },
+      { fact: 'three-bet-size', exclude: false, range: { min: null, max: 3.5 } },
+      { fact: 'open-size', exclude: false, range: { min: 2, max: 3 } },
+      { fact: 'preflop-line', exclude: false, values: ['RC', 'RF'] },
+      { fact: 'preflop-role', exclude: false, values: ['called-3-bet'] },
+      { fact: 'straddle', exclude: false, values: ['false'] },
+    ]
+
+    expect(criterionSummaries(criteria, en)).toEqual([
+      'Role: called a 3-bet',
+      'Preflop line RC, RF',
+      'Open 2–3 bb',
+      '3-bet ≤3.5×',
+      'Stack 20–40.5 bb',
+      'No straddle',
+    ])
+  })
+})
+
+describe('branchCounts on preflop', () => {
+  it('counts a named Action’s did, chance, faced and answer in the Preflop branch', () => {
+    const counts = branchCounts([
+      { fact: 'vpip-did', exclude: false, values: ['true'] },
+      { fact: 'resteal-answer', exclude: false, values: ['call'] },
+      { fact: 'hero-aggressor', exclude: false, values: ['true'] },
+    ])
+
+    expect(counts.preflop).toBe(3)
+  })
+})

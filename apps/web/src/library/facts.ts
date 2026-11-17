@@ -38,11 +38,107 @@ const texture = (suits: readonly string[]) =>
 /** What the turn or the river card changed on the Board before it. */
 const change = { kind: 'boolean' } as const
 
+// The preflop facts (facts catalogue §1–2).
+
+/** How the Hero answered an Action they faced. */
+export const ANSWERS = ['fold', 'call', 'raise'] as const
+
+/** Where the Hero's preflop ended, by their last voluntary Action: a raise, a call, or neither. */
+export const PREFLOP_ROLES = [
+  'opener',
+  'isolator',
+  '3-bettor',
+  '4-bettor',
+  '5-bettor-plus',
+  'limper',
+  'called-open',
+  'called-3-bet',
+  'called-4-bet-plus',
+  'walk',
+  'checked',
+  'folded',
+] as const
+
+/** What the Hero faced at their first preflop Action. */
+export const PREFLOP_FACED_FIRST = ['unopened', 'limps', 'open', '3-bet', '4-bet-plus'] as const
+
+/** The named preflop Actions, in the order a hand meets them, by the prefix of their facts. */
+export const PREFLOP_ACTIONS = [
+  'vpip',
+  'pfr',
+  'open',
+  'limp',
+  'isolate',
+  'steal',
+  'three-bet',
+  'squeeze',
+  'cold-call',
+  'four-bet',
+  'five-bet',
+  'resteal',
+] as const
+
+/** Those an opponent can make against the Hero, who then answers: they also have `-faced` and `-answer`. */
+export const FACED_PREFLOP_ACTIONS = ['isolate', 'steal', 'three-bet', 'squeeze', 'four-bet', 'five-bet', 'resteal'] as const
+
+export type PreflopAction = (typeof PREFLOP_ACTIONS)[number]
+
+/** A named Action's facts: `-did` and `-chance`, yes or no, and for one faced `-faced` and `-answer`. */
+type ActionFacts<A extends string, Faced extends boolean> = Record<`${A}-did` | `${A}-chance`, { kind: 'boolean' }> &
+  (Faced extends true ? Record<`${A}-faced`, { kind: 'boolean' }> & Record<`${A}-answer`, { kind: 'set'; values: typeof ANSWERS }> : unknown)
+
+function actionFacts<A extends string, Faced extends boolean>(action: A, faced: Faced): ActionFacts<A, Faced> {
+  const yes = { kind: 'boolean' } as const
+  return {
+    [`${action}-did`]: yes,
+    [`${action}-chance`]: yes,
+    ...(faced ? { [`${action}-faced`]: yes, [`${action}-answer`]: { kind: 'set', values: ANSWERS } } : {}),
+  } as ActionFacts<A, Faced>
+}
+
+/** A size or a stack, in big blinds or as a multiple, to two decimals. */
+const AMOUNT = { kind: 'range', min: 0, max: 100_000, decimals: 2 } as const
+
+const PREFLOP_FACTS = {
+  ...actionFacts('vpip', false),
+  ...actionFacts('pfr', false),
+  ...actionFacts('open', false),
+  ...actionFacts('limp', false),
+  ...actionFacts('isolate', true),
+  ...actionFacts('steal', true),
+  ...actionFacts('three-bet', true),
+  ...actionFacts('squeeze', true),
+  ...actionFacts('cold-call', false),
+  ...actionFacts('four-bet', true),
+  ...actionFacts('five-bet', true),
+  ...actionFacts('resteal', true),
+  'preflop-role': { kind: 'set', values: PREFLOP_ROLES },
+  'preflop-faced-first': { kind: 'set', values: PREFLOP_FACED_FIRST },
+  limpers: { kind: 'range', min: 0, max: 9 },
+  // X check, B bet, C call, R raise, F fold.
+  'preflop-line': { kind: 'pattern', pattern: /^[XBCRF]{1,20}$/ },
+  'open-size': AMOUNT,
+  'three-bet-size': AMOUNT,
+  'four-bet-size': AMOUNT,
+  'hero-raise-size': AMOUNT,
+  'hero-raise-multiple': AMOUNT,
+  'hero-second-raise-size': AMOUNT,
+  'hero-second-raise-multiple': AMOUNT,
+  'size-faced': AMOUNT,
+  'starting-stack': AMOUNT,
+  'preflop-effective-stack': AMOUNT,
+  straddle: { kind: 'boolean' },
+  antes: { kind: 'boolean' },
+} as const
+
 /** How a fact's values are written, and which ones it can take. */
 export type FactDomain =
   | { kind: 'set'; values: readonly string[] }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number }
+  /** Values matching `pattern`, too many to list, such as a line. */
+  | { kind: 'pattern'; pattern: RegExp }
+  /** Whole numbers, or with up to `decimals` decimal places. */
+  | { kind: 'range'; min: number; max: number; decimals?: number }
 
 export const FACTS = {
   players: { kind: 'range', min: 2, max: 10 },
@@ -76,6 +172,7 @@ export const FACTS = {
   'river-brings-flush': change,
   'river-brings-straight': change,
   'river-overcard': change,
+  ...PREFLOP_FACTS,
 } as const satisfies Record<string, FactDomain>
 
 export type FactKey = keyof typeof FACTS
@@ -107,14 +204,20 @@ export function readFactCriterion(text: string): FactCriterion | null {
   if (domain.kind === 'range') {
     const ends = written.split('..')
     if (ends.length !== 2) return null
-    const [min, max] = ends.map((end) => (end === '' ? null : /^\d+$/.test(end) ? Number(end) : NaN))
+    const number = domain.decimals ? new RegExp(`^\\d+(\\.\\d{1,${domain.decimals}})?$`) : /^\d+$/
+    const [min, max] = ends.map((end) => (end === '' ? null : number.test(end) ? Number(end) : NaN))
     const inside = (end: number | null) => end === null || (end >= domain.min && end <= domain.max)
     if (Number.isNaN(min) || Number.isNaN(max) || !inside(min) || !inside(max)) return null
     if ((min === null && max === null) || (min !== null && max !== null && min > max)) return null
     return { fact, exclude, range: { min, max } }
   }
-  const allowed: readonly string[] = domain.kind === 'boolean' ? ['true', 'false'] : domain.values
+  const allowed = (value: string) =>
+    domain.kind === 'boolean'
+      ? value === 'true' || value === 'false'
+      : domain.kind === 'pattern'
+        ? domain.pattern.test(value)
+        : domain.values.includes(value)
   const values = written.split(',')
-  if (!values.every((value) => allowed.includes(value))) return null
+  if (!values.every(allowed)) return null
   return { fact, exclude, values: [...new Set(values)] }
 }

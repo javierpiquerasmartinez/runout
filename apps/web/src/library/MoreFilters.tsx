@@ -3,8 +3,10 @@ import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { Toggle } from '../ui/Toggle'
-import { writeFactCriterion, type FactCriterion, type FactKey } from './facts'
+import { ANSWERS, writeFactCriterion, type FactCriterion, type FactKey } from './facts'
 import {
+  ACTION_SIDES,
+  actionSide,
   BRANCH_CRITERIA,
   BRANCHES,
   branchCounts,
@@ -15,7 +17,10 @@ import {
   definitionOf,
   inapplicableReason,
   inBranchOrder,
+  rowFacts,
+  type ActionSide,
   type Branch,
+  type CriterionControl,
   type CriterionDefinition,
   type Section,
 } from './moreFilterBranches'
@@ -179,8 +184,9 @@ function MoreFiltersPanel({
     moveTo(next)
   }
 
-  const put = (fact: FactKey, next: FactCriterion | null) => {
-    const at = criteria.findIndex((criterion) => criterion.fact === fact)
+  /** Puts a row's criterion, on whichever of its facts, in place of the one it held. */
+  const put = (facts: FactKey[], next: FactCriterion | null) => {
+    const at = criteria.findIndex((criterion) => facts.includes(criterion.fact))
     if (at === -1) onChange(next ? [...criteria, next] : criteria)
     else onChange(next ? criteria.map((criterion, index) => (index === at ? next : criterion)) : criteria.filter((_, index) => index !== at))
   }
@@ -264,9 +270,9 @@ function MoreFiltersPanel({
                 <CriterionRow
                   key={definition.fact}
                   definition={definition}
-                  criterion={criteria.find((criterion) => criterion.fact === definition.fact) ?? null}
+                  criterion={criteria.find((criterion) => rowFacts(definition).includes(criterion.fact)) ?? null}
                   criteria={criteria}
-                  onPut={(next) => put(definition.fact, next)}
+                  onPut={(next) => put(rowFacts(definition), next)}
                 />
               ))}
             </div>
@@ -313,50 +319,7 @@ function CriterionRow({
         {label}
       </span>
       <div className="more-filters__control">
-        {control.kind === 'options' ? (
-          control.values.map((value) => {
-            const picked = criterion !== null && 'values' in criterion && criterion.values.includes(value)
-            const values = criterion && 'values' in criterion ? criterion.values : []
-            return (
-              <button
-                key={value}
-                type="button"
-                className="more-filters__option"
-                aria-pressed={picked}
-                onClick={() => {
-                  // In the order the panel offers them, whatever order they were picked in.
-                  const next = control.values.filter((each) => (each === value ? !picked : values.includes(each)))
-                  onPut(next.length > 0 ? { fact: definition.fact, exclude, values: next } : null)
-                }}
-              >
-                <span>{control.label(value, t)}</span>
-              </button>
-            )
-          })
-        ) : control.kind === 'boolean' ? (
-          (['true', 'false'] as const).map((value) => {
-            const picked = criterion !== null && 'values' in criterion && criterion.values.length === 1 && criterion.values[0] === value
-            return (
-              <button
-                key={value}
-                type="button"
-                className="more-filters__option"
-                aria-pressed={picked}
-                onClick={() => onPut(picked ? null : { fact: definition.fact, exclude, values: [value] })}
-              >
-                <span>{t(value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no')}</span>
-              </button>
-            )
-          })
-        ) : (
-          <RangeControl
-            label={fullLabel}
-            min={control.min}
-            max={control.max}
-            criterion={criterion}
-            onPut={(range) => onPut(range && { fact: definition.fact, exclude, range })}
-          />
-        )}
+        <CriterionControlFor control={control} fact={definition.fact} label={fullLabel} criterion={criterion} exclude={exclude} onPut={onPut} />
       </div>
       <span className="more-filters__exclude" data-on={exclude ? '' : undefined}>
         <span aria-hidden="true">{t('library.moreFilters.exclude')}</span>
@@ -372,6 +335,229 @@ function CriterionRow({
   )
 }
 
+/** A row's control, as its definition says. */
+function CriterionControlFor({
+  control,
+  fact,
+  label,
+  criterion,
+  exclude,
+  onPut,
+}: {
+  control: CriterionControl
+  fact: FactKey
+  label: string
+  criterion: FactCriterion | null
+  exclude: boolean
+  onPut: (criterion: FactCriterion | null) => void
+}) {
+  const { t } = useI18n()
+  const values = criterion && 'values' in criterion ? criterion.values : []
+  switch (control.kind) {
+    case 'options':
+      return (
+        <>
+          {control.values.map((value) => {
+            const picked = values.includes(value)
+            return (
+              <OptionButton
+                key={value}
+                pressed={picked}
+                label={control.label(value, t)}
+                onClick={() => {
+                  // In the order the panel offers them, whatever order they were picked in.
+                  const next = control.values.filter((each) => (each === value ? !picked : values.includes(each)))
+                  onPut(next.length > 0 ? { fact, exclude, values: next } : null)
+                }}
+              />
+            )
+          })}
+        </>
+      )
+    case 'boolean':
+      return (
+        <>
+          {(['true', 'false'] as const).map((value) => {
+            const picked = values.length === 1 && values[0] === value
+            return (
+              <OptionButton
+                key={value}
+                pressed={picked}
+                label={t(value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no')}
+                onClick={() => onPut(picked ? null : { fact, exclude, values: [value] })}
+              />
+            )
+          })}
+        </>
+      )
+    case 'range':
+      return (
+        <RangeControl
+          label={label}
+          min={control.min}
+          max={control.max}
+          decimals={control.decimals ?? 0}
+          criterion={criterion}
+          onPut={(range) => onPut(range && { fact, exclude, range })}
+        />
+      )
+    case 'line':
+      return (
+        <LineControl
+          label={label}
+          common={control.common}
+          pattern={control.pattern}
+          values={values}
+          onPut={(next) => onPut(next.length > 0 ? { fact, exclude, values: next } : null)}
+        />
+      )
+    case 'action':
+      return <ActionControl fact={fact} label={label} faced={control.faced} criterion={criterion} exclude={exclude} onPut={onPut} />
+  }
+}
+
+function OptionButton({ pressed, label, onClick }: { pressed: boolean; label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="more-filters__option" aria-pressed={pressed} onClick={onClick}>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+/** The sides a named Action's row offers as buttons; an answer is set under "Me enfrenté". */
+type PickedSide = Exclude<ActionSide, 'answer'>
+
+/**
+ * A named Action (`namedAction`): "La hice", "Tuve la oportunidad" or "Me
+ * enfrenté", one at a time, and once faced, "Respondí" with any of fold,
+ * call and raise, which puts the criterion on the answer instead. Dropping
+ * every answer goes back to faced; another side drops the answer.
+ */
+function ActionControl({
+  fact,
+  label,
+  faced,
+  criterion,
+  exclude,
+  onPut,
+}: {
+  fact: FactKey
+  label: string
+  faced: boolean
+  criterion: FactCriterion | null
+  exclude: boolean
+  onPut: (criterion: FactCriterion | null) => void
+}) {
+  const { t } = useI18n()
+  // The row's facts are `<prefix>-<side>`, and `fact` is its did.
+  const prefix = fact.slice(0, -'-did'.length)
+  const on = (side: ActionSide) => `${prefix}-${side}` as FactKey
+  const held = criterion ? actionSide(criterion.fact) : null
+  const side: PickedSide | null = held === 'answer' ? 'faced' : held
+  const answers = held === 'answer' && criterion && 'values' in criterion ? criterion.values : []
+  const sides = ACTION_SIDES.filter((each): each is PickedSide => each !== 'answer' && (faced || each !== 'faced'))
+
+  return (
+    <>
+      {sides.map((each) => (
+        <OptionButton
+          key={each}
+          pressed={side === each}
+          label={t(`library.moreFilters.action.side.${each}`)}
+          onClick={() => onPut(side === each ? null : { fact: on(each), exclude, values: ['true'] })}
+        />
+      ))}
+      {side === 'faced' && (
+        <span className="more-filters__answer" role="group" aria-label={t('library.moreFilters.action.answeredLabel', { action: label })}>
+          <span className="more-filters__dim" aria-hidden="true">
+            {t('library.moreFilters.action.answered')}
+          </span>
+          {ANSWERS.map((answer) => {
+            const picked = answers.includes(answer)
+            return (
+              <OptionButton
+                key={answer}
+                pressed={picked}
+                label={answer}
+                onClick={() => {
+                  const next = ANSWERS.filter((each) => (each === answer ? !picked : answers.includes(each)))
+                  onPut(next.length > 0 ? { fact: on('answer'), exclude, values: next } : { fact: on('faced'), exclude, values: ['true'] })
+                }}
+              />
+            )
+          })}
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
+ * The common lines as buttons, and a field for any other: Enter adds what
+ * is typed once it is a line, in capitals. A line picked that isn't common
+ * shows as a button too, to drop it.
+ */
+function LineControl({
+  label,
+  common,
+  pattern,
+  values,
+  onPut,
+}: {
+  label: string
+  common: readonly string[]
+  pattern: RegExp
+  values: string[]
+  onPut: (values: string[]) => void
+}) {
+  const { t } = useI18n()
+  const [draft, setDraft] = useState('')
+  const [invalid, setInvalid] = useState(false)
+  const shown = [...common, ...values.filter((value) => !common.includes(value))]
+  const toggle = (value: string) => onPut(values.includes(value) ? values.filter((each) => each !== value) : [...values, value])
+
+  const add = () => {
+    const line = draft.trim().toUpperCase()
+    if (line === '') return
+    if (!pattern.test(line)) {
+      setInvalid(true)
+      return
+    }
+    setDraft('')
+    setInvalid(false)
+    if (!values.includes(line)) onPut([...values, line])
+  }
+
+  return (
+    <>
+      {shown.map((value) => (
+        <OptionButton key={value} pressed={values.includes(value)} label={value} onClick={() => toggle(value)} />
+      ))}
+      <input
+        type="text"
+        className="more-filters__number more-filters__line"
+        placeholder={t('library.moreFilters.line.other')}
+        aria-label={t('library.moreFilters.line.otherLabel', { criterion: label })}
+        aria-invalid={invalid || undefined}
+        autoCapitalize="characters"
+        spellCheck={false}
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value)
+          setInvalid(false)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          add()
+        }}
+        onBlur={add}
+      />
+      {invalid && <span className="more-filters__line-note">{t('library.moreFilters.line.invalid')}</span>}
+    </>
+  )
+}
+
 type Range = { min: number | null; max: number | null }
 
 /**
@@ -383,12 +569,15 @@ function RangeControl({
   label,
   min,
   max,
+  decimals,
   criterion,
   onPut,
 }: {
   label: string
   min: number
   max: number
+  /** How many decimal places either end may have. */
+  decimals: number
   criterion: FactCriterion | null
   onPut: (range: Range | null) => void
 }) {
@@ -407,9 +596,10 @@ function RangeControl({
   }
 
   function parse(fields: { from: string; to: string }): { valid: boolean; range: Range | null } {
-    const end = (text: string) => (text.trim() === '' ? null : Number(text))
+    const number = decimals > 0 ? new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`) : /^\d+$/
+    const end = (text: string) => (text.trim() === '' ? null : number.test(text.trim()) ? Number(text) : NaN)
     const ends = { min: end(fields.from), max: end(fields.to) }
-    const inside = (value: number | null) => value === null || (Number.isInteger(value) && value >= min && value <= max)
+    const inside = (value: number | null) => value === null || (!Number.isNaN(value) && value >= min && value <= max)
     if (!inside(ends.min) || !inside(ends.max)) return { valid: false, range: null }
     if (ends.min !== null && ends.max !== null && ends.min > ends.max) return { valid: false, range: null }
     return { valid: true, range: ends.min === null && ends.max === null ? null : ends }
@@ -427,9 +617,10 @@ function RangeControl({
       <input
         type="number"
         className="more-filters__number"
-        inputMode="numeric"
+        inputMode={decimals > 0 ? 'decimal' : 'numeric'}
         min={min}
         max={max}
+        step={decimals > 0 ? 10 ** -decimals : 1}
         placeholder={t('library.moreFilters.range.from')}
         aria-label={t('library.moreFilters.range.fromLabel', { criterion: label })}
         aria-invalid={invalid || undefined}
@@ -442,9 +633,10 @@ function RangeControl({
       <input
         type="number"
         className="more-filters__number"
-        inputMode="numeric"
+        inputMode={decimals > 0 ? 'decimal' : 'numeric'}
         min={min}
         max={max}
+        step={decimals > 0 ? 10 ** -decimals : 1}
         placeholder={t('library.moreFilters.range.to')}
         aria-label={t('library.moreFilters.range.toLabel', { criterion: label })}
         aria-invalid={invalid || undefined}
