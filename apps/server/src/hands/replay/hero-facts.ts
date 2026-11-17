@@ -25,6 +25,7 @@ import {
   type StreetStep,
 } from './street-situation.js';
 import { preflopFacts, type PreflopFacts } from './preflop-facts.js';
+import { streetActions, type StreetActionFacts } from './street-actions.js';
 
 /**
  * The version of the rules `heroFacts` works the facts out by. It goes up
@@ -32,7 +33,7 @@ import { preflopFacts, type PreflopFacts } from './preflop-facts.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 5;
+export const FACTS_VERSION = 6;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -466,7 +467,10 @@ export type OnStreet<S extends PostflopStreet, T = StreetFacts> = {
 
 export type PostflopFacts = OnStreet<'flop'> &
   OnStreet<'turn'> &
-  OnStreet<'river'>;
+  OnStreet<'river'> &
+  OnStreet<'flop', StreetActionFacts<'flop'>> &
+  OnStreet<'turn', StreetActionFacts<'turn'>> &
+  OnStreet<'river', StreetActionFacts<'river'>>;
 
 /** Prefixes each key of `facts` with the Street's name. */
 export function onStreet<S extends PostflopStreet, T extends object>(
@@ -483,8 +487,12 @@ export function onStreet<S extends PostflopStreet, T extends object>(
 
 function postflopFacts(hand: Hand): PostflopFacts {
   const situations = streetSituations(hand);
+  const actions = streetActions(hand, situations);
   const facts = POSTFLOP_STREETS.map((street) =>
-    onStreet(street, streetFacts(hand, situations[street])),
+    onStreet(street, {
+      ...streetFacts(hand, situations[street]),
+      ...actions[street],
+    }),
   );
   return Object.assign({}, ...facts) as PostflopFacts;
 }

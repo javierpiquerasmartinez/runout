@@ -24,6 +24,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { fromStored, type Hand, type StoredHand } from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
+import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
 import {
   INVITATION_DEFAULT_PLAN,
   PLAN_CHANGE_HOWS,
@@ -450,6 +451,12 @@ export const handFacts = pgTable('hand_facts', {
   ...streetFactColumns('flop'),
   ...streetFactColumns('turn'),
   ...streetFactColumns('river'),
+  // The named Actions on each postflop Street (facts catalogue §3.2), each
+  // with did, chance, faced and answer (fold, call or raise), all null when
+  // the Hero didn't see the Street: `flop_cbet_did`, `turn_probe_answer`.
+  ...streetActionColumns('flop', STREET_ACTIONS.flop),
+  ...streetActionColumns('turn', STREET_ACTIONS.turn),
+  ...streetActionColumns('river', STREET_ACTIONS.river),
   // Preflop (facts catalogue §1, §2.2–2.3). Each named Action has did and
   // chance; those an opponent can make against the Hero, faced and answer
   // (fold, call or raise). Sizes and stacks are in big blinds, or a multiple.
@@ -596,6 +603,39 @@ function streetFactColumns<S extends 'flop' | 'turn' | 'river'>(street: S) {
   return Object.fromEntries(
     Object.entries(columns).map(([key, column]) => [`${street}${key}`, column]),
   ) as { [K in keyof typeof columns as `${S}${K}`]: (typeof columns)[K] };
+}
+
+/**
+ * The named Actions of one postflop Street (`StreetActionFacts` in
+ * `street-actions.ts`), four columns each, named after the Street and the
+ * Action: `flopCbetDid` in `flop_cbet_did`, `turnDelayedCbetAnswer` in
+ * `turn_delayed_cbet_answer`.
+ */
+function streetActionColumns<
+  S extends 'flop' | 'turn' | 'river',
+  A extends string,
+>(street: S, actions: readonly A[]) {
+  const snake = (name: string) =>
+    name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  const capital = (name: string) => `${name[0].toUpperCase()}${name.slice(1)}`;
+  return Object.fromEntries(
+    actions.flatMap((action) => {
+      const column = `${street}_${snake(action)}`;
+      const key = `${street}${capital(action)}`;
+      return [
+        [`${key}Did`, boolean(`${column}_did`)],
+        [`${key}Chance`, boolean(`${column}_chance`)],
+        [`${key}Faced`, boolean(`${column}_faced`)],
+        [`${key}Answer`, text(`${column}_answer`)],
+      ];
+    }),
+  ) as {
+    [K in A as `${S}${Capitalize<K>}${'Did' | 'Chance' | 'Faced'}`]: ReturnType<
+      typeof boolean
+    >;
+  } & {
+    [K in A as `${S}${Capitalize<K>}Answer`]: ReturnType<typeof text>;
+  };
 }
 
 /**

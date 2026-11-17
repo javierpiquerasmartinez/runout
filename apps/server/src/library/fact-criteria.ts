@@ -25,6 +25,7 @@ import {
   STREET_DRAWS,
 } from '../hands/replay/hero-facts.js';
 import type { PostflopStreet } from '../hands/replay/street-situation.js';
+import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
 import {
   ANSWERS,
   PREFLOP_FACED_FIRST,
@@ -157,6 +158,50 @@ function actionFacts<A extends string, F extends ActionFact = 'did' | 'chance'>(
     ]),
   ) as Record<`${A}-${F}`, FactEntry>;
 }
+
+/** The rules version that added the named Actions on each postflop Street. */
+const STREET_ACTIONS_SINCE = 6;
+
+/**
+ * The named Actions of one postflop Street (facts catalogue §3.2), each with
+ * did, chance, faced and answer, named after the Street and the Action:
+ * `flop-cbet-did`, `turn-delayed-cbet-chance`, `river-probe-faced`,
+ * `flop-check-raise-answer`. `four-bet` is a 4-bet or more.
+ */
+function streetActionFacts<S extends PostflopStreet>(street: S) {
+  const kebab = (name: string) =>
+    name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  const capital = (name: string) => `${name[0].toUpperCase()}${name.slice(1)}`;
+  const column = (action: string, fact: string) =>
+    handFacts[
+      `${street}${capital(action)}${fact}` as keyof typeof handFacts
+    ] as PgColumn;
+  return Object.fromEntries(
+    STREET_ACTIONS[street].flatMap((action) =>
+      Object.entries(
+        actionFacts<string, ActionFact>(
+          `${street}-${kebab(action)}`,
+          {
+            did: column(action, 'Did'),
+            chance: column(action, 'Chance'),
+            faced: column(action, 'Faced'),
+            answer: column(action, 'Answer'),
+          },
+          STREET_ACTIONS_SINCE,
+        ),
+      ),
+    ),
+  ) as Record<`${S}-${KebabAction<S>}-${ActionFact}`, FactEntry>;
+}
+
+/** `delayedCbet` → `delayed-cbet`. */
+type Kebab<T extends string> = T extends `${infer H}${infer R}`
+  ? `${H extends Uppercase<H> ? (H extends Lowercase<H> ? H : `-${Lowercase<H>}`) : H}${Kebab<R>}`
+  : '';
+
+type KebabAction<S extends PostflopStreet> = Kebab<
+  (typeof STREET_ACTIONS)[S][number]
+>;
 
 /** The rules version that added the preflop facts. */
 const PREFLOP_SINCE = 5;
@@ -573,6 +618,10 @@ const FACTS = {
   ...streetFacts('flop', 4),
   ...streetFacts('turn', 4),
   ...streetFacts('river', 4),
+  // The named Actions on each postflop Street.
+  ...streetActionFacts('flop'),
+  ...streetActionFacts('turn'),
+  ...streetActionFacts('river'),
   ...PREFLOP_FACTS,
 } satisfies Record<string, FactEntry>;
 
