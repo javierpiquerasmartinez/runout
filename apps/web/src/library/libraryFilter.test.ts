@@ -134,6 +134,7 @@ describe('the filter in the address', () => {
     markedOnly: true,
     tags: ['t1', 't2'],
     stat: { key: 'three-bet', side: 'taken' },
+    facts: [],
   }
 
   it('writes the viewer’s days as they are, and reads back the same filter', () => {
@@ -168,5 +169,37 @@ describe('the filter in the address', () => {
 
   it('ignores what isn’t a filter, and days that aren’t days', () => {
     expect(libraryFilterFromSearch('?page=3&from=yesterday&to=2026-13-01&marked=yes&site=', now)).toEqual(defaultLibraryFilter(now))
+  })
+})
+
+describe('Más filtros criteria in the query and the address', () => {
+  const criteria: LibraryFilter['facts'] = [
+    { fact: 'pot-type', exclude: false, values: ['3-bet', '4-bet'] },
+    { fact: 'hero-position', exclude: true, values: ['BB'] },
+    { fact: 'players', exclude: false, range: { min: null, max: 4 } },
+  ]
+
+  it('writes each criterion as the server reads it, `!` for an exclusion and `..` for a range', () => {
+    const query = libraryFilterQuery({ ...EMPTY_LIBRARY_FILTER, facts: criteria })
+
+    expect(query.getAll('fact')).toEqual(['pot-type:3-bet,4-bet', '!hero-position:BB', 'players:..4'])
+  })
+
+  it('keeps them in the address and reads back the same criteria', () => {
+    const search = librarySearch({ ...EMPTY_LIBRARY_FILTER, facts: criteria }, now)
+
+    expect(search).toBe('?period=all&fact=pot-type%3A3-bet%2C4-bet&fact=%21hero-position%3ABB&fact=players%3A..4')
+    expect(libraryFilterFromSearch(search, now).facts).toEqual(criteria)
+  })
+
+  it('counts them as narrowing the Library', () => {
+    expect(differsFromDefault({ ...defaultLibraryFilter(now), facts: criteria }, now)).toBe(true)
+  })
+
+  it('drops a criterion it cannot read: an unknown fact, a value it cannot take, a broken range', () => {
+    const search =
+      '?period=all&fact=nope:1&fact=pot-type:6-bet&fact=players:7..3&fact=players:..&fact=hero-position&fact=players:2..11&fact=opener-position:BTN,CO'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([{ fact: 'opener-position', exclude: false, values: ['BTN', 'CO'] }])
   })
 })
