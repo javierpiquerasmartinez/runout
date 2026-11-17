@@ -166,6 +166,37 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  it('keeps Hands by the Hero’s cards on each Street', async () => {
+    // Besides the ten Hands above, coinpoker-ante.txt's three, one of them
+    // As Ad on 3s 8s 7s Kc 10s: an overpair with the nut flush draw on the
+    // flop and the turn. Read by hand: Hero4's Ad Jc is top pair on
+    // As 8h 3c; HeroAI's Kd Kc is top set to the river on Ks 7d 4h 9c 2s,
+    // the one Hand there that is the nuts on the river.
+    const account = await stockedAccount();
+    await importText(account.token, freshHandHistory('coinpoker-ante.txt'));
+    const cases: [string, number][] = [
+      [fact('flop-made-hand:top-pair'), 1],
+      [fact('flop-made-hand:top-pair,overpair'), 3],
+      [fact('turn-draw:flush-draw'), 1],
+      [fact('turn-draw:flush-draw-pair,gutshot-two-cards'), 1],
+      [fact('flop-nut-flush-draw:true'), 1],
+      [fact('river-nuts:true'), 1],
+      [fact('flop-kicker:weak'), 1],
+      // The Hero's hole cards, with the Board.
+      [`${fact('hero-class:AA,KK')}&${fact('flop-made-hand:set')}`, 1],
+      [`${fact('hero-class:AA')}&${fact('turn-draw:flush-draw')}`, 1],
+      // Hands with no flop are kept by an exclusion, not by a value.
+      [fact('!turn-draw:flush-draw'), 12],
+      [fact('flop-nuts:false'), 7],
+      [fact('flop-nuts:true,false'), 9],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
   it('rejects an unknown fact, an impossible value or a malformed range', async () => {
     const account = await newAccount(running.httpServer);
     for (const criterion of [
@@ -188,6 +219,12 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       'flop-high-card:10',
       'turn-overcard:yes',
       '!',
+      'flop-made-hand:pair',
+      'turn-draw:flush',
+      'river-draw:flush-draw',
+      'river-nut-flush-draw:true',
+      'flop-kicker:ace',
+      'river-nuts:yes',
     ]) {
       for (const endpoint of ['hands', 'hand-ids', 'results', 'stats']) {
         await get(
