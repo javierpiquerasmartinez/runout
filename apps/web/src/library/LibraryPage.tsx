@@ -57,6 +57,7 @@ import {
 import { LibraryTags, TagSelection } from './LibraryTags'
 import { SaveFilterDialog } from './SaveFilterDialog'
 import { SavedFiltersList } from './SavedFiltersList'
+import { useBuildsFilters } from './buildsFilters'
 import { applySavedFilter, appliedSavedFilter, hasSavedCriteria, type SavedFilter } from './savedFilters'
 import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
@@ -105,6 +106,12 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([])
   const [savedFiltersRevision, setSavedFiltersRevision] = useState(0)
   const [savingFilter, setSavingFilter] = useState(false)
+  // At phone width Filters are only applied and dropped: narrowing the window closes what builds them.
+  const buildsFilters = useBuildsFilters()
+  if (!buildsFilters && (moreFiltersOpen || savingFilter)) {
+    setMoreFiltersOpen(false)
+    setSavingFilter(false)
+  }
   // While the Más filtros panel is open it says how many Hands the rest of the filter keeps, besides what it keeps.
   const [handsBeforeMoreFilters, setHandsBeforeMoreFilters] = useState<{ query: string; total: number } | null>(null)
   const beforeMoreFiltersQuery = libraryFilterQuery({ ...filter, facts: [] }).toString()
@@ -265,7 +272,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   // A Saved Filter goes with the last of the criteria it named.
   const changeFilter = (next: LibraryFilter) =>
     redirect(`${path}${withLibrarySort(librarySearch(hasSavedCriteria(next) ? next : { ...next, saved: null }), sort)}`)
-  const openSaveFilter = hasSavedCriteria(filter) ? () => setSavingFilter(true) : undefined
+  const openSaveFilter = buildsFilters && hasSavedCriteria(filter) ? () => setSavingFilter(true) : undefined
   const changeSort = (by: LibrarySortColumn) =>
     redirect(`${path}${withLibraryPage(withLibrarySort(search, nextLibrarySort(sort, by)), 1)}`)
   // A Stat's links open Manos on the Hands behind it, every other filter and the sort kept; going back returns to the Stats.
