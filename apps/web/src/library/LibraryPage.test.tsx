@@ -203,9 +203,10 @@ beforeEach(() => {
   )
 })
 
-/** The query of the last list read, without its paging. */
+/** The query of the last list read, without its paging; the Más filtros panel's count of Hands before its criteria is no list. */
 function lastFilterQuery(): string {
-  const query = new URL(requests.at(-1)!, 'http://localhost').searchParams
+  const lists = requests.filter((url) => !/pageSize=1(&|$)/.test(url))
+  const query = new URL(lists.at(-1)!, 'http://localhost').searchParams
   query.delete('page')
   query.delete('pageSize')
   return query.toString()
@@ -545,6 +546,147 @@ describe('LibraryPage', () => {
 
       await screen.findByRole('group', { name: 'Filters' })
       expect(lastFilterQuery()).toBe('')
+    })
+  })
+
+  describe('Más filtros', () => {
+    /** The panel, opened from the bar. */
+    async function openPanel() {
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await userEvent.click(within(filters).getByRole('button', { name: /^More filters/ }))
+      return screen.getByRole('dialog', { name: 'More filters' })
+    }
+
+    /** A criterion's row in the panel, by its label. */
+    const criterion = (panel: HTMLElement, name: string) => within(panel).getByRole('group', { name })
+
+    it('opens on the Table branch, and every value picked keeps a Hand, list, graph and Stats alike, without an Apply', async () => {
+      renderLibrary()
+      const panel = await openPanel()
+
+      expect(within(panel).getByRole('tab', { name: 'Table' }).getAttribute('aria-selected')).toBe('true')
+      expect(within(panel).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+        'Table', 'Preflop', 'Flop', 'Turn', 'River', 'Cards', 'Board', 'Result', 'Stat',
+      ])
+      // Their criteria are still to come.
+      expect(within(panel).getByRole('tab', { name: 'Flop' }).hasAttribute('disabled')).toBe(true)
+
+      await userEvent.click(within(criterion(panel, 'Pot type')).getByRole('button', { name: '3-bet' }))
+      await userEvent.click(within(criterion(panel, 'Pot type')).getByRole('button', { name: '4-bet' }))
+
+      expect(within(criterion(panel, 'Pot type')).getByRole('button', { name: '4-bet' }).getAttribute('aria-pressed')).toBe('true')
+      expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet%2C4-bet')
+      expect(window.location.search).toBe('?period=all&fact=pot-type%3A3-bet%2C4-bet')
+      expect(within(panel).getByRole('tab', { name: 'Table, 1 criterion' })).toBeTruthy()
+      expect(within(panel).getByText(/3 of 3 hands/)).toBeTruthy()
+
+      await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+      expect(screen.queryByRole('dialog', { name: 'More filters' })).toBeNull()
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Graph' }))
+      await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?fact=pot-type%3A3-bet%2C4-bet'))
+      await userEvent.click(screen.getByRole('radio', { name: 'Stats' }))
+      await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?fact=pot-type%3A3-bet%2C4-bet'))
+    })
+
+    it('turns a criterion into an exclusion, and a range of players into one criterion', async () => {
+      renderLibrary()
+      const panel = await openPanel()
+      const exclude = within(criterion(panel, 'My position')).getByRole('switch', { name: /^Exclude My position/ })
+      // Nothing to exclude until a value is picked.
+      expect(exclude.getAttribute('aria-disabled')).toBe('true')
+
+      await userEvent.click(within(criterion(panel, 'My position')).getByRole('button', { name: 'BB' }))
+      await userEvent.click(exclude)
+      await userEvent.type(within(criterion(panel, 'Players dealt in')).getByRole('spinbutton', { name: 'Players dealt in, to' }), '4')
+
+      expect(exclude.getAttribute('aria-checked')).toBe('true')
+      expect(lastFilterQuery()).toBe('fact=%21hero-position%3ABB&fact=players%3A..4')
+    })
+
+    it('explains a criterion the pot types picked never meet', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
+      const panel = await openPanel()
+
+      await userEvent.click(within(criterion(panel, '3-bettor')).getByRole('button', { name: 'SB' }))
+
+      expect(within(criterion(panel, '3-bettor')).getByText(/Only 3-bet pots and bigger have a 3-bettor/)).toBeTruthy()
+    })
+
+    it('shows as one chip: its summary cut with +N, every criterion on hover, the panel on click, and × drops them all', async () => {
+      renderLibrary(
+        DEFAULT_PREFERENCES,
+        undefined,
+        '/library?period=all&site=pokerstars&fact=players:3..6&fact=!pot-type:walk,limped&fact=hero-position:BTN,CO&fact=opener-position:UTG,UTG%2B1,MP',
+      )
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      const chip = within(filters).getByRole('button', { name: /^More filters: / })
+
+      expect(chip.textContent).toBe('Not walk, limped pot · 3–6 players · Hero BTN, CO+1')
+      expect(screen.queryByRole('tooltip')).toBeNull()
+
+      await userEvent.hover(chip)
+      expect(within(screen.getByRole('tooltip')).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'Table Not walk, limped pot',
+        'Table 3–6 players',
+        'Table Hero BTN, CO',
+        'Table UTG, UTG+1, MP open',
+      ])
+      await userEvent.unhover(chip)
+      expect(screen.queryByRole('tooltip')).toBeNull()
+
+      await userEvent.click(chip)
+      const panel = screen.getByRole('dialog', { name: 'More filters' })
+      expect(within(criterion(panel, 'Opener')).getByRole('button', { name: 'MP' }).getAttribute('aria-pressed')).toBe('true')
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog', { name: 'More filters' })).toBeNull()
+      expect(document.activeElement).toBe(within(filters).getByRole('button', { name: /^More filters: / }))
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      expect(lastFilterQuery()).toBe('site=pokerstars')
+      expect(within(filters).getByRole('button', { name: 'More filters' })).toBeTruthy()
+    })
+
+    it('lists the criteria when the chip has the focus, too', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      within(filters).getByRole('button', { name: /^More filters: / }).focus()
+
+      expect(within(await screen.findByRole('tooltip')).getByText('3-bet pot')).toBeTruthy()
+    })
+
+    it('goes with Clear filters', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Clear filters' }))
+
+      expect(window.location.search).toBe('')
+      expect(lastFilterQuery()).not.toContain('fact')
+    })
+
+    it('works by keyboard: open, move between branches, set a criterion, close', async () => {
+      renderLibrary()
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      within(filters).getByRole('button', { name: 'More filters' }).focus()
+
+      await userEvent.keyboard('{Enter}')
+      const panel = screen.getByRole('dialog', { name: 'More filters' })
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
+      // The other branches have nothing to offer yet, so the arrows stay on Table.
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
+
+      await userEvent.tab()
+      await userEvent.keyboard(' ')
+      expect(lastFilterQuery()).toBe('fact=pot-type%3Awalk')
+
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(document.activeElement).toBe(within(filters).getByRole('button', { name: /^More filters: / }))
     })
   })
 
