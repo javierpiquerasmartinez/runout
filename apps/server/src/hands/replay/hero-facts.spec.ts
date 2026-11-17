@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { importHandHistory } from '../import/import.js';
-import { heroFacts } from './hero-facts.js';
+import { heroFacts, onStreet } from './hero-facts.js';
 
 function text(name: string) {
   return readFileSync(
@@ -125,6 +125,9 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
       heroHandClass: 'J4s',
       potType: 'walk',
       ...nobodyRaised,
+      ...unseen('flop'),
+      ...unseen('turn'),
+      ...unseen('river'),
     });
   });
 
@@ -327,6 +330,197 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
       fourBettorPosition: 'CO',
       aggressorPosition: 'HJ',
       heroAggressor: true,
+    });
+  });
+});
+
+/** Every fact of one Street empty: not dealt, or the Hero no longer in. */
+function unseen(street: 'flop' | 'turn' | 'river') {
+  const empty = [
+    'Players',
+    'Ip',
+    'First',
+    'Pot',
+    'EffectiveStack',
+    'Spr',
+    'AllIn',
+    'Line',
+    'BetSize',
+    'RaiseSize',
+    'BetSizeFaced',
+    'RaiseSizeFaced',
+    'Bets',
+    'Raises',
+    'Calls',
+    'Folds',
+  ].map((fact) => [`${street}${fact}`, null]);
+  return Object.fromEntries([[`${street}Saw`, false], ...empty]);
+}
+
+describe('Replay: the Hero’s facts, the situation on each postflop Street', () => {
+  // Expected values are read by hand off each Hand History, in big blinds.
+  it('describes a heads-up flop the Hero checks and raises out of position', () => {
+    // Hero (BB, $26.85) calls 9b7c2e44's open to $0.75 (CO, $25): a pot of
+    // $1.60 on the flop, 6.4 big blinds. 9b7c2e44 has $24.25 left, Hero
+    // $26.10, so the effective stack is 97 big blinds and the SPR 15.2.
+    // Hero checks, faces $0.80 (50 % of the pot) and raises to $3 (3.75
+    // times the bet). The turn and the river aren't dealt.
+    const hand = only(oneHand('ggpoker-session.txt', 'HD1180452377'));
+
+    expect(heroFacts(hand)).toMatchObject({
+      flopSaw: true,
+      flopPlayers: 2,
+      flopIp: false,
+      flopFirst: true,
+      flopPot: 6.4,
+      flopEffectiveStack: 97,
+      flopSpr: 15.2,
+      flopAllIn: false,
+      flopLine: 'XR',
+      flopBetSize: null,
+      flopRaiseSize: 3.75,
+      flopBetSizeFaced: 50,
+      flopRaiseSizeFaced: null,
+      flopBets: 0,
+      flopRaises: 1,
+      flopCalls: 0,
+      flopFolds: 0,
+      ...unseen('turn'),
+      ...unseen('river'),
+    });
+  });
+
+  it('puts a Hero who acts between two players on a multiway flop neither IP nor first', () => {
+    // Hand #262130000104 from Aspen1's seat (CO, €10): a limp, then calls of
+    // Hero4's raise to €0.40 (BTN) by Willow4 (BB) and Aspen1. €1.25 on the
+    // flop, 12.5 big blinds, every Stack €9.60: 96 big blinds, an SPR of
+    // 7.7. Willow4 checks, Aspen1 checks and calls Hero4's €0.60 (48 %).
+    // The turn is checked through; on the river, €3.05 in the pot, Aspen1
+    // bets €1 (33 %) after Willow4 checks.
+    const hand = only(
+      oneHand('pokerstars-edge-cases.txt', '262130000104').replace(
+        'Dealt to Hero4 [Ad Jc]',
+        'Dealt to Aspen1 [Ah Jd]',
+      ),
+    );
+
+    expect(heroFacts(hand)).toMatchObject({
+      flopSaw: true,
+      flopPlayers: 3,
+      flopIp: false,
+      flopFirst: false,
+      flopPot: 12.5,
+      flopEffectiveStack: 96,
+      flopSpr: 7.7,
+      flopLine: 'XC',
+      flopBetSizeFaced: 48,
+      flopCalls: 1,
+      turnSaw: true,
+      turnPlayers: 3,
+      turnPot: 30.5,
+      turnLine: 'X',
+      turnBetSizeFaced: null,
+      riverSaw: true,
+      riverLine: 'B',
+      riverBetSize: 33,
+      riverBets: 1,
+      riverCalls: 0,
+    });
+  });
+
+  it('sizes the Hero’s bet, the raise they face, and the turn they call all in', () => {
+    // Hero6 (BTN) bets $4.50 into $9.75 (46 %); Olive6 (the straddle, first
+    // to act) raises to $15, 3.33 times it, and Hero6 calls. On the turn,
+    // $39.75 in the pot and $31 behind each (SPR 0.8), Olive6 bets all in
+    // (78 %) and Hero6 calls all in. The river finds Hero6 all in.
+    const hand = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+
+    expect(heroFacts(hand)).toMatchObject({
+      flopPlayers: 2,
+      flopIp: true,
+      flopFirst: false,
+      flopPot: 19.5,
+      flopLine: 'BC',
+      flopBetSize: 46,
+      flopRaiseSize: null,
+      flopBetSizeFaced: null,
+      flopRaiseSizeFaced: 3.33,
+      flopBets: 1,
+      flopCalls: 1,
+      turnPot: 79.5,
+      turnEffectiveStack: 62,
+      turnSpr: 0.8,
+      turnAllIn: false,
+      turnLine: 'C',
+      turnBetSizeFaced: 78,
+      riverSaw: true,
+      riverPlayers: 2,
+      riverPot: 203.5,
+      riverEffectiveStack: 0,
+      riverSpr: 0,
+      riverAllIn: true,
+      riverLine: null,
+      riverBets: 0,
+      riverRaises: 0,
+      riverCalls: 0,
+      riverFolds: 0,
+    });
+  });
+
+  it('follows a Hero all in preflop through every Street', () => {
+    // HeroAI (BTN, heads-up) calls all in preflop: $100 in the pot, 200 big
+    // blinds, and nothing left to bet on any Street.
+    const hand = only(oneHand('pokerstars-all-ins.txt', '262140000101'));
+
+    const allIn = {
+      saw: true,
+      players: 2,
+      ip: true,
+      first: false,
+      pot: 200,
+      effectiveStack: 0,
+      spr: 0,
+      allIn: true,
+      line: null,
+      betSize: null,
+      raiseSize: null,
+      betSizeFaced: null,
+      raiseSizeFaced: null,
+      bets: 0,
+      raises: 0,
+      calls: 0,
+      folds: 0,
+    };
+    expect(heroFacts(hand)).toMatchObject({
+      ...onStreet('flop', allIn),
+      ...onStreet('turn', allIn),
+      ...onStreet('river', allIn),
+    });
+  });
+
+  it('leaves the turn and the river empty after the Hero folds the flop', () => {
+    // Hero checks the big blind in a limped pot, ₮0.86 with the antes, and
+    // folds to a ₮0.43 bet (50 %). The turn and the river aren't dealt.
+    const hand = only(oneHand('coinpoker-ante.txt', '172668000015'));
+
+    expect(heroFacts(hand)).toMatchObject({
+      flopSaw: true,
+      flopLine: 'F',
+      flopBetSizeFaced: 50,
+      flopFolds: 1,
+      ...unseen('turn'),
+      ...unseen('river'),
+    });
+  });
+
+  it('leaves a Street the Hero folded before empty, though it was dealt', () => {
+    // iMapleAA folds preflop; the flop is dealt for the others.
+    const hand = only(oneHand('pokerstars-session.txt', '262120715010'));
+
+    expect(heroFacts(hand)).toMatchObject({
+      ...unseen('flop'),
+      ...unseen('turn'),
+      ...unseen('river'),
     });
   });
 });

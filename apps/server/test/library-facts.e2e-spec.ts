@@ -6,6 +6,7 @@ import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
 import { handFacts, hands } from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
+import { FACTS_VERSION } from '../src/hands/replay/hero-facts.js';
 import { rereadHands } from '../src/hands/reread-backfill.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { freshDatabase } from './support/fresh-database.js';
@@ -58,9 +59,11 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       .expect(201);
   }
 
-  async function stockedAccount(): Promise<{ token: string }> {
+  async function stockedAccount(
+    files: string[] = FIXTURES,
+  ): Promise<{ token: string }> {
     const account = await newAccount(running.httpServer);
-    for (const file of FIXTURES) {
+    for (const file of files) {
       await importText(account.token, freshHandHistory(file));
     }
     return account;
@@ -131,6 +134,49 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  /*
+   * The postflop Streets of the same ten Hands and ggpoker-session.txt's
+   * three, read by hand. Nine see the flop: iMapleAA's two (CO and BTN, IP,
+   * SPRs 14.9 and 16.6, the BTN betting 31 % of the pot), HeroAI's two (all
+   * in preflop from the BTN, SPR 0; checking and calling all in from the
+   * BB, SPR 16.2), Hero9max's (the HJ, multiway, its opponents all in, SPR
+   * 0), Hero6's (the BTN, SPR 4.7, `BC` betting 46 %, then `C` on the
+   * turn), Hero4's (the BTN, multiway, SPR 7.7, betting 48 %, then `X` on
+   * the turn), and Hero's two on GGPoker (the SB all in preflop, SPR 0; `XR`
+   * from the BB facing 50 %, SPR 15.2). iMapleAA's CO folds the turn.
+   */
+  it('filters by the situation on each postflop Street', async () => {
+    const account = await stockedAccount([...FIXTURES, 'ggpoker-session.txt']);
+    const cases: [string, number][] = [
+      ['', 13],
+      [fact('flop-saw:true'), 9],
+      [fact('!flop-saw:true'), 4],
+      [fact('flop-ip:true'), 5],
+      // Heads-up against multiway.
+      [fact('flop-players:2..2'), 7],
+      [fact('flop-players:3..'), 2],
+      // The Hero's line.
+      [fact('flop-line:XR'), 1],
+      [fact('turn-line:X,F'), 2],
+      // SPR and bet size ranges, with decimals or open at one end.
+      [fact('flop-spr:..1'), 3],
+      [fact('flop-spr:4.5..8'), 2],
+      [fact('flop-spr:4.7..4.7'), 1],
+      [fact('flop-bet-size:40..60'), 2],
+      [fact('flop-bet-size-faced:50..50'), 1],
+      // Criteria on two Streets keep the Hands that meet both.
+      [`${fact('flop-ip:true')}&${fact('turn-line:X,F')}`, 2],
+      [`${fact('flop-line:BC')}&${fact('turn-line:C')}`, 1],
+      [`${fact('flop-ip:true')}&${fact('turn-saw:true')}`, 4],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
   it('rejects an unknown fact, an impossible value or a malformed range', async () => {
     const account = await newAccount(running.httpServer);
     for (const criterion of [
@@ -146,6 +192,13 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       'players:..',
       'players:x..3',
       'players:3',
+      'flop-spr:1.55..2',
+      'flop-bet-size:1.5..',
+      'flop-players:1..',
+      'turn-ip:yes',
+      'flop-line:',
+      'flop-line:FX',
+      'river-line:xr',
       '!',
     ]) {
       for (const endpoint of ['hands', 'hand-ids', 'results', 'stats']) {
@@ -268,7 +321,7 @@ describe('Each Hand’s facts row (e2e)', () => {
     expect(await count(account.token, fact('!hero-position:UTG'))).toBe(6);
     expect(
       (await factsOf(all.map(({ id }) => id))).map((row) => row.version),
-    ).toEqual(Array(6).fill(1));
+    ).toEqual(Array(6).fill(FACTS_VERSION));
     // Run again: nothing is behind.
     expect(await rederiveFacts(db)).toBe(0);
   });

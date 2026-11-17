@@ -1,5 +1,12 @@
 import type { Action, Hand } from '../hand.js';
 import { positions, type Position } from './positions.js';
+import {
+  POSTFLOP_STREETS,
+  streetSituations,
+  type PostflopStreet,
+  type StreetSituation,
+  type StreetStep,
+} from './street-situation.js';
 
 /**
  * The version of the rules `heroFacts` works the facts out by. It goes up
@@ -7,7 +14,7 @@ import { positions, type Position } from './positions.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 1;
+export const FACTS_VERSION = 2;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -55,7 +62,7 @@ export const HAND_CLASSES: readonly string[] = RANKS.split('').flatMap(
  * that Filters and Stats read it (ADR 0012). Each fact is defined in the
  * facts catalogue; a fact that doesn't apply is null.
  */
-export interface HeroFacts {
+export interface HeroFacts extends PostflopFacts {
   /** Seats dealt in: every seat not sitting out. */
   playersDealt: number;
   /** Null when the table's size has no Position names. */
@@ -102,6 +109,7 @@ export function heroFacts(hand: Hand): HeroFacts {
     fourBettorPosition: position(raisers[2]),
     aggressorPosition: position(raisers.at(-1)),
     heroAggressor: raisers.at(-1) === hero,
+    ...postflopFacts(hand),
   };
 }
 
@@ -140,4 +148,166 @@ function handClass(combo: string): string {
   const [high, highSuit, low, lowSuit] = combo;
   if (high === low) return `${high}${low}`;
   return `${high}${low}${highSuit === lowSuit ? 's' : 'o'}`;
+}
+
+// ---------------------------------------------------------------------------
+// Each postflop Street (facts catalogue §3.1, §3.3 and §5)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Hero's facts on one postflop Street. Every one but `saw` is null when
+ * the Street wasn't dealt or the Hero was no longer in. Stored once per
+ * Street, prefixed with its name: `flopIp`, `turnLine`, `riverSpr`.
+ */
+export interface StreetFacts {
+  /** Dealt, and the Hero hadn't folded, all in included. */
+  saw: boolean;
+  /** Players who hadn't folded as it began: 2 is heads-up, 3 or more multiway. */
+  players: number | null;
+  /** The Hero acts last on it among the players still in as it began. */
+  ip: boolean | null;
+  /** The Hero acts first on it among the players still in as it began. */
+  first: boolean | null;
+  /** In big blinds as it began, to two decimals. */
+  pot: number | null;
+  /** In big blinds as it began, to two decimals; see `StreetSituation`. */
+  effectiveStack: number | null;
+  /** The effective stack over the pot as it began, to one decimal. */
+  spr: number | null;
+  /** The Hero had no chips left as it began. */
+  allIn: boolean | null;
+  /**
+   * The Hero's Actions on it, a letter each: X check, B bet, C call,
+   * R raise, F fold (`XR`, `BC`). Null when they made none, all in say.
+   */
+  line: string | null;
+  /** The Hero's bet, % of the pot before it, whole. */
+  betSize: number | null;
+  /** The total of the Hero's first raise, as a multiple of the bet it raised, to two decimals. */
+  raiseSize: number | null;
+  /** The first bet the Hero faced, % of the pot before it, whole. */
+  betSizeFaced: number | null;
+  /** The first raise the Hero faced, as a multiple of the bet it raised. */
+  raiseSizeFaced: number | null;
+  /** How many bets, raises, calls and folds the Hero made on it, for AFq. */
+  bets: number | null;
+  raises: number | null;
+  calls: number | null;
+  folds: number | null;
+}
+
+/** `StreetFacts` under one Street's name: `ip` → `flopIp`. */
+export type OnStreet<S extends PostflopStreet, T = StreetFacts> = {
+  [K in keyof T & string as `${S}${Capitalize<K>}`]: T[K];
+};
+
+export type PostflopFacts = OnStreet<'flop'> &
+  OnStreet<'turn'> &
+  OnStreet<'river'>;
+
+/** Prefixes each key of `facts` with the Street's name. */
+export function onStreet<S extends PostflopStreet, T extends object>(
+  street: S,
+  facts: T,
+): OnStreet<S, T> {
+  return Object.fromEntries(
+    Object.entries(facts).map(([key, value]) => [
+      `${street}${key[0].toUpperCase()}${key.slice(1)}`,
+      value,
+    ]),
+  ) as OnStreet<S, T>;
+}
+
+function postflopFacts(hand: Hand): PostflopFacts {
+  const situations = streetSituations(hand);
+  const facts = POSTFLOP_STREETS.map((street) =>
+    onStreet(street, streetFacts(hand, situations[street])),
+  );
+  return Object.assign({}, ...facts) as PostflopFacts;
+}
+
+const LETTERS: Record<Action['type'], string> = {
+  check: 'X',
+  bet: 'B',
+  call: 'C',
+  raise: 'R',
+  fold: 'F',
+};
+
+function streetFacts(
+  hand: Hand,
+  situation: StreetSituation | null,
+): StreetFacts {
+  if (!situation) {
+    return {
+      saw: false,
+      players: null,
+      ip: null,
+      first: null,
+      pot: null,
+      effectiveStack: null,
+      spr: null,
+      allIn: null,
+      line: null,
+      betSize: null,
+      raiseSize: null,
+      betSizeFaced: null,
+      raiseSizeFaced: null,
+      bets: null,
+      raises: null,
+      calls: null,
+      folds: null,
+    };
+  }
+  const hero = hand.hero.screenName;
+  const bb = (amount: number) => round(amount / hand.stake.bigBlind, 2);
+  const { start, steps } = situation;
+  const own = steps.filter((step) => step.action.screenName === hero);
+  const count = (type: Action['type']) =>
+    own.filter((step) => step.action.type === type).length;
+  // Faced: an opponent's, with the Hero still to answer it on the Street.
+  const faced = (type: Action['type']) =>
+    steps.find(
+      (step, index) =>
+        step.action.type === type &&
+        step.action.screenName !== hero &&
+        steps.slice(index + 1).some((s) => s.action.screenName === hero),
+    );
+  return {
+    saw: true,
+    players: situation.inHand.length,
+    ip: situation.heroIp,
+    first: situation.heroFirst,
+    pot: bb(start.pot),
+    effectiveStack: bb(situation.effectiveStack),
+    spr: round(situation.effectiveStack / start.pot, 1),
+    allIn: situation.heroAllIn,
+    line: own.map((step) => LETTERS[step.action.type]).join('') || null,
+    betSize: betSize(own.find((step) => step.action.type === 'bet')),
+    raiseSize: raiseSize(own.find((step) => step.action.type === 'raise')),
+    betSizeFaced: betSize(faced('bet')),
+    raiseSizeFaced: raiseSize(faced('raise')),
+    bets: count('bet'),
+    raises: count('raise'),
+    calls: count('call'),
+    folds: count('fold'),
+  };
+}
+
+/** A bet as a whole % of the pot before it. */
+function betSize(step: StreetStep | undefined): number | null {
+  if (step?.action.type !== 'bet') return null;
+  return round((step.action.amount / step.before.pot) * 100, 0);
+}
+
+/** A raise's total as a multiple of the bet or raise it raised. */
+function raiseSize(step: StreetStep | undefined): number | null {
+  if (step?.action.type !== 'raise') return null;
+  const raised = Math.max(...step.before.players.map((p) => p.bet));
+  return round(step.action.to / raised, 2);
+}
+
+function round(value: number, decimals: number): number {
+  const scale = 10 ** decimals;
+  return Math.round(value * scale) / scale;
 }
