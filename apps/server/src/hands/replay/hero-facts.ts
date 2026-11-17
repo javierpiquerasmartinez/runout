@@ -269,32 +269,22 @@ function foldedBefore(hand: Hand, street: Street): boolean {
   );
 }
 
-/** Every card, as a Hand writes them (tens as `10`). */
-const DECK = [
-  'A',
-  'K',
-  'Q',
-  'J',
-  '10',
-  '9',
-  '8',
-  '7',
-  '6',
-  '5',
-  '4',
-  '3',
-  '2',
-].flatMap((rank) => ['s', 'h', 'd', 'c'].map((suit) => rank + suit));
+/** Every card, as the evaluator numbers them. */
+const DECK_CODES = Array.from({ length: 52 }, (_, code) => code);
 
 /** No two cards left in the deck beat the Hero's hand; a tie is still the nuts. */
 function isNuts(hole: string[], board: string[]): boolean {
   const boardCodes = board.map(cardCode);
   const hero = strength([...hole.map(cardCode), ...boardCodes]);
-  const used = new Set([...hole, ...board].map(cardCode));
-  const left = DECK.map(cardCode).filter((code) => !used.has(code));
+  const used = new Set([...hole.map(cardCode), ...boardCodes]);
+  const left = DECK_CODES.filter((code) => !used.has(code));
+  // One array for every pair tried: the Board after two slots for the pair.
+  const cards = [0, 0, ...boardCodes];
   for (let i = 0; i < left.length; i++) {
+    cards[0] = left[i];
     for (let j = i + 1; j < left.length; j++) {
-      if (strength([left[i], left[j], ...boardCodes]) > hero) return false;
+      cards[1] = left[j];
+      if (strength(cards) > hero) return false;
     }
   }
   return true;
