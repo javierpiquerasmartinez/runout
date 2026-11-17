@@ -2,9 +2,11 @@ import { and, gte, inArray, lte, not, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { handFacts, hands } from '../database/schema.js';
 import {
+  ANSWERS,
   HAND_CLASSES,
   POSITIONS,
   POT_TYPES,
+  STREETS,
 } from '../hands/replay/hero-facts.js';
 import { Rejected } from '../rejection/rejection.js';
 
@@ -16,7 +18,8 @@ import { Rejected } from '../rejection/rejection.js';
  * Query: `fact`, repeated for each criterion, written
  * `[!]<fact>:<value>[,<value>…]`, or `[!]<fact>:<min>..<max>` for a number,
  * where either end may be left out. `!` makes it an exclusion. For example
- * `fact=pot-type:3-bet,4-bet`, `fact=!hero-position:BB`, `fact=players:..4`.
+ * `fact=pot-type:3-bet,4-bet`, `fact=!hero-position:BB`, `fact=players:..4`,
+ * `fact=result:..-20.5`.
  */
 export type FactCriterion = {
   fact: FactKey;
@@ -25,27 +28,54 @@ export type FactCriterion = {
   { values: string[] } | { range: { min: number | null; max: number | null } }
 );
 
-/** How a fact's values are written, and which ones it can take. */
+/**
+ * How a fact's values are written, and which ones it can take. A range's
+ * ends are whole numbers, or with `signed` any number, negative or with
+ * decimals.
+ */
 type Domain =
   | { kind: 'set'; values: ReadonlySet<string> }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number };
+  | { kind: 'range'; min: number; max: number; signed?: boolean };
 
-interface FactEntry {
-  column: PgColumn;
-  domain: Domain;
-  /**
-   * The rules version that added the fact. A row worked out by an older one
-   * doesn't have it, so no criterion on the fact keeps that Hand, excluded
-   * or not, until the re-derive job reaches it.
-   */
-  since: number;
-}
+type FactEntry =
+  | {
+      /** A column of the Hand's facts row. */
+      column: PgColumn;
+      domain: Domain;
+      /**
+       * The rules version that added the fact. A row worked out by an older
+       * one doesn't have it, so no criterion on the fact keeps that Hand,
+       * excluded or not, until the re-derive job reaches it.
+       */
+      since: number;
+    }
+  | {
+      /**
+       * A fact the Hand's own row has had since it was stored, read there
+       * rather than copied into its facts row: it needs no facts row.
+       */
+      onHand: PgColumn | SQL;
+      domain: Domain;
+    };
 
 const oneOf = (values: readonly string[]): Domain => ({
   kind: 'set',
   values: new Set(values),
 });
+
+/** Any number, negative or with decimals. */
+const UNBOUNDED: Domain = {
+  kind: 'range',
+  min: -Infinity,
+  max: Infinity,
+  signed: true,
+};
+
+/** An Amount of the Hand's as big blinds of its Stake. */
+function inBigBlinds(amount: PgColumn): SQL {
+  return sql`(${amount}::numeric / ${hands.bigBlind})`;
+}
 
 /**
  * Every fact a criterion can name, by the name the query gives it. Adding
@@ -98,6 +128,52 @@ const FACTS = {
     domain: { kind: 'boolean' },
     since: 1,
   },
+
+  // Showdown and Result.
+  'hero-folded-on': {
+    column: handFacts.heroFoldedOn,
+    domain: oneOf(STREETS),
+    since: 2,
+  },
+  'hero-all-in-on': {
+    column: handFacts.heroAllInOn,
+    domain: oneOf(STREETS),
+    since: 2,
+  },
+  'faced-all-in-on': {
+    column: handFacts.heroFacedAllInOn,
+    domain: oneOf(STREETS),
+    since: 2,
+  },
+  'faced-all-in-answer': {
+    column: handFacts.heroFacedAllInAnswer,
+    domain: oneOf(ANSWERS),
+    since: 2,
+  },
+  'won-money': {
+    column: handFacts.heroWonMoney,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'won-at-showdown': {
+    column: handFacts.heroWonAtShowdown,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'reached-showdown': {
+    onHand: hands.heroReachedShowdown,
+    domain: { kind: 'boolean' },
+  },
+  /** In big blinds. */
+  result: {
+    onHand: inBigBlinds(hands.heroResult),
+    domain: UNBOUNDED,
+  },
+  /** In big blinds. */
+  'all-in-ev': {
+    onHand: inBigBlinds(hands.heroAllInEv),
+    domain: UNBOUNDED,
+  },
 } satisfies Record<string, FactEntry>;
 
 export type FactKey = keyof typeof FACTS;
@@ -126,16 +202,17 @@ export function parseFactCriterion(raw: string): FactCriterion {
   return { fact: key, exclude, values: [...new Set(values)] };
 }
 
-/** `2..6`, `..4` or `6..` within the domain's bounds. */
+/** `2..6`, `..4` or `6..` within the domain's bounds; `-20.5..` when signed. */
 function rangeOf(
   written: string,
-  domain: { min: number; max: number },
+  domain: { min: number; max: number; signed?: boolean },
 ): { min: number | null; max: number | null } {
   const ends = written.split('..');
   if (ends.length !== 2) throw invalid();
+  const number = domain.signed ? /^-?\d+(\.\d+)?$/ : /^\d+$/;
   const [min, max] = ends.map((end) => {
     if (end === '') return null;
-    if (!/^\d+$/.test(end)) throw invalid();
+    if (!number.test(end)) throw invalid();
     const value = Number(end);
     if (value < domain.min || value > domain.max) throw invalid();
     return value;
@@ -154,33 +231,59 @@ function invalid(): Rejected {
 }
 
 /**
- * The Hands whose facts row meets every criterion: AND across them, OR
- * within one. Every fact lives on the one row, so criteria on several facts
- * describe the same Hand. A Hand with no row yet matches none.
+ * The Hands whose facts meet every criterion: AND across them, OR within
+ * one. Every fact lives on the one facts row, or on the Hand's own row, so
+ * criteria on several facts describe the same Hand. A Hand with no facts
+ * row yet matches no criterion on one.
  */
 export function factCriteriaWhere(criteria: FactCriterion[]): SQL {
-  const conditions = criteria.map((criterion) => {
+  const onRow: SQL[] = [];
+  const onHand: SQL[] = [];
+  for (const criterion of criteria) {
     const entry = entryOf(criterion.fact)!;
-    const met =
-      'range' in criterion
-        ? and(
-            criterion.range.min === null
-              ? undefined
-              : gte(entry.column, criterion.range.min),
-            criterion.range.max === null
-              ? undefined
-              : lte(entry.column, criterion.range.max),
-          )!
-        : inArray(
-            entry.column,
-            entry.domain.kind === 'boolean'
-              ? criterion.values.map((value) => value === 'true')
-              : criterion.values,
-          );
-    // A fact that is empty (null) never meets a criterion, so excluding one
-    // keeps the Hand.
-    const kept = criterion.exclude ? not(sql`coalesce(${met}, false)`) : met;
-    return and(gte(handFacts.version, entry.since), kept)!;
-  });
-  return sql`exists (select 1 from ${handFacts} where ${handFacts.handId} = ${hands.id} and ${and(...conditions)})`;
+    if ('onHand' in entry) {
+      onHand.push(conditionOf(criterion, entry.onHand, entry.domain));
+    } else {
+      onRow.push(
+        and(
+          gte(handFacts.version, entry.since),
+          conditionOf(criterion, entry.column, entry.domain),
+        )!,
+      );
+    }
+  }
+  return and(
+    ...onHand,
+    onRow.length === 0
+      ? undefined
+      : sql`exists (select 1 from ${handFacts} where ${handFacts.handId} = ${hands.id} and ${and(...onRow)})`,
+  )!;
+}
+
+/** Whether the fact, read from `column`, meets the criterion. */
+function conditionOf(
+  criterion: FactCriterion,
+  column: PgColumn | SQL,
+  domain: Domain,
+): SQL {
+  const read = sql`${column}`;
+  const met =
+    'range' in criterion
+      ? and(
+          criterion.range.min === null
+            ? undefined
+            : gte(read, criterion.range.min),
+          criterion.range.max === null
+            ? undefined
+            : lte(read, criterion.range.max),
+        )!
+      : inArray(
+          read,
+          domain.kind === 'boolean'
+            ? criterion.values.map((value) => value === 'true')
+            : criterion.values,
+        );
+  // A fact that is empty (null) never meets a criterion, so excluding one
+  // keeps the Hand.
+  return criterion.exclude ? not(sql`coalesce(${met}, false)`) : met;
 }

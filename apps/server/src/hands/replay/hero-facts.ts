@@ -1,5 +1,6 @@
-import type { Action, Hand } from '../hand.js';
+import type { Action, Hand, Street } from '../hand.js';
 import { positions, type Position } from './positions.js';
+import { timeline } from './timeline.js';
 
 /**
  * The version of the rules `heroFacts` works the facts out by. It goes up
@@ -7,7 +8,7 @@ import { positions, type Position } from './positions.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 1;
+export const FACTS_VERSION = 2;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -33,6 +34,19 @@ export const POT_TYPES = [
 ] as const;
 
 export type PotType = (typeof POT_TYPES)[number];
+
+/** The Streets, in the order they are dealt. */
+export const STREETS = [
+  'preflop',
+  'flop',
+  'turn',
+  'river',
+] as const satisfies readonly Street[];
+
+/** How the Hero answered a bet or raise. */
+export const ANSWERS = ['fold', 'call', 'raise'] as const;
+
+export type Answer = (typeof ANSWERS)[number];
 
 /** Ranks from the highest down, as the Lab writes them. */
 const RANKS = 'AKQJT98765432';
@@ -75,6 +89,21 @@ export interface HeroFacts {
   aggressorPosition: Position | null;
   /** The Hero made the last preflop raise. */
   heroAggressor: boolean;
+
+  // Showdown and Result. Reached Showdown, the Result and All-in EV are the
+  // Hand's own columns, worked out with its Result (see `heroResult`).
+  /** The Street the Hero folded on. */
+  heroFoldedOn: Street | null;
+  /** The Street the Hero went all in on, a blind that left them none included. */
+  heroAllInOn: Street | null;
+  /** The Street of the first opponent's all-in bet or raise the Hero had to answer. */
+  heroFacedAllInOn: Street | null;
+  /** How the Hero answered that all-in. */
+  heroFacedAllInAnswer: Answer | null;
+  /** The Hero collected from some pot: a split pot or a side pot alone counts. */
+  heroWonMoney: boolean;
+  /** The Hero reached Showdown and won money. */
+  heroWonAtShowdown: boolean;
 }
 
 /**
@@ -102,7 +131,71 @@ export function heroFacts(hand: Hand): HeroFacts {
     fourBettorPosition: position(raisers[2]),
     aggressorPosition: position(raisers.at(-1)),
     heroAggressor: raisers.at(-1) === hero,
+    ...showdownAndResult(hand),
   };
+}
+
+/** The facts of how the Hand ended for the Hero. */
+function showdownAndResult(
+  hand: Hand,
+): Pick<
+  HeroFacts,
+  | 'heroFoldedOn'
+  | 'heroAllInOn'
+  | 'heroFacedAllInOn'
+  | 'heroFacedAllInAnswer'
+  | 'heroWonMoney'
+  | 'heroWonAtShowdown'
+> {
+  const hero = hand.hero.screenName;
+  const fold = hand.actions.find(
+    (action) => action.screenName === hero && action.type === 'fold',
+  );
+  // The first table state where the Hero has nothing behind: a blind or
+  // ante can leave them all in before they act.
+  const allIn = timeline(hand).states.find(
+    (state) => state.players.find((p) => p.screenName === hero)?.allIn,
+  );
+  const faced = facedAllIn(hand);
+  const wonMoney = hand.collected.some(
+    (winner) => winner.screenName === hero && winner.amount > 0,
+  );
+  return {
+    heroFoldedOn: fold?.street ?? null,
+    heroAllInOn: allIn?.street ?? null,
+    heroFacedAllInOn: faced?.street ?? null,
+    heroFacedAllInAnswer: faced?.answer ?? null,
+    heroWonMoney: wonMoney,
+    heroWonAtShowdown: hand.showdown && !fold && wonMoney,
+  };
+}
+
+/**
+ * The first all-in bet or raise of an opponent the Hero had to answer: the
+ * Hero acts after it on the same Street, so they were neither folded nor all
+ * in yet. Their answer is that next Action.
+ */
+function facedAllIn(hand: Hand): { street: Street; answer: Answer } | null {
+  const hero = hand.hero.screenName;
+  for (const [index, action] of hand.actions.entries()) {
+    if (action.screenName === hero || !action.allIn || !raising(action)) {
+      continue;
+    }
+    const answer = hand.actions
+      .slice(index + 1)
+      .find(
+        (next) => next.street === action.street && next.screenName === hero,
+      );
+    if (!answer) continue;
+    if (
+      answer.type === 'fold' ||
+      answer.type === 'call' ||
+      answer.type === 'raise'
+    ) {
+      return { street: action.street, answer: answer.type };
+    }
+  }
+  return null;
 }
 
 function raising(action: Action): boolean {

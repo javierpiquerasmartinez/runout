@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { importHandHistory } from '../import/import.js';
 import { heroFacts } from './hero-facts.js';
+import { heroOutcome } from './hero-result.js';
+import { heroStats } from './hero-stats.js';
 
 function text(name: string) {
   return readFileSync(
@@ -118,7 +120,7 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
         'iMapleAA (big blind) collected (€0.10)',
       );
 
-    expect(heroFacts(only(walk))).toEqual({
+    expect(heroFacts(only(walk))).toMatchObject({
       playersDealt: 4,
       heroPosition: 'BB',
       heroCombo: 'Jc4c',
@@ -330,3 +332,173 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
     });
   });
 });
+
+describe('Replay: the Hero’s facts, Showdown and Result', () => {
+  // Hand #262130000104 with Hero4 folding the river to Aspen1's bet, which
+  // Willow4 calls and loses.
+  const foldedRiver = oneHand('pokerstars-edge-cases.txt', '262130000104')
+    .replace('Hero4: calls €1', 'Hero4: folds')
+    .replace(/Hero4: shows \[Ad Jc\] \(a pair of Aces\)\r?\n/, '')
+    .replace(
+      /Hero4 collected €2\.98 from pot\r?\nAspen1 collected €2\.97 from pot/,
+      'Aspen1 collected €4.95 from pot',
+    )
+    .replace('Total pot €6.05', 'Total pot €5.05');
+
+  it('tells the Street the Hero folded on, and none when they didn’t', () => {
+    const preflop = only(oneHand('pokerstars-session.txt', '262120715506'));
+    const turn = only(oneHand('pokerstars-session.txt', '262120711267'));
+    const neverFolded = only(
+      oneHand('pokerstars-showdown.txt', '262120750636'),
+    );
+
+    expect(
+      [preflop, turn, only(foldedRiver), neverFolded].map(
+        (hand) => heroFacts(hand).heroFoldedOn,
+      ),
+    ).toEqual(['preflop', 'turn', 'river', null]);
+  });
+
+  it('tells the Street the Hero went all in on', () => {
+    // HeroAI calls all in preflop, then on the flop; Hero6 on the turn.
+    const preflop = only(oneHand('pokerstars-all-ins.txt', '262140000101'));
+    const flop = only(oneHand('pokerstars-all-ins.txt', '262140000102'));
+    const turn = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+    const never = only(oneHand('pokerstars-showdown.txt', '262120750636'));
+
+    expect(
+      [preflop, flop, turn, never].map((hand) => heroFacts(hand).heroAllInOn),
+    ).toEqual(['preflop', 'flop', 'turn', null]);
+  });
+
+  it('tells the all-in the Hero faced, its Street and how they answered', () => {
+    // Aces2 shoves over HeroAI's open, and HeroAI calls; Aces2 shoves the
+    // flop, and HeroAI calls; Cedar31 shoves over iMapleAA's open, and
+    // iMapleAA re-raises all in after Birch Woods calls.
+    const called = only(oneHand('pokerstars-all-ins.txt', '262140000101'));
+    const calledFlop = only(oneHand('pokerstars-all-ins.txt', '262140000102'));
+    const raised = only(
+      oneHand('winamax-session.txt', '20954312-7733-1757700200'),
+    );
+    // Hand #262130000103 with Hero6 folding to Olive6's turn shove.
+    const folded = only(
+      oneHand('pokerstars-edge-cases.txt', '262130000103')
+        .replace(
+          /Hero6: calls \$31 and is all-in[\s\S]*Olive6 collected \$98\.75 from pot/,
+          [
+            'Hero6: folds',
+            'Uncalled bet ($31) returned to Olive6',
+            'Olive6 collected $36.75 from pot',
+          ].join('\n'),
+        )
+        .replace('Total pot $101.75', 'Total pot $39.75')
+        .replace('Board [9d 5c 2h Jc 5h]', 'Board [9d 5c 2h Jc]'),
+    );
+    const none = only(oneHand('pokerstars-showdown.txt', '262120750636'));
+
+    expect(
+      [called, calledFlop, raised, folded, none].map((hand) => {
+        const { heroFacedAllInOn, heroFacedAllInAnswer } = heroFacts(hand);
+        return [heroFacedAllInOn, heroFacedAllInAnswer];
+      }),
+    ).toEqual([
+      ['preflop', 'call'],
+      ['flop', 'call'],
+      ['preflop', 'raise'],
+      ['turn', 'fold'],
+      [null, null],
+    ]);
+    expect(heroFacts(folded).heroFoldedOn).toBe('turn');
+  });
+
+  it('counts a split pot and a side pot won alone as won money, at Showdown', () => {
+    // Hero4 splits the pot with Aspen1; Hero9max takes both side pots and
+    // loses the main pot to Elm_UTG.
+    const split = only(oneHand('pokerstars-edge-cases.txt', '262130000104'));
+    const sidePots = only(oneHand('pokerstars-edge-cases.txt', '262130000102'));
+
+    for (const hand of [split, sidePots]) {
+      expect(heroFacts(hand)).toMatchObject({
+        heroWonMoney: true,
+        heroWonAtShowdown: true,
+      });
+    }
+  });
+
+  it('counts a Hero all in preflop and run out to Showdown as reaching it', () => {
+    // HeroAI calls all in preflop with KdKc and wins; on the next Hand, all
+    // in on the flop with 7c7d, they lose.
+    const won = only(oneHand('pokerstars-all-ins.txt', '262140000101'));
+    const lost = only(oneHand('pokerstars-all-ins.txt', '262140000102'));
+
+    expect(heroOutcome(won).reachedShowdown).toBe(true);
+    expect(heroFacts(won)).toMatchObject({
+      heroAllInOn: 'preflop',
+      heroWonMoney: true,
+      heroWonAtShowdown: true,
+    });
+    expect(heroOutcome(lost).reachedShowdown).toBe(true);
+    expect(heroFacts(lost)).toMatchObject({
+      heroWonMoney: false,
+      heroWonAtShowdown: false,
+    });
+  });
+
+  it('wins money without Showdown when everyone folds to the Hero', () => {
+    // iMapleAA bets the flop and everyone folds.
+    const hand = only(oneHand('pokerstars-session.txt', '262120710959'));
+
+    expect(heroFacts(hand)).toMatchObject({
+      heroFoldedOn: null,
+      heroWonMoney: true,
+      heroWonAtShowdown: false,
+    });
+  });
+
+  it('gives WTSD, W$SD and WWSF the values the Hero Stats give, on every fixture', () => {
+    const hands = FIXTURE_FILES.flatMap(
+      (name) => importHandHistory(text(name)).hands,
+    );
+    expect(hands.length).toBeGreaterThan(20);
+
+    const count = (fact: boolean) => (fact ? 1 : 0);
+    for (const hand of hands) {
+      const facts = heroFacts(hand);
+      // Reached Showdown is the Hand's own column, worked out with its Result.
+      const reachedShowdown = count(heroOutcome(hand).reachedShowdown);
+      const sawFlop = count(
+        hand.board.length >= 3 && facts.heroFoldedOn !== 'preflop',
+      );
+      const { wtsd, wsd, wwsf } = heroStats(hand);
+
+      expect(
+        {
+          wtsd: { opportunities: sawFlop, taken: reachedShowdown },
+          wsd: {
+            opportunities: reachedShowdown,
+            taken: count(facts.heroWonAtShowdown),
+          },
+          wwsf: {
+            opportunities: sawFlop,
+            taken: count(sawFlop === 1 && facts.heroWonMoney),
+          },
+        },
+        hand.siteHandId,
+      ).toEqual({ wtsd, wsd, wwsf });
+    }
+  });
+});
+
+/** Every fixture the import module reads Hands from. */
+const FIXTURE_FILES = [
+  'coinpoker-ante.txt',
+  'coinpoker-session.txt',
+  'ggpoker-session.txt',
+  'pokerstars-all-ins.txt',
+  'pokerstars-edge-cases.txt',
+  'pokerstars-pot-limit.txt',
+  'pokerstars-session.txt',
+  'pokerstars-showdown.txt',
+  'pokerstars-ten-max.txt',
+  'winamax-session.txt',
+];
