@@ -24,6 +24,7 @@ import {
   type StreetSituation,
   type StreetStep,
 } from './street-situation.js';
+import { preflopFacts, type PreflopFacts } from './preflop-facts.js';
 
 /**
  * The version of the rules `heroFacts` works the facts out by. It goes up
@@ -31,7 +32,7 @@ import {
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 4;
+export const FACTS_VERSION = 5;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -79,7 +80,8 @@ export const HAND_CLASSES: readonly string[] = RANKS.split('').flatMap(
  * that Filters and Stats read it (ADR 0012). Each fact is defined in the
  * facts catalogue; a fact that doesn't apply is null.
  */
-export interface HeroFacts extends BoardTextureFacts, PostflopFacts {
+export interface HeroFacts
+  extends PreflopFacts, BoardTextureFacts, PostflopFacts {
   /** Seats dealt in: every seat not sitting out. */
   playersDealt: number;
   /** Null when the table's size has no Position names. */
@@ -142,6 +144,7 @@ export function heroFacts(hand: Hand): HeroFacts {
     fourBettorPosition: position(raisers[2]),
     aggressorPosition: position(raisers.at(-1)),
     heroAggressor: raisers.at(-1) === hero,
+    ...preflopFacts(hand),
     ...boardTextureFacts(hand.board),
     ...streetCards(hand),
     ...postflopFacts(hand),

@@ -25,6 +25,11 @@ import {
   STREET_DRAWS,
 } from '../hands/replay/hero-facts.js';
 import type { PostflopStreet } from '../hands/replay/street-situation.js';
+import {
+  ANSWERS,
+  PREFLOP_FACED_FIRST,
+  PREFLOP_ROLES,
+} from '../hands/replay/preflop-facts.js';
 import { Rejected } from '../rejection/rejection.js';
 
 /**
@@ -125,6 +130,211 @@ function streetFacts<S extends PostflopStreet>(street: S, since: number) {
     ]),
   ) as { [K in keyof typeof entries as `${S}-${K}`]: FactEntry };
 }
+
+/** A size or a stack, in big blinds or as a multiple. */
+const AMOUNT: Domain = { kind: 'range', min: 0, max: 100_000, decimals: 2 };
+
+type ActionFact = 'did' | 'chance' | 'faced' | 'answer';
+
+/**
+ * A named Action's facts: `<action>-did` and `<action>-chance`, booleans,
+ * and, when given, `<action>-faced`, a boolean, and `<action>-answer`, one
+ * of fold, call or raise.
+ */
+function actionFacts<A extends string, F extends ActionFact = 'did' | 'chance'>(
+  action: A,
+  columns: Partial<Record<ActionFact, PgColumn>>,
+  since: number,
+): Record<`${A}-${F}`, FactEntry> {
+  return Object.fromEntries(
+    Object.entries(columns).map(([fact, column]) => [
+      `${action}-${fact}`,
+      {
+        column,
+        domain: fact === 'answer' ? oneOf(ANSWERS) : BOOLEAN,
+        since,
+      },
+    ]),
+  ) as Record<`${A}-${F}`, FactEntry>;
+}
+
+/** The rules version that added the preflop facts. */
+const PREFLOP_SINCE = 5;
+
+/** The preflop facts: facts catalogue §1 and §2.2–2.3. */
+const PREFLOP_FACTS = {
+  ...actionFacts(
+    'vpip',
+    { did: handFacts.vpipDid, chance: handFacts.vpipChance },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts(
+    'pfr',
+    { did: handFacts.pfrDid, chance: handFacts.pfrChance },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts(
+    'open',
+    { did: handFacts.openDid, chance: handFacts.openChance },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts(
+    'limp',
+    { did: handFacts.limpDid, chance: handFacts.limpChance },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'isolate', ActionFact>(
+    'isolate',
+    {
+      did: handFacts.isolateDid,
+      chance: handFacts.isolateChance,
+      faced: handFacts.isolateFaced,
+      answer: handFacts.isolateAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'steal', ActionFact>(
+    'steal',
+    {
+      did: handFacts.stealDid,
+      chance: handFacts.stealChance,
+      faced: handFacts.stealFaced,
+      answer: handFacts.stealAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'three-bet', ActionFact>(
+    'three-bet',
+    {
+      did: handFacts.threeBetDid,
+      chance: handFacts.threeBetChance,
+      faced: handFacts.threeBetFaced,
+      answer: handFacts.threeBetAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'squeeze', ActionFact>(
+    'squeeze',
+    {
+      did: handFacts.squeezeDid,
+      chance: handFacts.squeezeChance,
+      faced: handFacts.squeezeFaced,
+      answer: handFacts.squeezeAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts(
+    'cold-call',
+    { did: handFacts.coldCallDid, chance: handFacts.coldCallChance },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'four-bet', ActionFact>(
+    'four-bet',
+    {
+      did: handFacts.fourBetDid,
+      chance: handFacts.fourBetChance,
+      faced: handFacts.fourBetFaced,
+      answer: handFacts.fourBetAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'five-bet', ActionFact>(
+    'five-bet',
+    {
+      did: handFacts.fiveBetDid,
+      chance: handFacts.fiveBetChance,
+      faced: handFacts.fiveBetFaced,
+      answer: handFacts.fiveBetAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  ...actionFacts<'resteal', ActionFact>(
+    'resteal',
+    {
+      did: handFacts.restealDid,
+      chance: handFacts.restealChance,
+      faced: handFacts.restealFaced,
+      answer: handFacts.restealAnswer,
+    },
+    PREFLOP_SINCE,
+  ),
+  'preflop-role': {
+    column: handFacts.preflopRole,
+    domain: oneOf(PREFLOP_ROLES),
+    since: PREFLOP_SINCE,
+  },
+  'preflop-faced-first': {
+    column: handFacts.preflopFacedFirst,
+    domain: oneOf(PREFLOP_FACED_FIRST),
+    since: PREFLOP_SINCE,
+  },
+  limpers: {
+    column: handFacts.limpers,
+    domain: { kind: 'range', min: 0, max: 9 },
+    since: PREFLOP_SINCE,
+  },
+  'preflop-line': {
+    column: handFacts.preflopLine,
+    domain: { kind: 'pattern', pattern: /^[XBCRF]{1,20}$/ },
+    since: PREFLOP_SINCE,
+  },
+  'open-size': {
+    column: handFacts.openSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'three-bet-size': {
+    column: handFacts.threeBetSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'four-bet-size': {
+    column: handFacts.fourBetSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'hero-raise-size': {
+    column: handFacts.heroRaiseSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'hero-raise-multiple': {
+    column: handFacts.heroRaiseMultiple,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'hero-second-raise-size': {
+    column: handFacts.heroSecondRaiseSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'hero-second-raise-multiple': {
+    column: handFacts.heroSecondRaiseMultiple,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'size-faced': {
+    column: handFacts.sizeFaced,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'starting-stack': {
+    column: handFacts.heroStartingStack,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  'preflop-effective-stack': {
+    column: handFacts.preflopEffectiveStack,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
+  straddle: {
+    column: handFacts.straddle,
+    domain: BOOLEAN,
+    since: PREFLOP_SINCE,
+  },
+  antes: { column: handFacts.antes, domain: BOOLEAN, since: PREFLOP_SINCE },
+} satisfies Record<string, FactEntry>;
 
 /**
  * Every fact a criterion can name, by the name the query gives it. Adding
@@ -363,6 +573,7 @@ const FACTS = {
   ...streetFacts('flop', 4),
   ...streetFacts('turn', 4),
   ...streetFacts('river', 4),
+  ...PREFLOP_FACTS,
 } satisfies Record<string, FactEntry>;
 
 export type FactKey = keyof typeof FACTS;

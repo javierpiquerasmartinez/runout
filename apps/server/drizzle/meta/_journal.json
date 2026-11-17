@@ -288,6 +288,13 @@
       "when": 1794923828726,
       "tag": "0040_postflop_street_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794924016822,
+      "tag": "0041_hand_facts_preflop",
+      "breakpoints": true
     }
   ]
 }
