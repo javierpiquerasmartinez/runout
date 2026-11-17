@@ -2,6 +2,12 @@ import { and, gte, inArray, lte, not, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { handFacts, hands } from '../database/schema.js';
 import {
+  BOARD_PAIRINGS,
+  BOARD_RANKS,
+  FLOP_SUITS,
+  LATER_SUITS,
+} from '../hands/replay/board-texture.js';
+import {
   HAND_CLASSES,
   POSITIONS,
   POT_TYPES,
@@ -84,27 +90,30 @@ function actionFacts<A extends string, F extends ActionFact = 'did' | 'chance'>(
   ) as Record<`${A}-${F}`, FactEntry>;
 }
 
+/** The rules version that added the preflop facts. */
+const PREFLOP_SINCE = 3;
+
 /** The preflop facts: facts catalogue §1 and §2.2–2.3. */
 const PREFLOP_FACTS = {
   ...actionFacts(
     'vpip',
     { did: handFacts.vpipDid, chance: handFacts.vpipChance },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts(
     'pfr',
     { did: handFacts.pfrDid, chance: handFacts.pfrChance },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts(
     'open',
     { did: handFacts.openDid, chance: handFacts.openChance },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts(
     'limp',
     { did: handFacts.limpDid, chance: handFacts.limpChance },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'isolate', ActionFact>(
     'isolate',
@@ -114,7 +123,7 @@ const PREFLOP_FACTS = {
       faced: handFacts.isolateFaced,
       answer: handFacts.isolateAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'steal', ActionFact>(
     'steal',
@@ -124,7 +133,7 @@ const PREFLOP_FACTS = {
       faced: handFacts.stealFaced,
       answer: handFacts.stealAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'three-bet', ActionFact>(
     'three-bet',
@@ -134,7 +143,7 @@ const PREFLOP_FACTS = {
       faced: handFacts.threeBetFaced,
       answer: handFacts.threeBetAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'squeeze', ActionFact>(
     'squeeze',
@@ -144,12 +153,12 @@ const PREFLOP_FACTS = {
       faced: handFacts.squeezeFaced,
       answer: handFacts.squeezeAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts(
     'cold-call',
     { did: handFacts.coldCallDid, chance: handFacts.coldCallChance },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'four-bet', ActionFact>(
     'four-bet',
@@ -159,7 +168,7 @@ const PREFLOP_FACTS = {
       faced: handFacts.fourBetFaced,
       answer: handFacts.fourBetAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'five-bet', ActionFact>(
     'five-bet',
@@ -169,7 +178,7 @@ const PREFLOP_FACTS = {
       faced: handFacts.fiveBetFaced,
       answer: handFacts.fiveBetAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   ...actionFacts<'resteal', ActionFact>(
     'resteal',
@@ -179,68 +188,84 @@ const PREFLOP_FACTS = {
       faced: handFacts.restealFaced,
       answer: handFacts.restealAnswer,
     },
-    2,
+    PREFLOP_SINCE,
   ),
   'preflop-role': {
     column: handFacts.preflopRole,
     domain: oneOf(PREFLOP_ROLES),
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   'preflop-faced-first': {
     column: handFacts.preflopFacedFirst,
     domain: oneOf(PREFLOP_FACED_FIRST),
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   limpers: {
     column: handFacts.limpers,
     domain: { kind: 'range', min: 0, max: 9 },
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   'preflop-line': {
     column: handFacts.preflopLine,
     domain: { kind: 'line' },
-    since: 2,
+    since: PREFLOP_SINCE,
   },
-  'open-size': { column: handFacts.openSize, domain: AMOUNT, since: 2 },
+  'open-size': {
+    column: handFacts.openSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
   'three-bet-size': {
     column: handFacts.threeBetSize,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
-  'four-bet-size': { column: handFacts.fourBetSize, domain: AMOUNT, since: 2 },
+  'four-bet-size': {
+    column: handFacts.fourBetSize,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
   'hero-raise-size': {
     column: handFacts.heroRaiseSize,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   'hero-raise-multiple': {
     column: handFacts.heroRaiseMultiple,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   'hero-second-raise-size': {
     column: handFacts.heroSecondRaiseSize,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   'hero-second-raise-multiple': {
     column: handFacts.heroSecondRaiseMultiple,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
-  'size-faced': { column: handFacts.sizeFaced, domain: AMOUNT, since: 2 },
+  'size-faced': {
+    column: handFacts.sizeFaced,
+    domain: AMOUNT,
+    since: PREFLOP_SINCE,
+  },
   'starting-stack': {
     column: handFacts.heroStartingStack,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
   'preflop-effective-stack': {
     column: handFacts.preflopEffectiveStack,
     domain: AMOUNT,
-    since: 2,
+    since: PREFLOP_SINCE,
   },
-  straddle: { column: handFacts.straddle, domain: BOOLEAN, since: 2 },
-  antes: { column: handFacts.antes, domain: BOOLEAN, since: 2 },
+  straddle: {
+    column: handFacts.straddle,
+    domain: BOOLEAN,
+    since: PREFLOP_SINCE,
+  },
+  antes: { column: handFacts.antes, domain: BOOLEAN, since: PREFLOP_SINCE },
 } satisfies Record<string, FactEntry>;
 
 /**
@@ -293,6 +318,122 @@ const FACTS = {
     column: handFacts.heroAggressor,
     domain: { kind: 'boolean' },
     since: 1,
+  },
+  // The Board's texture on each Street (facts catalogue §3.5).
+  'flop-suits': {
+    column: handFacts.flopSuits,
+    domain: oneOf(FLOP_SUITS),
+    since: 2,
+  },
+  'flop-pairing': {
+    column: handFacts.flopPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'flop-straight-possible': {
+    column: handFacts.flopStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'flop-connectedness': {
+    column: handFacts.flopConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'flop-high-card': {
+    column: handFacts.flopHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'turn-suits': {
+    column: handFacts.turnSuits,
+    domain: oneOf(LATER_SUITS),
+    since: 2,
+  },
+  'turn-pairing': {
+    column: handFacts.turnPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'turn-straight-possible': {
+    column: handFacts.turnStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-connectedness': {
+    column: handFacts.turnConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'turn-high-card': {
+    column: handFacts.turnHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'turn-pairs-board': {
+    column: handFacts.turnPairsBoard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-brings-flush': {
+    column: handFacts.turnBringsFlush,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-brings-straight': {
+    column: handFacts.turnBringsStraight,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-overcard': {
+    column: handFacts.turnOvercard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-suits': {
+    column: handFacts.riverSuits,
+    domain: oneOf(LATER_SUITS),
+    since: 2,
+  },
+  'river-pairing': {
+    column: handFacts.riverPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'river-straight-possible': {
+    column: handFacts.riverStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-connectedness': {
+    column: handFacts.riverConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'river-high-card': {
+    column: handFacts.riverHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'river-pairs-board': {
+    column: handFacts.riverPairsBoard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-brings-flush': {
+    column: handFacts.riverBringsFlush,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-brings-straight': {
+    column: handFacts.riverBringsStraight,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-overcard': {
+    column: handFacts.riverOvercard,
+    domain: { kind: 'boolean' },
+    since: 2,
   },
   ...PREFLOP_FACTS,
 } satisfies Record<string, FactEntry>;

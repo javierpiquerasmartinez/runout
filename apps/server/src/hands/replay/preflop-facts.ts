@@ -207,13 +207,12 @@ export function preflopFacts(hand: Hand): PreflopFacts {
     (decision) =>
       decision.raises === 1 && decision.callers > 0 && raising(decision.action),
   );
-  const inBeforeSqueeze = (decision: HeroDecision) =>
-    decision.raisers[0] === name ||
+  // The opener, or a caller of the open.
+  const inBeforeSqueeze =
+    facingThreeBet?.raisers[0] === name ||
     mine.some((m) => m.raises === 1 && m.action.type === 'call');
   const facingSqueeze =
-    squeezeMade && facingThreeBet && inBeforeSqueeze(facingThreeBet)
-      ? facingThreeBet
-      : undefined;
+    squeezeMade && inBeforeSqueeze ? facingThreeBet : undefined;
 
   // The Hero's steal, re-raised from a blind with nobody calling between.
   const restolen =
@@ -244,8 +243,8 @@ export function preflopFacts(hand: Hand): PreflopFacts {
     first.raises === 0 &&
     first.limpers > 0 &&
     couldRaise(name, first.before);
-  const raisedAny = mine.some((decision) => raising(decision.action));
   const heroRaises = mine.filter((decision) => raising(decision.action));
+  const raisedAny = heroRaises.length > 0;
 
   const multiple = (to: number, of: number) => round(to / of);
   const inBigBlinds = (amount: number) => round(amount / bigBlind);

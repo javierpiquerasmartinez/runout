@@ -267,6 +267,20 @@
       "when": 1794903507906,
       "tag": "0037_hand_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794903917003,
+      "tag": "0038_board_texture",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794904445161,
+      "tag": "0039_hand_facts_preflop",
+      "breakpoints": true
     }
   ]
 }
