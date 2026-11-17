@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -36,14 +36,14 @@ export function MoreFilters({
   open,
   onOpenChange,
   count,
-  savedName = null,
+  saved = null,
   onRemove = () => onChange([]),
   onSave,
 }: {
   criteria: FactCriterion[]
   onChange: (criteria: FactCriterion[]) => void
-  /** The name of the Saved Filter applied, while its criteria are unchanged: the chip shows it instead of their summary. */
-  savedName?: string | null
+  /** The Saved Filter applied: the chip shows its name instead of the criteria's summary, and, once modified, a menu. */
+  saved?: AppliedSavedFilter | null
   /** What the chip's × drops; by default every criterion. */
   onRemove?: () => void
   /** Without it the panel offers no "Guardar filtro…". */
@@ -55,31 +55,62 @@ export function MoreFilters({
 }) {
   const root = useRef<HTMLSpanElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  // The menu is only for a modified Saved Filter; changed back, or saved, it goes.
+  const showMenu = menuOpen && saved?.modified === true
 
   const close = () => {
     onOpenChange(false)
     trigger.current?.focus()
   }
+  const closeMenu = () => {
+    setMenuOpen(false)
+    trigger.current?.focus()
+  }
 
   useEffect(() => {
-    if (!open) return
+    if (!open && !showMenu) return
     const closeOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) onOpenChange(false)
+      if (root.current?.contains(event.target as Node)) return
+      onOpenChange(false)
+      setMenuOpen(false)
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
-  }, [open, onOpenChange])
+  }, [open, showMenu, onOpenChange])
 
   return (
     <span className="more-filters" ref={root}>
       <MoreFiltersChip
         criteria={criteria}
-        savedName={savedName}
+        saved={saved}
         trigger={trigger}
         open={open}
-        onOpen={() => onOpenChange(!open)}
+        menuOpen={showMenu}
+        onOpen={() => {
+          if (saved?.modified) {
+            setMenuOpen(!showMenu)
+            return
+          }
+          onOpenChange(!open)
+        }}
         onRemove={onRemove}
-      />
+      >
+        {showMenu && saved && (
+          <SavedFilterMenu
+            saved={saved}
+            onClose={closeMenu}
+            onEdit={() => {
+              setMenuOpen(false)
+              onOpenChange(true)
+            }}
+            onPick={(action) => {
+              closeMenu()
+              action()
+            }}
+          />
+        )}
+      </MoreFiltersChip>
       {open && (
         <MoreFiltersPanel
           criteria={criteria}
@@ -99,26 +130,43 @@ export function MoreFilters({
   )
 }
 
+/** The Saved Filter applied, as the Más filtros chip shows it, and what its menu does once it is modified. */
+export interface AppliedSavedFilter {
+  name: string
+  modified: boolean
+  /** Its criteria as saved, written as the address writes them, so the chip's list can tell which are new. */
+  criteria: string[]
+  onSaveChanges: () => void
+  onSaveAsNew: () => void
+  onDiscard: () => void
+}
+
 function MoreFiltersChip({
   criteria,
-  savedName,
+  saved,
   trigger,
   open,
+  menuOpen,
   onOpen,
   onRemove,
+  children,
 }: {
   criteria: FactCriterion[]
-  savedName: string | null
+  saved: AppliedSavedFilter | null
   trigger: RefObject<HTMLButtonElement | null>
   open: boolean
+  menuOpen: boolean
   onOpen: () => void
   onRemove: () => void
+  /** The modified Saved Filter's menu, placed under the chip. */
+  children?: ReactNode
 }) {
   const { t } = useI18n()
   const [listing, setListing] = useState(false)
   const tooltipId = useId()
   const summaries = criterionSummaries(criteria, t)
 
+  const savedName = saved?.name ?? null
   if (summaries.length === 0 && savedName === null) {
     return (
       <button type="button" ref={trigger} className="more-filters__idle" aria-expanded={open} onClick={onOpen}>
@@ -139,11 +187,12 @@ function MoreFiltersChip({
         ref={trigger}
         className="more-filters__open"
         aria-label={
-          savedName === null
+          saved === null
             ? t('library.moreFilters.chip.open', { summary: summaries.join(' · ') })
-            : t('library.moreFilters.chip.saved', { name: savedName })
+            : t(saved.modified ? 'library.moreFilters.chip.savedModified' : 'library.moreFilters.chip.saved', { name: saved.name })
         }
-        aria-expanded={open}
+        aria-haspopup={saved?.modified ? 'menu' : undefined}
+        aria-expanded={saved?.modified ? menuOpen : open}
         aria-describedby={listing ? tooltipId : undefined}
         onClick={onOpen}
         onFocus={() => setListing(true)}
@@ -151,22 +200,112 @@ function MoreFiltersChip({
       >
         <Icon name={savedName === null ? 'filter' : 'saved-filter'} size={14} />
         <span className="more-filters__summary">{savedName ?? text}</span>
-        {savedName === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
+        {saved?.modified && <span className="more-filters__modified">{t('library.moreFilters.chip.modified')}</span>}
+        {saved === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
       </button>
       <span className="more-filters__sep" aria-hidden="true" />
       <button type="button" className="more-filters__remove" aria-label={t('library.moreFilters.chip.remove')} onClick={onRemove}>
         <Icon name="close" size={12} />
       </button>
-      {listing && !open && ordered.length > 0 && (
+      {listing && !open && !menuOpen && ordered.length > 0 && (
         <ul className="more-filters__tip" role="tooltip" id={tooltipId}>
-          {ordered.map((criterion, index) => (
-            <li key={criterion.fact}>
-              <b>{t(`library.moreFilters.branch.${branchOf(criterion)}`)}</b> {summaries[index]}
-            </li>
-          ))}
+          {ordered.map((criterion, index) => {
+            const unsaved = saved?.modified ? unsavedChange(criterion, saved.criteria) : null
+            return (
+              <li key={criterion.fact} className={unsaved ? 'more-filters__tip-unsaved' : undefined}>
+                <b>{t(`library.moreFilters.branch.${branchOf(criterion)}`)}</b> {summaries[index]}
+                {unsaved && ` ${t(`library.moreFilters.chip.${unsaved}`)}`}
+              </li>
+            )
+          })}
         </ul>
       )}
+      {children}
     </span>
+  )
+}
+
+/** Whether the criterion is one the Saved Filter doesn't hold: on a fact it has no criterion on, or with other values. */
+function unsavedChange(criterion: FactCriterion, saved: string[]): 'added' | 'changed' | null {
+  if (saved.includes(writeFactCriterion(criterion))) return null
+  const fact = (text: string) => text.replace(/^!/, '').split(':')[0]
+  return saved.some((text) => fact(text) === criterion.fact) ? 'changed' : 'added'
+}
+
+/**
+ * The "Biblioteca · Filtro guardado modificado" board's menu, under the
+ * chip of a modified Saved Filter: back to Más filtros, or keep the changes
+ * (over it, or as a new one), or drop them. It opens on its first item;
+ * the arrows move through them and Escape closes it.
+ */
+function SavedFilterMenu({
+  saved,
+  onClose,
+  onEdit,
+  onPick,
+}: {
+  saved: AppliedSavedFilter
+  onClose: () => void
+  onEdit: () => void
+  onPick: (action: () => void) => void
+}) {
+  const { t } = useI18n()
+  const items = useRef<(HTMLButtonElement | null)[]>([])
+  const [focused, setFocused] = useState(0)
+  useEffect(() => {
+    items.current[focused]?.focus()
+  }, [focused])
+
+  const entries: { label: string; hint?: string; act: () => void; ruled?: boolean }[] = [
+    { label: t('library.savedFilter.edit'), hint: t('library.savedFilter.edit.hint'), act: onEdit },
+    {
+      label: t('library.savedFilter.saveChanges'),
+      hint: t('library.savedFilter.saveChanges.hint', { name: saved.name }),
+      act: () => onPick(saved.onSaveChanges),
+      ruled: true,
+    },
+    { label: t('library.savedFilter.saveAsNew'), act: () => onPick(saved.onSaveAsNew) },
+    { label: t('library.savedFilter.discard'), hint: t('library.savedFilter.discard.hint'), act: () => onPick(saved.onDiscard) },
+  ]
+  const onKeyDown = (event: KeyboardEvent) => {
+    const last = entries.length - 1
+    const moves: Record<string, number> = {
+      ArrowDown: Math.min(focused + 1, last),
+      ArrowUp: Math.max(focused - 1, 0),
+      Home: 0,
+      End: last,
+    }
+    if (event.key in moves) {
+      event.preventDefault()
+      setFocused(moves[event.key])
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+    }
+  }
+
+  return (
+    <div role="menu" aria-label={t('library.savedFilter.menu', { name: saved.name })} className="more-filters__menu" onKeyDown={onKeyDown}>
+      {entries.map((entry, index) => (
+        <Fragment key={entry.label}>
+          {entry.ruled && <span className="more-filters__menu-rule" aria-hidden="true" />}
+          <button
+            type="button"
+            role="menuitem"
+            ref={(element) => {
+              items.current[index] = element
+            }}
+            className="more-filters__menu-item"
+            tabIndex={index === focused ? 0 : -1}
+            onClick={entry.act}
+          >
+            {entry.label}
+            {entry.hint && <small>{entry.hint}</small>}
+          </button>
+        </Fragment>
+      ))}
+    </div>
   )
 }
 

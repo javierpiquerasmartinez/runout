@@ -135,6 +135,68 @@
   font-weight: 500;
   color: var(--text-primary);
 }
+/* A criterion the applied Saved Filter doesn't hold, in brass as on the board. */
+.more-filters__tip .more-filters__tip-unsaved {
+  color: var(--brass-ink);
+}
+
+/* "· modificado" after the Saved Filter's name. */
+.more-filters__modified {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--brass-hover);
+}
+
+/* The "Biblioteca · Filtro guardado modificado" board's menu, under the chip. */
+.more-filters__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 330px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+  white-space: normal;
+}
+.more-filters__menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.more-filters__menu-item small {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.more-filters__menu-item:hover,
+.more-filters__menu-item:focus-visible {
+  background: var(--color-hover);
+  outline: none;
+}
+.more-filters__menu-rule {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-rule);
+}
 
 .more-filters__panel {
   position: absolute;

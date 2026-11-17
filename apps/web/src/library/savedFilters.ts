@@ -41,7 +41,12 @@ export function hasSavedCriteria(filter: LibraryFilter): boolean {
  * stay. Applying the one applied drops it, criteria and all.
  */
 export function applySavedFilter(filter: LibraryFilter, saved: SavedFilter): LibraryFilter {
-  if (filter.saved === saved.id) return { ...filter, facts: [], stat: null, saved: null }
+  if (filter.saved === saved.id) return withoutSavedCriteria(filter)
+  return restoreSavedFilter(filter, saved)
+}
+
+/** The filter with the Saved Filter's criteria, as saved, in place of the Más filtros ones: applying it, or discarding changes to it. */
+export function restoreSavedFilter(filter: LibraryFilter, saved: SavedFilter): LibraryFilter {
   return {
     ...filter,
     facts: saved.criteria.facts.flatMap((text) => readFactCriterion(text) ?? []),
@@ -50,14 +55,37 @@ export function applySavedFilter(filter: LibraryFilter, saved: SavedFilter): Lib
   }
 }
 
-/** The Saved Filter the filter names, while it still holds that one's criteria unchanged; otherwise null. */
-export function appliedSavedFilter(filter: LibraryFilter, savedFilters: SavedFilter[]): SavedFilter | null {
+/** The filter with no Más filtros criteria and no Saved Filter: what removing one, or finding it gone, leaves. */
+export function withoutSavedCriteria(filter: LibraryFilter): LibraryFilter {
+  return { ...filter, facts: [], stat: null, saved: null }
+}
+
+/**
+ * The Saved Filter the filter names, and whether its criteria are no longer
+ * the saved ones (the "· modificado" chip); null when it names none, or one
+ * the list doesn't hold. The address keeps the id beside the criteria, so a
+ * reload keeps a modified one modified, and undoing the change by hand, in
+ * any order, makes it unchanged again.
+ */
+export function savedFilterState(
+  filter: LibraryFilter,
+  savedFilters: SavedFilter[],
+): { saved: SavedFilter; modified: boolean } | null {
   const saved = savedFilters.find((each) => each.id === filter.saved)
   if (!saved) return null
-  const current = savedCriteriaOf(filter)
-  const same =
-    current.stat === saved.criteria.stat &&
-    current.facts.length === saved.criteria.facts.length &&
-    current.facts.every((fact, index) => fact === saved.criteria.facts[index])
-  return same ? saved : null
+  const current = comparable(savedCriteriaOf(filter))
+  // As the Library reads them, so a criterion it can't read doesn't count as a change.
+  const kept = comparable(savedCriteriaOf(restoreSavedFilter(filter, saved)))
+  return { saved, modified: current !== kept }
+}
+
+/** The criteria as one text, the order left out. */
+function comparable(criteria: SavedCriteria): string {
+  return JSON.stringify([[...criteria.facts].sort(), criteria.stat])
+}
+
+/** How many of the Saved Filter's criteria are left out: those the server dropped reading it, and those the Library can't read. */
+export function droppedCriteria(saved: SavedFilter): number {
+  const unread = saved.criteria.facts.filter((text) => readFactCriterion(text) === null).length
+  return saved.dropped + unread + (saved.criteria.stat !== null && statCriterion(saved.criteria.stat) === null ? 1 : 0)
 }
