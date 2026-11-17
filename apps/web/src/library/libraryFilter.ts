@@ -30,6 +30,11 @@ export interface LibraryFilter {
   stat: StatCriterion | null
   /** What Más filtros sets: criteria on the Hero's facts, every one of which a Hand must meet. */
   facts: FactCriterion[]
+  /**
+   * The id of the Saved Filter applied, whose criteria `stat` and `facts`
+   * hold. Only the address keeps it; the server is asked for the criteria.
+   */
+  saved: string | null
 }
 
 /** One Stat and a side, written `vpip:taken` in the query and the address. */
@@ -51,12 +56,16 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   tags: [],
   stat: null,
   facts: [],
+  saved: null,
 }
 
 export type QuickRange = 'today' | 'yesterday' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
 
 /** The period the Library starts on, and the one a bare address means. */
 export const DEFAULT_PERIOD: QuickRange = 'today'
+
+/** How the address names the Saved Filter applied, by id: `saved=<id>`. */
+const SAVED_PARAM = 'saved'
 
 /** How the address says all time, since leaving the period out means the default one. */
 const ALL_TIME_PARAM = { name: 'period', value: 'all' } as const
@@ -106,7 +115,7 @@ export function differsFromDefault(filter: LibraryFilter, now: Date = new Date()
   const byDefault = defaultLibraryFilter(now)
   return (Object.keys(filter) as (keyof LibraryFilter)[]).some((key) => {
     const part = filter[key]
-    if (key === 'stat') return part !== null
+    if (key === 'stat' || key === 'saved') return part !== null
     return Array.isArray(part) ? part.length > 0 : part !== byDefault[key]
   })
 }
@@ -135,6 +144,7 @@ export function librarySearch(filter: LibraryFilter, now: Date = new Date()): st
   writeFilter(isDefaultPeriod ? { ...filter, from: null, to: null } : filter, (day) => day).forEach((value, key) =>
     query.append(key, value),
   )
+  if (filter.saved) query.set(SAVED_PARAM, filter.saved)
   const search = query.toString()
   return search && `?${search}`
 }
@@ -158,11 +168,12 @@ export function libraryFilterFromSearch(search: string, now: Date = new Date()):
     tags: query.getAll('tag').filter(Boolean),
     stat: statCriterion(query.get('stat')),
     facts: query.getAll('fact').flatMap((text) => readFactCriterion(text) ?? []),
+    saved: query.get(SAVED_PARAM) || null,
   }
 }
 
 /** `vpip:taken` as a Stat criterion; anything else, as an old or hand-edited address may hold, is none. */
-function statCriterion(text: string | null): StatCriterion | null {
+export function statCriterion(text: string | null): StatCriterion | null {
   const [key, side, ...rest] = text?.split(':') ?? []
   if (rest.length > 0 || !(STAT_KEYS as readonly string[]).includes(key) || (side !== 'opportunity' && side !== 'taken')) return null
   return { key: key as StatKey, side }
