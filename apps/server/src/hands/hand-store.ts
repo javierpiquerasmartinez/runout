@@ -1,8 +1,9 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
-import { handStats, hands } from '../database/schema.js';
+import { handFacts, handStats, hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 import type { HeroResults } from './hero-results.js';
+import { FACTS_VERSION, heroFacts } from './replay/hero-facts.js';
 import { heroOutcome, type HeroResult } from './replay/hero-result.js';
 import { heroStats, STAT_KEYS } from './replay/hero-stats.js';
 import { finalPot } from './replay/overview.js';
@@ -113,7 +114,7 @@ export async function storedIds(
 /**
  * Gives the stored Hands in `ids` (by key) their Hand History from `read`,
  * when they have none, and rewrites their content, Rake, Rake Generated and
- * Stat rows as read from that text: stored without it, they had the Fees
+ * Stat rows and facts as read from that text: stored without it, they had the Fees
  * inside the Rake. A Hand's text, once set, is never replaced: it stays the
  * first text it was read from.
  */
@@ -152,10 +153,12 @@ export async function fillHistoriesAndReread(
         )
         .where(and(eq(hands.id, sql`${filled}.id`), isNull(hands.handHistory)))
         .returning({ id: hands.id });
-      await replaceStats(
-        tx,
-        reread.map(({ id }) => ({ id, hand: byKey.get(keyById.get(id)!)! })),
-      );
+      const rewritten = reread.map(({ id }) => ({
+        id,
+        hand: byKey.get(keyById.get(id)!)!,
+      }));
+      await replaceStats(tx, rewritten);
+      await writeFacts(tx, rewritten);
     }
   });
 }
@@ -203,10 +206,12 @@ export async function storeHands(
       })
       .returning(keyColumns);
     for (const row of stored) ids.set(rowKey(row), row.id);
-    await replaceStats(
-      tx,
-      stored.map((row) => ({ id: row.id, hand: toStore.get(rowKey(row))! })),
-    );
+    const storedHands = stored.map((row) => ({
+      id: row.id,
+      hand: toStore.get(rowKey(row))!,
+    }));
+    await replaceStats(tx, storedHands);
+    await writeFacts(tx, storedHands);
   }
   const missing = [...toStore.values()].filter((hand) => !ids.has(keyOf(hand)));
   if (missing.length > 0) {
@@ -276,4 +281,43 @@ export async function replaceStats(
   for (const chunk of inChunks(rows, 4)) {
     await db.insert(handStats).values(chunk);
   }
+}
+
+/** The parameters one facts row takes to write: the columns `factsRow` sets. */
+const FACTS_COLUMNS = 13;
+
+/** The facts row of `hand`, stored as `handId`, by the current rules. */
+function factsRow(handId: string, hand: Hand): typeof handFacts.$inferInsert {
+  return { handId, version: FACTS_VERSION, ...heroFacts(hand) };
+}
+
+/**
+ * Writes the facts rows of the stored Hands given, each worked out from the
+ * Hand given with it by the current rules (see `heroFacts`), in place of any
+ * row they had.
+ */
+export async function writeFacts(
+  db: Database | Transaction,
+  stored: { id: string; hand: Hand }[],
+): Promise<void> {
+  for (const chunk of inChunks(stored, FACTS_COLUMNS)) {
+    const rows = chunk.map(({ id, hand }) => factsRow(id, hand));
+    const replaced = Object.fromEntries(
+      Object.keys(rows[0])
+        .filter((column) => column !== 'handId')
+        .map((column) => [
+          column,
+          sql`excluded.${sql.identifier(columnName(column))}`,
+        ]),
+    );
+    await db
+      .insert(handFacts)
+      .values(rows)
+      .onConflictDoUpdate({ target: handFacts.handId, set: replaced });
+  }
+}
+
+/** A `hand_facts` property's column name. */
+function columnName(property: string): string {
+  return handFacts[property as keyof typeof handFacts.$inferInsert].name;
 }

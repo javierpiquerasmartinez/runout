@@ -19,6 +19,7 @@ import {
   type Transaction,
 } from '../database/database.js';
 import {
+  handFacts,
   handStats,
   hands,
   identities,
@@ -616,7 +617,7 @@ export class RoomsService {
 
   /**
    * Deletes the Room Hands of a Room that is closing, with everything that
-   * hangs off them: Notes, Marks, Tag links, Stats, Queue Entries and Playbacks,
+   * hangs off them: Notes, Marks, Tag links, Stats, facts, Queue Entries and Playbacks,
    * whichever Room (closed by now) they were in.
    */
   private async discardRoomHands(
@@ -636,6 +637,7 @@ export class RoomsService {
     await tx.delete(tagLinks).where(inArray(tagLinks.handId, discarded));
     await tx.delete(marks).where(inArray(marks.handId, discarded));
     await tx.delete(handStats).where(inArray(handStats.handId, discarded));
+    await tx.delete(handFacts).where(inArray(handFacts.handId, discarded));
     await tx.delete(notes).where(inArray(notes.handId, discarded));
     await tx.delete(playbacks).where(inArray(playbacks.handId, discarded));
     await tx
