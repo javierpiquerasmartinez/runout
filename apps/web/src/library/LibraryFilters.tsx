@@ -14,6 +14,7 @@ import {
   type LibraryFilter,
   type QuickRange,
 } from './libraryFilter'
+import { MoreFilters } from './MoreFilters'
 import { STAT_TILES } from './stats'
 import './LibraryFilters.css'
 
@@ -22,16 +23,24 @@ import './LibraryFilters.css'
  * Poker Site, Hero and Stake offering only what the Library holds, any
  * number of each ticked, and a way to clear them all. Marked only is the "Marcadas" collection beside it.
  * A Stat criterion, set from a Stat's links, shows as a chip naming the Stat
- * and the side, removed on its own.
+ * and the side, removed on its own. "Más filtros" follows them, as one
+ * chip once it holds criteria (`MoreFilters`).
  */
 export function LibraryFilters({
   filter,
   options,
   onChange,
+  moreFilters,
 }: {
   filter: LibraryFilter
   options: LibraryPage['options']
   onChange: (filter: LibraryFilter) => void
+  /** Whether the Más filtros panel is open, and the counts of Hands it shows. */
+  moreFilters: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    count: { hands: number | null; of: number | null }
+  }
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -107,6 +116,13 @@ export function LibraryFilters({
         value={filter.stakes}
         options={stakes.map((stake) => ({ value: stake.key, label: stakeName(stake) }))}
         onChange={(stakes) => set({ stakes })}
+      />
+      <MoreFilters
+        criteria={filter.facts}
+        onChange={(facts) => set({ facts })}
+        open={moreFilters.open}
+        onOpenChange={moreFilters.onOpenChange}
+        count={moreFilters.count}
       />
       {statChip && (
         <Chip variant="active" onRemove={() => set({ stat: null })} removeLabel={t('library.stats.chip.remove', { filter: statChip })}>

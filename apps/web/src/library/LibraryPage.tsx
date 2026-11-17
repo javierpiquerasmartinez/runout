@@ -97,6 +97,10 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [results, setResults] = useState<Results | null>(null)
   const [stats, setStats] = useState<{ state: 'loaded'; stats: LibraryStats } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [importing, setImporting] = useState(false)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  // While the Más filtros panel is open it says how many Hands the rest of the filter keeps, besides what it keeps.
+  const [handsBeforeMoreFilters, setHandsBeforeMoreFilters] = useState<{ query: string; total: number } | null>(null)
+  const beforeMoreFiltersQuery = libraryFilterQuery({ ...filter, facts: [] }).toString()
   // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
@@ -126,6 +130,20 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       cancelled = true
     }
   }, [token, pageNumber, filter, sort, revision])
+
+  useEffect(() => {
+    if (!moreFiltersOpen) return
+    let cancelled = false
+    const query = new URLSearchParams({ page: '1', pageSize: '1' })
+    new URLSearchParams(beforeMoreFiltersQuery).forEach((value, key) => query.append(key, value))
+    api<Page>(`/library/hands?${query}`, { token })
+      .then((read) => !cancelled && setHandsBeforeMoreFilters({ query: beforeMoreFiltersQuery, total: read.total }))
+      // Without it the panel counts only the Hands kept.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [token, moreFiltersOpen, beforeMoreFiltersQuery, revision])
 
   // The Results Graph reads the same filter, so it describes the same Hands, and its Zoom; paging leaves it be.
   useEffect(() => {
@@ -420,7 +438,19 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             </p>
           )}
           {page && page.counts.all > 0 && view !== 'imports' && (
-            <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />
+            <LibraryFilters
+              filter={filter}
+              options={page.options}
+              onChange={changeFilter}
+              moreFilters={{
+                open: moreFiltersOpen,
+                onOpenChange: setMoreFiltersOpen,
+                count: {
+                  hands: page.total,
+                  of: handsBeforeMoreFilters?.query === beforeMoreFiltersQuery ? handsBeforeMoreFilters.total : null,
+                },
+              }}
+            />
           )}
           {!room && (
             <SegmentedControl
