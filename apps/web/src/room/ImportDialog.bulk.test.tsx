@@ -59,6 +59,8 @@ beforeEach(() => {
       if (url.startsWith('https://storage.test/')) return putting(url)
       if (url === '/api/library/imports/previews') {
         const file = (init.body as FormData).get('file') as File
+        // Past 2,000 Hands the server stops reading and refuses the file.
+        if (file.name === 'export.zip') return Response.json({ reason: 'too-many-hands', limit: 2000 }, { status: 400 })
         return Response.json(previews[file.name], { status: 201 })
       }
       if (url === '/api/library/bulk-imports' && method === 'POST') {
@@ -126,6 +128,21 @@ describe('ImportDialog, a large import', () => {
     expect(screen.getByText(/we will email you/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Upload and import' })).toBeTruthy()
     expect(sent).toEqual([])
+  })
+
+  it('offers a large import when the server finds a file holds more than 2,000 Hands', async () => {
+    renderDialog()
+
+    await choose(sized('big.txt', 4), sized('export.zip', 4))
+    expect(await screen.findByText('This import has more than 2,000 hands: it will be a large import, without a preview')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Continue as a large import' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Upload and import' }))
+
+    await screen.findByText('You can close now; we will email you')
+    expect(started).toEqual([
+      { name: 'big.txt', size: 4 },
+      { name: 'export.zip', size: 4 },
+    ])
   })
 
   it('offers a large import once the files read hold more than 2,000 Hands', async () => {
