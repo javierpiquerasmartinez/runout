@@ -284,7 +284,7 @@ export async function replaceStats(
 }
 
 /** The parameters one facts row takes to write: the columns `factsRow` sets. */
-const FACTS_COLUMNS = 13;
+const FACTS_COLUMNS = 36;
 
 /** The facts row of `hand`, stored as `handId`, by the current rules. */
 function factsRow(handId: string, hand: Hand): typeof handFacts.$inferInsert {
