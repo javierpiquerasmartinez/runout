@@ -28,10 +28,16 @@ export function LibraryFilters({
   options,
   onChange,
   moreFilters,
+  savedName = null,
+  onSave,
 }: {
   filter: LibraryFilter
   options: LibraryPage['options']
   onChange: (filter: LibraryFilter) => void
+  /** The name of the Saved Filter applied, while unchanged: Más filtros shows it, and its × drops the whole of it. */
+  savedName?: string | null
+  /** Opens "Guardar filtro"; without it nothing is offered for saving. */
+  onSave?: () => void
   /** Whether the Más filtros panel is open, and the counts of Hands it shows. */
   moreFilters: {
     open: boolean
@@ -112,6 +118,9 @@ export function LibraryFilters({
       <MoreFilters
         value={{ facts: filter.facts, stat: filter.stat }}
         onChange={set}
+        savedName={savedName}
+        onRemove={() => set(savedName === null ? { facts: [], stat: null } : { facts: [], stat: null, saved: null })}
+        onSave={onSave}
         open={moreFilters.open}
         onOpenChange={moreFilters.onOpenChange}
         count={moreFilters.count}
