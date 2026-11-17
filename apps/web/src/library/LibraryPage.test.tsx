@@ -1445,6 +1445,35 @@ describe('LibraryPage', () => {
       expect(window.location.search).toBe('?period=all&hero=Hero')
     })
 
+    it('offers Más filtros, keeping the Room in the address, and adds Hands from the list it keeps', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room)
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.click(within(filters).getByRole('button', { name: /^More filters/ }))
+      const panel = screen.getByRole('dialog', { name: 'More filters' })
+      await userEvent.click(within(within(panel).getByRole('group', { name: 'Pot type' })).getByRole('button', { name: '3-bet' }))
+      await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+
+      expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
+      expect(window.location.search).toBe('?period=all&fact=pot-type%3A3-bet')
+      expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot')
+
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add 1 to the room' }))
+
+      expect(addRequests).toEqual(['POST /api/rooms/RNT4K9PX/library-hands {"handIds":["h1"]}'])
+      await waitFor(() => expect(window.location.pathname).toBe('/room/RNT4K9PX'))
+    })
+
+    it('reads Más filtros from the Room’s address, as one chip', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room, '/room/RNT4K9PX/library?period=all&fact=pot-type:3-bet')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot')
+      expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+    })
+
     it('offers no Room to add to when opened on its own', async () => {
       renderLibrary()
       await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
