@@ -6,6 +6,7 @@ import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
 import { handFacts, hands } from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
+import { FACTS_VERSION } from '../src/hands/replay/hero-facts.js';
 import { rereadHands } from '../src/hands/reread-backfill.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { freshDatabase } from './support/fresh-database.js';
@@ -131,6 +132,40 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  it('filters by the Board’s texture on each Street', async () => {
+    const account = await newAccount(running.httpServer);
+    // The session's flops, as dealt: Qs Qd Ts, 3d 6h 9s with the turn 8c,
+    // and Ts 4s Tc. Two are rewritten: a flop of three hearts with a heart
+    // on the turn, and a monotone flop.
+    await importText(
+      account.token,
+      freshHandHistory('pokerstars-session.txt')
+        .replaceAll('[3d 6h 9s]', '[3h 6h 5d]')
+        .replace('[8c]', '[8h]')
+        .replace('Board [3d 6h 9s 8c]', 'Board [3h 6h 5d 8h]')
+        .replaceAll('[Ts 4s Tc]', '[Ts 4s 2s]'),
+    );
+    const cases: [string, number][] = [
+      [fact('flop-suits:monotone'), 1],
+      [fact('flop-suits:two-tone'), 2],
+      [fact('flop-pairing:paired'), 1],
+      [fact('!flop-pairing:paired'), 3],
+      [fact('turn-brings-flush:true'), 1],
+      [fact('turn-suits:flush-possible'), 1],
+      [fact('turn-suits:no-flush'), 0],
+      [fact('flop-high-card:Q,6'), 2],
+      [fact('flop-connectedness:3..'), 1],
+      [fact('flop-straight-possible:true'), 1],
+      [fact('turn-overcard:true'), 1],
+      [`${fact('flop-suits:two-tone')}&${fact('flop-high-card:T')}`, 0],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
   it('rejects an unknown fact, an impossible value or a malformed range', async () => {
     const account = await newAccount(running.httpServer);
     for (const criterion of [
@@ -146,6 +181,12 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       'players:..',
       'players:x..3',
       'players:3',
+      'flop-suits:no-flush',
+      'turn-suits:monotone',
+      'flop-pairing:pair',
+      'flop-connectedness:..6',
+      'flop-high-card:10',
+      'turn-overcard:yes',
       '!',
     ]) {
       for (const endpoint of ['hands', 'hand-ids', 'results', 'stats']) {
@@ -268,7 +309,7 @@ describe('Each Hand’s facts row (e2e)', () => {
     expect(await count(account.token, fact('!hero-position:UTG'))).toBe(6);
     expect(
       (await factsOf(all.map(({ id }) => id))).map((row) => row.version),
-    ).toEqual(Array(6).fill(1));
+    ).toEqual(Array(6).fill(FACTS_VERSION));
     // Run again: nothing is behind.
     expect(await rederiveFacts(db)).toBe(0);
   });
