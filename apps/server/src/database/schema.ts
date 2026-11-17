@@ -14,6 +14,7 @@ import {
   numeric,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -420,6 +421,32 @@ export const handStats = pgTable(
   },
   (table) => [primaryKey({ columns: [table.handId, table.stat] })],
 );
+
+/**
+ * What a Hand tells about its Hero (ADR 0012): one row per Hand, worked out
+ * from `content` by `heroFacts` when the Hand is stored, so that Filters read
+ * typed columns. Each fact is defined in the facts catalogue; null where it
+ * doesn't apply. `version` is the rules version that worked the row out:
+ * `db:rederive-facts` rewrites the rows behind it. Deleted with the Hand.
+ */
+export const handFacts = pgTable('hand_facts', {
+  handId: uuid('hand_id')
+    .primaryKey()
+    .references(() => hands.id),
+  version: integer('version').notNull(),
+  playersDealt: smallint('players_dealt').notNull(),
+  heroPosition: text('hero_position'),
+  /** As the Lab writes a Combo, e.g. `AhKd`. */
+  heroCombo: text('hero_combo'),
+  /** One of the 169, e.g. `AKs`, `77`, `T9o`. */
+  heroHandClass: text('hero_hand_class'),
+  potType: text('pot_type').notNull(),
+  openerPosition: text('opener_position'),
+  threeBettorPosition: text('three_bettor_position'),
+  fourBettorPosition: text('four_bettor_position'),
+  aggressorPosition: text('aggressor_position'),
+  heroAggressor: boolean('hero_aggressor').notNull(),
+});
 
 /**
  * A Hand placed in a Room's Queue, with its Author in that Room. Removing it
