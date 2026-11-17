@@ -1,10 +1,22 @@
-import { and, gte, inArray, lte, not, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  arrayOverlaps,
+  gte,
+  inArray,
+  lte,
+  not,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { handFacts, hands } from '../database/schema.js';
+import { MADE_HANDS } from '@runout/poker';
 import {
   HAND_CLASSES,
+  KICKERS,
   POSITIONS,
   POT_TYPES,
+  STREET_DRAWS,
 } from '../hands/replay/hero-facts.js';
 import { Rejected } from '../rejection/rejection.js';
 
@@ -28,6 +40,8 @@ export type FactCriterion = {
 /** How a fact's values are written, and which ones it can take. */
 type Domain =
   | { kind: 'set'; values: ReadonlySet<string> }
+  /** A column holding several values: a criterion keeps any it overlaps. */
+  | { kind: 'members'; values: ReadonlySet<string> }
   | { kind: 'boolean' }
   | { kind: 'range'; min: number; max: number };
 
@@ -44,6 +58,11 @@ interface FactEntry {
 
 const oneOf = (values: readonly string[]): Domain => ({
   kind: 'set',
+  values: new Set(values),
+});
+
+const anyOf = (values: readonly string[]): Domain => ({
+  kind: 'members',
   values: new Set(values),
 });
 
@@ -97,6 +116,72 @@ const FACTS = {
     column: handFacts.heroAggressor,
     domain: { kind: 'boolean' },
     since: 1,
+  },
+  // The Hero's cards on each Street.
+  'flop-made-hand': {
+    column: handFacts.flopMadeHand,
+    domain: oneOf(MADE_HANDS),
+    since: 2,
+  },
+  'flop-draw': {
+    column: handFacts.flopDraws,
+    domain: anyOf(STREET_DRAWS),
+    since: 2,
+  },
+  'flop-nuts': {
+    column: handFacts.flopNuts,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'flop-kicker': {
+    column: handFacts.flopKicker,
+    domain: oneOf(KICKERS),
+    since: 2,
+  },
+  'flop-nut-flush-draw': {
+    column: handFacts.flopNutFlushDraw,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-made-hand': {
+    column: handFacts.turnMadeHand,
+    domain: oneOf(MADE_HANDS),
+    since: 2,
+  },
+  'turn-draw': {
+    column: handFacts.turnDraws,
+    domain: anyOf(STREET_DRAWS),
+    since: 2,
+  },
+  'turn-nuts': {
+    column: handFacts.turnNuts,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-kicker': {
+    column: handFacts.turnKicker,
+    domain: oneOf(KICKERS),
+    since: 2,
+  },
+  'turn-nut-flush-draw': {
+    column: handFacts.turnNutFlushDraw,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-made-hand': {
+    column: handFacts.riverMadeHand,
+    domain: oneOf(MADE_HANDS),
+    since: 2,
+  },
+  'river-nuts': {
+    column: handFacts.riverNuts,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-kicker': {
+    column: handFacts.riverKicker,
+    domain: oneOf(KICKERS),
+    since: 2,
   },
 } satisfies Record<string, FactEntry>;
 
@@ -171,12 +256,14 @@ export function factCriteriaWhere(criteria: FactCriterion[]): SQL {
               ? undefined
               : lte(entry.column, criterion.range.max),
           )!
-        : inArray(
-            entry.column,
-            entry.domain.kind === 'boolean'
-              ? criterion.values.map((value) => value === 'true')
-              : criterion.values,
-          );
+        : entry.domain.kind === 'members'
+          ? arrayOverlaps(entry.column, criterion.values)
+          : inArray(
+              entry.column,
+              entry.domain.kind === 'boolean'
+                ? criterion.values.map((value) => value === 'true')
+                : criterion.values,
+            );
     // A fact that is empty (null) never meets a criterion, so excluding one
     // keeps the Hand.
     const kept = criterion.exclude ? not(sql`coalesce(${met}, false)`) : met;

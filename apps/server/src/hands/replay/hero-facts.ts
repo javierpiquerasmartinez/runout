@@ -1,4 +1,14 @@
-import type { Action, Hand } from '../hand.js';
+import {
+  cardCode,
+  classifyCombo,
+  COMBINATION_DRAWS,
+  DRAWS,
+  strength,
+  type CombinationDrawCategory,
+  type DrawCategory,
+  type MadeHandCategory,
+} from '@runout/poker';
+import type { Action, Hand, Street } from '../hand.js';
 import { positions, type Position } from './positions.js';
 
 /**
@@ -7,7 +17,7 @@ import { positions, type Position } from './positions.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 1;
+export const FACTS_VERSION = 2;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -75,6 +85,22 @@ export interface HeroFacts {
   aggressorPosition: Position | null;
   /** The Hero made the last preflop raise. */
   heroAggressor: boolean;
+  // The Hero's cards on each Street (facts catalogue §3.4): null when the
+  // Street wasn't dealt, the Hero had folded before it, or their cards are
+  // unknown.
+  flopMadeHand: MadeHandCategory | null;
+  flopDraws: StreetDraw[] | null;
+  flopNuts: boolean | null;
+  flopKicker: Kicker | null;
+  flopNutFlushDraw: boolean | null;
+  turnMadeHand: MadeHandCategory | null;
+  turnDraws: StreetDraw[] | null;
+  turnNuts: boolean | null;
+  turnKicker: Kicker | null;
+  turnNutFlushDraw: boolean | null;
+  riverMadeHand: MadeHandCategory | null;
+  riverNuts: boolean | null;
+  riverKicker: Kicker | null;
 }
 
 /**
@@ -102,6 +128,7 @@ export function heroFacts(hand: Hand): HeroFacts {
     fourBettorPosition: position(raisers[2]),
     aggressorPosition: position(raisers.at(-1)),
     heroAggressor: raisers.at(-1) === hero,
+    ...streetCards(hand),
   };
 }
 
@@ -140,4 +167,173 @@ function handClass(combo: string): string {
   const [high, highSuit, low, lowSuit] = combo;
   if (high === low) return `${high}${low}`;
   return `${high}${low}${highSuit === lowSuit ? 's' : 'o'}`;
+}
+
+// The Hero's cards on each Street (facts catalogue §3.4).
+
+/**
+ * What a Street's Draws fact holds: every Draw and every combination Draw
+ * the Hero's Combo is in, the one-card backdoor included.
+ */
+export const STREET_DRAWS = [...DRAWS, ...COMBINATION_DRAWS] as const;
+
+export type StreetDraw = DrawCategory | CombinationDrawCategory;
+
+/**
+ * How good the Hero's other card is, when the Made Hand uses only one of
+ * them: the highest rank not on the Board, the next one, or any other.
+ */
+export const KICKERS = ['top', 'second', 'weak'] as const;
+
+export type Kicker = (typeof KICKERS)[number];
+
+/** How many Board cards each postflop Street has dealt. */
+const BOARD_SIZE = { flop: 3, turn: 4, river: 5 } as const;
+
+/** The Made Hands that use exactly one of the Hero's cards. */
+const ONE_CARD_HANDS: readonly MadeHandCategory[] = [
+  'top-pair',
+  'middle-pair',
+  'bottom-pair',
+  'trips',
+];
+
+type StreetCards = Pick<
+  HeroFacts,
+  | 'flopMadeHand'
+  | 'flopDraws'
+  | 'flopNuts'
+  | 'flopKicker'
+  | 'flopNutFlushDraw'
+  | 'turnMadeHand'
+  | 'turnDraws'
+  | 'turnNuts'
+  | 'turnKicker'
+  | 'turnNutFlushDraw'
+  | 'riverMadeHand'
+  | 'riverNuts'
+  | 'riverKicker'
+>;
+
+function streetCards(hand: Hand): StreetCards {
+  const flop = cardsOn(hand, 'flop');
+  const turn = cardsOn(hand, 'turn');
+  const river = cardsOn(hand, 'river');
+  return {
+    flopMadeHand: flop?.madeHand ?? null,
+    flopDraws: flop?.draws ?? null,
+    flopNuts: flop?.nuts ?? null,
+    flopKicker: flop ? flop.kicker : null,
+    flopNutFlushDraw: flop?.nutFlushDraw ?? null,
+    turnMadeHand: turn?.madeHand ?? null,
+    turnDraws: turn?.draws ?? null,
+    turnNuts: turn?.nuts ?? null,
+    turnKicker: turn ? turn.kicker : null,
+    turnNutFlushDraw: turn?.nutFlushDraw ?? null,
+    riverMadeHand: river?.madeHand ?? null,
+    riverNuts: river?.nuts ?? null,
+    riverKicker: river ? river.kicker : null,
+  };
+}
+
+/**
+ * The Hero's cards on the Board as it stands after `street` is dealt; null
+ * when it wasn't, or the Hero had folded before it.
+ */
+function cardsOn(hand: Hand, street: keyof typeof BOARD_SIZE) {
+  const hole = hand.hero.cards;
+  const size = BOARD_SIZE[street];
+  if (hole.length !== 2 || hand.board.length < size) return null;
+  if (foldedBefore(hand, street)) return null;
+  const board = hand.board.slice(0, size);
+  const { madeHand, draws, combinationDraws } = classifyCombo(hole, board, {
+    oneCardBackdoors: true,
+  });
+  return {
+    madeHand,
+    draws: [...draws, ...combinationDraws] as StreetDraw[],
+    nuts: isNuts(hole, board),
+    kicker: ONE_CARD_HANDS.includes(madeHand) ? kicker(hole, board) : null,
+    nutFlushDraw: draws.includes('flush-draw') && nutFlushDraw(hole, board),
+  };
+}
+
+const STREETS: readonly Street[] = ['preflop', 'flop', 'turn', 'river'];
+
+function foldedBefore(hand: Hand, street: Street): boolean {
+  return hand.actions.some(
+    (action) =>
+      action.type === 'fold' &&
+      action.screenName === hand.hero.screenName &&
+      STREETS.indexOf(action.street) < STREETS.indexOf(street),
+  );
+}
+
+/** Every card, as a Hand writes them (tens as `10`). */
+const DECK = [
+  'A',
+  'K',
+  'Q',
+  'J',
+  '10',
+  '9',
+  '8',
+  '7',
+  '6',
+  '5',
+  '4',
+  '3',
+  '2',
+].flatMap((rank) => ['s', 'h', 'd', 'c'].map((suit) => rank + suit));
+
+/** No two cards left in the deck beat the Hero's hand; a tie is still the nuts. */
+function isNuts(hole: string[], board: string[]): boolean {
+  const boardCodes = board.map(cardCode);
+  const hero = strength([...hole.map(cardCode), ...boardCodes]);
+  const used = new Set([...hole, ...board].map(cardCode));
+  const left = DECK.map(cardCode).filter((code) => !used.has(code));
+  for (let i = 0; i < left.length; i++) {
+    for (let j = i + 1; j < left.length; j++) {
+      if (strength([left[i], left[j], ...boardCodes]) > hero) return false;
+    }
+  }
+  return true;
+}
+
+/** How high a card's rank is: the ace 0, the deuce 12. */
+function rankIndex(card: string): number {
+  return RANKS.indexOf(card.slice(0, -1).replace('10', 'T'));
+}
+
+/**
+ * The Hero's card that isn't on the Board, rated against the ranks that
+ * aren't on it either.
+ */
+function kicker(hole: string[], board: string[]): Kicker {
+  const onBoard = new Set(board.map(rankIndex));
+  const other = hole.map(rankIndex).find((rank) => !onBoard.has(rank))!;
+  const above = [...RANKS].filter(
+    (_, rank) => rank < other && !onBoard.has(rank),
+  ).length;
+  return KICKERS[Math.min(above, 2)];
+}
+
+/**
+ * The Hero's highest card of the flush draw's suit is the highest of that
+ * suit not on the Board. Called only with a flush draw: four of a suit.
+ */
+function nutFlushDraw(hole: string[], board: string[]): boolean {
+  const suitOf = (card: string) => card.slice(-1);
+  const all = [...hole, ...board];
+  const suit = hole
+    .map(suitOf)
+    .find((s) => all.filter((card) => suitOf(card) === s).length === 4);
+  if (suit === undefined) return false;
+  const onBoard = new Set(
+    board.filter((card) => suitOf(card) === suit).map(rankIndex),
+  );
+  const highestOut = [...RANKS].findIndex((_, rank) => !onBoard.has(rank));
+  return hole.some(
+    (card) => suitOf(card) === suit && rankIndex(card) === highestOut,
+  );
 }
