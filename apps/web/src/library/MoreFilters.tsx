@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -20,6 +20,9 @@ import {
   type Section,
 } from './moreFilterBranches'
 import './MoreFilters.css'
+
+/** The Lab's matrix, for the hole cards: fetched once the Cards branch is opened, never with the page. */
+const HandClassMatrix = lazy(() => import('./HandClassMatrix'))
 
 /** How many characters of summary the chip shows before it counts the rest as "+N". */
 const CHIP_BUDGET = 56
@@ -348,6 +351,13 @@ function CriterionRow({
               </button>
             )
           })
+        ) : control.kind === 'hand-classes' ? (
+          <Suspense fallback={<span className="more-filters__dim">{t('library.moreFilters.handClasses.loading')}</span>}>
+            <HandClassMatrix
+              values={criterion && 'values' in criterion ? criterion.values : []}
+              onChange={(values) => onPut(values.length > 0 ? { fact: definition.fact, exclude, values } : null)}
+            />
+          </Suspense>
         ) : (
           <RangeControl
             label={fullLabel}

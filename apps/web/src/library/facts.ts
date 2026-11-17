@@ -1,3 +1,5 @@
+import { COMBINATION_DRAWS, DRAWS, MADE_HANDS } from '@runout/poker'
+
 /*
  * The Hero's facts a Más filtros criterion can name, as the server's
  * `FACTS` catalogue in `fact-criteria.ts` defines them (ADR 0001: no shared
@@ -35,6 +37,20 @@ const texture = (suits: readonly string[]) =>
     'high-card': { kind: 'set', values: BOARD_RANKS },
   }) as const
 
+/** Ranks from the highest down, as Hand Classes write them. */
+const RANKS = 'AKQJT98765432'
+
+/** The 169 Hand Classes the Hero can be dealt, as players write them: `AA`, `AKs`, `AKo`. */
+export const HAND_CLASSES: readonly string[] = [...RANKS].flatMap((high, h) =>
+  [...RANKS.slice(h)].flatMap((low, offset) => (offset === 0 ? [high + low] : [`${high}${low}s`, `${high}${low}o`])),
+)
+
+/** Every Draw and combination Draw the Hero's Combo can be in on the flop or the turn, in the Lab's order. */
+export const STREET_DRAWS = [...DRAWS, ...COMBINATION_DRAWS] as const
+
+/** How good the Hero's other card is when the Made Hand uses only one of them. */
+export const KICKERS = ['top', 'second', 'weak'] as const
+
 /** What the turn or the river card changed on the Board before it. */
 const change = { kind: 'boolean' } as const
 
@@ -47,6 +63,7 @@ export type FactDomain =
 export const FACTS = {
   players: { kind: 'range', min: 2, max: 10 },
   'hero-position': { kind: 'set', values: POSITIONS },
+  'hero-class': { kind: 'set', values: HAND_CLASSES },
   'pot-type': { kind: 'set', values: POT_TYPES },
   'opener-position': { kind: 'set', values: POSITIONS },
   'three-bettor-position': { kind: 'set', values: POSITIONS },
@@ -76,6 +93,21 @@ export const FACTS = {
   'river-brings-flush': change,
   'river-brings-straight': change,
   'river-overcard': change,
+  // The Hero's cards on each Street (facts catalogue §3.4). The Draws are a
+  // list on the server (`members`): a criterion keeps a Hand in any of them.
+  'flop-made-hand': { kind: 'set', values: MADE_HANDS },
+  'flop-draw': { kind: 'set', values: STREET_DRAWS },
+  'flop-nuts': { kind: 'boolean' },
+  'flop-kicker': { kind: 'set', values: KICKERS },
+  'flop-nut-flush-draw': { kind: 'boolean' },
+  'turn-made-hand': { kind: 'set', values: MADE_HANDS },
+  'turn-draw': { kind: 'set', values: STREET_DRAWS },
+  'turn-nuts': { kind: 'boolean' },
+  'turn-kicker': { kind: 'set', values: KICKERS },
+  'turn-nut-flush-draw': { kind: 'boolean' },
+  'river-made-hand': { kind: 'set', values: MADE_HANDS },
+  'river-nuts': { kind: 'boolean' },
+  'river-kicker': { kind: 'set', values: KICKERS },
 } as const satisfies Record<string, FactDomain>
 
 export type FactKey = keyof typeof FACTS
