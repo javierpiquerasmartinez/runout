@@ -1,4 +1,5 @@
 import type { QueueEntry } from '../room/roomClient'
+import { readFactCriterion, writeFactCriterion, type FactCriterion } from './facts'
 import { STAT_KEYS, type StatKey } from './stats'
 
 type Stake = QueueEntry['stake']
@@ -27,6 +28,8 @@ export interface LibraryFilter {
   tags: string[]
   /** Only the Hands behind one Stat: those where the Hero had its opportunity, or took it. */
   stat: StatCriterion | null
+  /** What Más filtros sets: criteria on the Hero's facts, every one of which a Hand must meet. */
+  facts: FactCriterion[]
 }
 
 /** One Stat and a side, written `vpip:taken` in the query and the address. */
@@ -47,6 +50,7 @@ export const EMPTY_LIBRARY_FILTER: LibraryFilter = {
   markedOnly: false,
   tags: [],
   stat: null,
+  facts: [],
 }
 
 export type QuickRange = 'today' | 'yesterday' | 'this-week' | 'this-month' | 'this-year' | 'all-time'
@@ -153,6 +157,7 @@ export function libraryFilterFromSearch(search: string, now: Date = new Date()):
     markedOnly: query.get('marked') === 'true',
     tags: query.getAll('tag').filter(Boolean),
     stat: statCriterion(query.get('stat')),
+    facts: query.getAll('fact').flatMap((text) => readFactCriterion(text) ?? []),
   }
 }
 
@@ -174,6 +179,7 @@ function writeFilter(filter: LibraryFilter, writeDay: (day: string, end: 'from' 
   if (filter.markedOnly) query.set('marked', 'true')
   for (const tag of filter.tags) query.append('tag', tag)
   if (filter.stat) query.set('stat', `${filter.stat.key}:${filter.stat.side}`)
+  for (const criterion of filter.facts) query.append('fact', writeFactCriterion(criterion))
   return query
 }
 

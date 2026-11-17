@@ -4,6 +4,8 @@
  */
 
 .library-filters {
+  /* The Más filtros panel opens under the bar, as wide as it. */
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
