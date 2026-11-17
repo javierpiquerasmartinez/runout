@@ -686,6 +686,64 @@ describe('LibraryPage', () => {
       })
     })
 
+    describe('the Cards branch', () => {
+      async function cardsBranch() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Cards' }))
+        return panel
+      }
+
+      it('picks Hand Classes on the Lab’s matrix, a cell or a whole kind, and sums them up in the chip', async () => {
+        renderLibrary()
+        const panel = await cardsBranch()
+        const holeCards = criterion(panel, 'My hole cards')
+        const matrix = await within(holeCards).findByRole('group', { name: 'Range matrix' })
+        expect(within(matrix).getAllByRole('button')).toHaveLength(169)
+
+        await userEvent.click(within(matrix).getByRole('button', { name: 'AKs' }))
+        await userEvent.click(within(holeCards).getByRole('button', { name: 'Pairs' }))
+
+        expect(within(matrix).getByRole('button', { name: 'AKs' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(matrix).getByRole('button', { name: '77' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(holeCards).getByRole('button', { name: 'Pairs' }).getAttribute('aria-pressed')).toBe('true')
+        expect(lastFilterQuery()).toBe(`fact=${encodeURIComponent('hero-class:AA,AKs,KK,QQ,JJ,TT,99,88,77,66,55,44,33,22')}`)
+
+        // A kind already all picked is taken out whole.
+        await userEvent.click(within(holeCards).getByRole('button', { name: 'Pairs' }))
+        expect(lastFilterQuery()).toBe('fact=hero-class%3AAKs')
+        await userEvent.click(within(matrix).getByRole('button', { name: 'AKo' }))
+        await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('AK')
+      })
+
+      it('offers the Made Hand, the kicker and the nuts on every Street, the Draws on the flop and the turn only', async () => {
+        renderLibrary()
+        const panel = await cardsBranch()
+        const flop = within(panel).getByRole('group', { name: 'Flop' })
+        const river = within(panel).getByRole('group', { name: 'River' })
+
+        await userEvent.click(within(criterion(flop, 'Made hand')).getByRole('button', { name: 'Top pair' }))
+        await userEvent.click(within(criterion(flop, 'Kicker')).getByRole('button', { name: 'top' }))
+        await userEvent.click(within(criterion(flop, 'Draws')).getByRole('button', { name: 'Flush draw + gutshot' }))
+        await userEvent.click(within(criterion(river, 'The nuts')).getByRole('button', { name: 'Yes' }))
+
+        expect(lastFilterQuery()).toBe(
+          'fact=flop-made-hand%3Atop-pair&fact=flop-kicker%3Atop&fact=flop-draw%3Aflush-draw-gutshot&fact=river-nuts%3Atrue',
+        )
+        expect(within(panel).getByRole('tab', { name: 'Cards, 4 criteria' })).toBeTruthy()
+        expect(within(river).queryByRole('group', { name: 'Draws' })).toBeNull()
+        expect(within(river).queryByRole('group', { name: 'Nut flush draw' })).toBeNull()
+        expect(
+          within(criterion(flop, 'Made hand'))
+            .getAllByRole('button')
+            .map((button) => button.textContent)
+            .slice(0, 3),
+        ).toEqual(['Straight flush', 'Quads', 'Full house'])
+      })
+    })
+
     it('explains a criterion the pot types picked never meet', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
       const panel = await openPanel()
@@ -759,6 +817,8 @@ describe('LibraryPage', () => {
       const panel = screen.getByRole('dialog', { name: 'More filters' })
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
       // The arrows skip the branches that have nothing to offer yet, and wrap.
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Cards' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Board' }))
       await userEvent.keyboard('{ArrowDown}')

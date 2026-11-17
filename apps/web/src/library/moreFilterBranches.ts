@@ -1,13 +1,17 @@
 import type { MessageKey } from '../i18n/catalogue'
 import type { Translator } from '../i18n/translator'
+import { categoryNameKey, MADE_HANDS, type Category } from '../lab/board'
+import { EMPTY_RANGE, formatRange, HAND_CLASS_BY_NAME, HAND_CLASSES, handClassFrequency, parseRange, withHandClass } from '../lab/range'
 import {
   BOARD_PAIRINGS,
   BOARD_RANKS,
   FACTS,
   FLOP_SUITS,
+  KICKERS,
   LATER_SUITS,
   POT_TYPES,
   POSITIONS,
+  STREET_DRAWS,
   type FactCriterion,
   type FactKey,
   type PotType,
@@ -30,11 +34,13 @@ export type Branch = (typeof BRANCHES)[number]
  * How a criterion is set:
  * - `options`: one button per value, any number of them pressed, any of which keeps a Hand;
  * - `boolean`: "Sí" or "No", one of them at most, for a fact that holds or doesn't;
- * - `range`: a from and a to, both included, either left open.
+ * - `range`: a from and a to, both included, either left open;
+ * - `hand-classes`: the Lab's 13×13 matrix, any number of Hand Classes picked, any of which keeps a Hand.
  */
 export type CriterionControl =
   | { kind: 'options'; values: readonly string[]; label: (value: string, t: Translator['t']) => string }
   | { kind: 'boolean' }
+  | { kind: 'hand-classes' }
   | { kind: 'range'; min: number; max: number }
 
 /** The Streets after the flop is dealt, in order. */
@@ -101,7 +107,7 @@ export interface CriterionDefinition {
 }
 
 /** The headings a branch's criteria sit under. Its label is `library.moreFilters.section.<section>`. */
-export type Section = 'pot' | 'positions' | Street
+export type Section = 'pot' | 'positions' | 'hole-cards' | Street
 
 /** A Position reads as players write it, in every language. */
 const asWritten = (value: string) => value
@@ -132,6 +138,58 @@ function boardOn(street: Street): CriterionDefinition[] {
       ? []
       : [...on('pairs-board', yesOrNo), ...on('brings-flush', yesOrNo), ...on('brings-straight', yesOrNo), ...on('overcard', yesOrNo)]),
   ]
+}
+
+/*
+ * The Cards branch: the Hero's hole cards on the Lab's matrix, then Street
+ * by Street (facts catalogue §3.4) the Made Hand and the Draws in the Lab's
+ * Categories, named and ordered as its tables have them, the kicker, the
+ * nuts and the nut flush draw. The river has no Draws.
+ */
+
+/** A Made Hand or a Draw, as the Lab's tables name it. */
+const categoryLabel = (value: string, t: Translator['t']) => t(categoryNameKey(value as Category))
+
+const kickerLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.kicker.${value as (typeof KICKERS)[number]}`)
+
+function cardsOn(street: Street): CriterionDefinition[] {
+  const on = (name: NameOnStreet<FactKey>, control: CriterionControl) => perStreet([street], name, () => ({ control }))
+  return [
+    ...on('made-hand', { kind: 'options', values: MADE_HANDS, label: categoryLabel }),
+    ...on('kicker', { kind: 'options', values: KICKERS, label: kickerLabel }),
+    ...on('nuts', yesOrNo),
+    ...(street === 'river'
+      ? []
+      : [...on('draw', { kind: 'options', values: STREET_DRAWS, label: categoryLabel }), ...on('nut-flush-draw', yesOrNo)]),
+  ]
+}
+
+/** How many of the chip's pieces a hole-card pick shows before it counts the rest's Hand Classes. */
+const HOLE_CARD_PIECES = 2
+
+/**
+ * A hole-card pick as the Lab writes a Range, shortened for the chip: runs
+ * as `QQ+`, a suited and an offsuit piece of the same cards as one (`AK`),
+ * and past the first pieces the Hand Classes left, `QQ+, AK +3 clases`.
+ */
+function holeCardsSummary(names: readonly string[], t: Translator['t']): string {
+  const range = names.reduce((picked, name) => {
+    const handClass = HAND_CLASS_BY_NAME.get(name)
+    return handClass ? withHandClass(picked, handClass, 100) : picked
+  }, EMPTY_RANGE)
+  // No rank is written with an `s` or an `o`: they only ever say suited or offsuit.
+  const pieces = formatRange(range).split(',')
+  const merged = pieces.flatMap((piece) => {
+    if (piece.includes('o') && pieces.includes(piece.replaceAll('o', 's'))) return []
+    if (piece.includes('s') && pieces.includes(piece.replaceAll('s', 'o'))) return [piece.replaceAll('s', '')]
+    return [piece]
+  })
+  if (merged.length <= HOLE_CARD_PIECES) return merged.join(', ')
+  const shown = merged.slice(0, HOLE_CARD_PIECES)
+  const parsed = parseRange(shown.join(','))
+  const covered = 'range' in parsed ? HAND_CLASSES.filter((handClass) => handClassFrequency(parsed.range, handClass).value > 0).length : 0
+  const left = names.length - covered
+  return `${shown.join(', ')} ${t(left === 1 ? 'library.moreFilters.value.hero-class.more.one' : 'library.moreFilters.value.hero-class.more.other', { count: left })}`
 }
 
 /**
@@ -173,7 +231,7 @@ export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
   flop: [],
   turn: [],
   river: [],
-  cards: [],
+  cards: [{ fact: 'hero-class', section: 'hole-cards', control: { kind: 'hand-classes' } }, ...STREETS.flatMap(cardsOn)],
   board: STREETS.flatMap(boardOn),
   result: [],
   stat: [],
@@ -222,6 +280,7 @@ export function valuesSummary(criterion: FactCriterion, t: Translator['t']): str
     return min !== null ? `${min}+` : `≤${max}`
   }
   const control = definitionOf(criterion.fact)?.definition.control
+  if (control?.kind === 'hand-classes') return holeCardsSummary(criterion.values, t)
   const label = control?.kind === 'options' ? control.label : asWritten
   return criterion.values.map((value) => label(value, t)).join(', ')
 }
