@@ -2,6 +2,12 @@ import { and, gte, inArray, lte, not, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { handFacts, hands } from '../database/schema.js';
 import {
+  BOARD_PAIRINGS,
+  BOARD_RANKS,
+  FLOP_SUITS,
+  LATER_SUITS,
+} from '../hands/replay/board-texture.js';
+import {
   ANSWERS,
   HAND_CLASSES,
   POSITIONS,
@@ -128,37 +134,153 @@ const FACTS = {
     domain: { kind: 'boolean' },
     since: 1,
   },
+  // The Board's texture on each Street (facts catalogue §3.5).
+  'flop-suits': {
+    column: handFacts.flopSuits,
+    domain: oneOf(FLOP_SUITS),
+    since: 2,
+  },
+  'flop-pairing': {
+    column: handFacts.flopPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'flop-straight-possible': {
+    column: handFacts.flopStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'flop-connectedness': {
+    column: handFacts.flopConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'flop-high-card': {
+    column: handFacts.flopHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'turn-suits': {
+    column: handFacts.turnSuits,
+    domain: oneOf(LATER_SUITS),
+    since: 2,
+  },
+  'turn-pairing': {
+    column: handFacts.turnPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'turn-straight-possible': {
+    column: handFacts.turnStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-connectedness': {
+    column: handFacts.turnConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'turn-high-card': {
+    column: handFacts.turnHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'turn-pairs-board': {
+    column: handFacts.turnPairsBoard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-brings-flush': {
+    column: handFacts.turnBringsFlush,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-brings-straight': {
+    column: handFacts.turnBringsStraight,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-overcard': {
+    column: handFacts.turnOvercard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-suits': {
+    column: handFacts.riverSuits,
+    domain: oneOf(LATER_SUITS),
+    since: 2,
+  },
+  'river-pairing': {
+    column: handFacts.riverPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'river-straight-possible': {
+    column: handFacts.riverStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-connectedness': {
+    column: handFacts.riverConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'river-high-card': {
+    column: handFacts.riverHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'river-pairs-board': {
+    column: handFacts.riverPairsBoard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-brings-flush': {
+    column: handFacts.riverBringsFlush,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-brings-straight': {
+    column: handFacts.riverBringsStraight,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-overcard': {
+    column: handFacts.riverOvercard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
 
   // Showdown and Result.
   'hero-folded-on': {
     column: handFacts.heroFoldedOn,
     domain: oneOf(STREETS),
-    since: 2,
+    since: 3,
   },
   'hero-all-in-on': {
     column: handFacts.heroAllInOn,
     domain: oneOf(STREETS),
-    since: 2,
+    since: 3,
   },
   'faced-all-in-on': {
     column: handFacts.heroFacedAllInOn,
     domain: oneOf(STREETS),
-    since: 2,
+    since: 3,
   },
   'faced-all-in-answer': {
     column: handFacts.heroFacedAllInAnswer,
     domain: oneOf(ANSWERS),
-    since: 2,
+    since: 3,
   },
   'won-money': {
     column: handFacts.heroWonMoney,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'won-at-showdown': {
     column: handFacts.heroWonAtShowdown,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'reached-showdown': {
     onHand: hands.heroReachedShowdown,

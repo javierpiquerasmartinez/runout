@@ -446,6 +446,33 @@ export const handFacts = pgTable('hand_facts', {
   fourBettorPosition: text('four_bettor_position'),
   aggressorPosition: text('aggressor_position'),
   heroAggressor: boolean('hero_aggressor').notNull(),
+  // The Board's texture on each Street, null when it wasn't dealt.
+  flopSuits: text('flop_suits'),
+  flopPairing: text('flop_pairing'),
+  flopStraightPossible: boolean('flop_straight_possible'),
+  flopConnectedness: smallint('flop_connectedness'),
+  /** As the Lab writes a rank: `A`, `T`, `2`. */
+  flopHighCard: text('flop_high_card'),
+  turnSuits: text('turn_suits'),
+  turnPairing: text('turn_pairing'),
+  turnStraightPossible: boolean('turn_straight_possible'),
+  turnConnectedness: smallint('turn_connectedness'),
+  /** As the Lab writes a rank: `A`, `T`, `2`. */
+  turnHighCard: text('turn_high_card'),
+  turnPairsBoard: boolean('turn_pairs_board'),
+  turnBringsFlush: boolean('turn_brings_flush'),
+  turnBringsStraight: boolean('turn_brings_straight'),
+  turnOvercard: boolean('turn_overcard'),
+  riverSuits: text('river_suits'),
+  riverPairing: text('river_pairing'),
+  riverStraightPossible: boolean('river_straight_possible'),
+  riverConnectedness: smallint('river_connectedness'),
+  /** As the Lab writes a rank: `A`, `T`, `2`. */
+  riverHighCard: text('river_high_card'),
+  riverPairsBoard: boolean('river_pairs_board'),
+  riverBringsFlush: boolean('river_brings_flush'),
+  riverBringsStraight: boolean('river_brings_straight'),
+  riverOvercard: boolean('river_overcard'),
   // Showdown and Result. Reached Showdown, the Result and All-in EV are on
   // `hands` already, and criteria read them there.
   /** A Street: `preflop`, `flop`, `turn` or `river`. */

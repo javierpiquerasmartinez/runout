@@ -333,6 +333,84 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
   });
 });
 
+describe('Replay: the Board’s texture on each Street', () => {
+  // Texture reads the Board alone, so each test deals its own on this Hand.
+  const hand = only(oneHand('pokerstars-session.txt', '262120715506'));
+  const dealt = (cards: string) =>
+    heroFacts({ ...hand, board: cards.split(' ') });
+
+  it('describes the flop, the turn and the river as each was dealt', () => {
+    expect(dealt('Kh 9h 4h 9s 10h')).toMatchObject({
+      flopSuits: 'monotone',
+      flopPairing: 'unpaired',
+      flopStraightPossible: false,
+      flopConnectedness: 2,
+      flopHighCard: 'K',
+      turnSuits: 'flush-possible',
+      turnPairing: 'paired',
+      turnStraightPossible: false,
+      turnConnectedness: 2,
+      turnHighCard: 'K',
+      turnPairsBoard: true,
+      turnBringsFlush: false,
+      turnBringsStraight: false,
+      turnOvercard: false,
+      riverSuits: 'four-of-a-suit',
+      riverPairing: 'paired',
+      riverStraightPossible: true,
+      riverConnectedness: 3,
+      riverHighCard: 'K',
+      riverPairsBoard: false,
+      riverBringsFlush: true,
+      riverBringsStraight: true,
+      riverOvercard: false,
+    });
+  });
+
+  const emptyTurn = {
+    turnSuits: null,
+    turnPairing: null,
+    turnStraightPossible: null,
+    turnConnectedness: null,
+    turnHighCard: null,
+    turnPairsBoard: null,
+    turnBringsFlush: null,
+    turnBringsStraight: null,
+    turnOvercard: null,
+  };
+
+  it('leaves a Street’s texture empty when it wasn’t dealt', () => {
+    expect(dealt('8h 5d 2c')).toMatchObject({
+      flopSuits: 'rainbow',
+      ...emptyTurn,
+      riverSuits: null,
+      riverOvercard: null,
+    });
+    expect(heroFacts({ ...hand, board: [] })).toMatchObject({
+      flopSuits: null,
+      flopPairing: null,
+      flopStraightPossible: null,
+      flopConnectedness: null,
+      flopHighCard: null,
+      ...emptyTurn,
+    });
+  });
+
+  it('describes a Board the Hero didn’t see', () => {
+    // iMapleAA folds preflop; the flop is Qs Qd Ts and the Hand ends there.
+    const folded = only(oneHand('pokerstars-session.txt', '262120715010'));
+
+    expect(heroFacts(folded)).toMatchObject({
+      flopSuits: 'two-tone',
+      flopPairing: 'paired',
+      flopStraightPossible: false,
+      flopConnectedness: 2,
+      flopHighCard: 'Q',
+      ...emptyTurn,
+    });
+  });
+});
+
 describe('Replay: the Hero’s facts, Showdown and Result', () => {
   // Hand #262130000104 with Hero4 folding the river to Aspen1's bet, which
   // Willow4 calls and loses.

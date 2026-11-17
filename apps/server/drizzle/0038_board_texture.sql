@@ -1,0 +1,23 @@
+ALTER TABLE "hand_facts" ADD COLUMN "flop_suits" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "flop_pairing" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "flop_straight_possible" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "flop_connectedness" smallint;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "flop_high_card" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_suits" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_pairing" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_straight_possible" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_connectedness" smallint;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_high_card" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_pairs_board" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_brings_flush" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_brings_straight" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "turn_overcard" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_suits" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_pairing" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_straight_possible" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_connectedness" smallint;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_high_card" text;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_pairs_board" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_brings_flush" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_brings_straight" boolean;--> statement-breakpoint
+ALTER TABLE "hand_facts" ADD COLUMN "river_overcard" boolean;
