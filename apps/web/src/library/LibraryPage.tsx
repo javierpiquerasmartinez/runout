@@ -100,7 +100,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   // While the Más filtros panel is open it says how many Hands the rest of the filter keeps, besides what it keeps.
   const [handsBeforeMoreFilters, setHandsBeforeMoreFilters] = useState<{ query: string; total: number } | null>(null)
-  const beforeMoreFiltersQuery = libraryFilterQuery({ ...filter, facts: [] }).toString()
+  const beforeMoreFiltersQuery = libraryFilterQuery({ ...filter, facts: [], stat: null }).toString()
   // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)

@@ -202,4 +202,23 @@ describe('Más filtros criteria in the query and the address', () => {
 
     expect(libraryFilterFromSearch(search, now).facts).toEqual([{ fact: 'opener-position', exclude: false, values: ['BTN', 'CO'] }])
   })
+
+  it('reads a Result or an All-in EV in big blinds, negative or with decimals, and nothing else as a number', () => {
+    const search = '?period=all&fact=result:..-20.5&fact=all-in-ev:-3..12.25&fact=result:1e3..&fact=all-in-ev:..&fact=players:-1..4'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([
+      { fact: 'result', exclude: false, range: { min: null, max: -20.5 } },
+      { fact: 'all-in-ev', exclude: false, range: { min: -3, max: 12.25 } },
+    ])
+  })
+
+  it('reads how the Hand ended for the Hero', () => {
+    const search = '?period=all&fact=hero-folded-on:turn,river&fact=faced-all-in-answer:call&fact=!won-at-showdown:true&fact=hero-all-in-on:showdown'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([
+      { fact: 'hero-folded-on', exclude: false, values: ['turn', 'river'] },
+      { fact: 'faced-all-in-answer', exclude: false, values: ['call'] },
+      { fact: 'won-at-showdown', exclude: true, values: ['true'] },
+    ])
+  })
 })

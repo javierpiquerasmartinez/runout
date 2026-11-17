@@ -1,10 +1,12 @@
 import type { MessageKey } from '../i18n/catalogue'
 import type { Translator } from '../i18n/translator'
 import {
+  ANSWERS,
   BOARD_PAIRINGS,
   BOARD_RANKS,
   FACTS,
   FLOP_SUITS,
+  HAND_STREETS,
   LATER_SUITS,
   POT_TYPES,
   POSITIONS,
@@ -12,6 +14,8 @@ import {
   type FactKey,
   type PotType,
 } from './facts'
+import type { StatCriterion } from './libraryFilter'
+import { STAT_TILES } from './stats'
 
 /*
  * What the Más filtros panel offers, branch by branch, as the "Biblioteca ·
@@ -35,7 +39,8 @@ export type Branch = (typeof BRANCHES)[number]
 export type CriterionControl =
   | { kind: 'options'; values: readonly string[]; label: (value: string, t: Translator['t']) => string }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number }
+  /** With `signed`, its ends may be negative or have decimals. */
+  | { kind: 'range'; min: number; max: number; signed?: boolean }
 
 /** The Streets after the flop is dealt, in order. */
 export const STREETS = ['flop', 'turn', 'river'] as const
@@ -101,7 +106,7 @@ export interface CriterionDefinition {
 }
 
 /** The headings a branch's criteria sit under. Its label is `library.moreFilters.section.<section>`. */
-export type Section = 'pot' | 'positions' | Street
+export type Section = 'pot' | 'positions' | Street | ResultSection
 
 /** A Position reads as players write it, in every language. */
 const asWritten = (value: string) => value
@@ -158,6 +163,28 @@ const position = (fact: FactKey, inapplicable?: CriterionDefinition['inapplicabl
   inapplicable,
 })
 
+/** The Resultado branch's headings: how the Hand ended, the Showdown, and the amounts in big blinds. */
+type ResultSection = 'ending' | 'showdown' | 'amounts'
+
+const streetLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.street.${value as (typeof HAND_STREETS)[number]}`)
+const answerLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.answer.${value as (typeof ANSWERS)[number]}`)
+
+/** In big blinds, negative or with decimals, either end open. */
+const bigBlinds: CriterionControl = { kind: 'range', min: -Infinity, max: Infinity, signed: true }
+
+/** The Resultado branch: how the Hand ended for the Hero (facts catalogue §4). */
+const RESULT: CriterionDefinition[] = [
+  { fact: 'hero-folded-on', section: 'ending', control: { kind: 'options', values: HAND_STREETS, label: streetLabel } },
+  { fact: 'hero-all-in-on', section: 'ending', control: { kind: 'options', values: HAND_STREETS, label: streetLabel } },
+  { fact: 'faced-all-in-on', section: 'ending', control: { kind: 'options', values: HAND_STREETS, label: streetLabel } },
+  { fact: 'faced-all-in-answer', section: 'ending', control: { kind: 'options', values: ANSWERS, label: answerLabel } },
+  { fact: 'reached-showdown', section: 'showdown', control: yesOrNo },
+  { fact: 'won-money', section: 'showdown', control: yesOrNo },
+  { fact: 'won-at-showdown', section: 'showdown', control: yesOrNo },
+  { fact: 'result', section: 'amounts', control: bigBlinds },
+  { fact: 'all-in-ev', section: 'amounts', control: bigBlinds },
+]
+
 /** Each branch's criteria, in the order the panel lists them and the chip names them. */
 export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
   table: [
@@ -175,7 +202,8 @@ export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
   river: [],
   cards: [],
   board: STREETS.flatMap(boardOn),
-  result: [],
+  result: RESULT,
+  // The Stat criterion is not a fact's: the panel draws its own branch (`StatBranch`).
   stat: [],
 }
 
@@ -262,4 +290,17 @@ export function chipSummary(summaries: string[], budget: number): { text: string
 /** Why a criterion keeps no Hand alongside the others, or null when it may keep some. */
 export function inapplicableReason(criterion: FactCriterion, criteria: FactCriterion[]): MessageKey | null {
   return definitionOf(criterion.fact)?.definition.inapplicable?.(criterion, criteria) ?? null
+}
+
+/*
+ * The Estadística branch. Its one criterion is a Stat's: the Hands where the
+ * Hero had its chance, or took it, as a Stat's tooltip links to them. It is
+ * the filter's `stat`, which the server reads apart from the facts, so it is
+ * one Stat at a time and can't be excluded.
+ */
+
+/** The Stat criterion as the chip and its list name it, after every fact's: `VPIP · lo hiciste`. */
+export function statSummary(stat: StatCriterion, t: Translator['t']): string {
+  const abbreviation = STAT_TILES.find((tile) => tile.key === stat.key)?.abbreviation ?? stat.key
+  return t(`library.stats.chip.${stat.side}`, { stat: abbreviation })
 }
