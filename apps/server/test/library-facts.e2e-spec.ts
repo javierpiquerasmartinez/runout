@@ -6,6 +6,7 @@ import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
 import { handFacts, hands } from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
+import { FACTS_VERSION } from '../src/hands/replay/hero-facts.js';
 import { rereadHands } from '../src/hands/reread-backfill.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { freshDatabase } from './support/fresh-database.js';
@@ -131,6 +132,77 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  it('filters by the preflop Actions, role, line, sizes and stacks', async () => {
+    // Read by hand off the fixtures. Opened (role opener): iMapleAA from the
+    // CO and the BTN, HeroHU from the BTN; HeroAI opens and calls Aces2's
+    // 3-bet. Steals faced: iMapleAA folds the BB to the BTN, HeroAI calls in
+    // the BB. Hero9max calls the open, faces Oak_BB's squeeze and 4-bets to
+    // 3.2 times it, 159.9 big blinds, 120 deep. Hero6 and Hero4 raise over a
+    // limper, to 8 and 4 big blinds.
+    const account = await stockedAccount();
+    const cases: [string, number][] = [
+      [fact('three-bet-chance:true'), 3],
+      [`${fact('three-bet-chance:true')}&${fact('three-bet-did:false')}`, 3],
+      [fact('three-bet-faced:true'), 1],
+      [fact('three-bet-answer:call'), 1],
+      [fact('steal-did:true'), 4],
+      [fact('steal-faced:true'), 2],
+      [fact('steal-answer:fold'), 1],
+      [fact('!steal-answer:fold'), 9],
+      [fact('squeeze-answer:raise'), 1],
+      [fact('four-bet-did:true'), 1],
+      [fact('isolate-did:true'), 2],
+      [fact('preflop-role:opener'), 3],
+      [fact('preflop-role:isolator,called-3-bet'), 3],
+      [fact('!preflop-role:folded'), 8],
+      [fact('preflop-faced-first:limps'), 2],
+      [fact('limpers:1..'), 2],
+      [fact('preflop-line:R'), 5],
+      [fact('preflop-line:RC,CR'), 2],
+      [fact('open-size:2.5..2.5'), 2],
+      [fact('open-size:..3'), 7],
+      [fact('hero-raise-size:4..10'), 2],
+      [fact('hero-raise-multiple:3.2..3.2'), 1],
+      [fact('size-faced:2.5..3'), 2],
+      [fact('preflop-effective-stack:110..'), 3],
+      [fact('preflop-effective-stack:..100'), 7],
+      [fact('antes:true'), 1],
+      [fact('straddle:true'), 1],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.results, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
+  it('agrees with the Stats on an Action’s chance and did', async () => {
+    const account = await stockedAccount();
+    const statsOf = async (query: string) =>
+      (await get(account.token, `/api/library/stats?${query}`).expect(200))
+        .body as {
+        hands: number;
+        stats: Record<string, { opportunities: number; taken: number }>;
+      };
+    for (const [action, stat] of [
+      ['vpip', 'vpip'],
+      ['pfr', 'pfr'],
+      ['steal', 'steal'],
+      ['three-bet', 'three-bet'],
+      ['four-bet', 'four-bet'],
+      ['cold-call', 'cold-call'],
+    ]) {
+      const everything = (await statsOf('')).stats[stat];
+      const chance = await statsOf(fact(`${action}-chance:true`));
+      const did = await statsOf(fact(`${action}-did:true`));
+      expect(chance.hands, action).toBe(everything.opportunities);
+      expect(chance.stats[stat], action).toEqual(everything);
+      expect(did.hands, action).toBe(everything.taken);
+    }
+  }, 30_000);
+
   it('rejects an unknown fact, an impossible value or a malformed range', async () => {
     const account = await newAccount(running.httpServer);
     for (const criterion of [
@@ -146,6 +218,11 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       'players:..',
       'players:x..3',
       'players:3',
+      'players:2.5..',
+      'three-bet-answer:check',
+      'preflop-role:caller',
+      'preflop-line:RQ',
+      'open-size:2,5..3',
       '!',
     ]) {
       for (const endpoint of ['hands', 'hand-ids', 'results', 'stats']) {
@@ -268,7 +345,7 @@ describe('Each Hand’s facts row (e2e)', () => {
     expect(await count(account.token, fact('!hero-position:UTG'))).toBe(6);
     expect(
       (await factsOf(all.map(({ id }) => id))).map((row) => row.version),
-    ).toEqual(Array(6).fill(1));
+    ).toEqual(Array(6).fill(FACTS_VERSION));
     // Run again: nothing is behind.
     expect(await rederiveFacts(db)).toBe(0);
   });

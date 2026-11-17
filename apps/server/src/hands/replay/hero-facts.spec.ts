@@ -118,7 +118,7 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
         'iMapleAA (big blind) collected (€0.10)',
       );
 
-    expect(heroFacts(only(walk))).toEqual({
+    expect(heroFacts(only(walk))).toMatchObject({
       playersDealt: 4,
       heroPosition: 'BB',
       heroCombo: 'Jc4c',

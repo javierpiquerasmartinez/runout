@@ -6,6 +6,11 @@ import {
   POSITIONS,
   POT_TYPES,
 } from '../hands/replay/hero-facts.js';
+import {
+  ANSWERS,
+  PREFLOP_FACED_FIRST,
+  PREFLOP_ROLES,
+} from '../hands/replay/preflop-facts.js';
 import { Rejected } from '../rejection/rejection.js';
 
 /**
@@ -29,7 +34,10 @@ export type FactCriterion = {
 type Domain =
   | { kind: 'set'; values: ReadonlySet<string> }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number };
+  /** A Hero's line: one letter per Action, X, B, C, R or F. */
+  | { kind: 'line' }
+  /** Whole numbers, unless `decimals` (sizes and stacks). */
+  | { kind: 'range'; min: number; max: number; decimals?: boolean };
 
 interface FactEntry {
   column: PgColumn;
@@ -46,6 +54,194 @@ const oneOf = (values: readonly string[]): Domain => ({
   kind: 'set',
   values: new Set(values),
 });
+
+const BOOLEAN: Domain = { kind: 'boolean' };
+
+/** A size or a stack, in big blinds or as a multiple. */
+const AMOUNT: Domain = { kind: 'range', min: 0, max: 100_000, decimals: true };
+
+type ActionFact = 'did' | 'chance' | 'faced' | 'answer';
+
+/**
+ * A named Action's facts: `<action>-did` and `<action>-chance`, booleans,
+ * and, when given, `<action>-faced`, a boolean, and `<action>-answer`, one
+ * of fold, call or raise.
+ */
+function actionFacts<A extends string, F extends ActionFact = 'did' | 'chance'>(
+  action: A,
+  columns: Partial<Record<ActionFact, PgColumn>>,
+  since: number,
+): Record<`${A}-${F}`, FactEntry> {
+  return Object.fromEntries(
+    Object.entries(columns).map(([fact, column]) => [
+      `${action}-${fact}`,
+      {
+        column,
+        domain: fact === 'answer' ? oneOf(ANSWERS) : BOOLEAN,
+        since,
+      },
+    ]),
+  ) as Record<`${A}-${F}`, FactEntry>;
+}
+
+/** The preflop facts: facts catalogue §1 and §2.2–2.3. */
+const PREFLOP_FACTS = {
+  ...actionFacts(
+    'vpip',
+    { did: handFacts.vpipDid, chance: handFacts.vpipChance },
+    2,
+  ),
+  ...actionFacts(
+    'pfr',
+    { did: handFacts.pfrDid, chance: handFacts.pfrChance },
+    2,
+  ),
+  ...actionFacts(
+    'open',
+    { did: handFacts.openDid, chance: handFacts.openChance },
+    2,
+  ),
+  ...actionFacts(
+    'limp',
+    { did: handFacts.limpDid, chance: handFacts.limpChance },
+    2,
+  ),
+  ...actionFacts<'isolate', ActionFact>(
+    'isolate',
+    {
+      did: handFacts.isolateDid,
+      chance: handFacts.isolateChance,
+      faced: handFacts.isolateFaced,
+      answer: handFacts.isolateAnswer,
+    },
+    2,
+  ),
+  ...actionFacts<'steal', ActionFact>(
+    'steal',
+    {
+      did: handFacts.stealDid,
+      chance: handFacts.stealChance,
+      faced: handFacts.stealFaced,
+      answer: handFacts.stealAnswer,
+    },
+    2,
+  ),
+  ...actionFacts<'three-bet', ActionFact>(
+    'three-bet',
+    {
+      did: handFacts.threeBetDid,
+      chance: handFacts.threeBetChance,
+      faced: handFacts.threeBetFaced,
+      answer: handFacts.threeBetAnswer,
+    },
+    2,
+  ),
+  ...actionFacts<'squeeze', ActionFact>(
+    'squeeze',
+    {
+      did: handFacts.squeezeDid,
+      chance: handFacts.squeezeChance,
+      faced: handFacts.squeezeFaced,
+      answer: handFacts.squeezeAnswer,
+    },
+    2,
+  ),
+  ...actionFacts(
+    'cold-call',
+    { did: handFacts.coldCallDid, chance: handFacts.coldCallChance },
+    2,
+  ),
+  ...actionFacts<'four-bet', ActionFact>(
+    'four-bet',
+    {
+      did: handFacts.fourBetDid,
+      chance: handFacts.fourBetChance,
+      faced: handFacts.fourBetFaced,
+      answer: handFacts.fourBetAnswer,
+    },
+    2,
+  ),
+  ...actionFacts<'five-bet', ActionFact>(
+    'five-bet',
+    {
+      did: handFacts.fiveBetDid,
+      chance: handFacts.fiveBetChance,
+      faced: handFacts.fiveBetFaced,
+      answer: handFacts.fiveBetAnswer,
+    },
+    2,
+  ),
+  ...actionFacts<'resteal', ActionFact>(
+    'resteal',
+    {
+      did: handFacts.restealDid,
+      chance: handFacts.restealChance,
+      faced: handFacts.restealFaced,
+      answer: handFacts.restealAnswer,
+    },
+    2,
+  ),
+  'preflop-role': {
+    column: handFacts.preflopRole,
+    domain: oneOf(PREFLOP_ROLES),
+    since: 2,
+  },
+  'preflop-faced-first': {
+    column: handFacts.preflopFacedFirst,
+    domain: oneOf(PREFLOP_FACED_FIRST),
+    since: 2,
+  },
+  limpers: {
+    column: handFacts.limpers,
+    domain: { kind: 'range', min: 0, max: 9 },
+    since: 2,
+  },
+  'preflop-line': {
+    column: handFacts.preflopLine,
+    domain: { kind: 'line' },
+    since: 2,
+  },
+  'open-size': { column: handFacts.openSize, domain: AMOUNT, since: 2 },
+  'three-bet-size': {
+    column: handFacts.threeBetSize,
+    domain: AMOUNT,
+    since: 2,
+  },
+  'four-bet-size': { column: handFacts.fourBetSize, domain: AMOUNT, since: 2 },
+  'hero-raise-size': {
+    column: handFacts.heroRaiseSize,
+    domain: AMOUNT,
+    since: 2,
+  },
+  'hero-raise-multiple': {
+    column: handFacts.heroRaiseMultiple,
+    domain: AMOUNT,
+    since: 2,
+  },
+  'hero-second-raise-size': {
+    column: handFacts.heroSecondRaiseSize,
+    domain: AMOUNT,
+    since: 2,
+  },
+  'hero-second-raise-multiple': {
+    column: handFacts.heroSecondRaiseMultiple,
+    domain: AMOUNT,
+    since: 2,
+  },
+  'size-faced': { column: handFacts.sizeFaced, domain: AMOUNT, since: 2 },
+  'starting-stack': {
+    column: handFacts.heroStartingStack,
+    domain: AMOUNT,
+    since: 2,
+  },
+  'preflop-effective-stack': {
+    column: handFacts.preflopEffectiveStack,
+    domain: AMOUNT,
+    since: 2,
+  },
+  straddle: { column: handFacts.straddle, domain: BOOLEAN, since: 2 },
+  antes: { column: handFacts.antes, domain: BOOLEAN, since: 2 },
+} satisfies Record<string, FactEntry>;
 
 /**
  * Every fact a criterion can name, by the name the query gives it. Adding
@@ -98,6 +294,7 @@ const FACTS = {
     domain: { kind: 'boolean' },
     since: 1,
   },
+  ...PREFLOP_FACTS,
 } satisfies Record<string, FactEntry>;
 
 export type FactKey = keyof typeof FACTS;
@@ -120,22 +317,26 @@ export function parseFactCriterion(raw: string): FactCriterion {
     return { fact: key, exclude, range: rangeOf(written, domain) };
   }
   const values = written.split(',');
-  const allowed =
-    domain.kind === 'boolean' ? new Set(['true', 'false']) : domain.values;
-  if (!values.every((value) => allowed.has(value))) throw invalid();
+  const allowed = (value: string) => {
+    if (domain.kind === 'boolean') return value === 'true' || value === 'false';
+    if (domain.kind === 'line') return /^[XBCRF]{1,20}$/.test(value);
+    return domain.values.has(value);
+  };
+  if (!values.every(allowed)) throw invalid();
   return { fact: key, exclude, values: [...new Set(values)] };
 }
 
-/** `2..6`, `..4` or `6..` within the domain's bounds. */
+/** `2..6`, `..4` or `6..`, or `2.5..3` with decimals, within the domain's bounds. */
 function rangeOf(
   written: string,
-  domain: { min: number; max: number },
+  domain: { min: number; max: number; decimals?: boolean },
 ): { min: number | null; max: number | null } {
   const ends = written.split('..');
   if (ends.length !== 2) throw invalid();
+  const number = domain.decimals ? /^\d+(\.\d+)?$/ : /^\d+$/;
   const [min, max] = ends.map((end) => {
     if (end === '') return null;
-    if (!/^\d+$/.test(end)) throw invalid();
+    if (!number.test(end)) throw invalid();
     const value = Number(end);
     if (value < domain.min || value > domain.max) throw invalid();
     return value;

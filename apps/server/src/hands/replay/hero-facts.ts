@@ -1,5 +1,6 @@
 import type { Action, Hand } from '../hand.js';
 import { positions, type Position } from './positions.js';
+import { preflopFacts, type PreflopFacts } from './preflop-facts.js';
 
 /**
  * The version of the rules `heroFacts` works the facts out by. It goes up
@@ -7,7 +8,7 @@ import { positions, type Position } from './positions.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 1;
+export const FACTS_VERSION = 2;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -55,7 +56,7 @@ export const HAND_CLASSES: readonly string[] = RANKS.split('').flatMap(
  * that Filters and Stats read it (ADR 0012). Each fact is defined in the
  * facts catalogue; a fact that doesn't apply is null.
  */
-export interface HeroFacts {
+export interface HeroFacts extends PreflopFacts {
   /** Seats dealt in: every seat not sitting out. */
   playersDealt: number;
   /** Null when the table's size has no Position names. */
@@ -102,6 +103,7 @@ export function heroFacts(hand: Hand): HeroFacts {
     fourBettorPosition: position(raisers[2]),
     aggressorPosition: position(raisers.at(-1)),
     heroAggressor: raisers.at(-1) === hero,
+    ...preflopFacts(hand),
   };
 }
 
