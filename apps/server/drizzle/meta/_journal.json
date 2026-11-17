@@ -295,6 +295,20 @@
       "when": 1794924016822,
       "tag": "0041_hand_facts_preflop",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794924128225,
+      "tag": "0042_showdown_and_result_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794939253278,
+      "tag": "0043_postflop_named_actions",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,8 @@ import {
   BRANCHES,
   branchCounts,
   chipSummary,
+  criterionFullLabel,
+  criterionLabel,
   criterionSummaries,
   definitionOf,
   inapplicableReason,
@@ -254,8 +256,10 @@ function MoreFiltersPanel({
         <div className="more-filters__main" role="tabpanel" id={`${id}-branch`} aria-labelledby={`${id}-tab-${branch}`}>
           {sections.length === 0 && <p className="more-filters__dim">{t('library.moreFilters.soon')}</p>}
           {sections.map(({ section, definitions }) => (
-            <div className="more-filters__section" key={section}>
-              <div className="more-filters__section-title ro-mono">{t(`library.moreFilters.section.${section}`)}</div>
+            <div className="more-filters__section" key={section} role="group" aria-labelledby={`${id}-section-${section}`}>
+              <div className="more-filters__section-title ro-mono" id={`${id}-section-${section}`}>
+                {t(`library.moreFilters.section.${section}`)}
+              </div>
               {definitions.map((definition) => (
                 <CriterionRow
                   key={definition.fact}
@@ -296,7 +300,9 @@ function CriterionRow({
 }) {
   const { t } = useI18n()
   const labelId = useId()
-  const label = t(`library.moreFilters.fact.${definition.fact}`)
+  const label = criterionLabel(definition.fact, t)
+  // Where the row's section isn't there to say it, as for the exclusion's switch, the label says its Street.
+  const fullLabel = criterionFullLabel(definition.fact, t)
   const exclude = criterion?.exclude ?? false
   const reason = criterion && inapplicableReason(criterion, criteria)
   const { control } = definition
@@ -327,9 +333,24 @@ function CriterionRow({
               </button>
             )
           })
+        ) : control.kind === 'boolean' ? (
+          (['true', 'false'] as const).map((value) => {
+            const picked = criterion !== null && 'values' in criterion && criterion.values.length === 1 && criterion.values[0] === value
+            return (
+              <button
+                key={value}
+                type="button"
+                className="more-filters__option"
+                aria-pressed={picked}
+                onClick={() => onPut(picked ? null : { fact: definition.fact, exclude, values: [value] })}
+              >
+                <span>{t(value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no')}</span>
+              </button>
+            )
+          })
         ) : (
           <RangeControl
-            label={label}
+            label={fullLabel}
             min={control.min}
             max={control.max}
             criterion={criterion}
@@ -340,7 +361,7 @@ function CriterionRow({
       <span className="more-filters__exclude" data-on={exclude ? '' : undefined}>
         <span aria-hidden="true">{t('library.moreFilters.exclude')}</span>
         <Toggle
-          label={t('library.moreFilters.exclude.label', { criterion: label })}
+          label={t('library.moreFilters.exclude.label', { criterion: fullLabel })}
           checked={exclude}
           disabledReason={criterion ? undefined : t('library.moreFilters.exclude.locked')}
           onChange={(checked) => criterion && onPut({ ...criterion, exclude: checked })}
