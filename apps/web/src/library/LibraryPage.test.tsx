@@ -626,6 +626,66 @@ describe('LibraryPage', () => {
       expect(lastFilterQuery()).toBe('fact=%21hero-position%3ABB&fact=players%3A..4')
     })
 
+    describe('the Board branch', () => {
+      /** The Board branch's section for a Street. */
+      async function streetOf(name: 'Flop' | 'Turn' | 'River') {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Board' }))
+        return { panel, street: within(panel).getByRole('group', { name }) }
+      }
+
+      it('sets the texture Street by Street, each its own criterion', async () => {
+        renderLibrary()
+        const { panel, street: flop } = await streetOf('Flop')
+        const turn = within(panel).getByRole('group', { name: 'Turn' })
+
+        await userEvent.click(within(criterion(flop, 'Suits')).getByRole('button', { name: 'monotone' }))
+        await userEvent.click(within(criterion(turn, 'Suits')).getByRole('button', { name: 'flush possible' }))
+        await userEvent.click(within(criterion(turn, 'Pairing')).getByRole('button', { name: 'paired' }))
+
+        expect(lastFilterQuery()).toBe('fact=flop-suits%3Amonotone&fact=turn-suits%3Aflush-possible&fact=turn-pairing%3Apaired')
+        expect(within(panel).getByRole('tab', { name: 'Board, 3 criteria' })).toBeTruthy()
+        // The flop's suits are three of a kind; what the card changed is the turn's and the river's only.
+        expect(within(criterion(flop, 'Suits')).queryByRole('button', { name: 'flush possible' })).toBeNull()
+        expect(within(flop).queryByRole('group', { name: 'Overcard' })).toBeNull()
+      })
+
+      it('says yes or no to a Street’s yes-or-no facts, once, and excludes them', async () => {
+        renderLibrary()
+        const { street: river } = await streetOf('River')
+        const overcard = criterion(river, 'Overcard')
+
+        await userEvent.click(within(overcard).getByRole('button', { name: 'Yes' }))
+        await userEvent.click(within(overcard).getByRole('button', { name: 'No' }))
+        expect(within(overcard).getByRole('button', { name: 'Yes' }).getAttribute('aria-pressed')).toBe('false')
+        expect(lastFilterQuery()).toBe('fact=river-overcard%3Afalse')
+
+        await userEvent.click(within(overcard).getByRole('switch', { name: /^Exclude Overcard \(river\)/ }))
+        expect(lastFilterQuery()).toBe('fact=%21river-overcard%3Afalse')
+
+        await userEvent.click(within(overcard).getByRole('button', { name: 'No' }))
+        expect(lastFilterQuery()).not.toContain('fact')
+      })
+
+      it('picks the highest card by rank and connectedness by its count', async () => {
+        renderLibrary()
+        const { street: flop } = await streetOf('Flop')
+
+        await userEvent.click(within(criterion(flop, 'Highest card')).getByRole('button', { name: 'A' }))
+        await userEvent.click(within(criterion(flop, 'Highest card')).getByRole('button', { name: 'K' }))
+        await userEvent.type(within(criterion(flop, 'Connectedness')).getByRole('spinbutton', { name: 'Connectedness (flop), from' }), '3')
+
+        expect(lastFilterQuery()).toBe('fact=flop-high-card%3AA%2CK&fact=flop-connectedness%3A3..')
+      })
+
+      it('names the Street in the chip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=turn-brings-flush:true&fact=flop-suits:monotone')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Flop: monotone · Turn: brings a flush')
+      })
+    })
+
     it('explains a criterion the pot types picked never meet', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
       const panel = await openPanel()
@@ -698,7 +758,9 @@ describe('LibraryPage', () => {
       await userEvent.keyboard('{Enter}')
       const panel = screen.getByRole('dialog', { name: 'More filters' })
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
-      // The other branches have nothing to offer yet, so the arrows stay on Table.
+      // The arrows skip the branches that have nothing to offer yet, and wrap.
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Board' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
 
@@ -1575,6 +1637,35 @@ describe('LibraryPage', () => {
 
       expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
       expect(window.location.search).toBe('?period=all&hero=Hero')
+    })
+
+    it('offers Más filtros, keeping the Room in the address, and adds Hands from the list it keeps', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room)
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.click(within(filters).getByRole('button', { name: /^More filters/ }))
+      const panel = screen.getByRole('dialog', { name: 'More filters' })
+      await userEvent.click(within(within(panel).getByRole('group', { name: 'Pot type' })).getByRole('button', { name: '3-bet' }))
+      await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+
+      expect(window.location.pathname).toBe('/room/RNT4K9PX/library')
+      expect(window.location.search).toBe('?period=all&fact=pot-type%3A3-bet')
+      expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot')
+
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select BTN vs BB, iMapleAA' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add 1 to the room' }))
+
+      expect(addRequests).toEqual(['POST /api/rooms/RNT4K9PX/library-hands {"handIds":["h1"]}'])
+      await waitFor(() => expect(window.location.pathname).toBe('/room/RNT4K9PX'))
+    })
+
+    it('reads Más filtros from the Room’s address, as one chip', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, room, '/room/RNT4K9PX/library?period=all&fact=pot-type:3-bet')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot')
+      expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
     })
 
     it('offers no Room to add to when opened on its own', async () => {

@@ -278,8 +278,36 @@
     {
       "idx": 39,
       "version": "7",
-      "when": 1794923865365,
-      "tag": "0039_saved_filters",
+      "when": 1794921136632,
+      "tag": "0039_hero_cards_per_street",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794923828726,
+      "tag": "0040_postflop_street_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794924016822,
+      "tag": "0041_hand_facts_preflop",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794924128225,
+      "tag": "0042_showdown_and_result_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794938954068,
+      "tag": "0043_saved_filters",
       "breakpoints": true
     }
   ]

@@ -1,5 +1,5 @@
 {
-  "id": "fca4dbd3-87c3-4360-ba42-fff9a049cd32",
+  "id": "1d6f4cb3-a6b3-4618-b807-e3d5c34d9d31",
   "prevId": "814f133c-eef1-4db2-bc81-08cdb43727da",
   "version": "7",
   "dialect": "postgresql",
@@ -503,6 +503,84 @@
         "river_overcard": {
           "name": "river_overcard",
           "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_made_hand": {
+          "name": "flop_made_hand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_draws": {
+          "name": "flop_draws",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_nuts": {
+          "name": "flop_nuts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_kicker": {
+          "name": "flop_kicker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_nut_flush_draw": {
+          "name": "flop_nut_flush_draw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_made_hand": {
+          "name": "turn_made_hand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_draws": {
+          "name": "turn_draws",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_nuts": {
+          "name": "turn_nuts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_kicker": {
+          "name": "turn_kicker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_nut_flush_draw": {
+          "name": "turn_nut_flush_draw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_made_hand": {
+          "name": "river_made_hand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_nuts": {
+          "name": "river_nuts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_kicker": {
+          "name": "river_kicker",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -2543,92 +2621,6 @@
           ]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.saved_filters": {
-      "name": "saved_filters",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "identity_id": {
-          "name": "identity_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "criteria": {
-          "name": "criteria",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "saved_filters_identity_id_name_idx": {
-          "name": "saved_filters_identity_id_name_idx",
-          "columns": [
-            {
-              "expression": "identity_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "lower(\"name\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "saved_filters_identity_id_identities_id_fk": {
-          "name": "saved_filters_identity_id_identities_id_fk",
-          "tableFrom": "saved_filters",
-          "tableTo": "identities",
-          "columnsFrom": [
-            "identity_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

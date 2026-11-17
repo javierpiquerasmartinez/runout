@@ -8,7 +8,11 @@ import { handFacts, hands } from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
 import { FACTS_VERSION } from '../src/hands/replay/hero-facts.js';
 import { rereadHands } from '../src/hands/reread-backfill.js';
-import { freshHandHistory } from './support/hand-histories.js';
+import {
+  freshHandHistory,
+  oneHand,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { freshDatabase } from './support/fresh-database.js';
 import { HeldFileStore } from './support/held-file-store.js';
 import { startImportService } from './support/import-service.js';
@@ -59,9 +63,11 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       .expect(201);
   }
 
-  async function stockedAccount(): Promise<{ token: string }> {
+  async function stockedAccount(
+    files: string[] = FIXTURES,
+  ): Promise<{ token: string }> {
     const account = await newAccount(running.httpServer);
-    for (const file of FIXTURES) {
+    for (const file of files) {
       await importText(account.token, freshHandHistory(file));
     }
     return account;
@@ -132,6 +138,95 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  /*
+   * The postflop Streets of the same ten Hands and ggpoker-session.txt's
+   * three, read by hand. Nine see the flop: iMapleAA's two (CO and BTN, IP,
+   * SPRs 14.9 and 16.6, the BTN betting 31 % of the pot), HeroAI's two (all
+   * in preflop from the BTN, SPR 0; checking and calling all in from the
+   * BB, SPR 16.2), Hero9max's (the HJ, multiway, its opponents all in, SPR
+   * 0), Hero6's (the BTN, SPR 4.7, `BC` betting 46 %, then `C` on the
+   * turn), Hero4's (the BTN, multiway, SPR 7.7, betting 48 %, then `X` on
+   * the turn), and Hero's two on GGPoker (the SB all in preflop, SPR 0; `XR`
+   * from the BB facing 50 %, SPR 15.2). iMapleAA's CO folds the turn.
+   */
+  it('filters by the situation on each postflop Street', async () => {
+    const account = await stockedAccount([...FIXTURES, 'ggpoker-session.txt']);
+    const cases: [string, number][] = [
+      ['', 13],
+      [fact('flop-saw:true'), 9],
+      [fact('!flop-saw:true'), 4],
+      [fact('flop-ip:true'), 5],
+      // Heads-up against multiway.
+      [fact('flop-players:2..2'), 7],
+      [fact('flop-players:3..'), 2],
+      // The Hero's line.
+      [fact('flop-line:XR'), 1],
+      [fact('turn-line:X,F'), 2],
+      // SPR and bet size ranges, with decimals or open at one end.
+      [fact('flop-spr:..1'), 3],
+      [fact('flop-spr:4.5..8'), 2],
+      [fact('flop-spr:4.7..4.7'), 1],
+      [fact('flop-bet-size:40..60'), 2],
+      [fact('flop-bet-size-faced:50..50'), 1],
+      // Criteria on two Streets keep the Hands that meet both.
+      [`${fact('flop-ip:true')}&${fact('turn-line:X,F')}`, 2],
+      [`${fact('flop-line:BC')}&${fact('turn-line:C')}`, 1],
+      [`${fact('flop-ip:true')}&${fact('turn-saw:true')}`, 4],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
+  it('filters by the preflop Actions, role, line, sizes and stacks', async () => {
+    // Read by hand off the fixtures. Opened (role opener): iMapleAA from the
+    // CO and the BTN, HeroHU from the BTN; HeroAI opens and calls Aces2's
+    // 3-bet. Steals faced: iMapleAA folds the BB to the BTN, HeroAI calls in
+    // the BB. Hero9max calls the open, faces Oak_BB's squeeze and 4-bets to
+    // 3.2 times it, 159.9 big blinds, 120 deep. Hero6 and Hero4 raise over a
+    // limper, to 8 and 4 big blinds.
+    const account = await stockedAccount();
+    const cases: [string, number][] = [
+      [fact('three-bet-chance:true'), 3],
+      [`${fact('three-bet-chance:true')}&${fact('three-bet-did:false')}`, 3],
+      [fact('three-bet-faced:true'), 1],
+      [fact('three-bet-answer:call'), 1],
+      [fact('steal-did:true'), 4],
+      [fact('steal-faced:true'), 2],
+      [fact('steal-answer:fold'), 1],
+      [fact('!steal-answer:fold'), 9],
+      [fact('squeeze-answer:raise'), 1],
+      [fact('four-bet-did:true'), 1],
+      [fact('isolate-did:true'), 2],
+      [fact('preflop-role:opener'), 3],
+      [fact('preflop-role:isolator,called-3-bet'), 3],
+      [fact('!preflop-role:folded'), 8],
+      [fact('preflop-faced-first:limps'), 2],
+      [fact('limpers:1..'), 2],
+      [fact('preflop-line:R'), 5],
+      [fact('preflop-line:RC,CR'), 2],
+      [fact('open-size:2.5..2.5'), 2],
+      [fact('open-size:..3'), 7],
+      [fact('hero-raise-size:4..10'), 2],
+      [fact('hero-raise-multiple:3.2..3.2'), 1],
+      [fact('size-faced:2.5..3'), 2],
+      [fact('preflop-effective-stack:110..'), 3],
+      [fact('preflop-effective-stack:..100'), 7],
+      [fact('antes:true'), 1],
+      [fact('straddle:true'), 1],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.results, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
   it('filters by the Board’s texture on each Street', async () => {
     const account = await newAccount(running.httpServer);
     // The session's flops, as dealt: Qs Qd Ts, 3d 6h 9s with the turn 8c,
@@ -166,6 +261,110 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  it('keeps Hands by the Hero’s cards on each Street', async () => {
+    // Besides the ten Hands above, coinpoker-ante.txt's three, one of them
+    // As Ad on 3s 8s 7s Kc 10s: an overpair with the nut flush draw on the
+    // flop and the turn. Read by hand: Hero4's Ad Jc is top pair on
+    // As 8h 3c; HeroAI's Kd Kc is top set to the river on Ks 7d 4h 9c 2s,
+    // the one Hand there that is the nuts on the river.
+    const account = await stockedAccount();
+    await importText(account.token, freshHandHistory('coinpoker-ante.txt'));
+    const cases: [string, number][] = [
+      [fact('flop-made-hand:top-pair'), 1],
+      [fact('flop-made-hand:top-pair,overpair'), 3],
+      [fact('turn-draw:flush-draw'), 1],
+      [fact('turn-draw:flush-draw-pair,gutshot-two-cards'), 1],
+      [fact('flop-nut-flush-draw:true'), 1],
+      [fact('river-nuts:true'), 1],
+      [fact('flop-kicker:weak'), 1],
+      // The Hero's hole cards, with the Board.
+      [`${fact('hero-class:AA,KK')}&${fact('flop-made-hand:set')}`, 1],
+      [`${fact('hero-class:AA')}&${fact('turn-draw:flush-draw')}`, 1],
+      // Hands with no flop are kept by an exclusion, not by a value.
+      [fact('!turn-draw:flush-draw'), 12],
+      [fact('flop-nuts:false'), 7],
+      [fact('flop-nuts:true,false'), 9],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
+  it('filters by how the Hand ended for the Hero', async () => {
+    const account = await stockedAccount();
+    // Hand #262130000104 with Hero4 folding the river instead of splitting
+    // the pot at Showdown.
+    await importText(
+      account.token,
+      withFreshHandIds(
+        oneHand('pokerstars-edge-cases.txt', '262130000104')
+          .replace('Hero4: calls €1', 'Hero4: folds')
+          .replace(/Hero4: shows \[Ad Jc\] \(a pair of Aces\)\r?\n/, '')
+          .replace(
+            /Hero4 collected €2\.98 from pot\r?\nAspen1 collected €2\.97 from pot/,
+            'Aspen1 collected €4.95 from pot',
+          )
+          .replace('Total pot €6.05', 'Total pot €5.05'),
+      ),
+    );
+    /*
+     * Read by hand: HeroAI reaches Showdown on both all-in Hands, calling
+     * Aces2's shove preflop and winning, then on the flop and losing, 100
+     * big blinds. Hero9max calls Elm_UTG's preflop shove and takes the side
+     * pots; Hero6 calls Olive6's turn shove and loses 100 big blinds; Hero4
+     * splits the pot at Showdown. The new Hand is the only river fold.
+     */
+    const cases: [string, number][] = [
+      [fact('reached-showdown:true'), 5],
+      [`${fact('reached-showdown:true')}&${fact('won-money:false')}`, 2],
+      [fact('won-at-showdown:true'), 3],
+      [fact('!reached-showdown:true'), 6],
+      [fact('hero-folded-on:river'), 1],
+      [fact('faced-all-in-answer:call'), 4],
+      [
+        `${fact('faced-all-in-on:preflop')}&${fact('faced-all-in-answer:call')}`,
+        2,
+      ],
+      [fact('hero-all-in-on:flop,turn'), 2],
+      [fact('result:..-50'), 2],
+      [fact('!result:..-50'), 9],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.results, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
+  it('agrees with the Stats on an Action’s chance and did', async () => {
+    const account = await stockedAccount();
+    const statsOf = async (query: string) =>
+      (await get(account.token, `/api/library/stats?${query}`).expect(200))
+        .body as {
+        hands: number;
+        stats: Record<string, { opportunities: number; taken: number }>;
+      };
+    for (const [action, stat] of [
+      ['vpip', 'vpip'],
+      ['pfr', 'pfr'],
+      ['steal', 'steal'],
+      ['three-bet', 'three-bet'],
+      ['four-bet', 'four-bet'],
+      ['cold-call', 'cold-call'],
+    ]) {
+      const everything = (await statsOf('')).stats[stat];
+      const chance = await statsOf(fact(`${action}-chance:true`));
+      const did = await statsOf(fact(`${action}-did:true`));
+      expect(chance.hands, action).toBe(everything.opportunities);
+      expect(chance.stats[stat], action).toEqual(everything);
+      expect(did.hands, action).toBe(everything.taken);
+    }
+  }, 30_000);
+
   it('rejects an unknown fact, an impossible value or a malformed range', async () => {
     const account = await newAccount(running.httpServer);
     for (const criterion of [
@@ -181,13 +380,37 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       'players:..',
       'players:x..3',
       'players:3',
+      'flop-spr:1.55..2',
+      'flop-bet-size:1.5..',
+      'flop-players:1..',
+      'turn-ip:yes',
+      'flop-line:',
+      'flop-line:FX',
+      'river-line:xr',
+      'players:2.5..',
+      'three-bet-answer:check',
+      'preflop-role:caller',
+      'preflop-line:RQ',
+      'open-size:2,5..3',
       'flop-suits:no-flush',
       'turn-suits:monotone',
       'flop-pairing:pair',
       'flop-connectedness:..6',
       'flop-high-card:10',
       'turn-overcard:yes',
+      'players:-1..3',
+      'hero-folded-on:showdown',
+      'faced-all-in-answer:check',
+      'won-money:yes',
+      'result:..x',
+      'result:-..2',
       '!',
+      'flop-made-hand:pair',
+      'turn-draw:flush',
+      'river-draw:flush-draw',
+      'river-nut-flush-draw:true',
+      'flop-kicker:ace',
+      'river-nuts:yes',
     ]) {
       for (const endpoint of ['hands', 'hand-ids', 'results', 'stats']) {
         await get(

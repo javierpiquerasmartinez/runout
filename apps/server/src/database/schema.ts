@@ -7,6 +7,7 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -447,6 +448,68 @@ export const handFacts = pgTable('hand_facts', {
   fourBettorPosition: text('four_bettor_position'),
   aggressorPosition: text('aggressor_position'),
   heroAggressor: boolean('hero_aggressor').notNull(),
+  ...streetFactColumns('flop'),
+  ...streetFactColumns('turn'),
+  ...streetFactColumns('river'),
+  // Preflop (facts catalogue §1, §2.2–2.3). Each named Action has did and
+  // chance; those an opponent can make against the Hero, faced and answer
+  // (fold, call or raise). Sizes and stacks are in big blinds, or a multiple.
+  // A row worked out before version 5 has them all null.
+  vpipDid: boolean('vpip_did'),
+  vpipChance: boolean('vpip_chance'),
+  pfrDid: boolean('pfr_did'),
+  pfrChance: boolean('pfr_chance'),
+  openDid: boolean('open_did'),
+  openChance: boolean('open_chance'),
+  limpDid: boolean('limp_did'),
+  limpChance: boolean('limp_chance'),
+  isolateDid: boolean('isolate_did'),
+  isolateChance: boolean('isolate_chance'),
+  isolateFaced: boolean('isolate_faced'),
+  isolateAnswer: text('isolate_answer'),
+  stealDid: boolean('steal_did'),
+  stealChance: boolean('steal_chance'),
+  stealFaced: boolean('steal_faced'),
+  stealAnswer: text('steal_answer'),
+  threeBetDid: boolean('three_bet_did'),
+  threeBetChance: boolean('three_bet_chance'),
+  threeBetFaced: boolean('three_bet_faced'),
+  threeBetAnswer: text('three_bet_answer'),
+  squeezeDid: boolean('squeeze_did'),
+  squeezeChance: boolean('squeeze_chance'),
+  squeezeFaced: boolean('squeeze_faced'),
+  squeezeAnswer: text('squeeze_answer'),
+  coldCallDid: boolean('cold_call_did'),
+  coldCallChance: boolean('cold_call_chance'),
+  fourBetDid: boolean('four_bet_did'),
+  fourBetChance: boolean('four_bet_chance'),
+  fourBetFaced: boolean('four_bet_faced'),
+  fourBetAnswer: text('four_bet_answer'),
+  fiveBetDid: boolean('five_bet_did'),
+  fiveBetChance: boolean('five_bet_chance'),
+  fiveBetFaced: boolean('five_bet_faced'),
+  fiveBetAnswer: text('five_bet_answer'),
+  restealDid: boolean('resteal_did'),
+  restealChance: boolean('resteal_chance'),
+  restealFaced: boolean('resteal_faced'),
+  restealAnswer: text('resteal_answer'),
+  preflopRole: text('preflop_role'),
+  preflopFacedFirst: text('preflop_faced_first'),
+  limpers: smallint('limpers'),
+  /** The Hero's preflop Actions, one letter each: X, B, C, R, F. */
+  preflopLine: text('preflop_line'),
+  openSize: doublePrecision('open_size'),
+  threeBetSize: doublePrecision('three_bet_size'),
+  fourBetSize: doublePrecision('four_bet_size'),
+  heroRaiseSize: doublePrecision('hero_raise_size'),
+  heroRaiseMultiple: doublePrecision('hero_raise_multiple'),
+  heroSecondRaiseSize: doublePrecision('hero_second_raise_size'),
+  heroSecondRaiseMultiple: doublePrecision('hero_second_raise_multiple'),
+  sizeFaced: doublePrecision('size_faced'),
+  heroStartingStack: doublePrecision('hero_starting_stack'),
+  preflopEffectiveStack: doublePrecision('preflop_effective_stack'),
+  straddle: boolean('straddle'),
+  antes: boolean('antes'),
   // The Board's texture on each Street, null when it wasn't dealt.
   flopSuits: text('flop_suits'),
   flopPairing: text('flop_pairing'),
@@ -474,7 +537,78 @@ export const handFacts = pgTable('hand_facts', {
   riverBringsFlush: boolean('river_brings_flush'),
   riverBringsStraight: boolean('river_brings_straight'),
   riverOvercard: boolean('river_overcard'),
+  // The Hero's cards on each Street (facts catalogue §3.4). A Made Hand and
+  // the Draws are the Lab's Categories; the Draws, the combination Draws
+  // among them, are an array so a criterion keeps any Hand that overlaps it.
+  flopMadeHand: text('flop_made_hand'),
+  flopDraws: text('flop_draws').array(),
+  flopNuts: boolean('flop_nuts'),
+  /** `top`, `second` or `weak`; null unless the Made Hand uses one hole card. */
+  flopKicker: text('flop_kicker'),
+  flopNutFlushDraw: boolean('flop_nut_flush_draw'),
+  turnMadeHand: text('turn_made_hand'),
+  turnDraws: text('turn_draws').array(),
+  turnNuts: boolean('turn_nuts'),
+  turnKicker: text('turn_kicker'),
+  turnNutFlushDraw: boolean('turn_nut_flush_draw'),
+  riverMadeHand: text('river_made_hand'),
+  riverNuts: boolean('river_nuts'),
+  riverKicker: text('river_kicker'),
+  // Showdown and Result. Reached Showdown, the Result and All-in EV are on
+  // `hands` already, and criteria read them there.
+  /** A Street: `preflop`, `flop`, `turn` or `river`. */
+  heroFoldedOn: text('hero_folded_on'),
+  heroAllInOn: text('hero_all_in_on'),
+  heroFacedAllInOn: text('hero_faced_all_in_on'),
+  /** `fold`, `call` or `raise`. */
+  heroFacedAllInAnswer: text('hero_faced_all_in_answer'),
+  /** Null on a row worked out before the rules had it. */
+  heroWonMoney: boolean('hero_won_money'),
+  heroWonAtShowdown: boolean('hero_won_at_showdown'),
 });
+
+/**
+ * One postflop Street's facts (`StreetFacts` in `hero-facts.ts`), each named
+ * after the Street: `flopIp` in `flop_ip`. Quantities in big blinds.
+ */
+function streetFactColumns<S extends 'flop' | 'turn' | 'river'>(street: S) {
+  const bigBlinds = (name: string) =>
+    numeric(`${street}_${name}`, { precision: 10, scale: 2, mode: 'number' });
+  const columns = {
+    // Rows from before the Street's facts read false until re-derived.
+    Saw: boolean(`${street}_saw`).notNull().default(false),
+    Players: smallint(`${street}_players`),
+    Ip: boolean(`${street}_ip`),
+    First: boolean(`${street}_first`),
+    Pot: bigBlinds('pot'),
+    EffectiveStack: bigBlinds('effective_stack'),
+    Spr: numeric(`${street}_spr`, { precision: 9, scale: 1, mode: 'number' }),
+    AllIn: boolean(`${street}_all_in`),
+    /** `XR`, `BC`: X check, B bet, C call, R raise, F fold. */
+    Line: text(`${street}_line`),
+    /** Whole % of the pot before the bet. */
+    BetSize: integer(`${street}_bet_size`),
+    /** Multiple of the bet raised. */
+    RaiseSize: numeric(`${street}_raise_size`, {
+      precision: 8,
+      scale: 2,
+      mode: 'number',
+    }),
+    BetSizeFaced: integer(`${street}_bet_size_faced`),
+    RaiseSizeFaced: numeric(`${street}_raise_size_faced`, {
+      precision: 8,
+      scale: 2,
+      mode: 'number',
+    }),
+    Bets: smallint(`${street}_bets`),
+    Raises: smallint(`${street}_raises`),
+    Calls: smallint(`${street}_calls`),
+    Folds: smallint(`${street}_folds`),
+  };
+  return Object.fromEntries(
+    Object.entries(columns).map(([key, column]) => [`${street}${key}`, column]),
+  ) as { [K in keyof typeof columns as `${S}${K}`]: (typeof columns)[K] };
+}
 
 /**
  * A Hand placed in a Room's Queue, with its Author in that Room. Removing it

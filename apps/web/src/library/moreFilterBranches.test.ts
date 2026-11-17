@@ -31,6 +31,24 @@ describe('criterionSummaries', () => {
   })
 })
 
+describe('criterionSummaries on a Street', () => {
+  it('names the Street, then the criterion, an exclusion and a yes-or-no fact’s No included', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'river-overcard', exclude: false, values: ['false'] },
+      { fact: 'flop-connectedness', exclude: false, range: { min: 3, max: null } },
+      { fact: 'turn-suits', exclude: true, values: ['flush-possible'] },
+      { fact: 'flop-high-card', exclude: false, values: ['A', 'K'] },
+    ]
+
+    expect(criterionSummaries(criteria, t)).toEqual([
+      'Flop: conexión 3+',
+      'Flop: carta alta A, K',
+      'Turn: Excepto color posible',
+      'River: sin sobrecarta',
+    ])
+  })
+})
+
 describe('chipSummary', () => {
   it('keeps what fits and counts the rest as +N', () => {
     expect(chipSummary(['Bote 3-bet', 'Hero BB'], 40)).toEqual({ text: 'Bote 3-bet · Hero BB', more: 0 })
