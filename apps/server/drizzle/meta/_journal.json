@@ -271,8 +271,8 @@
     {
       "idx": 38,
       "version": "7",
-      "when": 1794903942248,
-      "tag": "0038_hero_cards_per_street",
+      "when": 1794903917003,
+      "tag": "0038_board_texture",
       "breakpoints": true
     }
   ]

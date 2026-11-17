@@ -1,5 +1,5 @@
 {
-  "id": "c86934d5-e5d8-4a90-be26-22921705afed",
+  "id": "814f133c-eef1-4db2-bc81-08cdb43727da",
   "prevId": "53c0735e-f6e9-4bba-a227-04f742a5aa1c",
   "version": "7",
   "dialect": "postgresql",
@@ -368,81 +368,141 @@
           "primaryKey": false,
           "notNull": true
         },
-        "flop_made_hand": {
-          "name": "flop_made_hand",
+        "flop_suits": {
+          "name": "flop_suits",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "flop_draws": {
-          "name": "flop_draws",
-          "type": "text[]",
+        "flop_pairing": {
+          "name": "flop_pairing",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "flop_nuts": {
-          "name": "flop_nuts",
+        "flop_straight_possible": {
+          "name": "flop_straight_possible",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
-        "flop_kicker": {
-          "name": "flop_kicker",
+        "flop_connectedness": {
+          "name": "flop_connectedness",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_high_card": {
+          "name": "flop_high_card",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "flop_nut_flush_draw": {
-          "name": "flop_nut_flush_draw",
+        "turn_suits": {
+          "name": "turn_suits",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_pairing": {
+          "name": "turn_pairing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_straight_possible": {
+          "name": "turn_straight_possible",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
-        "turn_made_hand": {
-          "name": "turn_made_hand",
+        "turn_connectedness": {
+          "name": "turn_connectedness",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_high_card": {
+          "name": "turn_high_card",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "turn_draws": {
-          "name": "turn_draws",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "turn_nuts": {
-          "name": "turn_nuts",
+        "turn_pairs_board": {
+          "name": "turn_pairs_board",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
-        "turn_kicker": {
-          "name": "turn_kicker",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "turn_nut_flush_draw": {
-          "name": "turn_nut_flush_draw",
+        "turn_brings_flush": {
+          "name": "turn_brings_flush",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
-        "river_made_hand": {
-          "name": "river_made_hand",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "river_nuts": {
-          "name": "river_nuts",
+        "turn_brings_straight": {
+          "name": "turn_brings_straight",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
-        "river_kicker": {
-          "name": "river_kicker",
+        "turn_overcard": {
+          "name": "turn_overcard",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_suits": {
+          "name": "river_suits",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_pairing": {
+          "name": "river_pairing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_straight_possible": {
+          "name": "river_straight_possible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_connectedness": {
+          "name": "river_connectedness",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_high_card": {
+          "name": "river_high_card",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_pairs_board": {
+          "name": "river_pairs_board",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_brings_flush": {
+          "name": "river_brings_flush",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_brings_straight": {
+          "name": "river_brings_straight",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_overcard": {
+          "name": "river_overcard",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         }

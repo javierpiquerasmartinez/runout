@@ -9,6 +9,13 @@ import {
   type MadeHandCategory,
 } from '@runout/poker';
 import type { Action, Hand, Street } from '../hand.js';
+import {
+  boardTexture,
+  cardChange,
+  type BoardPairing,
+  type BoardRank,
+  type BoardSuits,
+} from './board-texture.js';
 import { positions, type Position } from './positions.js';
 
 /**
@@ -17,7 +24,7 @@ import { positions, type Position } from './positions.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 2;
+export const FACTS_VERSION = 3;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [
@@ -65,7 +72,7 @@ export const HAND_CLASSES: readonly string[] = RANKS.split('').flatMap(
  * that Filters and Stats read it (ADR 0012). Each fact is defined in the
  * facts catalogue; a fact that doesn't apply is null.
  */
-export interface HeroFacts {
+export interface HeroFacts extends BoardTextureFacts {
   /** Seats dealt in: every seat not sitting out. */
   playersDealt: number;
   /** Null when the table's size has no Position names. */
@@ -128,6 +135,7 @@ export function heroFacts(hand: Hand): HeroFacts {
     fourBettorPosition: position(raisers[2]),
     aggressorPosition: position(raisers.at(-1)),
     heroAggressor: raisers.at(-1) === hero,
+    ...boardTextureFacts(hand.board),
     ...streetCards(hand),
   };
 }
@@ -169,6 +177,72 @@ function handClass(combo: string): string {
   return `${high}${low}${highSuit === lowSuit ? 's' : 'o'}`;
 }
 
+/**
+ * The Board's texture on each Street (facts catalogue §3.5). It describes
+ * the Board, so it is there whether or not the Hero saw the Street, and
+ * empty only when the Street wasn't dealt.
+ */
+export interface BoardTextureFacts {
+  flopSuits: BoardSuits | null;
+  flopPairing: BoardPairing | null;
+  flopStraightPossible: boolean | null;
+  flopConnectedness: number | null;
+  flopHighCard: BoardRank | null;
+  turnSuits: BoardSuits | null;
+  turnPairing: BoardPairing | null;
+  turnStraightPossible: boolean | null;
+  turnConnectedness: number | null;
+  turnHighCard: BoardRank | null;
+  turnPairsBoard: boolean | null;
+  turnBringsFlush: boolean | null;
+  turnBringsStraight: boolean | null;
+  turnOvercard: boolean | null;
+  riverSuits: BoardSuits | null;
+  riverPairing: BoardPairing | null;
+  riverStraightPossible: boolean | null;
+  riverConnectedness: number | null;
+  riverHighCard: BoardRank | null;
+  riverPairsBoard: boolean | null;
+  riverBringsFlush: boolean | null;
+  riverBringsStraight: boolean | null;
+  riverOvercard: boolean | null;
+}
+
+function boardTextureFacts(board: string[]): BoardTextureFacts {
+  const texture = (cards: number) =>
+    board.length >= cards ? boardTexture(board.slice(0, cards)) : null;
+  const change = (cards: number) =>
+    board.length >= cards
+      ? cardChange(board.slice(0, cards - 1), board[cards - 1])
+      : null;
+  const [flop, turn, river] = [texture(3), texture(4), texture(5)];
+  const [turnCard, riverCard] = [change(4), change(5)];
+  return {
+    flopSuits: flop?.suits ?? null,
+    flopPairing: flop?.pairing ?? null,
+    flopStraightPossible: flop?.straightPossible ?? null,
+    flopConnectedness: flop?.connectedness ?? null,
+    flopHighCard: flop?.highCard ?? null,
+    turnSuits: turn?.suits ?? null,
+    turnPairing: turn?.pairing ?? null,
+    turnStraightPossible: turn?.straightPossible ?? null,
+    turnConnectedness: turn?.connectedness ?? null,
+    turnHighCard: turn?.highCard ?? null,
+    turnPairsBoard: turnCard?.pairsBoard ?? null,
+    turnBringsFlush: turnCard?.bringsFlush ?? null,
+    turnBringsStraight: turnCard?.bringsStraight ?? null,
+    turnOvercard: turnCard?.overcard ?? null,
+    riverSuits: river?.suits ?? null,
+    riverPairing: river?.pairing ?? null,
+    riverStraightPossible: river?.straightPossible ?? null,
+    riverConnectedness: river?.connectedness ?? null,
+    riverHighCard: river?.highCard ?? null,
+    riverPairsBoard: riverCard?.pairsBoard ?? null,
+    riverBringsFlush: riverCard?.bringsFlush ?? null,
+    riverBringsStraight: riverCard?.bringsStraight ?? null,
+    riverOvercard: riverCard?.overcard ?? null,
+  };
+}
 // The Hero's cards on each Street (facts catalogue §3.4).
 
 /**

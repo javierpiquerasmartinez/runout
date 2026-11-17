@@ -12,6 +12,12 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import { handFacts, hands } from '../database/schema.js';
 import { MADE_HANDS } from '@runout/poker';
 import {
+  BOARD_PAIRINGS,
+  BOARD_RANKS,
+  FLOP_SUITS,
+  LATER_SUITS,
+} from '../hands/replay/board-texture.js';
+import {
   HAND_CLASSES,
   KICKERS,
   POSITIONS,
@@ -117,71 +123,187 @@ const FACTS = {
     domain: { kind: 'boolean' },
     since: 1,
   },
+  // The Board's texture on each Street (facts catalogue §3.5).
+  'flop-suits': {
+    column: handFacts.flopSuits,
+    domain: oneOf(FLOP_SUITS),
+    since: 2,
+  },
+  'flop-pairing': {
+    column: handFacts.flopPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'flop-straight-possible': {
+    column: handFacts.flopStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'flop-connectedness': {
+    column: handFacts.flopConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'flop-high-card': {
+    column: handFacts.flopHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'turn-suits': {
+    column: handFacts.turnSuits,
+    domain: oneOf(LATER_SUITS),
+    since: 2,
+  },
+  'turn-pairing': {
+    column: handFacts.turnPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'turn-straight-possible': {
+    column: handFacts.turnStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-connectedness': {
+    column: handFacts.turnConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'turn-high-card': {
+    column: handFacts.turnHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'turn-pairs-board': {
+    column: handFacts.turnPairsBoard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-brings-flush': {
+    column: handFacts.turnBringsFlush,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-brings-straight': {
+    column: handFacts.turnBringsStraight,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'turn-overcard': {
+    column: handFacts.turnOvercard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-suits': {
+    column: handFacts.riverSuits,
+    domain: oneOf(LATER_SUITS),
+    since: 2,
+  },
+  'river-pairing': {
+    column: handFacts.riverPairing,
+    domain: oneOf(BOARD_PAIRINGS),
+    since: 2,
+  },
+  'river-straight-possible': {
+    column: handFacts.riverStraightPossible,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-connectedness': {
+    column: handFacts.riverConnectedness,
+    domain: { kind: 'range', min: 1, max: 5 },
+    since: 2,
+  },
+  'river-high-card': {
+    column: handFacts.riverHighCard,
+    domain: oneOf(BOARD_RANKS),
+    since: 2,
+  },
+  'river-pairs-board': {
+    column: handFacts.riverPairsBoard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-brings-flush': {
+    column: handFacts.riverBringsFlush,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-brings-straight': {
+    column: handFacts.riverBringsStraight,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
+  'river-overcard': {
+    column: handFacts.riverOvercard,
+    domain: { kind: 'boolean' },
+    since: 2,
+  },
   // The Hero's cards on each Street.
   'flop-made-hand': {
     column: handFacts.flopMadeHand,
     domain: oneOf(MADE_HANDS),
-    since: 2,
+    since: 3,
   },
   'flop-draw': {
     column: handFacts.flopDraws,
     domain: anyOf(STREET_DRAWS),
-    since: 2,
+    since: 3,
   },
   'flop-nuts': {
     column: handFacts.flopNuts,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'flop-kicker': {
     column: handFacts.flopKicker,
     domain: oneOf(KICKERS),
-    since: 2,
+    since: 3,
   },
   'flop-nut-flush-draw': {
     column: handFacts.flopNutFlushDraw,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'turn-made-hand': {
     column: handFacts.turnMadeHand,
     domain: oneOf(MADE_HANDS),
-    since: 2,
+    since: 3,
   },
   'turn-draw': {
     column: handFacts.turnDraws,
     domain: anyOf(STREET_DRAWS),
-    since: 2,
+    since: 3,
   },
   'turn-nuts': {
     column: handFacts.turnNuts,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'turn-kicker': {
     column: handFacts.turnKicker,
     domain: oneOf(KICKERS),
-    since: 2,
+    since: 3,
   },
   'turn-nut-flush-draw': {
     column: handFacts.turnNutFlushDraw,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'river-made-hand': {
     column: handFacts.riverMadeHand,
     domain: oneOf(MADE_HANDS),
-    since: 2,
+    since: 3,
   },
   'river-nuts': {
     column: handFacts.riverNuts,
     domain: { kind: 'boolean' },
-    since: 2,
+    since: 3,
   },
   'river-kicker': {
     column: handFacts.riverKicker,
     domain: oneOf(KICKERS),
-    since: 2,
+    since: 3,
   },
 } satisfies Record<string, FactEntry>;
 
