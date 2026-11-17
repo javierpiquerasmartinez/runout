@@ -274,6 +274,13 @@
       "when": 1794903917003,
       "tag": "0038_board_texture",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794904810504,
+      "tag": "0039_postflop_street_facts",
+      "breakpoints": true
     }
   ]
 }
