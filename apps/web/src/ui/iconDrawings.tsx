@@ -159,6 +159,7 @@ export const drawings = {
   filter: <path {...stroke} d="M4 6h16M7 12h10M10 18h4" />,
   sort: <path {...stroke} d="M7 20V4m0 16-3-3m3 3 3-3M17 4v16m0-16-3 3m3-3 3 3" />,
   mark: <path {...stroke} d="M5 4.5h14v15l-7-4.2-7 4.2v-15z" />,
+  'saved-filter': <path {...stroke} d="M7 4h10v16l-5-3.5L7 20z" />,
   stats: (
     <>
       <path {...stroke} d="M5 19V11M12 19V5M19 19v-6" />
@@ -230,6 +231,6 @@ export const iconGroups = {
   navigation: ['home', 'library', 'room', 'search', 'profile', 'settings', 'chevron', 'expand', 'menu'],
   player: ['play', 'pause', 'previous', 'next', 'street-back', 'street-forward', 'speed', 'repeat', 'in-progress', 'history'],
   room: ['master', 'live', 'link', 'copy', 'participants', 'locked', 'share', 'note', 'notifications'],
-  hands: ['import', 'file', 'tag', 'filter', 'sort', 'mark', 'stats', 'pot', 'edit', 'delete'],
+  hands: ['import', 'file', 'tag', 'filter', 'saved-filter', 'sort', 'mark', 'stats', 'pot', 'edit', 'delete'],
   system: ['success', 'warning', 'error', 'close', 'add', 'help'],
 } as const satisfies Record<string, readonly IconName[]>

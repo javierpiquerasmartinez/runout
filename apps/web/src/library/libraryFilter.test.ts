@@ -135,6 +135,7 @@ describe('the filter in the address', () => {
     tags: ['t1', 't2'],
     stat: { key: 'three-bet', side: 'taken' },
     facts: [],
+    saved: null,
   }
 
   it('writes the viewer’s days as they are, and reads back the same filter', () => {
@@ -201,5 +202,25 @@ describe('Más filtros criteria in the query and the address', () => {
       '?period=all&fact=nope:1&fact=pot-type:6-bet&fact=players:7..3&fact=players:..&fact=hero-position&fact=players:2..11&fact=opener-position:BTN,CO'
 
     expect(libraryFilterFromSearch(search, now).facts).toEqual([{ fact: 'opener-position', exclude: false, values: ['BTN', 'CO'] }])
+  })
+})
+
+describe('a Saved Filter in the address', () => {
+  const applied: LibraryFilter = {
+    ...EMPTY_LIBRARY_FILTER,
+    stakes: ['no-limit:5:10:EUR'],
+    facts: [{ fact: 'pot-type', exclude: false, values: ['3-bet'] }],
+    saved: 'sf1',
+  }
+
+  it('names it by id after its criteria, written out, and reads it back', () => {
+    const search = librarySearch(applied, now)
+
+    expect(search).toBe('?period=all&stake=no-limit%3A5%3A10%3AEUR&fact=pot-type%3A3-bet&saved=sf1')
+    expect(libraryFilterFromSearch(search, now)).toEqual(applied)
+  })
+
+  it('never asks the server for it: the criteria are what narrow the Hands', () => {
+    expect(libraryFilterQuery(applied).toString()).toBe('stake=no-limit%3A5%3A10%3AEUR&fact=pot-type%3A3-bet')
   })
 })
