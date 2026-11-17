@@ -496,6 +496,17 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - An empty Library, or filters that match nothing, show the same empty states as the other views (H7.2).
 - It follows my Theme and the app's visual style.
 
+**H7.12 — Save my Filters.** As a player, I want to save what I set in Más filtros under a name and apply it again later, so I review the same Spot in one click over any stretch or Stake.
+
+- **Guardar filtro…** in the Más filtros panel, or **Guardar filtro** at the end of the side column's list, opens a dialog asking for a name of up to 40 characters. It lists what will be saved, branch by branch ("Mesa: Bote 3-bet · No ≤2 jugadores"), and says it doesn't keep the period, the Poker Sites, the Heroes, the Stakes, Marcadas or the Tags. It is offered only while there are Más filtros criteria, or a Stat criterion, to save.
+- A Saved Filter keeps the Más filtros criteria and the Stat criterion, nothing else. Two of my Saved Filters never share a name, ignoring case; a clash is said in the dialog, which stays open.
+- My Saved Filters are listed in the Library's side column under **Filtros guardados**, after my Tags, sorted by name, the applied one lit.
+- Applying one replaces whatever Más filtros and the Stat criterion held, and keeps the period, Poker Sites, Heroes, Stakes, Marcadas and the Tags. Applying the one applied again drops it, with its criteria. Saving a filter applies it.
+- While its criteria are unchanged, the Más filtros chip shows the Saved Filter's name instead of their summary, and its × drops the whole Saved Filter. Once a criterion changes, the chip shows the summary again.
+- The address names the applied Saved Filter by id, `saved=<id>`, after its criteria written out as usual, so a reload, the back button or a link keeps it, and replaying the filtered Hands keeps the same ones.
+- Saved Filters are mine alone: nobody else sees or changes them. An Administrator Impersonating my Account sees and uses them as I would.
+- A criterion on a fact the Library no longer knows is left out when a Saved Filter is read.
+
 ## E8 · Accounts and preferences
 
 Almost everything here is personal reading: how each person wants to see the table. The exception is Screen Names, which are not cosmetic: without them a Room cannot tell who the Author of a Queue Entry is, nor which seats Hide Opponent Names keeps.
