@@ -8,7 +8,11 @@ import { handFacts, hands } from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
 import { FACTS_VERSION } from '../src/hands/replay/hero-facts.js';
 import { rereadHands } from '../src/hands/reread-backfill.js';
-import { freshHandHistory } from './support/hand-histories.js';
+import {
+  freshHandHistory,
+  oneHand,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { freshDatabase } from './support/fresh-database.js';
 import { HeldFileStore } from './support/held-file-store.js';
 import { startImportService } from './support/import-service.js';
@@ -288,6 +292,54 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  it('filters by how the Hand ended for the Hero', async () => {
+    const account = await stockedAccount();
+    // Hand #262130000104 with Hero4 folding the river instead of splitting
+    // the pot at Showdown.
+    await importText(
+      account.token,
+      withFreshHandIds(
+        oneHand('pokerstars-edge-cases.txt', '262130000104')
+          .replace('Hero4: calls €1', 'Hero4: folds')
+          .replace(/Hero4: shows \[Ad Jc\] \(a pair of Aces\)\r?\n/, '')
+          .replace(
+            /Hero4 collected €2\.98 from pot\r?\nAspen1 collected €2\.97 from pot/,
+            'Aspen1 collected €4.95 from pot',
+          )
+          .replace('Total pot €6.05', 'Total pot €5.05'),
+      ),
+    );
+    /*
+     * Read by hand: HeroAI reaches Showdown on both all-in Hands, calling
+     * Aces2's shove preflop and winning, then on the flop and losing, 100
+     * big blinds. Hero9max calls Elm_UTG's preflop shove and takes the side
+     * pots; Hero6 calls Olive6's turn shove and loses 100 big blinds; Hero4
+     * splits the pot at Showdown. The new Hand is the only river fold.
+     */
+    const cases: [string, number][] = [
+      [fact('reached-showdown:true'), 5],
+      [`${fact('reached-showdown:true')}&${fact('won-money:false')}`, 2],
+      [fact('won-at-showdown:true'), 3],
+      [fact('!reached-showdown:true'), 6],
+      [fact('hero-folded-on:river'), 1],
+      [fact('faced-all-in-answer:call'), 4],
+      [
+        `${fact('faced-all-in-on:preflop')}&${fact('faced-all-in-answer:call')}`,
+        2,
+      ],
+      [fact('hero-all-in-on:flop,turn'), 2],
+      [fact('result:..-50'), 2],
+      [fact('!result:..-50'), 9],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.results, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+  }, 30_000);
+
   it('agrees with the Stats on an Action’s chance and did', async () => {
     const account = await stockedAccount();
     const statsOf = async (query: string) =>
@@ -346,6 +398,12 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
       'flop-connectedness:..6',
       'flop-high-card:10',
       'turn-overcard:yes',
+      'players:-1..3',
+      'hero-folded-on:showdown',
+      'faced-all-in-answer:check',
+      'won-money:yes',
+      'result:..x',
+      'result:-..2',
       '!',
       'flop-made-hand:pair',
       'turn-draw:flush',

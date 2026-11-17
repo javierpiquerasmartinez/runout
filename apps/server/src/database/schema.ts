@@ -553,6 +553,17 @@ export const handFacts = pgTable('hand_facts', {
   riverMadeHand: text('river_made_hand'),
   riverNuts: boolean('river_nuts'),
   riverKicker: text('river_kicker'),
+  // Showdown and Result. Reached Showdown, the Result and All-in EV are on
+  // `hands` already, and criteria read them there.
+  /** A Street: `preflop`, `flop`, `turn` or `river`. */
+  heroFoldedOn: text('hero_folded_on'),
+  heroAllInOn: text('hero_all_in_on'),
+  heroFacedAllInOn: text('hero_faced_all_in_on'),
+  /** `fold`, `call` or `raise`. */
+  heroFacedAllInAnswer: text('hero_faced_all_in_answer'),
+  /** Null on a row worked out before the rules had it. */
+  heroWonMoney: boolean('hero_won_money'),
+  heroWonAtShowdown: boolean('hero_won_at_showdown'),
 });
 
 /**
