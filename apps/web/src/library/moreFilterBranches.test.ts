@@ -131,3 +131,27 @@ describe('the Cards branch', () => {
     expect(counts.flop).toBe(0)
   })
 })
+
+describe('criterionSummaries on the Result', () => {
+  it('says how the Hand ended, the amounts in big blinds, after every other branch', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'result', exclude: false, range: { min: null, max: -20.5 } },
+      { fact: 'won-at-showdown', exclude: false, values: ['false'] },
+      { fact: 'faced-all-in-answer', exclude: false, values: ['call'] },
+      { fact: 'hero-folded-on', exclude: true, values: ['turn', 'river'] },
+      { fact: 'all-in-ev', exclude: false, range: { min: -3, max: 12.25 } },
+      potType(['3-bet']),
+    ]
+
+    expect(criterionSummaries(criteria, en)).toEqual([
+      '3-bet pot',
+      'Not Folded on turn, river',
+      'Answered an all-in with call',
+      'Didn’t win at Showdown',
+      'Result ≤-20.5 bb',
+      'All-in EV -3–12.25 bb',
+    ])
+    expect(criterionSummaries([{ fact: 'reached-showdown', exclude: false, values: ['true'] }], t)).toEqual(['Llegué a showdown'])
+    expect(branchCounts(criteria).result).toBe(5)
+  })
+})

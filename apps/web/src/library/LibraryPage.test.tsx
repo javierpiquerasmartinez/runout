@@ -541,21 +541,35 @@ describe('LibraryPage', () => {
       await waitFor(() => expect(lastFilterQuery()).toBe('stat=pfr%3Aopportunity'))
     })
 
-    it.each(['/library', '/library/graph', '/library/stats'])('names the Stat and the side in the filters bar at %s, as after a reload, and reads only those Hands', async (path) => {
+    it.each(['/library', '/library/graph', '/library/stats'])('names the Stat and the side in the Más filtros chip at %s, as after a reload or from an old link, and reads only those Hands', async (path) => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?period=all&hero=iMapleAA&stat=vpip:taken`)
 
       const filters = await screen.findByRole('group', { name: 'Filters' })
-      expect(within(filters).getByText('VPIP · you did it')).toBeTruthy()
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('VPIP · you did it')
+      // It has no chip of its own any more.
+      expect(within(filters).queryByRole('button', { name: /^Remove filter/ })).toBeNull()
       expect(lastFilterQuery()).toBe('hero=iMapleAA&stat=vpip%3Ataken')
       if (path.endsWith('graph')) await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?hero=iMapleAA&stat=vpip%3Ataken'))
       if (path.endsWith('stats')) await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?hero=iMapleAA&stat=vpip%3Ataken'))
     })
 
-    it('clears the Stat criterion when its chip is removed, keeping the view and the other filters', async () => {
+    it('adds the Stat criterion to the other Más filtros criteria, asking for the Hands the link counted', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&fact=pot-type:3-bet')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+
+      await userEvent.hover(within(shown).getByRole('button', { name: 'PFR 50.0%' }))
+      await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'Opportunities (2)' }))
+
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot · PFR · opportunities')
+      await waitFor(() => expect(lastFilterQuery()).toBe('stat=pfr%3Aopportunity&fact=pot-type%3A3-bet'))
+    })
+
+    it('clears the Stat criterion with the other Más filtros criteria, keeping the view and the other filters', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&site=pokerstars&stat=pfr:opportunity')
       const filters = await screen.findByRole('group', { name: 'Filters' })
 
-      await userEvent.click(within(filters).getByRole('button', { name: 'Remove filter PFR · opportunities' }))
+      await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
 
       expect(window.location.pathname).toBe('/library/stats')
       expect(window.location.search).toBe('?period=all&site=pokerstars')
@@ -744,6 +758,82 @@ describe('LibraryPage', () => {
       })
     })
 
+    describe('the Result branch', () => {
+      async function resultBranch() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Result' }))
+        return panel
+      }
+
+      it('sets how the Hand ended, excludes it, and clears it', async () => {
+        renderLibrary()
+        const panel = await resultBranch()
+
+        await userEvent.click(within(criterion(panel, 'I folded on')).getByRole('button', { name: 'turn' }))
+        await userEvent.click(within(criterion(panel, 'I folded on')).getByRole('button', { name: 'river' }))
+        await userEvent.click(within(criterion(panel, 'I answered the all-in')).getByRole('button', { name: 'call' }))
+        await userEvent.click(within(criterion(panel, 'I won at Showdown')).getByRole('button', { name: 'No' }))
+        await userEvent.click(within(criterion(panel, 'I folded on')).getByRole('switch', { name: /^Exclude I folded on/ }))
+
+        expect(lastFilterQuery()).toBe('fact=%21hero-folded-on%3Aturn%2Criver&fact=faced-all-in-answer%3Acall&fact=won-at-showdown%3Afalse')
+        expect(within(panel).getByRole('tab', { name: 'Result, 3 criteria' })).toBeTruthy()
+
+        await userEvent.click(within(criterion(panel, 'I answered the all-in')).getByRole('button', { name: 'call' }))
+        expect(lastFilterQuery()).toBe('fact=%21hero-folded-on%3Aturn%2Criver&fact=won-at-showdown%3Afalse')
+      })
+
+      it('takes a Result or an All-in EV in big blinds, negative or with decimals', async () => {
+        renderLibrary()
+        const panel = await resultBranch()
+
+        await userEvent.type(within(criterion(panel, 'Result')).getByRole('spinbutton', { name: 'Result, to' }), '-20.5')
+        await userEvent.type(within(criterion(panel, 'All-in EV')).getByRole('spinbutton', { name: 'All-in EV, from' }), '1.25')
+
+        expect(lastFilterQuery()).toBe('fact=result%3A..-20.5&fact=all-in-ev%3A1.25..')
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Result ≤-20.5 bb · All-in EV 1.25+ bb')
+      })
+    })
+
+    describe('the Stat branch', () => {
+      async function statBranch() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: /^Stat/ }))
+        return panel
+      }
+
+      it('picks a Stat’s chance or when the Hero took it, one Stat at a time, as its tooltip links do', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const panel = await statBranch()
+        const preflop = within(panel).getByRole('group', { name: 'Preflop' })
+
+        await userEvent.click(within(criterion(preflop, 'VPIP')).getByRole('button', { name: 'I did it' }))
+
+        expect(lastFilterQuery()).toBe('stat=vpip%3Ataken&fact=pot-type%3A3-bet')
+        expect(window.location.search).toBe('?period=all&stat=vpip%3Ataken&fact=pot-type%3A3-bet')
+        expect(within(panel).getByRole('tab', { name: 'Stat, 1 criterion' })).toBeTruthy()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot · VPIP · you did it')
+
+        await userEvent.click(within(criterion(panel, 'W$SD')).getByRole('button', { name: 'I had the chance' }))
+        expect(lastFilterQuery()).toBe('stat=wsd%3Aopportunity&fact=pot-type%3A3-bet')
+        expect(within(criterion(preflop, 'VPIP')).getByRole('button', { name: 'I did it' }).getAttribute('aria-pressed')).toBe('false')
+
+        await userEvent.click(within(criterion(panel, 'W$SD')).getByRole('button', { name: 'I had the chance' }))
+        expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+      })
+
+      it('goes with Remove all', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=vpip:taken&fact=pot-type:3-bet')
+        const panel = await statBranch()
+
+        expect(within(criterion(panel, 'VPIP')).getByRole('button', { name: 'I did it' }).getAttribute('aria-pressed')).toBe('true')
+        await userEvent.click(within(panel).getByRole('button', { name: 'Remove all' }))
+
+        expect(lastFilterQuery()).toBe('')
+      })
+    })
+
     it('explains a criterion the pot types picked never meet', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
       const panel = await openPanel()
@@ -821,6 +911,8 @@ describe('LibraryPage', () => {
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Cards' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Board' }))
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Stat' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
 

@@ -27,6 +27,15 @@ export const BOARD_PAIRINGS = ['unpaired', 'paired', 'two-pair', 'trips', 'full-
 /** Ranks from the highest down, as the Lab writes them. */
 export const BOARD_RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'] as const
 
+/** The Streets, in the order they are dealt. */
+export const HAND_STREETS = ['preflop', 'flop', 'turn', 'river'] as const
+
+/** What the Hero answered an Action with. */
+export const ANSWERS = ['fold', 'call', 'raise'] as const
+
+/** An amount in big blinds: negative or with decimals, any size. */
+const BIG_BLINDS = { kind: 'range', min: -Infinity, max: Infinity, signed: true } as const
+
 /** The Board's texture on a Street (facts catalogue §3.5), the same facts on each. */
 const texture = (suits: readonly string[]) =>
   ({
@@ -58,7 +67,8 @@ const change = { kind: 'boolean' } as const
 export type FactDomain =
   | { kind: 'set'; values: readonly string[] }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number }
+  /** With `signed`, its ends may be negative or have decimals. */
+  | { kind: 'range'; min: number; max: number; signed?: boolean }
 
 export const FACTS = {
   players: { kind: 'range', min: 2, max: 10 },
@@ -108,6 +118,16 @@ export const FACTS = {
   'river-made-hand': { kind: 'set', values: MADE_HANDS },
   'river-nuts': { kind: 'boolean' },
   'river-kicker': { kind: 'set', values: KICKERS },
+  // Showdown and Result (facts catalogue §4).
+  'hero-folded-on': { kind: 'set', values: HAND_STREETS },
+  'hero-all-in-on': { kind: 'set', values: HAND_STREETS },
+  'faced-all-in-on': { kind: 'set', values: HAND_STREETS },
+  'faced-all-in-answer': { kind: 'set', values: ANSWERS },
+  'reached-showdown': { kind: 'boolean' },
+  'won-money': { kind: 'boolean' },
+  'won-at-showdown': { kind: 'boolean' },
+  result: BIG_BLINDS,
+  'all-in-ev': BIG_BLINDS,
 } as const satisfies Record<string, FactDomain>
 
 export type FactKey = keyof typeof FACTS
@@ -139,7 +159,8 @@ export function readFactCriterion(text: string): FactCriterion | null {
   if (domain.kind === 'range') {
     const ends = written.split('..')
     if (ends.length !== 2) return null
-    const [min, max] = ends.map((end) => (end === '' ? null : /^\d+$/.test(end) ? Number(end) : NaN))
+    const number = domain.signed ? /^-?\d+(\.\d+)?$/ : /^\d+$/
+    const [min, max] = ends.map((end) => (end === '' ? null : number.test(end) ? Number(end) : NaN))
     const inside = (end: number | null) => end === null || (end >= domain.min && end <= domain.max)
     if (Number.isNaN(min) || Number.isNaN(max) || !inside(min) || !inside(max)) return null
     if ((min === null && max === null) || (min !== null && max !== null && min > max)) return null
