@@ -1133,6 +1133,7 @@ export const en: Messages = {
   'library.moreFilters.save': 'Save filter…',
   'library.moreFilters.chip.saved': 'Saved filter {name}',
   'library.savedFilters': 'Saved filters',
+  'library.savedFilters.elsewhere': 'Create and edit filters on a computer.',
   'library.savedFilters.save': 'Save filter',
   'library.saveFilter.title': 'Save filter',
   'library.saveFilter.name': 'Name',

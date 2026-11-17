@@ -19,6 +19,7 @@ import {
   type CriterionDefinition,
   type Section,
 } from './moreFilterBranches'
+import { useBuildsFilters } from './buildsFilters'
 import './MoreFilters.css'
 
 /** How many characters of summary the chip shows before it counts the rest as "+N". */
@@ -55,6 +56,7 @@ export function MoreFilters({
 }) {
   const root = useRef<HTMLSpanElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
+  const builds = useBuildsFilters()
 
   const close = () => {
     onOpenChange(false)
@@ -69,6 +71,8 @@ export function MoreFilters({
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
   }, [open, onOpenChange])
+
+  if (!builds) return <AppliedChip criteria={criteria} savedName={savedName} onRemove={onRemove} />
 
   return (
     <span className="more-filters" ref={root}>
@@ -166,6 +170,29 @@ function MoreFiltersChip({
           ))}
         </ul>
       )}
+    </span>
+  )
+}
+
+/** The chip at phone width: what is applied and a × to drop it, nothing to open; nothing while there is nothing applied. */
+function AppliedChip({ criteria, savedName, onRemove }: { criteria: FactCriterion[]; savedName: string | null; onRemove: () => void }) {
+  const { t } = useI18n()
+  const summaries = criterionSummaries(criteria, t)
+  if (summaries.length === 0 && savedName === null) return null
+  const { text, more } = chipSummary(summaries, CHIP_BUDGET)
+  return (
+    <span className="more-filters">
+      <span className="more-filters__chip">
+        <span className="more-filters__applied">
+          <Icon name={savedName === null ? 'filter' : 'saved-filter'} size={14} />
+          <span className="more-filters__summary">{savedName ?? text}</span>
+          {savedName === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
+        </span>
+        <span className="more-filters__sep" aria-hidden="true" />
+        <button type="button" className="more-filters__remove" aria-label={t('library.moreFilters.chip.remove')} onClick={onRemove}>
+          <Icon name="close" size={12} />
+        </button>
+      </span>
     </span>
   )
 }
