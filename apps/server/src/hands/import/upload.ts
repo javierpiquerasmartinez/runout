@@ -9,10 +9,11 @@ export class UnreadableUpload extends Error {
 }
 
 /**
- * How much text one zip may unpack to. Hand Histories compress about ten to
- * one, so a 20 MB zip of them stays well under this.
+ * How much text one zip may unpack to. 2,000 Hands, the most one preview
+ * reads, take a few MB of text; a zip that unpacks past this holds far more,
+ * and unpacking it whole would take the server's memory.
  */
-const MAX_TEXT_BYTES = 256 * 1024 * 1024;
+const MAX_TEXT_BYTES = 32 * 1024 * 1024;
 
 export const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];
 

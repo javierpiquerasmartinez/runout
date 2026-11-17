@@ -102,7 +102,23 @@ export function ImportDialog({
     return () => window.removeEventListener('beforeunload', holdOn)
   }, [holding])
 
+  // Items are read one at a time: the server reads each file whole, and
+  // several large exports at once could take all its memory.
+  const reading = useRef<Promise<void>>(Promise.resolve())
+  // Closed, it reads none of the items still waiting.
+  useEffect(() => {
+    const waiting = sources.current
+    return () => waiting.clear()
+  }, [])
+
   function read(key: string, source: Source, format?: SourceFormat) {
+    reading.current = reading.current.then(() =>
+      // An item removed while it waited is not read.
+      sources.current.has(key) ? preview(key, source, format) : undefined,
+    )
+  }
+
+  function preview(key: string, source: Source, format?: SourceFormat): Promise<void> {
     let body: FormData | { text: string; format?: SourceFormat }
     if (typeof source === 'string') {
       body = { text: source, format }
@@ -111,7 +127,7 @@ export function ImportDialog({
       body.append('file', source)
       if (format) body.append('format', format)
     }
-    api<ImportPreview>(`${importsPath(destination)}/previews`, { token, method: 'POST', body })
+    return api<ImportPreview>(`${importsPath(destination)}/previews`, { token, method: 'POST', body })
       .then((preview) => {
         // Into a Library, a duplicate can get its Original back already.
         forgetHands()
@@ -218,8 +234,10 @@ export function ImportDialog({
   }
 
   const limit = IMPORT_LIMIT[destinationKind]
+  // The server stops reading a file past the limit, and refuses it.
+  const fileOverLimit = batch.items.some((item) => item.state === 'failed' && item.reason === 'too-many-hands')
   // Over 2,000 Hands, the Library offers a Bulk Import instead.
-  const offersBulk = destinationKind === 'library' && !bulk && totals.ready > limit
+  const offersBulk = destinationKind === 'library' && !bulk && (totals.ready > limit || fileOverLimit)
   const overLimit =
     totals.ready > limit && !offersBulk
       ? t(`import.${destinationKind}.overLimit`, { count: formatNumber(totals.ready), limit: formatNumber(limit) })
@@ -411,7 +429,11 @@ export function ImportDialog({
             )}
           </div>
           {offersBulk && !confirmFailure && (
-            <p className="import-dialog__failure">{t('import.bulk.offer', { count: formatNumber(totals.ready) })}</p>
+            <p className="import-dialog__failure">
+              {fileOverLimit
+                ? t('import.bulk.offerOverLimit', { limit: formatNumber(limit) })
+                : t('import.bulk.offer', { count: formatNumber(totals.ready) })}
+            </p>
           )}
           {overLimit && !confirmFailure && <p className="import-dialog__failure">{overLimit}</p>}
           {confirmFailure && (

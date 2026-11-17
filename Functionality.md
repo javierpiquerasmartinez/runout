@@ -178,6 +178,7 @@ Import has two destinations sharing one flow: a Room's Queue, or the importing p
 
 - Accepts .txt and .zip, up to 20 MB per file and several files at once. A file over the limit is refused with a message suggesting I split the export.
 - Each file shows its status: detected format, Hands read and Hands discarded.
+- The files are read one after another, not all at once, so that several large exports cannot take the server's memory together. A file of more than 2,000 Hands, or a zip whose text unpacks past 32 MB, is not read whole: reading stops there and the file is refused as having too many Hands.
 - I can remove a file from the list before confirming the import.
 
 **H2.2 — Paste plain text.** As a Participant, I want to paste the Hand History of a single Hand, so I can share something I just played without exporting anything.
@@ -380,6 +381,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - **Importar manos** sits in the Library's title row, on the right, so it is always in sight without scrolling, in every view. An empty Library also invites me to import.
 - The flow, preview and 20 MB limit are those of Room import (E2). I can import several files one after the other to bring in more than 20 MB.
 - The preview marks each Hand as new, already in my Library, or discarded with its reason. Hands already in my Library are not added twice, so my Results are not inflated.
+- A file the preview refuses for holding more than 2,000 Hands is offered as a Bulk Import instead: "Esta importación tiene más de 2.000 manos: será una importación grande, sin vista previa".
 - Hands whose Hero is not me (a friend's export, a forum Hand) are accepted, as are CoinPoker Hands whose Hero is written `Hero`.
 - If someone else already imported the same Hand from the same seat, my import still succeeds: we share the Hand, and I see the Notes already written on it.
 - My Library holds at most what my Plan allows (ADR 0011): 20,000 Hands on Beta, Runout's own 10 million on Pro. Hands already in it, and Hands removed from it, count as they stand now. An import that would take it past that is refused whole, saying so: "Tu plan Beta admite hasta 20.000 manos en la biblioteca. Tienes 19.200 y esta importación añade 1.500." A Library already over its limit, after a move to a smaller Plan, keeps every Hand and takes no more until it is under it.

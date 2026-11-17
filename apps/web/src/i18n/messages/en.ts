@@ -519,6 +519,7 @@ export const en: Messages = {
   'import.room.overLimit': 'This import has {count} hands; a room takes at most {limit}',
   'import.library.overLimit': 'This import has {count} hands; your library takes at most {limit} at once',
   'import.bulk.offer': 'This import has {count} hands: it will be a large import, without a preview',
+  'import.bulk.offerOverLimit': 'This import has more than {limit} hands: it will be a large import, without a preview',
   'import.bulk.continue': 'Continue as a large import',
   'import.bulk.title': 'Large import',
   'import.bulk.noPreview': 'There is no preview: there are too many hands to review them first.',

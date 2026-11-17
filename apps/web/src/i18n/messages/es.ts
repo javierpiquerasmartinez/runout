@@ -520,6 +520,7 @@ export const es = {
   'import.room.overLimit': 'Esta importación tiene {count} manos; el máximo en una sala son {limit}',
   'import.library.overLimit': 'Esta importación tiene {count} manos; tu biblioteca admite como máximo {limit} de una vez',
   'import.bulk.offer': 'Esta importación tiene {count} manos: será una importación grande, sin vista previa',
+  'import.bulk.offerOverLimit': 'Esta importación tiene más de {limit} manos: será una importación grande, sin vista previa',
   'import.bulk.continue': 'Continuar como importación grande',
   'import.bulk.title': 'Importación grande',
   'import.bulk.noPreview': 'No hay vista previa: son demasiadas manos para revisarlas antes.',

@@ -70,9 +70,13 @@ let confirmed: () => Promise<Response>
 
 let requests: { url: string; body: FormData | string }[]
 
+/** What the server answers a preview of the file named with; a pending one leaves it reading. */
+let previewed: (name: string) => Promise<Response>
+
 beforeEach(() => {
   requests = []
   confirmed = async () => Response.json({ imported: 3 }, { status: 201 })
+  previewed = async (name) => Response.json(previews[name], { status: 201 })
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {
@@ -83,7 +87,7 @@ beforeEach(() => {
       }
       if (url.endsWith('/imports/previews')) {
         const file = (init.body as FormData).get('file') as File
-        return Response.json(previews[file.name], { status: 201 })
+        return previewed(file.name)
       }
       return confirmed()
     }),
@@ -101,14 +105,14 @@ function renderDialog(
   const onClose = vi.fn()
   const onImported = vi.fn()
   const session = fakeSession({ screenNames: ['Javier_PS'], ...identity })
-  render(
+  const { unmount } = render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
         <ImportDialog destination={destination} onClose={onClose} onImported={onImported} />
       </SessionContext.Provider>
     </I18nProvider>,
   )
-  return { onClose, onImported, session }
+  return { onClose, onImported, session, unmount }
 }
 
 async function choose(...names: string[]) {
@@ -137,6 +141,35 @@ describe('ImportDialog', () => {
     expect(requests.at(-1)!.url).toBe('/api/rooms/ABCD2345/imports')
     expect(onImported).toHaveBeenCalledWith(3, 1)
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('reads the files one at a time, so that the server reads one export at once', async () => {
+    const answers = new Map<string, (response: Response) => void>()
+    previewed = (name) => new Promise((resolve) => answers.set(name, resolve))
+    const previewsSent = () => requests.filter((request) => request.url.endsWith('/previews')).map((request) => (request.body as FormData).get('file') as File).map((file) => file.name)
+    renderDialog()
+
+    await choose('session.txt', 'other.txt')
+
+    await waitFor(() => expect(previewsSent()).toEqual(['session.txt']))
+    answers.get('session.txt')!(Response.json(previews['session.txt'], { status: 201 }))
+    await waitFor(() => expect(previewsSent()).toEqual(['session.txt', 'other.txt']))
+    answers.get('other.txt')!(Response.json(previews['other.txt'], { status: 201 }))
+    expect(await screen.findByText('3 hands ready to add')).toBeTruthy()
+  })
+
+  it('reads no more of the files once it is closed', async () => {
+    const answers = new Map<string, (response: Response) => void>()
+    previewed = (name) => new Promise((resolve) => answers.set(name, resolve))
+    const { unmount } = renderDialog()
+
+    await choose('session.txt', 'other.txt')
+    await waitFor(() => expect(answers.has('session.txt')).toBe(true))
+    unmount()
+    answers.get('session.txt')!(Response.json(previews['session.txt'], { status: 201 }))
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(requests.filter((request) => request.url.endsWith('/previews'))).toHaveLength(1)
   })
 
   it('previews each Hand’s board, Positions, final pot, Final Street and date', async () => {

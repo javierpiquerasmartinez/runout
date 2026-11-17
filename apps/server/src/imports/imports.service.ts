@@ -28,6 +28,7 @@ import {
 import { readUpload, UnreadableUpload } from '../hands/import/upload.js';
 import { overview, type HandOverview } from '../hands/replay/overview.js';
 import type { Identity } from '../identity/identity.service.js';
+import { LIBRARY_IMPORT_LIMIT } from '../library/library-limits.js';
 import { LibraryService } from '../library/library.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import {
@@ -72,6 +73,14 @@ export interface ImportPreview {
 export type ImportSource =
   { name: string; bytes: Uint8Array } | { text: unknown };
 
+/**
+ * The most Hands one preview reads, into either destination: past it,
+ * reading stops and the file is refused, so that a large export cannot take
+ * the server's memory. The Library takes no more at once anyway; a Room takes
+ * far fewer, and says so at confirming.
+ */
+const PREVIEW_HAND_LIMIT = LIBRARY_IMPORT_LIMIT;
+
 /** How long an unconfirmed preview is kept. */
 const PREVIEW_KEPT_FOR_MS = 60 * 60 * 1000;
 
@@ -93,7 +102,8 @@ export class ImportsService {
   /**
    * Reads one file or paste, in the format picked by hand if there is one,
    * and keeps the Hands until they are confirmed. Nothing reaches the
-   * destination. Hands already there are left out as duplicates; into a
+   * destination. Refuses with `too-many-hands` a file or paste of more than
+   * `PREVIEW_HAND_LIMIT` Hands. Hands already there are left out as duplicates; into a
    * Room, each Hand kept says who its Author would be.
    */
   async preview(
@@ -104,7 +114,13 @@ export class ImportsService {
   ): Promise<ImportPreview> {
     const roomId = (await this.roomOf(importer, destination))?.id ?? null;
     const picked = pickedFormat(format);
-    const result = importHandHistory(textOf(source), { format: picked });
+    const result = importHandHistory(textOf(source), {
+      format: picked,
+      maxHands: PREVIEW_HAND_LIMIT,
+    });
+    if (result.overLimit) {
+      throw new Rejected('too-many-hands', { limit: PREVIEW_HAND_LIMIT });
+    }
     const read = withHistories(result.hands, result.texts);
     let kept: Hand[];
     let previews: HandPreview[];
@@ -268,6 +284,10 @@ function textOf(source: ImportSource): string {
     return readUpload(source.name, source.bytes);
   } catch (error) {
     if (!(error instanceof UnreadableUpload)) throw error;
+    // A zip that unpacks to that much text holds far more Hands than a preview reads.
+    if (error.message === 'too-large') {
+      throw new Rejected('too-many-hands', { limit: PREVIEW_HAND_LIMIT });
+    }
     throw new Rejected('unreadable-file');
   }
 }
