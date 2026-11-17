@@ -24,6 +24,7 @@ import {
   type CriterionDefinition,
   type Section,
 } from './moreFilterBranches'
+import { useBuildsFilters } from './buildsFilters'
 import './MoreFilters.css'
 
 /** How many characters of summary the chip shows before it counts the rest as "+N". */
@@ -41,9 +42,18 @@ export function MoreFilters({
   open,
   onOpenChange,
   count,
+  savedName = null,
+  onRemove = () => onChange([]),
+  onSave,
 }: {
   criteria: FactCriterion[]
   onChange: (criteria: FactCriterion[]) => void
+  /** The name of the Saved Filter applied, while its criteria are unchanged: the chip shows it instead of their summary. */
+  savedName?: string | null
+  /** What the chip's × drops; by default every criterion. */
+  onRemove?: () => void
+  /** Without it the panel offers no "Guardar filtro…". */
+  onSave?: () => void
   open: boolean
   onOpenChange: (open: boolean) => void
   /** The Hands the whole filter keeps, and those it would without Más filtros; null until read. */
@@ -51,6 +61,7 @@ export function MoreFilters({
 }) {
   const root = useRef<HTMLSpanElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
+  const builds = useBuildsFilters()
 
   const close = () => {
     onOpenChange(false)
@@ -66,22 +77,47 @@ export function MoreFilters({
     return () => document.removeEventListener('pointerdown', closeOutside)
   }, [open, onOpenChange])
 
+  if (!builds) return <AppliedChip criteria={criteria} savedName={savedName} onRemove={onRemove} />
+
   return (
     <span className="more-filters" ref={root}>
-      <MoreFiltersChip criteria={criteria} trigger={trigger} open={open} onOpen={() => onOpenChange(!open)} onRemove={() => onChange([])} />
-      {open && <MoreFiltersPanel criteria={criteria} onChange={onChange} count={count} onClose={close} />}
+      <MoreFiltersChip
+        criteria={criteria}
+        savedName={savedName}
+        trigger={trigger}
+        open={open}
+        onOpen={() => onOpenChange(!open)}
+        onRemove={onRemove}
+      />
+      {open && (
+        <MoreFiltersPanel
+          criteria={criteria}
+          onChange={onChange}
+          count={count}
+          onClose={close}
+          onSave={
+            onSave &&
+            (() => {
+              onOpenChange(false)
+              onSave()
+            })
+          }
+        />
+      )}
     </span>
   )
 }
 
 function MoreFiltersChip({
   criteria,
+  savedName,
   trigger,
   open,
   onOpen,
   onRemove,
 }: {
   criteria: FactCriterion[]
+  savedName: string | null
   trigger: RefObject<HTMLButtonElement | null>
   open: boolean
   onOpen: () => void
@@ -92,7 +128,7 @@ function MoreFiltersChip({
   const tooltipId = useId()
   const summaries = criterionSummaries(criteria, t)
 
-  if (summaries.length === 0) {
+  if (summaries.length === 0 && savedName === null) {
     return (
       <button type="button" ref={trigger} className="more-filters__idle" aria-expanded={open} onClick={onOpen}>
         <Icon name="filter" size={14} />
@@ -111,22 +147,26 @@ function MoreFiltersChip({
         type="button"
         ref={trigger}
         className="more-filters__open"
-        aria-label={t('library.moreFilters.chip.open', { summary: summaries.join(' · ') })}
+        aria-label={
+          savedName === null
+            ? t('library.moreFilters.chip.open', { summary: summaries.join(' · ') })
+            : t('library.moreFilters.chip.saved', { name: savedName })
+        }
         aria-expanded={open}
         aria-describedby={listing ? tooltipId : undefined}
         onClick={onOpen}
         onFocus={() => setListing(true)}
         onBlur={() => setListing(false)}
       >
-        <Icon name="filter" size={14} />
-        <span className="more-filters__summary">{text}</span>
-        {more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
+        <Icon name={savedName === null ? 'filter' : 'saved-filter'} size={14} />
+        <span className="more-filters__summary">{savedName ?? text}</span>
+        {savedName === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
       </button>
       <span className="more-filters__sep" aria-hidden="true" />
       <button type="button" className="more-filters__remove" aria-label={t('library.moreFilters.chip.remove')} onClick={onRemove}>
         <Icon name="close" size={12} />
       </button>
-      {listing && !open && (
+      {listing && !open && ordered.length > 0 && (
         <ul className="more-filters__tip" role="tooltip" id={tooltipId}>
           {ordered.map((criterion, index) => (
             <li key={criterion.fact}>
@@ -139,16 +179,41 @@ function MoreFiltersChip({
   )
 }
 
+/** The chip at phone width: what is applied and a × to drop it, nothing to open; nothing while there is nothing applied. */
+function AppliedChip({ criteria, savedName, onRemove }: { criteria: FactCriterion[]; savedName: string | null; onRemove: () => void }) {
+  const { t } = useI18n()
+  const summaries = criterionSummaries(criteria, t)
+  if (summaries.length === 0 && savedName === null) return null
+  const { text, more } = chipSummary(summaries, CHIP_BUDGET)
+  return (
+    <span className="more-filters">
+      <span className="more-filters__chip">
+        <span className="more-filters__applied">
+          <Icon name={savedName === null ? 'filter' : 'saved-filter'} size={14} />
+          <span className="more-filters__summary">{savedName ?? text}</span>
+          {savedName === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
+        </span>
+        <span className="more-filters__sep" aria-hidden="true" />
+        <button type="button" className="more-filters__remove" aria-label={t('library.moreFilters.chip.remove')} onClick={onRemove}>
+          <Icon name="close" size={12} />
+        </button>
+      </span>
+    </span>
+  )
+}
+
 function MoreFiltersPanel({
   criteria,
   onChange,
   count,
   onClose,
+  onSave,
 }: {
   criteria: FactCriterion[]
   onChange: (criteria: FactCriterion[]) => void
   count: { hands: number | null; of: number | null }
   onClose: () => void
+  onSave?: () => void
 }) {
   const { t, formatNumber } = useI18n()
   const id = useId()
@@ -284,6 +349,12 @@ function MoreFiltersPanel({
           {t('library.moreFilters.removeAll')}
         </Button>
         <span className="more-filters__spacer" />
+        {onSave && (
+          <Button variant="secondary" onClick={onSave}>
+            <Icon name="saved-filter" size={14} />
+            {t('library.moreFilters.save')}
+          </Button>
+        )}
         <Button variant="primary" onClick={onClose}>
           {t('library.moreFilters.done')}
         </Button>

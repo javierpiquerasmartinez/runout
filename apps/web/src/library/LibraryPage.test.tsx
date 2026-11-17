@@ -12,6 +12,7 @@ import { LibraryPage } from './LibraryPage'
 import type { Results } from './results'
 import { STAT_KEYS, type LibraryStats } from './stats'
 import { BULK_IMPORTS_POLL_MS, type BulkImport } from './bulkImports'
+import type { SavedFilter } from './savedFilters'
 
 const libraryHand = (id: string, overrides: Partial<LibraryHand> = {}): LibraryHand => ({
   id,
@@ -82,6 +83,12 @@ let addReply: () => Response
 let bulkImports: BulkImport[]
 /** Changes to Bulk Imports, as `POST /api/library/bulk-imports/b1/cancel`. */
 let bulkImportRequests: string[]
+/** The Account's Saved Filters, as the server lists them. */
+let savedFilters: SavedFilter[]
+/** Changes to Saved Filters, as `POST /api/library/saved-filters {"name":"…","criteria":{…}}`. */
+let savedFilterRequests: string[]
+/** What the server answers saving a filter with, unless the test says otherwise. */
+let saveFilterReply: (body: { name: string; criteria: SavedFilter['criteria'] }) => Response
 
 const runningImport = (overrides: Partial<BulkImport> = {}): BulkImport => ({
   id: 'b1',
@@ -101,6 +108,16 @@ const runningImport = (overrides: Partial<BulkImport> = {}): BulkImport => ({
 beforeEach(() => {
   bulkImports = [runningImport()]
   bulkImportRequests = []
+  savedFilters = [
+    { id: 'sf1', name: '3-bet OOP como caller', criteria: { facts: ['pot-type:3-bet', '!hero-position:BTN,CO'], stat: null }, dropped: 0 },
+    { id: 'sf2', name: 'BTN vs BB', criteria: { facts: ['hero-position:BTN'], stat: 'vpip:taken' }, dropped: 0 },
+  ]
+  savedFilterRequests = []
+  saveFilterReply = ({ name, criteria }) => {
+    const saved = { id: 'sf3', name, criteria, dropped: 0 }
+    savedFilters = [...savedFilters, saved]
+    return Response.json(saved, { status: 201 })
+  }
   requests = []
   resultsRequests = []
   statsRequests = []
@@ -148,6 +165,11 @@ beforeEach(() => {
         copyRequests.push(url)
         const text = url.includes('as=history') ? 'PokerStars Hand #1' : 'NL10 · Hero BTN'
         return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      }
+      if (url.startsWith('/api/library/saved-filters')) {
+        if (method === 'GET') return Response.json(savedFilters)
+        savedFilterRequests.push(`${method} ${url} ${String(init?.body)}`)
+        return saveFilterReply(JSON.parse(String(init?.body)))
       }
       if (url.startsWith('/api/library/tags')) {
         tagRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
@@ -821,6 +843,209 @@ describe('LibraryPage', () => {
       await userEvent.keyboard('{Escape}')
       expect(screen.queryByRole('dialog')).toBeNull()
       expect(document.activeElement).toBe(within(filters).getByRole('button', { name: /^More filters: / }))
+    })
+  })
+
+  describe('Saved Filters', () => {
+    /** The side column's Saved Filters. */
+    const savedList = async () => within(await screen.findByRole('navigation', { name: 'Collections' })).findByRole('group', { name: 'Saved filters' })
+
+    it('lists them in the side column, after the Tags', async () => {
+      renderLibrary()
+      const list = await savedList()
+
+      const groups = within(screen.getByRole('navigation', { name: 'Collections' })).getAllByRole('group')
+      expect(groups.map((group) => group.getAttribute('aria-labelledby') && group.textContent?.slice(0, 15))).toEqual([
+        expect.stringMatching(/^Tags/),
+        expect.stringMatching(/^Saved filters/),
+      ])
+      expect(within(list).getAllByRole('button').map((button) => button.textContent)).toEqual(['3-bet OOP como caller', 'BTN vs BB'])
+    })
+
+    it('applies one in place of the More filters criteria, keeping the rest, with its name on the chip and its id in the address', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars&fact=players:3..')
+      const list = await savedList()
+
+      await userEvent.click(within(list).getByRole('button', { name: '3-bet OOP como caller' }))
+
+      expect(window.location.search).toBe('?period=all&site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO&saved=sf1')
+      await waitFor(() => expect(lastFilterQuery()).toBe('site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO'))
+      const filters = screen.getByRole('group', { name: 'Filters' })
+      const chip = within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' })
+      expect(chip.textContent).toBe('3-bet OOP como caller')
+      expect(within(list).getByRole('button', { name: '3-bet OOP como caller' }).getAttribute('aria-pressed')).toBe('true')
+
+      // Another one replaces it, its Stat criterion too.
+      await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+      expect(window.location.search).toBe('?period=all&site=pokerstars&stat=vpip%3Ataken&fact=hero-position%3ABTN&saved=sf2')
+
+      // The one applied, again, drops it.
+      await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      expect(within(filters).getByRole('button', { name: 'More filters' })).toBeTruthy()
+      expect(within(list).getByRole('button', { name: 'BTN vs BB' }).getAttribute('aria-pressed')).toBe('false')
+    })
+
+    it('stays applied on a reload, and the chip shows the criteria once one changes', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&fact=!hero-position:BTN,CO&saved=sf1')
+      const list = await savedList()
+      const filters = screen.getByRole('group', { name: 'Filters' })
+
+      expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' })).toBeTruthy()
+      expect(within(list).getByRole('button', { name: '3-bet OOP como caller' }).getAttribute('aria-pressed')).toBe('true')
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' }))
+      const panel = screen.getByRole('dialog', { name: 'More filters' })
+      await userEvent.click(within(within(panel).getByRole('group', { name: 'Pot type' })).getByRole('button', { name: '4-bet' }))
+
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toContain('3-bet, 4-bet pot')
+    })
+
+    it('saves the More filters criteria under a name, says what it leaves out, and applies it', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars&fact=pot-type:3-bet&fact=!players:..2&stat=vpip:taken')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await userEvent.click(within(filters).getByRole('button', { name: /^More filters: / }))
+
+      await userEvent.click(within(screen.getByRole('dialog', { name: 'More filters' })).getByRole('button', { name: 'Save filter…' }))
+
+      expect(screen.queryByRole('dialog', { name: 'More filters' })).toBeNull()
+      const dialog = screen.getByRole('dialog', { name: 'Save filter' })
+      expect(within(within(dialog).getByRole('list', { name: 'What it saves' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'Table: 3-bet pot · Not ≤2 players',
+        'Stat: VPIP · you did it',
+      ])
+      expect(within(dialog).getByText(/doesn't save the period, sites, heroes, stakes, Marked or tags/)).toBeTruthy()
+
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), '  Mis 3-bet ')
+      expect(within(dialog).getByText('12 / 40')).toBeTruthy()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Save filter' }))
+
+      expect(savedFilterRequests).toEqual([
+        'POST /api/library/saved-filters {"name":"Mis 3-bet","criteria":{"facts":["pot-type:3-bet","!players:..2"],"stat":"vpip:taken"}}',
+      ])
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Save filter' })).toBeNull())
+      expect(window.location.search).toBe('?period=all&site=pokerstars&stat=vpip%3Ataken&fact=pot-type%3A3-bet&fact=%21players%3A..2&saved=sf3')
+      const list = await savedList()
+      expect(await within(list).findByRole('button', { name: 'Mis 3-bet' })).toBeTruthy()
+      expect(within(list).getByRole('button', { name: 'Mis 3-bet' }).getAttribute('aria-pressed')).toBe('true')
+      expect(within(filters).getByRole('button', { name: 'Saved filter Mis 3-bet' })).toBeTruthy()
+    })
+
+    it('says so when the name is taken, and stays open to change it', async () => {
+      saveFilterReply = () => Response.json({ reason: 'saved-filter-name-taken' }, { status: 409 })
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+      const list = await savedList()
+
+      await userEvent.click(within(list).getByRole('button', { name: 'Save filter' }))
+      const dialog = screen.getByRole('dialog', { name: 'Save filter' })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'btn vs bb{Enter}')
+
+      expect(await within(dialog).findByText('You already have a saved filter with that name.')).toBeTruthy()
+      expect(screen.getByRole('dialog', { name: 'Save filter' })).toBeTruthy()
+      expect(window.location.search).toBe('?period=all&fact=pot-type:3-bet')
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+      expect(screen.queryByRole('dialog', { name: 'Save filter' })).toBeNull()
+    })
+
+    it('offers saving only once there are criteria to save', async () => {
+      renderLibrary()
+      const list = await savedList()
+
+      expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+    })
+
+    describe('at phone width', () => {
+      /** The screen's width, as `matchMedia` answers the 760 px breakpoint; changing it tells whoever listens. */
+      let narrow: boolean
+      const listeners = new Set<() => void>()
+      const resize = (toNarrow: boolean) =>
+        act(() => {
+          narrow = toNarrow
+          listeners.forEach((changed) => changed())
+        })
+
+      beforeEach(() => {
+        narrow = true
+        listeners.clear()
+        vi.stubGlobal('matchMedia', (query: string) => ({
+          get matches() {
+            return query === '(max-width: 760px)' && narrow
+          },
+          addEventListener: (_: string, changed: () => void) => listeners.add(changed),
+          removeEventListener: (_: string, changed: () => void) => listeners.delete(changed),
+        }))
+      })
+
+      it('applies and drops them from the side column, which says where to create and edit them', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+
+        expect(within(list).getByText('Create and edit filters on a computer.')).toBeTruthy()
+        expect(within(filters).queryByRole('button', { name: /^More filters/ })).toBeNull()
+
+        await userEvent.click(within(list).getByRole('button', { name: '3-bet OOP como caller' }))
+
+        expect(window.location.search).toBe('?period=all&site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO&saved=sf1')
+        await waitFor(() => expect(lastFilterQuery()).toBe('site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO'))
+        // The chip names it and drops it, and opens nothing.
+        expect(within(filters).queryByRole('button', { name: /^Saved filter/ })).toBeNull()
+        expect(within(filters).getByText('3-bet OOP como caller')).toBeTruthy()
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+        expect(within(list).getByRole('button', { name: '3-bet OOP como caller' }).getAttribute('aria-pressed')).toBe('false')
+
+        // Tapping the applied one again drops it too.
+        await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+        await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+      })
+
+      it('opens the Hands of a link carrying More filters criteria, with their summary and a ×, and nothing to open', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+        expect(within(filters).getByText('3-bet pot')).toBeTruthy()
+        expect(within(filters).queryByRole('button', { name: /^More filters/ })).toBeNull()
+        expect(within(await savedList()).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+        expect(window.location.search).toBe('?period=all')
+        await waitFor(() => expect(lastFilterQuery()).toBe(''))
+      })
+
+      it('keeps adding a Stat criterion from a Stat’s tooltip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+        const shown = await screen.findByRole('region', { name: 'Stats' })
+
+        await userEvent.hover(within(shown).getByRole('button', { name: 'VPIP 33.3%' }))
+        await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'You did it (1)' }))
+
+        await waitFor(() => expect(lastFilterQuery()).toBe('stat=vpip%3Ataken'))
+      })
+
+      it('brings everything back once the screen is wider', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        resize(false)
+
+        expect(within(list).getByRole('button', { name: 'Save filter' })).toBeTruthy()
+        expect(within(list).queryByText('Create and edit filters on a computer.')).toBeNull()
+        await userEvent.click(within(filters).getByRole('button', { name: /^More filters: / }))
+        expect(screen.getByRole('dialog', { name: 'More filters' })).toBeTruthy()
+
+        // Narrowed again, the panel goes with the rest.
+        resize(true)
+        expect(screen.queryByRole('dialog', { name: 'More filters' })).toBeNull()
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+      })
     })
   })
 
