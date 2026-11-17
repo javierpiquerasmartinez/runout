@@ -1,6 +1,11 @@
+import { strToU8, zipSync } from 'fflate';
 import pg from 'pg';
 import request from 'supertest';
-import { freshHandHistory, manyHands } from './support/hand-histories.js';
+import {
+  fixture,
+  freshHandHistory,
+  manyHands,
+} from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 import { libraryLimitOf } from './support/plans.js';
@@ -89,6 +94,51 @@ describe('How many Hands one import adds to a Library (e2e)', () => {
     const all = await stats(account.token);
     expect(all.hands).toBe(2000);
     expect(all.stats.vpip.opportunities).toBe(2000);
+  }, 120_000);
+
+  it('refuses to preview a file of more than 2,000 Hands, stopping as it reads them', async () => {
+    const account = await newAccount(running.httpServer);
+
+    const refused = await preview(account.token, manyHands(2001)).expect(400);
+
+    expect(refused.body).toMatchObject({
+      reason: 'too-many-hands',
+      limit: 2000,
+    });
+  }, 120_000);
+
+  it('previews 2,000 Hands followed by one it discards, which does not count towards the limit', async () => {
+    const account = await newAccount(running.httpServer);
+    const tournament = fixture('pokerstars-showdown.txt').replace(
+      "Hold'em No Limit (€0.05/€0.10 EUR)",
+      "Tournament #3912345678, €4.40+€0.60 EUR Hold'em No Limit - Level I (10/20)",
+    );
+
+    const read = await preview(
+      account.token,
+      `${manyHands(2000)}\n\n\n${tournament}`,
+    ).expect(201);
+
+    expect(read.body.hands).toHaveLength(2000);
+    expect(read.body.discarded).toMatchObject([{ reason: 'not-cash-holdem' }]);
+  }, 120_000);
+
+  it('refuses to preview a zip whose text would unpack past 32 MB, as too many Hands', async () => {
+    const account = await newAccount(running.httpServer);
+    const zip = zipSync({
+      'export.txt': strToU8('x'.repeat(32 * 1024 * 1024 + 1)),
+    });
+
+    const refused = await request(running.httpServer)
+      .post('/api/library/imports/previews')
+      .set('Authorization', `Bearer ${account.token}`)
+      .attach('file', Buffer.from(zip), 'export.zip')
+      .expect(400);
+
+    expect(refused.body).toMatchObject({
+      reason: 'too-many-hands',
+      limit: 2000,
+    });
   }, 120_000);
 
   it('refuses to confirm more than 2,000 Hands at once, and saves none of them', async () => {

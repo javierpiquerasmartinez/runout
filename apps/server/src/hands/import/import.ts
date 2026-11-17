@@ -55,17 +55,25 @@ export interface ImportResult {
   /** The text each Hand was read from, in the order of `hands`. */
   texts: string[];
   discarded: Discarded[];
+  /**
+   * Whether the text holds more than `maxHands` Hands that could be read.
+   * Reading stops at the first one past it, so the rest of the result is
+   * incomplete.
+   */
+  overLimit: boolean;
 }
 
 /**
- * Reads Hand History text holding any number of Hands. Each Hand's format is
- * detected on its own unless `format` picks one by hand. A Hand that can't be
- * read is discarded with its reason and never blocks the rest.
+ * Reads Hand History text holding any number of Hands, or up to `maxHands`
+ * of them: past that, it stops and says so. Each Hand's format is detected on
+ * its own unless `format` picks one by hand. A Hand that can't be read is
+ * discarded with its reason and never blocks the rest.
  */
 export function importHandHistory(
   text: string,
-  options: { format?: SourceFormat } = {},
+  options: { format?: SourceFormat; maxHands?: number } = {},
 ): ImportResult {
+  const maxHands = options.maxHands ?? Infinity;
   const tried = options.format ? [options.format] : SOURCE_FORMATS;
   const result: ImportResult = {
     format: null,
@@ -73,6 +81,7 @@ export function importHandHistory(
     hands: [],
     texts: [],
     discarded: [],
+    overLimit: false,
   };
   const detected = new Map<SourceFormat, number>();
   // Consecutive pieces that aren't Hands are one discarded entry, not many.
@@ -99,13 +108,21 @@ export function importHandHistory(
     }
     flushUnrecognised();
     detected.set(format, (detected.get(format) ?? 0) + 1);
+    let hand: Hand;
     try {
-      result.hands.push(parseBlock(block, format));
-      result.texts.push(block);
+      hand = parseBlock(block, format);
     } catch (error) {
       if (!(error instanceof Discard)) throw error;
       result.discarded.push({ text: block, reason: error.reason });
+      continue;
     }
+    // Only Hands read count: one discarded past the limit does not.
+    if (result.hands.length === maxHands) {
+      result.overLimit = true;
+      break;
+    }
+    result.hands.push(hand);
+    result.texts.push(block);
   }
   flushUnrecognised();
   result.format =
@@ -116,16 +133,14 @@ export function importHandHistory(
 }
 
 /**
- * Where each run of non-blank lines starts and ends. Hands are separated by
- * blank lines and have none inside, so each run is one Hand, or a piece of
- * text that isn't one.
+ * Where each run of non-blank lines starts and ends, found as they are read.
+ * Hands are separated by blank lines and have none inside, so each run is one
+ * Hand, or a piece of text that isn't one.
  */
-function blocks(text: string): { start: number; end: number }[] {
-  const found: { start: number; end: number }[] = [];
+function* blocks(text: string): Generator<{ start: number; end: number }> {
   const runs = /\S(?:[^\n]|\n(?![ \t\r]*\n))*/g;
   for (const run of text.matchAll(runs)) {
     const trimmed = run[0].trimEnd();
-    found.push({ start: run.index, end: run.index + trimmed.length });
+    yield { start: run.index, end: run.index + trimmed.length };
   }
-  return found;
 }
