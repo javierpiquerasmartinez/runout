@@ -461,6 +461,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 **H7.9 — Bring Library Hands into a Room.** As a signed-in Participant, I want to add Hands from my Library to the Queue of the Room I'm in, so I bring my prepared spots to the session.
 
 - I can filter my Library while choosing, select several Hands and add them in a single action, at the end of the Queue. Only the list is shown, with no view switch.
+- The filters are the Library's own, **Más filtros** panel and chip included, so I can fill the Queue with one kind of Spot (only 3-bet pots, say). They stay in the address next to the Room's, as in the Library.
 - Only Hands in my own Library can be added.
 - I become the Author of those Queue Entries until the Master reassigns them.
 - They are the same Hands, not copies: Notes the group writes on them in the Room stay with them in my Library after the Room closes.
