@@ -473,6 +473,23 @@ export const handFacts = pgTable('hand_facts', {
   riverBringsFlush: boolean('river_brings_flush'),
   riverBringsStraight: boolean('river_brings_straight'),
   riverOvercard: boolean('river_overcard'),
+  // The Hero's cards on each Street (facts catalogue §3.4). A Made Hand and
+  // the Draws are the Lab's Categories; the Draws, the combination Draws
+  // among them, are an array so a criterion keeps any Hand that overlaps it.
+  flopMadeHand: text('flop_made_hand'),
+  flopDraws: text('flop_draws').array(),
+  flopNuts: boolean('flop_nuts'),
+  /** `top`, `second` or `weak`; null unless the Made Hand uses one hole card. */
+  flopKicker: text('flop_kicker'),
+  flopNutFlushDraw: boolean('flop_nut_flush_draw'),
+  turnMadeHand: text('turn_made_hand'),
+  turnDraws: text('turn_draws').array(),
+  turnNuts: boolean('turn_nuts'),
+  turnKicker: text('turn_kicker'),
+  turnNutFlushDraw: boolean('turn_nut_flush_draw'),
+  riverMadeHand: text('river_made_hand'),
+  riverNuts: boolean('river_nuts'),
+  riverKicker: text('river_kicker'),
 });
 
 /**

@@ -33,6 +33,23 @@ const nobodyRaised = {
   heroAggressor: false,
 };
 
+/** The Hero's cards on each Street, for a Hand that never reached the flop. */
+const noStreetsSeen = {
+  flopMadeHand: null,
+  flopDraws: null,
+  flopNuts: null,
+  flopKicker: null,
+  flopNutFlushDraw: null,
+  turnMadeHand: null,
+  turnDraws: null,
+  turnNuts: null,
+  turnKicker: null,
+  turnNutFlushDraw: null,
+  riverMadeHand: null,
+  riverNuts: null,
+  riverKicker: null,
+};
+
 describe('Replay: the Hero’s facts, table and Hero', () => {
   // Expected values are read by hand off each Hand History.
   it('counts the players dealt in, leaving out those sitting out', () => {
@@ -125,6 +142,7 @@ describe('Replay: the Hero’s facts, the pot’s shape', () => {
       heroHandClass: 'J4s',
       potType: 'walk',
       ...nobodyRaised,
+      ...noStreetsSeen,
     });
   });
 
@@ -406,5 +424,137 @@ describe('Replay: the Board’s texture on each Street', () => {
       flopHighCard: 'Q',
       ...emptyTurn,
     });
+  });
+});
+
+describe('Replay: the Hero’s facts, their cards on each Street', () => {
+  // Hero4 holds Ad Jc and stays in to the river: As 8h 3c, Kd, Qs.
+  const toTheRiver = () =>
+    only(oneHand('pokerstars-edge-cases.txt', '262130000104'));
+
+  /** Hero4's Hand, with other hole cards and another Board. */
+  function dealt(hole: string, board: string) {
+    const hand = toTheRiver();
+    return heroFacts({
+      ...hand,
+      hero: { ...hand.hero, cards: hole.split(' ') },
+      board: board.split(' '),
+    });
+  }
+
+  // Expected values are read by hand off each Hand History or Board.
+  it('names the Made Hand, the Draws, the nuts and the kicker on each Street', () => {
+    expect(heroFacts(toTheRiver())).toMatchObject({
+      // A J on A 8 3: top pair, with K and Q above the jack still out.
+      flopMadeHand: 'top-pair',
+      flopDraws: [],
+      flopNuts: false,
+      flopKicker: 'weak',
+      flopNutFlushDraw: false,
+      // The king comes: only the queen is above the jack now.
+      turnMadeHand: 'top-pair',
+      turnDraws: [],
+      turnNuts: false,
+      turnKicker: 'second',
+      turnNutFlushDraw: false,
+      // And the queen: the jack is the highest rank not on the Board.
+      riverMadeHand: 'top-pair',
+      riverNuts: false,
+      riverKicker: 'top',
+    });
+  });
+
+  it('gives the Draws and combination Draws on the flop and the turn', () => {
+    // iMapleAA's Qc Tc on 3d 6h 9s, then the 8c, and folds to the turn's bet.
+    const hand = only(oneHand('pokerstars-session.txt', '262120711267'));
+
+    expect(heroFacts(hand)).toMatchObject({
+      flopMadeHand: 'nothing',
+      flopDraws: ['overcards'],
+      // A jack or a seven: two ranks make the straight.
+      turnMadeHand: 'nothing',
+      turnDraws: ['open-ended-two-cards', 'overcards'],
+      riverMadeHand: null,
+    });
+    // A flush draw with a pair of tens, and the two combined.
+    expect(dealt('Kh Th', 'Ah Td 4h').flopDraws).toEqual([
+      'flush-draw',
+      'flush-draw-pair',
+    ]);
+  });
+
+  it('leaves out the Streets the Hero didn’t see', () => {
+    // iMapleAA folds preflop; the Board was never dealt.
+    const folded = only(oneHand('pokerstars-session.txt', '262120715506'));
+    // Hero6 calls all in on the turn: the river is theirs too.
+    const allIn = only(oneHand('pokerstars-edge-cases.txt', '262130000103'));
+
+    expect(heroFacts(folded)).toMatchObject(noStreetsSeen);
+    expect(heroFacts(allIn)).toMatchObject({
+      // Top set on a rainbow 9 5 2.
+      flopMadeHand: 'set',
+      flopNuts: true,
+      flopKicker: null,
+      // A higher set is possible once the jack comes, and a bigger full
+      // house when the five pairs the Board.
+      turnNuts: false,
+      riverMadeHand: 'full-house',
+      riverNuts: false,
+    });
+    // A Board that stops at the flop has no turn.
+    expect(dealt('Ad Jc', 'As 8h 3c')).toMatchObject({
+      turnMadeHand: null,
+      riverMadeHand: null,
+    });
+    // iMapleAA folds on the turn, so a river dealt after is not theirs.
+    const turnFold = only(oneHand('pokerstars-session.txt', '262120711267'));
+    expect(
+      heroFacts({ ...turnFold, board: [...turnFold.board, 'Jd'] }),
+    ).toMatchObject({ turnMadeHand: 'nothing', riverMadeHand: null });
+  });
+
+  it('calls a hand the nuts when no two cards beat it, a tie included', () => {
+    // Top pair, top kicker on A 7 2 loses to a set.
+    expect(dealt('Ah Kd', 'As 7c 2d').flopNuts).toBe(false);
+    // The ace-high flush on the river, with no pair and no straight flush.
+    expect(dealt('Ah 4h', 'Kh 9h 2h 7c 3s').riverNuts).toBe(true);
+    // A broadway on the Board: everyone ties it, nobody beats it.
+    expect(dealt('2c 3h', '10s Js Qd Kc Ad').riverNuts).toBe(true);
+  });
+
+  it('rates the kicker only when the Made Hand uses one hole card', () => {
+    expect(
+      ['Ah Kd', 'Ah Qd', 'Ah Jd'].map(
+        (hole) => dealt(hole, 'As 7c 2d').flopKicker,
+      ),
+    ).toEqual(['top', 'second', 'weak']);
+    // Trips on a paired Board: the ace is the highest rank not on it.
+    expect(dealt('Ah 7d', '7s 7c 2d')).toMatchObject({
+      flopMadeHand: 'trips',
+      flopKicker: 'top',
+    });
+    // A pocket pair, and a hand using both cards.
+    expect(dealt('Kh Kd', 'As 7c 2d').flopKicker).toBeNull();
+    expect(dealt('Ah 7d', 'As 7c 2d')).toMatchObject({
+      flopMadeHand: 'two-pair',
+      flopKicker: null,
+    });
+  });
+
+  it('calls a flush draw the nut one when no higher card of its suit is out', () => {
+    expect(
+      ['Ah 5h', 'Kh 5h', 'Qh 5h'].map(
+        (hole) => dealt(hole, 'Jh 8h 2c').flopNutFlushDraw,
+      ),
+    ).toEqual([true, false, false]);
+    // The king, with the ace on the Board.
+    expect(dealt('Kh 5h', 'Ah 8h 2c').flopNutFlushDraw).toBe(true);
+    // A backdoor never counts.
+    expect(dealt('Ah 5h', '8h 2c 3d')).toMatchObject({
+      flopDraws: expect.arrayContaining(['backdoor-two-cards']),
+      flopNutFlushDraw: false,
+    });
+    // On the turn too.
+    expect(dealt('Ah 5h', 'Jh 8c 2c 3h').turnNutFlushDraw).toBe(true);
   });
 });
