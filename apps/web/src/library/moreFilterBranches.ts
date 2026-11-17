@@ -1,6 +1,17 @@
 import type { MessageKey } from '../i18n/catalogue'
 import type { Translator } from '../i18n/translator'
-import { POT_TYPES, POSITIONS, type FactCriterion, type FactKey, type PotType } from './facts'
+import {
+  BOARD_PAIRINGS,
+  BOARD_RANKS,
+  FACTS,
+  FLOP_SUITS,
+  LATER_SUITS,
+  POT_TYPES,
+  POSITIONS,
+  type FactCriterion,
+  type FactKey,
+  type PotType,
+} from './facts'
 
 /*
  * What the Más filtros panel offers, branch by branch, as the "Biblioteca ·
@@ -18,11 +29,63 @@ export type Branch = (typeof BRANCHES)[number]
 /**
  * How a criterion is set:
  * - `options`: one button per value, any number of them pressed, any of which keeps a Hand;
+ * - `boolean`: "Sí" or "No", one of them at most, for a fact that holds or doesn't;
  * - `range`: a from and a to, both included, either left open.
  */
 export type CriterionControl =
   | { kind: 'options'; values: readonly string[]; label: (value: string, t: Translator['t']) => string }
+  | { kind: 'boolean' }
   | { kind: 'range'; min: number; max: number }
+
+/** The Streets after the flop is dealt, in order. */
+export const STREETS = ['flop', 'turn', 'river'] as const
+
+export type Street = (typeof STREETS)[number]
+
+/**
+ * A fact about one Street is its own fact, named `<street>-<name>`
+ * (`turn-suits`), so a Hand can be asked for it Street by Street. Its row is
+ * labelled by the name alone, `library.moreFilters.fact.<name>`, as the
+ * Street is already said by its section or branch; its summary is
+ * `library.moreFilters.summary.<name>`, after the Street ("Turn: …").
+ */
+type NameOnStreet<F> = F extends `${Street}-${infer Name}` ? Name : never
+
+/** The name a fact's row and summary go by: the fact's own, or without its Street. */
+export type FactName = Exclude<FactKey, `${Street}-${string}`> | NameOnStreet<FactKey>
+
+/** A yes-or-no fact's name, whose "No" summary is `library.moreFilters.summary.<name>.no`. */
+type BooleanName = {
+  [F in FactKey]: (typeof FACTS)[F]['kind'] extends 'boolean' ? (F extends `${Street}-${infer Name}` ? Name : F) : never
+}[FactKey]
+
+/** The Street a fact is about, or null when it is about the whole Hand. */
+export function streetOf(fact: FactKey): Street | null {
+  return STREETS.find((street) => fact.startsWith(`${street}-`)) ?? null
+}
+
+/** The name a fact's row and summary go by: `suits` for `turn-suits`, `pot-type` for itself. */
+export function factName(fact: FactKey): FactName {
+  const street = streetOf(fact)
+  return (street ? fact.slice(street.length + 1) : fact) as FactName
+}
+
+/**
+ * The same criterion on each of `streets`, each on its own `<street>-<name>`
+ * fact and under its Street's heading: Flop, Turn, River. `define` says the
+ * rest, Street by Street (the flop's suits take other values).
+ */
+export function perStreet(
+  streets: readonly Street[],
+  name: NameOnStreet<FactKey>,
+  define: (street: Street) => Omit<CriterionDefinition, 'fact' | 'section'>,
+): CriterionDefinition[] {
+  return streets.map((street) => {
+    const fact = `${street}-${name}`
+    if (!Object.hasOwn(FACTS, fact)) throw new Error(`No fact ${fact}`)
+    return { ...define(street), fact: fact as FactKey, section: street }
+  })
+}
 
 export interface CriterionDefinition {
   fact: FactKey
@@ -38,12 +101,38 @@ export interface CriterionDefinition {
 }
 
 /** The headings a branch's criteria sit under. Its label is `library.moreFilters.section.<section>`. */
-export type Section = 'pot' | 'positions'
+export type Section = 'pot' | 'positions' | Street
 
 /** A Position reads as players write it, in every language. */
 const asWritten = (value: string) => value
 
 const potTypeLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.pot-type.${value as PotType}`)
+
+type BoardSuits = (typeof FLOP_SUITS)[number] | (typeof LATER_SUITS)[number]
+type BoardPairing = (typeof BOARD_PAIRINGS)[number]
+
+const suitsLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.suits.${value as BoardSuits}`)
+const pairingLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.pairing.${value as BoardPairing}`)
+
+const yesOrNo: CriterionControl = { kind: 'boolean' }
+
+/**
+ * The Board branch: the Board's texture on each Street (facts catalogue
+ * §3.5), then what the turn or the river card changed, Street by Street.
+ */
+function boardOn(street: Street): CriterionDefinition[] {
+  const on = (name: NameOnStreet<FactKey>, control: CriterionControl) => perStreet([street], name, () => ({ control }))
+  return [
+    ...on('suits', { kind: 'options', values: street === 'flop' ? FLOP_SUITS : LATER_SUITS, label: suitsLabel }),
+    ...on('pairing', { kind: 'options', values: BOARD_PAIRINGS, label: pairingLabel }),
+    ...on('straight-possible', yesOrNo),
+    ...on('connectedness', { kind: 'range', min: 1, max: 5 }),
+    ...on('high-card', { kind: 'options', values: BOARD_RANKS, label: asWritten }),
+    ...(street === 'flop'
+      ? []
+      : [...on('pairs-board', yesOrNo), ...on('brings-flush', yesOrNo), ...on('brings-straight', yesOrNo), ...on('overcard', yesOrNo)]),
+  ]
+}
 
 /**
  * A Position criterion keeps no Hand when every pot type it is required in
@@ -85,7 +174,7 @@ export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
   turn: [],
   river: [],
   cards: [],
-  board: [],
+  board: STREETS.flatMap(boardOn),
   result: [],
   stat: [],
 }
@@ -113,6 +202,18 @@ export function branchCounts(criteria: FactCriterion[]): Record<Branch, number> 
   return counts
 }
 
+/** A criterion's row label: its name, without its Street, which its section or branch says. */
+export function criterionLabel(fact: FactKey, t: Translator['t']): string {
+  return t(`library.moreFilters.fact.${factName(fact)}`)
+}
+
+/** A criterion's label with its Street, for what is read away from its section: `Suits (turn)`. */
+export function criterionFullLabel(fact: FactKey, t: Translator['t']): string {
+  const street = streetOf(fact)
+  const label = criterionLabel(fact, t)
+  return street ? t('library.moreFilters.fact.onStreet', { criterion: label, street: t(`library.moreFilters.street.${street}`) }) : label
+}
+
 /** What a criterion's values read as: `BTN, CO`, `3-bet, SRP`, `3–6`, `6+`, `≤4`. */
 export function valuesSummary(criterion: FactCriterion, t: Translator['t']): string {
   if ('range' in criterion) {
@@ -128,8 +229,16 @@ export function valuesSummary(criterion: FactCriterion, t: Translator['t']): str
 /** One line per criterion, in branch order, as the chip and its list name them: `Bote 3-bet`, `Excepto Hero BB`. */
 export function criterionSummaries(criteria: FactCriterion[], t: Translator['t']): string[] {
   return inBranchOrder(criteria).map((criterion) => {
-    const summary = t(`library.moreFilters.summary.${criterion.fact}`, { values: valuesSummary(criterion, t) })
-    return criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
+    const name = factName(criterion.fact)
+    const summary =
+      FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
+        ? criterion.values
+            .map((value) => t(value === 'true' ? `library.moreFilters.summary.${name as BooleanName}` : `library.moreFilters.summary.${name as BooleanName}.no`))
+            .join(', ')
+        : t(`library.moreFilters.summary.${name}`, { values: valuesSummary(criterion, t) })
+    const kept = criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
+    const street = streetOf(criterion.fact)
+    return street ? t('library.moreFilters.summary.onStreet', { street: t(`library.moreFilters.branch.${street}`), criterion: kept }) : kept
   })
 }
 
