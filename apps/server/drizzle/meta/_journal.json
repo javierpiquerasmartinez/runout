@@ -267,6 +267,13 @@
       "when": 1794903507906,
       "tag": "0037_hand_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794903942248,
+      "tag": "0038_hero_cards_per_street",
+      "breakpoints": true
     }
   ]
 }
