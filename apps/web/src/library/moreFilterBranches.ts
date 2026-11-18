@@ -21,6 +21,7 @@ import {
   STREET_LINE,
   STREET_DRAWS,
   type FactCriterion,
+  type CounterFact,
   type FactKey,
   type PotType,
   type PreflopAction,
@@ -96,7 +97,9 @@ type NameOnStreet<F> = F extends `${Street}-${infer Name}` ? Name : never
 type ActionFactKey = Extract<FactKey, `${string}-${'did' | 'chance' | 'faced' | 'answer'}`>
 
 /** The name a fact's row and summary go by: the fact's own, or without its Street. */
-export type FactName = Exclude<FactKey, `${Street}-${string}` | ActionFactKey> | NameOnStreet<Exclude<FactKey, ActionFactKey>>
+export type FactName =
+  | Exclude<FactKey, `${Street}-${string}` | ActionFactKey>
+  | NameOnStreet<Exclude<FactKey, ActionFactKey | CounterFact>>
 
 /** A yes-or-no fact's name, whose "No" summary is `library.moreFilters.summary.<name>.no`. */
 type BooleanName = {
@@ -514,27 +517,39 @@ export function valuesSummary(criterion: FactCriterion, t: Translator['t']): str
 
 /** One line per criterion, in branch order, as the chip and its list name them: `Bote 3-bet`, `Excepto Hero BB`. */
 export function criterionSummaries(criteria: FactCriterion[], t: Translator['t']): string[] {
-  return inBranchOrder(criteria).map((criterion) => {
-    const name = factName(criterion.fact)
-    const control = definitionOf(criterion.fact)?.definition.control
-    const preset =
-      control?.kind === 'range' && 'range' in criterion
-        ? control.presets?.find(({ range }) => range.min === criterion.range.min && range.max === criterion.range.max)
-        : undefined
-    const summary =
-      control?.kind === 'action'
-        ? actionSummary(criterion, control.action, t)
-        : preset
-        ? t(preset.summary)
-        : FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
-        ? criterion.values
-            .map((value) => t(value === 'true' ? `library.moreFilters.summary.${name as BooleanName}` : `library.moreFilters.summary.${name as BooleanName}.no`))
-            .join(', ')
-        : t(`library.moreFilters.summary.${name}`, { values: valuesSummary(criterion, t) })
-    const kept = criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
-    const street = streetOf(criterion.fact)
-    return street ? t('library.moreFilters.summary.onStreet', { street: t(`library.moreFilters.branch.${street}`), criterion: kept }) : kept
-  })
+  const offered = inBranchOrder(criteria)
+  // A link may carry a criterion the panel doesn't offer (`flop-bets`): it
+  // still filters, so it is listed too, last, by its own name.
+  const others = criteria
+    .filter((criterion) => !offered.includes(criterion))
+    .map((criterion) => {
+      const summary = `${criterion.fact}: ${valuesSummary(criterion, t)}`
+      return criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
+    })
+  return [...offered.map((criterion) => offeredSummary(criterion, t)), ...others]
+}
+
+/** An offered criterion's line, by its row's name and values. */
+function offeredSummary(criterion: FactCriterion, t: Translator['t']): string {
+  const name = factName(criterion.fact)
+  const control = definitionOf(criterion.fact)?.definition.control
+  const preset =
+    control?.kind === 'range' && 'range' in criterion
+      ? control.presets?.find(({ range }) => range.min === criterion.range.min && range.max === criterion.range.max)
+      : undefined
+  const summary =
+    control?.kind === 'action'
+      ? actionSummary(criterion, control.action, t)
+      : preset
+      ? t(preset.summary)
+      : FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
+      ? criterion.values
+          .map((value) => t(value === 'true' ? `library.moreFilters.summary.${name as BooleanName}` : `library.moreFilters.summary.${name as BooleanName}.no`))
+          .join(', ')
+      : t(`library.moreFilters.summary.${name}`, { values: valuesSummary(criterion, t) })
+  const kept = criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
+  const street = streetOf(criterion.fact)
+  return street ? t('library.moreFilters.summary.onStreet', { street: t(`library.moreFilters.branch.${street}`), criterion: kept }) : kept
 }
 
 /**

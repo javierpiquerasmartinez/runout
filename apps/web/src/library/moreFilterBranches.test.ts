@@ -29,6 +29,17 @@ describe('criterionSummaries', () => {
     ).toEqual(['Not walk pot', '≤4 players'])
     expect(criterionSummaries([{ fact: 'players', exclude: false, range: { min: 6, max: null } }], t)).toEqual(['6+ jugadores'])
   })
+
+  it('lists the criteria the panel doesn’t offer by their names, after the others', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'flop-bets', exclude: false, range: { min: 1, max: null } },
+      { fact: 'turn-folds', exclude: true, range: { min: 1, max: 1 } },
+      potType(['3-bet']),
+    ]
+
+    expect(criterionSummaries(criteria, t)).toEqual(['Bote 3-bet', 'flop-bets: 1+', 'Excepto turn-folds: 1'])
+    expect(branchCounts(criteria).table).toBe(1)
+  })
 })
 
 describe('criterionSummaries on a Street', () => {

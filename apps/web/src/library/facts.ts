@@ -174,6 +174,21 @@ export const STREET_LINE = /^[XBCR]{0,30}[XBCRF]$/
 const yes = { kind: 'boolean' } as const
 
 /**
+ * How many bets, raises, calls and folds the Hero made on a Street, which
+ * AFq counts. The panel doesn't offer them, but a link may carry them, so
+ * they are read, kept and listed like the others (`flop-bets:1..`).
+ */
+const COUNTERS = {
+  bets: { kind: 'range', min: 0, max: 30 },
+  raises: { kind: 'range', min: 0, max: 30 },
+  calls: { kind: 'range', min: 0, max: 30 },
+  folds: { kind: 'range', min: 0, max: 1 },
+} as const
+
+/** A Street's counter fact: `flop-bets`. */
+export type CounterFact = `${'flop' | 'turn' | 'river'}-${keyof typeof COUNTERS}`
+
+/**
  * One Street's facts, named after it (`flop-ip`, `turn-line`,
  * `river-cbet-did`): the situation as it begins, its named Actions, the
  * Hero's line, and the sizes. Pot and stack are in big blinds, bet sizes a
@@ -195,11 +210,14 @@ function streetFacts<S extends keyof typeof STREET_ACTIONS>(street: S) {
     'bet-size-faced': { kind: 'range', min: 0, max: 1_000_000 },
     'raise-size-faced': { kind: 'range', min: 0, max: 999_999, decimals: 2 },
   } as const
-  const facts: Record<string, FactDomain> = { ...situation }
+  const facts: Record<string, FactDomain> = { ...situation, ...COUNTERS }
   for (const action of STREET_ACTIONS[street]) Object.assign(facts, actionFacts(action, true))
   return Object.fromEntries(Object.entries(facts).map(([name, domain]) => [`${street}-${name}`, domain])) as {
     [K in keyof typeof situation as `${S}-${K}`]: (typeof situation)[K]
-  } & ActionFacts<`${S}-${(typeof STREET_ACTIONS)[S][number]}`, true>
+  } & { [K in keyof typeof COUNTERS as `${S}-${K}`]: (typeof COUNTERS)[K] } & ActionFacts<
+      `${S}-${(typeof STREET_ACTIONS)[S][number]}`,
+      true
+    >
 }
 
 /** How a fact's values are written, and which ones it can take. */
