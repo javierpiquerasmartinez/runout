@@ -20,7 +20,6 @@ import {
 } from '../database/database.js';
 import {
   handFacts,
-  handStats,
   hands,
   identities,
   libraryEntries,
@@ -636,7 +635,6 @@ export class RoomsService {
     if (discarded.length === 0) return;
     await tx.delete(tagLinks).where(inArray(tagLinks.handId, discarded));
     await tx.delete(marks).where(inArray(marks.handId, discarded));
-    await tx.delete(handStats).where(inArray(handStats.handId, discarded));
     await tx.delete(handFacts).where(inArray(handFacts.handId, discarded));
     await tx.delete(notes).where(inArray(notes.handId, discarded));
     await tx.delete(playbacks).where(inArray(playbacks.handId, discarded));

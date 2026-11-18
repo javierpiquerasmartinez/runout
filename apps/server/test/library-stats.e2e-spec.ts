@@ -385,12 +385,11 @@ describe('The Library’s Stats (e2e)', () => {
     await importText(account.token, text);
     const imported = await stats(account.token);
     // As a Hand stored before Runout kept its text, and before Stats: no
-    // Hand History, no Stat rows and no facts row.
+    // Hand History and no facts row.
     const [handId] = await starsHandIds(account.token);
     const db = new pg.Client(inject('databaseUrl'));
     await db.connect();
     try {
-      await db.query('delete from hand_stats where hand_id = $1', [handId]);
       await db.query('delete from hand_facts where hand_id = $1', [handId]);
       await db.query('update hands set hand_history = null where id = $1', [
         handId,

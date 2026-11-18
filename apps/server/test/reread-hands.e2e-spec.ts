@@ -4,7 +4,7 @@ import pg from 'pg';
 import request from 'supertest';
 import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
-import { handStats, hands } from '../src/database/schema.js';
+import { handFacts, hands } from '../src/database/schema.js';
 import type { Hand } from '../src/hands/hand.js';
 import { importHandHistory } from '../src/hands/import/import.js';
 import { rereadHands } from '../src/hands/reread-backfill.js';
@@ -97,7 +97,7 @@ describe('Reading stored Hands again from their Hand History (e2e)', () => {
       .update(hands)
       .set({ content: asOnceStored(read), heroAllInEv: 3934 })
       .where(eq(hands.id, id));
-    await db.delete(handStats).where(eq(handStats.handId, id));
+    await db.delete(handFacts).where(eq(handFacts.handId, id));
 
     const once = await rereadHands(db);
 
@@ -107,7 +107,7 @@ describe('Reading stored Hands again from their Hand History (e2e)', () => {
       .where(eq(hands.id, id));
     expect(stored).toEqual({ content: read, heroAllInEv: 2068 });
     expect(
-      await db.select().from(handStats).where(eq(handStats.handId, id)),
+      await db.select().from(handFacts).where(eq(handFacts.handId, id)),
     ).not.toHaveLength(0);
     // Only the Hand read wrong: every other reads again as it was stored.
     expect(once).toMatchObject({ rewritten: 1, unread: 0 });

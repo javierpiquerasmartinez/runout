@@ -411,25 +411,6 @@ export const hands = pgTable(
 );
 
 /**
- * The Hero's Stats in a Hand, worked out from `content` at import: one row
- * per Stat they had at least one opportunity at. A Stat with no row had no
- * opportunity in the Hand. Deleted with the Hand.
- */
-export const handStats = pgTable(
-  'hand_stats',
-  {
-    handId: uuid('hand_id')
-      .notNull()
-      .references(() => hands.id),
-    /** The Stat's stable key, e.g. `vpip`. */
-    stat: text('stat').notNull(),
-    opportunities: integer('opportunities').notNull(),
-    taken: integer('taken').notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.handId, table.stat] })],
-);
-
-/**
  * What a Hand tells about its Hero (ADR 0012): one row per Hand, worked out
  * from `content` by `heroFacts` when the Hand is stored, so that Filters read
  * typed columns. Each fact is defined in the facts catalogue; null where it

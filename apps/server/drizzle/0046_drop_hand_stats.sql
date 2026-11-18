@@ -1,0 +1,1 @@
+DROP TABLE "hand_stats" CASCADE;
