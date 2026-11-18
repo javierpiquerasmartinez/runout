@@ -38,7 +38,7 @@ import { timeline } from './timeline.js';
  * carry the version they were worked out by, so a job can bring the stale
  * ones up to date (ADR 0012).
  */
-export const FACTS_VERSION = 7;
+export const FACTS_VERSION = 8;
 
 /** Every Position, in preflop acting order. */
 export const POSITIONS = [

@@ -197,9 +197,11 @@ export function preflopFacts(hand: Hand): PreflopFacts {
     first.callers === 0 &&
     STEALING.has(positionOf.get(first.raisers[0]));
 
-  // Limped first, and the first raise came after.
+  // Limped first, and the first raise came after. A 3-bet over it before the
+  // Hero acted again means they answered that, not the isolation alone.
   const limped = !!first && limping(first);
-  const facingIsolation = limped ? mine[1] : undefined;
+  const facingIsolation =
+    limped && mine[1]?.raises === 1 ? mine[1] : undefined;
 
   // The 3-bet that made the second raise, if it was a squeeze: an open and
   // one or more calls before it.
