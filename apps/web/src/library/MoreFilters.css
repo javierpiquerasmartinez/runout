@@ -379,6 +379,39 @@
   flex: 1;
 }
 
+/* A named Action's row: its sides, then "Respondí" and the answers on a line of their own, once faced. */
+.more-filters__label::first-letter {
+  text-transform: uppercase;
+}
+.more-filters__answer {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.more-filters__answer > .more-filters__dim {
+  margin-right: 4px;
+}
+
+/* A line typed rather than picked: letters, not a number. */
+.more-filters__line {
+  width: 88px;
+  text-transform: uppercase;
+}
+.more-filters__line::placeholder {
+  text-transform: none;
+}
+.more-filters__line:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+.more-filters__line-note {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 /* A touch target of 44 px around the ×, the chip keeping its height. */
 @media (max-width: 760px) {
   .more-filters__remove {

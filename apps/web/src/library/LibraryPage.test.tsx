@@ -834,6 +834,76 @@ describe('LibraryPage', () => {
       })
     })
 
+    describe('the Preflop branch', () => {
+      async function openPreflop() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Preflop' }))
+        return panel
+      }
+
+      it('sets a named Action as made, a chance, or faced and answered, one at a time in its row', async () => {
+        renderLibrary()
+        const panel = await openPreflop()
+        const threeBet = criterion(panel, '3-bet')
+        // Nobody makes a VPIP against the Hero.
+        expect(within(criterion(panel, 'VPIP')).queryByRole('button', { name: 'I faced it' })).toBeNull()
+
+        await userEvent.click(within(threeBet).getByRole('button', { name: 'I faced it' }))
+        expect(lastFilterQuery()).toBe('fact=three-bet-faced%3Atrue')
+
+        const answered = within(threeBet).getByRole('group', { name: '3-bet, I answered' })
+        await userEvent.click(within(answered).getByRole('button', { name: 'fold' }))
+        await userEvent.click(within(answered).getByRole('button', { name: 'call' }))
+        expect(lastFilterQuery()).toBe('fact=three-bet-answer%3Afold%2Ccall')
+        expect(within(threeBet).getByRole('button', { name: 'I faced it' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(panel).getByRole('tab', { name: 'Preflop, 1 criterion' })).toBeTruthy()
+
+        await userEvent.click(within(threeBet).getByRole('switch', { name: /^Exclude 3-bet/ }))
+        expect(lastFilterQuery()).toBe('fact=%21three-bet-answer%3Afold%2Ccall')
+
+        // Another side drops the answer, and keeps the exclusion.
+        await userEvent.click(within(threeBet).getByRole('button', { name: 'I made it' }))
+        expect(lastFilterQuery()).toBe('fact=%21three-bet-did%3Atrue')
+        expect(within(threeBet).queryByRole('group', { name: '3-bet, I answered' })).toBeNull()
+
+        await userEvent.click(within(threeBet).getByRole('button', { name: 'I made it' }))
+        expect(lastFilterQuery()).not.toContain('fact')
+      })
+
+      it('offers the common lines and takes any other typed, sizes in big blinds with decimals', async () => {
+        renderLibrary()
+        const panel = await openPreflop()
+        const line = criterion(panel, 'My line')
+
+        await userEvent.click(within(line).getByRole('button', { name: 'RC' }))
+        await userEvent.type(within(line).getByRole('textbox', { name: 'My line, another line' }), 'rz{Enter}')
+        expect(within(line).getByText(/A line is X, B, C, R or F/)).toBeTruthy()
+        await userEvent.clear(within(line).getByRole('textbox', { name: 'My line, another line' }))
+        await userEvent.type(within(line).getByRole('textbox', { name: 'My line, another line' }), 'rrc{Enter}')
+        expect(lastFilterQuery()).toBe('fact=preflop-line%3ARC%2CRRC')
+        expect(within(line).getByRole('button', { name: 'RRC' }).getAttribute('aria-pressed')).toBe('true')
+
+        await userEvent.type(within(criterion(panel, 'Open (bb)')).getByRole('spinbutton', { name: 'Open (bb), from' }), '2.5')
+        expect(lastFilterQuery()).toBe('fact=preflop-line%3ARC%2CRRC&fact=open-size%3A2.5..')
+      })
+
+      it('reads its criteria from the address, in the panel and in the chip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=straddle:false&fact=three-bet-answer:fold&fact=preflop-role:called-open')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe(
+          'Role: called an open · Faced a 3-bet → fold+1',
+        )
+
+        await userEvent.click(within(filters).getByRole('button', { name: /^More filters: / }))
+        const panel = screen.getByRole('dialog', { name: 'More filters' })
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Preflop, 3 criteria' }))
+        const answered = within(criterion(panel, '3-bet')).getByRole('group', { name: '3-bet, I answered' })
+        expect(within(answered).getByRole('button', { name: 'fold' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(criterion(panel, 'Straddle')).getByRole('button', { name: 'No' }).getAttribute('aria-pressed')).toBe('true')
+      })
+    })
+
     it('explains a criterion the pot types picked never meet', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
       const panel = await openPanel()
@@ -908,10 +978,14 @@ describe('LibraryPage', () => {
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
       // The arrows skip the branches that have nothing to offer yet, and wrap.
       await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Preflop' }))
+      await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Cards' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Board' }))
-      await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Result' }))
+      await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Stat' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))

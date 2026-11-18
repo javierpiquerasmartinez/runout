@@ -6,6 +6,7 @@ import {
   ANSWERS,
   BOARD_PAIRINGS,
   BOARD_RANKS,
+  FACED_PREFLOP_ACTIONS,
   FACTS,
   FLOP_SUITS,
   HAND_STREETS,
@@ -13,10 +14,14 @@ import {
   LATER_SUITS,
   POT_TYPES,
   POSITIONS,
+  PREFLOP_ACTIONS,
+  PREFLOP_FACED_FIRST,
+  PREFLOP_ROLES,
   STREET_DRAWS,
   type FactCriterion,
   type FactKey,
   type PotType,
+  type PreflopAction,
 } from './facts'
 import type { StatCriterion } from './libraryFilter'
 import { STAT_TILES } from './stats'
@@ -38,15 +43,19 @@ export type Branch = (typeof BRANCHES)[number]
  * How a criterion is set:
  * - `options`: one button per value, any number of them pressed, any of which keeps a Hand;
  * - `boolean`: "Sí" or "No", one of them at most, for a fact that holds or doesn't;
- * - `range`: a from and a to, both included, either left open;
- * - `hand-classes`: the Lab's 13×13 matrix, any number of Hand Classes picked, any of which keeps a Hand.
+ * - `range`: a from and a to, both included, either left open, whole or to `decimals` places, negative too when `signed`;
+ * - `hand-classes`: the Lab's 13×13 matrix, any number of Hand Classes picked, any of which keeps a Hand;
+ * - `line`: the common lines as options, and any other typed, any of which keeps a Hand;
+ * - `action`: a named Action, see `namedAction`.
  */
 export type CriterionControl =
   | { kind: 'options'; values: readonly string[]; label: (value: string, t: Translator['t']) => string }
   | { kind: 'boolean' }
   | { kind: 'hand-classes' }
-  /** With `signed`, its ends may be negative or have decimals. */
-  | { kind: 'range'; min: number; max: number; signed?: boolean }
+  /** With `signed`, its ends may be negative, and have any decimals unless `decimals` says. */
+  | { kind: 'range'; min: number; max: number; signed?: boolean; decimals?: number }
+  | { kind: 'line'; common: readonly string[]; pattern: RegExp }
+  | { kind: 'action'; action: ActionName; faced: boolean }
 
 /** The Streets after the flop is dealt, in order. */
 export const STREETS = ['flop', 'turn', 'river'] as const
@@ -62,13 +71,16 @@ export type Street = (typeof STREETS)[number]
  */
 type NameOnStreet<F> = F extends `${Street}-${infer Name}` ? Name : never
 
+/** A named Action's facts, whose row and summary are the Action's (`namedAction`), not their own. */
+type ActionFactKey = Extract<FactKey, `${string}-${'did' | 'chance' | 'faced' | 'answer'}`>
+
 /** The name a fact's row and summary go by: the fact's own, or without its Street. */
-export type FactName = Exclude<FactKey, `${Street}-${string}`> | NameOnStreet<FactKey>
+export type FactName = Exclude<FactKey, `${Street}-${string}` | ActionFactKey> | NameOnStreet<Exclude<FactKey, ActionFactKey>>
 
 /** A yes-or-no fact's name, whose "No" summary is `library.moreFilters.summary.<name>.no`. */
 type BooleanName = {
-  [F in FactKey]: (typeof FACTS)[F]['kind'] extends 'boolean' ? (F extends `${Street}-${infer Name}` ? Name : F) : never
-}[FactKey]
+  [F in Exclude<FactKey, ActionFactKey>]: (typeof FACTS)[F]['kind'] extends 'boolean' ? (F extends `${Street}-${infer Name}` ? Name : F) : never
+}[Exclude<FactKey, ActionFactKey>]
 
 /** The Street a fact is about, or null when it is about the whole Hand. */
 export function streetOf(fact: FactKey): Street | null {
@@ -100,6 +112,12 @@ export function perStreet(
 
 export interface CriterionDefinition {
   fact: FactKey
+  /**
+   * The other facts the same row sets, one at a time instead of `fact`: a
+   * named Action's chance, faced and answer besides its did. The row holds
+   * one criterion on any of them.
+   */
+  also?: FactKey[]
   /** The heading it sits under in its branch; criteria sharing one are grouped under it, in this order. */
   section: Section
   control: CriterionControl
@@ -112,7 +130,12 @@ export interface CriterionDefinition {
 }
 
 /** The headings a branch's criteria sit under. Its label is `library.moreFilters.section.<section>`. */
-export type Section = 'pot' | 'positions' | 'hole-cards' | Street | ResultSection
+export type Section = 'pot' | 'positions' | PreflopSection | 'hole-cards' | Street | ResultSection
+
+/** Every fact a row sets: its own, and the others it may set instead. */
+export function rowFacts(definition: CriterionDefinition): FactKey[] {
+  return [definition.fact, ...(definition.also ?? [])]
+}
 
 /** A Position reads as players write it, in every language. */
 const asWritten = (value: string) => value
@@ -243,6 +266,100 @@ const RESULT: CriterionDefinition[] = [
   { fact: 'all-in-ev', section: 'amounts', control: bigBlinds },
 ]
 
+// The Preflop branch (facts catalogue §1–2), and the named Actions every Street's branch shares.
+
+/** A named Action, as its row and summary name it: `library.moreFilters.action.<name>`. */
+export type ActionName = PreflopAction
+
+/** One an opponent can make against the Hero; `library.moreFilters.action.<name>.faced` says it with its article. */
+type FacedActionName = (typeof FACED_PREFLOP_ACTIONS)[number]
+
+/** What the Hero did with a named Action: made it, had the chance, faced it, or faced it and answered. */
+export const ACTION_SIDES = ['did', 'chance', 'faced', 'answer'] as const
+
+export type ActionSide = (typeof ACTION_SIDES)[number]
+
+/** Which of a named Action's facts `fact` is, by its last word: `three-bet-answer` is the answer. */
+export function actionSide(fact: FactKey): ActionSide {
+  return ACTION_SIDES.find((side) => fact.endsWith(`-${side}`)) ?? 'did'
+}
+
+/**
+ * A named Action as one row: "La hice", "Tuve la oportunidad" or, for one
+ * an opponent can make, "Me enfrenté", one at a time, and once faced,
+ * "Respondí" fold, call or raise. Its facts are `<prefix>-did`, `-chance`,
+ * `-faced` and `-answer`, and the row holds one criterion on one of them:
+ * `<prefix>-did:true`, `<prefix>-chance:true`, `<prefix>-faced:true`, or,
+ * with an answer picked, `<prefix>-answer:fold,call` alone, since an answer
+ * is only there when the Hero faced it. `prefix` is the Action's own name
+ * preflop (`three-bet`) and carries its Street after (`flop-cbet`).
+ */
+export function namedAction(prefix: string, action: ActionName, faced: boolean, section: Section): CriterionDefinition {
+  const facts = ACTION_SIDES.filter((side) => faced || side === 'did' || side === 'chance').map((side) => `${prefix}-${side}`)
+  for (const fact of facts) if (!Object.hasOwn(FACTS, fact)) throw new Error(`No fact ${fact}`)
+  const [fact, ...also] = facts as FactKey[]
+  return { fact, also, section, control: { kind: 'action', action, faced } }
+}
+
+/** How a named Action criterion reads: `Hice steal`, `Me enfrenté a un 3-bet → fold`. */
+function actionSummary(criterion: FactCriterion, action: ActionName, t: Translator['t']): string {
+  const side = actionSide(criterion.fact)
+  const values = 'values' in criterion ? criterion.values : []
+  const name = t(`library.moreFilters.action.${action}`)
+  if (side === 'answer') {
+    const faced = t(`library.moreFilters.action.${action as FacedActionName}.faced`)
+    return t('library.moreFilters.summary.action.answer', { action: faced, values: values.join(', ') })
+  }
+  const said = side === 'faced' ? t(`library.moreFilters.action.${action as FacedActionName}.faced`) : name
+  return values
+    .map((value) => t(value === 'true' ? `library.moreFilters.summary.action.${side}` : `library.moreFilters.summary.action.${side}.no`, { action: said }))
+    .join(', ')
+}
+
+type PreflopSection = 'situation' | 'action' | 'sizes' | 'stacks'
+
+const preflopRoleLabel = (value: string, t: Translator['t']) =>
+  t(`library.moreFilters.value.preflop-role.${value as (typeof PREFLOP_ROLES)[number]}`)
+const facedFirstLabel = (value: string, t: Translator['t']) =>
+  t(`library.moreFilters.value.preflop-faced-first.${value as (typeof PREFLOP_FACED_FIRST)[number]}`)
+
+/** The preflop lines most hands take, offered as buttons; any other is typed. */
+const COMMON_PREFLOP_LINES = ['F', 'C', 'CF', 'CC', 'CR', 'R', 'RF', 'RC', 'RR', 'X', 'XF', 'XC', 'XR'] as const
+
+/** A size or a stack, in big blinds or as a multiple, to two decimals. */
+const amount = (fact: FactKey, section: PreflopSection): CriterionDefinition => ({
+  fact,
+  section,
+  control: { kind: 'range', min: 0, max: 100_000, decimals: 2 },
+})
+
+/**
+ * The Preflop branch: the Hero's situation and role, the named Actions and
+ * their line, the sizes, and the stacks and forced bets.
+ */
+const PREFLOP_CRITERIA: CriterionDefinition[] = [
+  { fact: 'preflop-faced-first', section: 'situation', control: { kind: 'options', values: PREFLOP_FACED_FIRST, label: facedFirstLabel } },
+  { fact: 'limpers', section: 'situation', control: { kind: 'range', min: 0, max: 9 } },
+  { fact: 'preflop-role', section: 'situation', control: { kind: 'options', values: PREFLOP_ROLES, label: preflopRoleLabel } },
+  { fact: 'hero-aggressor', section: 'situation', control: yesOrNo },
+  ...PREFLOP_ACTIONS.map((action) =>
+    namedAction(action, action, (FACED_PREFLOP_ACTIONS as readonly string[]).includes(action), 'action'),
+  ),
+  { fact: 'preflop-line', section: 'action', control: { kind: 'line', common: COMMON_PREFLOP_LINES, pattern: /^[XBCRF]{1,20}$/ } },
+  amount('open-size', 'sizes'),
+  amount('three-bet-size', 'sizes'),
+  amount('four-bet-size', 'sizes'),
+  amount('hero-raise-size', 'sizes'),
+  amount('hero-raise-multiple', 'sizes'),
+  amount('hero-second-raise-size', 'sizes'),
+  amount('hero-second-raise-multiple', 'sizes'),
+  amount('size-faced', 'sizes'),
+  amount('starting-stack', 'stacks'),
+  amount('preflop-effective-stack', 'stacks'),
+  { fact: 'straddle', section: 'stacks', control: yesOrNo },
+  { fact: 'antes', section: 'stacks', control: yesOrNo },
+]
+
 /** Each branch's criteria, in the order the panel lists them and the chip names them. */
 export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
   table: [
@@ -254,7 +371,7 @@ export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
     position('four-bettor-position', needsPot('4-bet')),
     position('aggressor-position', needsPot('single-raised')),
   ],
-  preflop: [],
+  preflop: PREFLOP_CRITERIA,
   flop: [],
   turn: [],
   river: [],
@@ -270,12 +387,12 @@ const ORDERED = BRANCHES.flatMap((branch) => BRANCH_CRITERIA[branch].map((defini
 
 /** The panel's definition of a fact, and its branch. */
 export function definitionOf(fact: FactKey): { branch: Branch; definition: CriterionDefinition } | undefined {
-  return ORDERED.find(({ definition }) => definition.fact === fact)
+  return ORDERED.find(({ definition }) => rowFacts(definition).includes(fact))
 }
 
 /** The criteria in branch order, those the panel doesn't offer left out. */
 export function inBranchOrder(criteria: FactCriterion[]): FactCriterion[] {
-  return ORDERED.flatMap(({ definition }) => criteria.filter((criterion) => criterion.fact === definition.fact))
+  return ORDERED.flatMap(({ definition }) => criteria.filter((criterion) => rowFacts(definition).includes(criterion.fact)))
 }
 
 /** How many criteria each branch holds, for its rail. */
@@ -290,6 +407,8 @@ export function branchCounts(criteria: FactCriterion[]): Record<Branch, number> 
 
 /** A criterion's row label: its name, without its Street, which its section or branch says. */
 export function criterionLabel(fact: FactKey, t: Translator['t']): string {
+  const control = definitionOf(fact)?.definition.control
+  if (control?.kind === 'action') return t(`library.moreFilters.action.${control.action}`)
   return t(`library.moreFilters.fact.${factName(fact)}`)
 }
 
@@ -317,8 +436,11 @@ export function valuesSummary(criterion: FactCriterion, t: Translator['t']): str
 export function criterionSummaries(criteria: FactCriterion[], t: Translator['t']): string[] {
   return inBranchOrder(criteria).map((criterion) => {
     const name = factName(criterion.fact)
+    const control = definitionOf(criterion.fact)?.definition.control
     const summary =
-      FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
+      control?.kind === 'action'
+        ? actionSummary(criterion, control.action, t)
+        : FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
         ? criterion.values
             .map((value) => t(value === 'true' ? `library.moreFilters.summary.${name as BooleanName}` : `library.moreFilters.summary.${name as BooleanName}.no`))
             .join(', ')
