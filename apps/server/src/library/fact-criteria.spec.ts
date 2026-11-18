@@ -5,7 +5,7 @@ import { FACT_KEYS, factOnRow } from './fact-criteria.js';
 
 describe('The facts a criterion can name', () => {
   it('reads every fact of the facts row from one of its columns', () => {
-    const columns = new Set(Object.values(getTableColumns(handFacts)));
+    const columns = new Set<unknown>(Object.values(getTableColumns(handFacts)));
     // The Hand's own columns (the Result, Reached Showdown) are not on it.
     const onRow = FACT_KEYS.filter((fact) => {
       try {

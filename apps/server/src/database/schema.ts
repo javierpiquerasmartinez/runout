@@ -434,7 +434,7 @@ export const handStats = pgTable(
  * from `content` by `heroFacts` when the Hand is stored, so that Filters read
  * typed columns. Each fact is defined in the facts catalogue; null where it
  * doesn't apply. `version` is the rules version that worked the row out:
- * `db:rederive-facts` rewrites the rows behind it. Deleted with the Hand.
+ * the `hand-facts` backfill (`db:backfill`) rewrites the rows behind it. Deleted with the Hand.
  */
 export const handFacts = pgTable('hand_facts', {
   handId: uuid('hand_id')
