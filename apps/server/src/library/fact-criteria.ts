@@ -708,6 +708,16 @@ const FACTS = {
 
 export type FactKey = keyof typeof FACTS;
 
+/**
+ * A fact of the facts row, with the rules version that added it: for the
+ * Stats, which count from the same facts (see `stat-facts.ts`).
+ */
+export function factOnRow(fact: FactKey): { column: PgColumn; since: number } {
+  const entry: FactEntry = FACTS[fact];
+  if ('onHand' in entry) throw new Error(`${fact} is not on the facts row`);
+  return { column: entry.column, since: entry.since };
+}
+
 function entryOf(fact: string): FactEntry | undefined {
   return Object.hasOwn(FACTS, fact)
     ? (FACTS as Record<string, FactEntry>)[fact]
