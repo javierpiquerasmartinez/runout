@@ -1,0 +1,1 @@
+CREATE INDEX "hands_played_at_idx" ON "hands" USING btree ("played_at","id");

@@ -403,6 +403,10 @@ export const hands = pgTable(
       table.heroScreenName,
       table.heroSeat,
     ),
+    // The Library's date range and its order by date (and the Results
+    // Graph's played order) read Hands by when they were played; measured in
+    // docs/research/library-indexes.md.
+    index('hands_played_at_idx').on(table.playedAt, table.id),
   ],
 );
 
