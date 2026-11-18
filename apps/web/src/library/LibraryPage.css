@@ -380,6 +380,11 @@
 .library__failure {
   color: var(--alert-ink);
 }
+/* What became of a Saved Filter: one gone, or criteria it held dropped. Not a failure, so not in alert red. */
+.library__notice {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
 .library__empty {
   display: flex;
   flex-direction: column;
