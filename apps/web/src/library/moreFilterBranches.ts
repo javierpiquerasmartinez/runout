@@ -556,7 +556,29 @@ export function chipSummary(summaries: string[], budget: number): { text: string
 
 /** Why a criterion keeps no Hand alongside the others, or null when it may keep some. */
 export function inapplicableReason(criterion: FactCriterion, criteria: FactCriterion[]): MessageKey | null {
-  return definitionOf(criterion.fact)?.definition.inapplicable?.(criterion, criteria) ?? null
+  return definitionOf(criterion.fact)?.definition.inapplicable?.(criterion, criteria) ?? streetReason(criterion, criteria)
+}
+
+/**
+ * A Street's criterion keeps no Hand when the Street is never reached: in a
+ * walk nothing is dealt after preflop, and once the Hero folds, their facts
+ * on the later Streets are empty, though the Board's are still dealt. Only
+ * "didn't see it" applies there, and an exclusion keeps the empty ones.
+ */
+function streetReason(criterion: FactCriterion, criteria: FactCriterion[]): MessageKey | null {
+  const street = streetOf(criterion.fact)
+  if (!street || criterion.exclude) return null
+  if (factName(criterion.fact) === 'saw' && 'values' in criterion && criterion.values.includes('false')) return null
+  const only = (fact: FactKey, within: (value: string) => boolean) => {
+    const other = criteria.find((candidate) => candidate.fact === fact && !candidate.exclude)
+    return !!other && 'values' in other && other.values.length > 0 && other.values.every(within)
+  }
+  if (only('pot-type', (value) => value === 'walk')) return 'library.moreFilters.inapplicable.street-in-walk'
+  const before = (value: string) => HAND_STREETS.indexOf(value as (typeof HAND_STREETS)[number]) < HAND_STREETS.indexOf(street)
+  if (definitionOf(criterion.fact)?.branch !== 'board' && only('hero-folded-on', before)) {
+    return 'library.moreFilters.inapplicable.street-after-fold'
+  }
+  return null
 }
 
 /*

@@ -91,6 +91,35 @@ describe('inapplicableReason', () => {
     expect(inapplicableReason(opener, [potType(['walk', 'limped']), opener])).toBe('library.moreFilters.inapplicable.opener-position')
     expect(inapplicableReason(opener, [opener])).toBeNull()
   })
+
+  it('explains a Street’s criterion in a walk, where no flop is dealt', () => {
+    const turnLine: FactCriterion = { fact: 'turn-line', exclude: false, values: ['XC'] }
+    const flopSuits: FactCriterion = { fact: 'flop-suits', exclude: false, values: ['monotone'] }
+    const flopTopPair: FactCriterion = { fact: 'flop-made-hand', exclude: false, values: ['top-pair'] }
+
+    for (const criterion of [turnLine, flopSuits, flopTopPair]) {
+      expect(inapplicableReason(criterion, [potType(['walk']), criterion])).toBe('library.moreFilters.inapplicable.street-in-walk')
+    }
+    // Another pot type besides the walk, an excluded walk or an excluded criterion may keep some.
+    expect(inapplicableReason(turnLine, [potType(['walk', 'limped']), turnLine])).toBeNull()
+    expect(inapplicableReason(turnLine, [potType(['walk'], true), turnLine])).toBeNull()
+    expect(inapplicableReason({ ...turnLine, exclude: true }, [potType(['walk'])])).toBeNull()
+  })
+
+  it('explains the Hero’s criterion on a Street after the one they folded on', () => {
+    const foldedOn = (values: string[], exclude = false): FactCriterion => ({ fact: 'hero-folded-on', exclude, values })
+    const turnLine: FactCriterion = { fact: 'turn-line', exclude: false, values: ['XC'] }
+    const turnPair: FactCriterion = { fact: 'turn-made-hand', exclude: false, values: ['top-pair'] }
+
+    expect(inapplicableReason(turnLine, [foldedOn(['preflop', 'flop']), turnLine])).toBe('library.moreFilters.inapplicable.street-after-fold')
+    expect(inapplicableReason(turnPair, [foldedOn(['flop']), turnPair])).toBe('library.moreFilters.inapplicable.street-after-fold')
+    // Folding on the turn itself, or on a later Street, still saw it.
+    expect(inapplicableReason(turnLine, [foldedOn(['flop', 'turn']), turnLine])).toBeNull()
+    expect(inapplicableReason(turnLine, [foldedOn(['flop'], true), turnLine])).toBeNull()
+    // The Board is dealt whether or not the Hero is still in.
+    const turnSuits: FactCriterion = { fact: 'turn-suits', exclude: false, values: ['rainbow'] }
+    expect(inapplicableReason(turnSuits, [foldedOn(['preflop']), turnSuits])).toBeNull()
+  })
 })
 
 describe('the Cards branch', () => {

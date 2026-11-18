@@ -1255,6 +1255,8 @@ export const en: Messages = {
   'library.moreFilters.inapplicable.aggressor-position': "A walk or a limped pot has no preflop aggressor, so with the pot types picked this criterion keeps no hand.",
   'library.moreFilters.inapplicable.three-bettor-position': 'Only 3-bet pots and bigger have a 3-bettor, so with the pot types picked this criterion keeps no hand.',
   'library.moreFilters.inapplicable.four-bettor-position': 'Only 4-bet pots and bigger have a 4-bettor, so with the pot types picked this criterion keeps no hand.',
+  'library.moreFilters.inapplicable.street-in-walk': 'No flop is dealt in a walk, so with the pot type picked this criterion keeps no hand.',
+  'library.moreFilters.inapplicable.street-after-fold': "After folding you don't see the next streets, so with the fold street picked this criterion keeps no hand.",
   'library.moreFilters.section.hole-cards': 'Hole cards',
   'library.moreFilters.fact.hero-class': 'My hole cards',
   'library.moreFilters.fact.made-hand': 'Made hand',

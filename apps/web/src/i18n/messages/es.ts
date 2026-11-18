@@ -1256,6 +1256,8 @@ export const es = {
   'library.moreFilters.inapplicable.aggressor-position': 'En un walk o un bote limpeado no hay agresor preflop: con los tipos de bote elegidos, este criterio no deja ninguna mano.',
   'library.moreFilters.inapplicable.three-bettor-position': 'Solo hay 3-bet en botes 3-bet o mayores: con los tipos de bote elegidos, este criterio no deja ninguna mano.',
   'library.moreFilters.inapplicable.four-bettor-position': 'Solo hay 4-bet en botes 4-bet o mayores: con los tipos de bote elegidos, este criterio no deja ninguna mano.',
+  'library.moreFilters.inapplicable.street-in-walk': 'En un walk no se reparte el flop: con el tipo de bote elegido, este criterio no deja ninguna mano.',
+  'library.moreFilters.inapplicable.street-after-fold': 'Tras retirarte no ves las calles siguientes: con la calle de retirada elegida, este criterio no deja ninguna mano.',
   'library.moreFilters.section.hole-cards': 'Cartas de mano',
   'library.moreFilters.fact.hero-class': 'Mis cartas',
   'library.moreFilters.fact.made-hand': 'Mano hecha',
