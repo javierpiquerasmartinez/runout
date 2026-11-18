@@ -714,6 +714,9 @@ const FACTS = {
 
 export type FactKey = keyof typeof FACTS;
 
+/** Every fact a criterion can name. */
+export const FACT_KEYS = Object.keys(FACTS) as FactKey[];
+
 /**
  * A fact of the facts row, with the rules version that added it: for the
  * Stats, which count from the same facts (see `stat-facts.ts`).

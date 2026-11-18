@@ -22,6 +22,27 @@ export type StatFacts = (
   since: number;
 };
 
+/** A named Action with a did and a chance fact: `vpip`, `flop-cbet`. */
+type DidAction = {
+  [K in FactKey]: K extends `${infer A}-did`
+    ? `${A}-chance` extends FactKey
+      ? A
+      : never
+    : never;
+}[FactKey];
+
+/** A named Action the Hero can face, with a faced and an answer fact. */
+type FacedAction = {
+  [K in FactKey]: K extends `${infer A}-faced`
+    ? `${A}-answer` extends FactKey
+      ? A
+      : never
+    : never;
+}[FactKey];
+
+/** The per-Street counters AFq adds up. */
+type Counter = 'bets' | 'raises' | 'calls' | 'folds';
+
 /** The facts' columns as SQL, and the newest `since` among them. */
 function read(...facts: FactKey[]) {
   const rows = facts.map(factOnRow);
@@ -37,28 +58,28 @@ function perHand(opportunity: SQL, taken: SQL, since: number): StatFacts {
 }
 
 /** A named Action's did over its chance: `vpip`, `flop-cbet`. */
-function didOverChance(action: string): StatFacts {
+function didOverChance(action: DidAction): StatFacts {
   const {
     columns: [did, chance],
     since,
-  } = read(`${action}-did` as FactKey, `${action}-chance` as FactKey);
+  } = read(`${action}-did`, `${action}-chance`);
   return perHand(chance, did, since);
 }
 
 /** A defensive Stat: the Action answered with a fold, over faced. */
-function foldOverFaced(action: string): StatFacts {
+function foldOverFaced(action: FacedAction): StatFacts {
   const {
     columns: [faced, answer],
     since,
-  } = read(`${action}-faced` as FactKey, `${action}-answer` as FactKey);
+  } = read(`${action}-faced`, `${action}-answer`);
   return perHand(faced, sql`${faced} and ${answer} = 'fold'`, since);
 }
 
 /** The Hero's postflop Actions of the given kinds, from the per-Street counters. */
-function postflopActions(kinds: ('bets' | 'raises' | 'calls' | 'folds')[]) {
+function postflopActions(kinds: Counter[]) {
   const { columns, since } = read(
     ...(['flop', 'turn', 'river'] as const).flatMap((street) =>
-      kinds.map((kind) => `${street}-${kind}` as FactKey),
+      kinds.map((kind): FactKey => `${street}-${kind}`),
     ),
   );
   return {
