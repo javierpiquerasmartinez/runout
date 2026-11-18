@@ -2,7 +2,7 @@
 
 Research note, 2026-11-18. It measures the Library's list, Results Graph, Stats and hand ids on one Library of a million Hands, with the criteria players use most, and chooses the indexes from those numbers. The spec asks for this under "Indexes" (the facts layer); the ticket is Advanced Filters 11.
 
-**Outcome.** One index is added, `hands_played_at_idx` on `hands (played_at, id)` (migration `0045_hands_played_at_index`). A month's queries with no criterion or one become 2 to 5 times faster (texture, which already keeps only 1.3% of the Hands, about the same), and the list's page of Hands 3 to 15 times faster. No index on `hand_facts` is added: every criterion measured already answers within the unfiltered time without one, and the few gains such indexes gave did not pay for six more indexes written at every import. No query reached the 60 s cap. The slowest single query took 4.4 s under load: the list's query of the Sites, Heroes and Stakes the Library offers, which ignores the Filter. Of the queries that apply the Filter, the slowest took 2.1 s without the index (the list's page, no Filter) and 1.6 s with it (the Results Graph's running sums, no Filter, which the index doesn't change).
+**Outcome.** One index is added, `hands_played_at_idx` on `hands (played_at, id)` (migration `0045_hands_played_at_index`). A month's queries with no criterion or one become 2 to 5 times faster (texture, which already keeps only 1.3% of the Hands, about the same), and the list's page of Hands 3 to 15 times faster. No index on `hand_facts` is added: every criterion measured already answers within the unfiltered time without one, and the few gains such indexes gave did not pay for six more indexes written at every import. No query reached the 60 s cap. The slowest single query took 4.4 s under load: the list's query of the Sites, Heroes and Stakes the Library offers, which ignores the Filter. A follow-up replaced it, and the list's count of every Hand, with per-Account tallies kept by triggers: the list now answers in 24–733 ms, median 98 ms (see "The list's Filter-free queries"). Of the queries that apply the Filter, the slowest took 2.1 s without the index (the list's page, no Filter) and 1.6 s with it (the Results Graph's running sums, no Filter, which the index doesn't change).
 
 ## How it was measured
 
@@ -139,6 +139,40 @@ HTTP medians in ms, without the index → with it; below each, the database's ow
 3. *No Filter, all time.* The Results Graph (1.3–2 s), Stats (0.6–1.3 s) and hand ids (0.6–1 s) read every Hand of the Library. No index changes that; they are today's times.
 
 **Facts and results.** The index adds no column and changes no row; the e2e specs pass with it.
+
+## The list's Filter-free queries (follow-up, 2026-11-18)
+
+The list's HTTP time was its two queries that ignore the Filter: what the Library offers to filter by (`select distinct` of the Poker Site, Hero and Stake over `library_entries ⋈ hands`) and its counts (every Hand, and the Marked ones). Measured again on a quieter machine, same seed, same bench, with `hands_played_at_idx` in place: the list took 1,602–1,812 ms in every case measured, of which the options query took 1,518–1,607 ms and the counts 566–634 ms (they run alongside each other and the page).
+
+**Why.** The options query reads every Hand of the Library, and the Stake's limit only from its content (`content -> 'stake' ->> 'limit'`), so it reads the 1.8 GB of `hands` with its JSON, then sorts the million rows (spilling 48 MB to disk) to keep 12. The counts query joins every entry to `hands` to count rows `library_entries` already counts, and tests each for a Mark.
+
+**What was weighed.**
+
+| Option | Options query at 1M Hands | Cost |
+|---|---|---|
+| Today | 1,518 ms | — |
+| Covering index `hands (id) include (site, hero_screen_name, small_blind, big_blind, currency)` | 206 ms (index-only scan, hashed against `library_entries`) | 66 MB; still reads every Hand of the Library, so about 2 s at 10M; and the limit, which lives in the content, needs a stored column first, so the real index is larger and the measured time a lower bound |
+| Tallies per Account, kept by triggers | under 1 ms (12 rows by primary key) | one small upsert per statement that adds, removes or rewrites Hands; independent of the Library's size |
+| A separate endpoint the web asks once | 1,518 ms, once per visit instead of per page | the first page still waits for it or shows no options; it must be asked again after every import and removal; the cost stays |
+
+Caching the options in the server's memory per Account was not measured: it is the same as the tallies when warm, but Runout runs more than one server process (the API and the import service), so an import in one would have to invalidate the other's cache, and the first request after each import still pays 1.5 s.
+
+**Chosen: tallies.** `library_tallies` (migration `0047_library_tallies`) holds, per Account, how many Hands of each Poker Site, Hero and Stake its Library holds. Statement-level triggers keep it exact: after `library_entries` inserts, deletes and updates, and after `hands` updates that change a Hand's Poker Site, Hero or Stake (as a re-read could). A group whose count reaches 0 is deleted. The server never writes it, so every path that changes a Library, the seed script's SQL included, keeps it right. The list reads its options from it, its count of every Hand as the sum of its counts, and its Marked count from `marks ⋈ library_entries` (the Marks, not the Hands). What the list returns is unchanged; `test/library-tallies.e2e-spec.ts` checks the tallies against a recount from the Hands after removals, a Hand two Libraries share, and rewrites.
+
+The migration fills the table from the Libraries already stored: at a million Hands, under 3 s for the whole migration. Adding a million entries in the seed's 100,000-Hand statements costs one grouped upsert per statement.
+
+**Before and after**, HTTP medians in ms (five requests after a warm-up), the list only:
+
+| Criteria | Before | After |
+|---|---|---|
+| no Filter, all time | 1,728 | 130 |
+| no Filter, one month | 1,602 | 24 |
+| pot, all time | 1,812 | 208 |
+| pot, one month | 1,635 | 39 |
+| position+role, all time | 1,658 | 125 |
+| position+role, one month | 1,659 | 40 |
+
+Over every case the bench measures (59), the list's median is now 98 ms, from 24 to 733 ms. The slowest five are the empty texture pairs over all time (653–733 ms), gap 1 above, which the Filter-free queries used to hide; the next slowest is `pot` over all time (213 ms), its filtered count reading 61% of the Library. The Results Graph, the Stats and the hand ids don't run these queries and are unchanged.
 
 ## Re-running
 

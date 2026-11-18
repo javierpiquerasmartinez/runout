@@ -10,6 +10,7 @@ import {
   hands,
   identities,
   libraryEntries,
+  libraryTallies,
   marks,
   tagLinks,
   tags,
@@ -31,7 +32,6 @@ import {
   libraryFilterWhere,
   markedBy,
   stakeKey,
-  stakeLimit,
   type LibraryFilter,
   type LibraryFilterOptions,
 } from './library-filter.js';
@@ -321,20 +321,22 @@ export class LibraryService {
     return { handIds: ids };
   }
 
-  /** The Poker Sites, Heroes and Stakes present in the Library, sorted. */
+  /**
+   * The Poker Sites, Heroes and Stakes present in the Library, sorted, read
+   * from its tallies rather than from its Hands.
+   */
   private async options(account: Identity): Promise<LibraryFilterOptions> {
     const rows = await this.db
-      .selectDistinct({
-        site: hands.site,
-        hero: hands.heroScreenName,
-        limit: stakeLimit,
-        smallBlind: hands.smallBlind,
-        bigBlind: hands.bigBlind,
-        currency: hands.currency,
+      .select({
+        site: libraryTallies.site,
+        hero: libraryTallies.heroScreenName,
+        limit: libraryTallies.stakeLimit,
+        smallBlind: libraryTallies.smallBlind,
+        bigBlind: libraryTallies.bigBlind,
+        currency: libraryTallies.currency,
       })
-      .from(libraryEntries)
-      .innerJoin(hands, eq(hands.id, libraryEntries.handId))
-      .where(eq(libraryEntries.identityId, account.id));
+      .from(libraryTallies)
+      .where(eq(libraryTallies.identityId, account.id));
     const stakes = new Map<string, Stake>();
     for (const { limit, smallBlind, bigBlind, currency } of rows) {
       stakes.set(stakeKey({ limit, smallBlind, bigBlind, currency }), {
@@ -357,20 +359,33 @@ export class LibraryService {
     };
   }
 
-  /** How many Hands the whole Library holds, and how many of them are Marked. */
+  /**
+   * How many Hands the whole Library holds, from its tallies, and how many of
+   * them are Marked, from its Marks.
+   */
   private async counts(account: Identity): Promise<LibraryCounts> {
-    const [row] = await this.db
-      .select({
-        all: count(),
-        marked:
-          sql<number>`count(*) filter (where ${markedBy(account.id)})`.mapWith(
+    const [[{ all }], [{ marked }]] = await Promise.all([
+      this.db
+        .select({
+          all: sql<number>`coalesce(sum(${libraryTallies.hands}), 0)`.mapWith(
             Number,
           ),
-      })
-      .from(libraryEntries)
-      .innerJoin(hands, eq(hands.id, libraryEntries.handId))
-      .where(eq(libraryEntries.identityId, account.id));
-    return row;
+        })
+        .from(libraryTallies)
+        .where(eq(libraryTallies.identityId, account.id)),
+      this.db
+        .select({ marked: count() })
+        .from(marks)
+        .innerJoin(
+          libraryEntries,
+          and(
+            eq(libraryEntries.identityId, marks.identityId),
+            eq(libraryEntries.handId, marks.handId),
+          ),
+        )
+        .where(eq(marks.identityId, account.id)),
+    ]);
+    return { all, marked };
   }
 
   /** The ids of the Hands among `read` this Library already has, by key. */
