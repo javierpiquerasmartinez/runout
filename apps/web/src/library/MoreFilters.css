@@ -423,3 +423,19 @@
     inset: -10px;
   }
 }
+
+/* The Cards branch's hole cards: the Lab's matrix, at a size the panel's column holds, and the kinds under it. */
+.more-filters__hand-classes {
+  width: min(100%, 390px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.more-filters__hand-classes .lab__cell {
+  font-size: 10.5px;
+}
+.more-filters__hand-class-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

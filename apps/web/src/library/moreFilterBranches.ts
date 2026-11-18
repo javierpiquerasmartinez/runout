@@ -1,11 +1,16 @@
 import type { MessageKey } from '../i18n/catalogue'
 import type { Translator } from '../i18n/translator'
+import { categoryNameKey, MADE_HANDS, type Category } from '../lab/board'
+import { EMPTY_RANGE, formatRange, HAND_CLASS_BY_NAME, HAND_CLASSES, handClassFrequency, parseRange, withHandClass } from '../lab/range'
 import {
+  ANSWERS,
   BOARD_PAIRINGS,
   BOARD_RANKS,
   FACED_PREFLOP_ACTIONS,
   FACTS,
   FLOP_SUITS,
+  HAND_STREETS,
+  KICKERS,
   LATER_SUITS,
   POT_TYPES,
   POSITIONS,
@@ -14,12 +19,15 @@ import {
   PREFLOP_ROLES,
   STREET_ACTIONS,
   STREET_LINE,
+  STREET_DRAWS,
   type FactCriterion,
   type FactKey,
   type PotType,
   type PreflopAction,
   type StreetAction,
 } from './facts'
+import type { StatCriterion } from './libraryFilter'
+import { STAT_TILES } from './stats'
 
 /*
  * What the Más filtros panel offers, branch by branch, as the "Biblioteca ·
@@ -47,15 +55,26 @@ export type Unit = 'bb' | 'pot' | 'times'
  * How a criterion is set:
  * - `options`: one button per value, any number of them pressed, any of which keeps a Hand;
  * - `boolean`: "Sí" or "No", or its `labels`, one of them at most, for a fact that holds or doesn't;
- * - `range`: a from and a to, both included, either left open, whole or to `decimals` places,
+ * - `range`: a from and a to, both included, either left open, whole or to `decimals` places, negative too when `signed`,
  *   in `unit`, with `presets` as buttons that fill both, one at a time;
+ * - `hand-classes`: the Lab's 13×13 matrix, any number of Hand Classes picked, any of which keeps a Hand;
  * - `line`: the common lines as options, and any other typed, any of which keeps a Hand;
  * - `action`: a named Action, see `namedAction`.
  */
 export type CriterionControl =
   | { kind: 'options'; values: readonly string[]; label: (value: string, t: Translator['t']) => string }
   | { kind: 'boolean'; labels?: { true: MessageKey; false: MessageKey } }
-  | { kind: 'range'; min: number; max: number; decimals?: number; unit?: Unit; presets?: readonly RangePreset[] }
+  | { kind: 'hand-classes' }
+  /** With `signed`, its ends may be negative, and have any decimals unless `decimals` says. */
+  | {
+      kind: 'range'
+      min: number
+      max: number
+      signed?: boolean
+      decimals?: number
+      unit?: Unit
+      presets?: readonly RangePreset[]
+    }
   | { kind: 'line'; common: readonly string[]; pattern: RegExp }
   | { kind: 'action'; action: ActionName; faced: boolean }
 
@@ -134,7 +153,7 @@ export interface CriterionDefinition {
 }
 
 /** The headings a branch's criteria sit under. Its label is `library.moreFilters.section.<section>`. */
-export type Section = 'pot' | 'positions' | Street | PreflopSection | `situation-${Street}`
+export type Section = 'pot' | 'positions' | PreflopSection | 'hole-cards' | Street | `situation-${Street}` | ResultSection
 
 /** Every fact a row sets: its own, and the others it may set instead. */
 export function rowFacts(definition: CriterionDefinition): FactKey[] {
@@ -172,6 +191,58 @@ function boardOn(street: Street): CriterionDefinition[] {
   ]
 }
 
+/*
+ * The Cards branch: the Hero's hole cards on the Lab's matrix, then Street
+ * by Street (facts catalogue §3.4) the Made Hand and the Draws in the Lab's
+ * Categories, named and ordered as its tables have them, the kicker, the
+ * nuts and the nut flush draw. The river has no Draws.
+ */
+
+/** A Made Hand or a Draw, as the Lab's tables name it. */
+const categoryLabel = (value: string, t: Translator['t']) => t(categoryNameKey(value as Category))
+
+const kickerLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.kicker.${value as (typeof KICKERS)[number]}`)
+
+function cardsOn(street: Street): CriterionDefinition[] {
+  const on = (name: NameOnStreet<FactKey>, control: CriterionControl) => perStreet([street], name, () => ({ control }))
+  return [
+    ...on('made-hand', { kind: 'options', values: MADE_HANDS, label: categoryLabel }),
+    ...on('kicker', { kind: 'options', values: KICKERS, label: kickerLabel }),
+    ...on('nuts', yesOrNo),
+    ...(street === 'river'
+      ? []
+      : [...on('draw', { kind: 'options', values: STREET_DRAWS, label: categoryLabel }), ...on('nut-flush-draw', yesOrNo)]),
+  ]
+}
+
+/** How many of the chip's pieces a hole-card pick shows before it counts the rest's Hand Classes. */
+const HOLE_CARD_PIECES = 2
+
+/**
+ * A hole-card pick as the Lab writes a Range, shortened for the chip: runs
+ * as `QQ+`, a suited and an offsuit piece of the same cards as one (`AK`),
+ * and past the first pieces the Hand Classes left, `QQ+, AK +3 clases`.
+ */
+function holeCardsSummary(names: readonly string[], t: Translator['t']): string {
+  const range = names.reduce((picked, name) => {
+    const handClass = HAND_CLASS_BY_NAME.get(name)
+    return handClass ? withHandClass(picked, handClass, 100) : picked
+  }, EMPTY_RANGE)
+  // No rank is written with an `s` or an `o`: they only ever say suited or offsuit.
+  const pieces = formatRange(range).split(',')
+  const merged = pieces.flatMap((piece) => {
+    if (piece.includes('o') && pieces.includes(piece.replaceAll('o', 's'))) return []
+    if (piece.includes('s') && pieces.includes(piece.replaceAll('s', 'o'))) return [piece.replaceAll('s', '')]
+    return [piece]
+  })
+  if (merged.length <= HOLE_CARD_PIECES) return merged.join(', ')
+  const shown = merged.slice(0, HOLE_CARD_PIECES)
+  const parsed = parseRange(shown.join(','))
+  const covered = 'range' in parsed ? HAND_CLASSES.filter((handClass) => handClassFrequency(parsed.range, handClass).value > 0).length : 0
+  const left = names.length - covered
+  return `${shown.join(', ')} ${t(left === 1 ? 'library.moreFilters.value.hero-class.more.one' : 'library.moreFilters.value.hero-class.more.other', { count: left })}`
+}
+
 /**
  * A Position criterion keeps no Hand when every pot type it is required in
  * has nobody in that seat: no opener in a walk or a limped pot, no 3-bettor
@@ -195,6 +266,28 @@ const position = (fact: FactKey, inapplicable?: CriterionDefinition['inapplicabl
   control: { kind: 'options', values: POSITIONS, label: asWritten },
   inapplicable,
 })
+
+/** The Resultado branch's headings: how the Hand ended, the Showdown, and the amounts in big blinds. */
+type ResultSection = 'ending' | 'showdown' | 'amounts'
+
+const streetLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.street.${value as (typeof HAND_STREETS)[number]}`)
+const answerLabel = (value: string, t: Translator['t']) => t(`library.moreFilters.value.answer.${value as (typeof ANSWERS)[number]}`)
+
+/** In big blinds, negative or with decimals, either end open. */
+const bigBlinds: CriterionControl = { kind: 'range', min: -Infinity, max: Infinity, signed: true }
+
+/** The Resultado branch: how the Hand ended for the Hero (facts catalogue §4). */
+const RESULT: CriterionDefinition[] = [
+  { fact: 'hero-folded-on', section: 'ending', control: { kind: 'options', values: HAND_STREETS, label: streetLabel } },
+  { fact: 'hero-all-in-on', section: 'ending', control: { kind: 'options', values: HAND_STREETS, label: streetLabel } },
+  { fact: 'faced-all-in-on', section: 'ending', control: { kind: 'options', values: HAND_STREETS, label: streetLabel } },
+  { fact: 'faced-all-in-answer', section: 'ending', control: { kind: 'options', values: ANSWERS, label: answerLabel } },
+  { fact: 'reached-showdown', section: 'showdown', control: yesOrNo },
+  { fact: 'won-money', section: 'showdown', control: yesOrNo },
+  { fact: 'won-at-showdown', section: 'showdown', control: yesOrNo },
+  { fact: 'result', section: 'amounts', control: bigBlinds },
+  { fact: 'all-in-ev', section: 'amounts', control: bigBlinds },
+]
 
 // The Preflop branch (facts catalogue §1–2), and the named Actions every Street's branch shares.
 
@@ -362,9 +455,10 @@ export const BRANCH_CRITERIA: Record<Branch, CriterionDefinition[]> = {
   flop: streetBranch('flop'),
   turn: streetBranch('turn'),
   river: streetBranch('river'),
-  cards: [],
+  cards: [{ fact: 'hero-class', section: 'hole-cards', control: { kind: 'hand-classes' } }, ...STREETS.flatMap(cardsOn)],
   board: STREETS.flatMap(boardOn),
-  result: [],
+  result: RESULT,
+  // The Stat criterion is not a fact's: the panel draws its own branch (`StatBranch`).
   stat: [],
 }
 
@@ -413,6 +507,7 @@ export function valuesSummary(criterion: FactCriterion, t: Translator['t']): str
     return min !== null ? `${min}+` : `≤${max}`
   }
   const control = definitionOf(criterion.fact)?.definition.control
+  if (control?.kind === 'hand-classes') return holeCardsSummary(criterion.values, t)
   const label = control?.kind === 'options' ? control.label : asWritten
   return criterion.values.map((value) => label(value, t)).join(', ')
 }
@@ -462,4 +557,17 @@ export function chipSummary(summaries: string[], budget: number): { text: string
 /** Why a criterion keeps no Hand alongside the others, or null when it may keep some. */
 export function inapplicableReason(criterion: FactCriterion, criteria: FactCriterion[]): MessageKey | null {
   return definitionOf(criterion.fact)?.definition.inapplicable?.(criterion, criteria) ?? null
+}
+
+/*
+ * The Estadística branch. Its one criterion is a Stat's: the Hands where the
+ * Hero had its chance, or took it, as a Stat's tooltip links to them. It is
+ * the filter's `stat`, which the server reads apart from the facts, so it is
+ * one Stat at a time and can't be excluded.
+ */
+
+/** The Stat criterion as the chip and its list name it, after every fact's: `VPIP · lo hiciste`. */
+export function statSummary(stat: StatCriterion, t: Translator['t']): string {
+  const abbreviation = STAT_TILES.find((tile) => tile.key === stat.key)?.abbreviation ?? stat.key
+  return t(`library.stats.chip.${stat.side}`, { stat: abbreviation })
 }
