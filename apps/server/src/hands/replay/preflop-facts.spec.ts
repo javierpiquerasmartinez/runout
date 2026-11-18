@@ -166,6 +166,27 @@ describe('Replay: the Hero’s preflop Actions and role', () => {
     });
   });
 
+  it('leaves a limper who faced a 3-bet over the isolation not facing the isolation', () => {
+    // Aspen1 limps, Hero4 raises, Willow4 re-raises from the big blind before
+    // Aspen1 acts again, and Aspen1 folds to the 3-bet.
+    const threeBetOver = only(
+      oneHand('pokerstars-edge-cases.txt', '262130000104')
+        .replace('Dealt to Hero4 [Ad Jc]', 'Dealt to Aspen1 [Ah Jd]')
+        .replace(
+          /Willow4: calls €0.30\nAspen1: calls €0.30\n[\s\S]*$/,
+          'Willow4: raises €0.80 to €1.20\nAspen1: folds\nHero4: folds\n' +
+            'Uncalled bet (€0.80) returned to Willow4\n' +
+            'Willow4 collected €0.95 from pot\n',
+        ),
+    );
+
+    expect(heroFacts(threeBetOver)).toMatchObject({
+      limpDid: true,
+      isolateFaced: false,
+      isolateAnswer: null,
+    });
+  });
+
   it('makes a 3-bet from a blind over a caller of the steal a squeeze, not a resteal', () => {
     // Birch Woods opens the button, iMapleAA calls from the small blind and
     // Cedar31 re-raises from the big blind.

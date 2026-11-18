@@ -2,10 +2,10 @@ import type { Action, Hand } from '../hand.js';
 import { couldRaise } from './hero-stats.js';
 import type { Answer } from './preflop-facts.js';
 import type {
+  ActionWithTable,
   PostflopStreet,
-  StreetSituation,
-  StreetStep,
-} from './street-situation.js';
+  StreetStart,
+} from './street-start.js';
 import type { TableState } from './timeline.js';
 
 /**
@@ -73,8 +73,8 @@ export type StreetActionFacts<S extends PostflopStreet> = {
 };
 
 /** One Action on a Street, with how the betting stood for it. */
-interface Decision extends StreetStep {
-  /** Its index among the Street's steps. */
+interface Decision extends ActionWithTable {
+  /** Its index among the Street's Actions. */
   index: number;
   /** Bets and raises before it on the Street: 0 unopened, 1 a bet, 2 a raise. */
   level: number;
@@ -94,7 +94,7 @@ interface Decision extends StreetStep {
  */
 export function streetActions(
   hand: Hand,
-  situations: Record<PostflopStreet, StreetSituation | null>,
+  starts: Record<PostflopStreet, StreetStart | null>,
 ): { [S in PostflopStreet]: StreetActionFacts<S> } {
   const hero = hand.hero.screenName;
   const preflopAggressor = hand.actions
@@ -103,21 +103,21 @@ export function streetActions(
   const cbetChain = continuationBets(hand, preflopAggressor);
   const previous = {
     flop: null,
-    turn: situations.flop,
-    river: situations.turn,
+    turn: starts.flop,
+    river: starts.turn,
   } as const;
 
   const facts = <S extends PostflopStreet>(street: S): StreetActionFacts<S> => {
-    const situation = situations[street];
+    const start = starts[street];
     const actions = STREET_ACTIONS[street] as readonly StreetAction[];
-    if (!situation) {
+    if (!start) {
       return quartets(
         actions.map((action) => [action, EMPTY]),
       ) as StreetActionFacts<S>;
     }
     const read = new StreetReader(
       hero,
-      situation,
+      start,
       previous[street],
       hand.stake.bigBlind,
     );
@@ -127,7 +127,7 @@ export function streetActions(
       donkBet: read.donkBet(
         street === 'flop'
           ? preflopAggressor
-          : previous[street]?.steps.filter((s) => aggressive(s.action)).at(-1)
+          : previous[street]?.actions.filter((a) => aggressive(a.action)).at(-1)
               ?.action.screenName,
       ),
       probe: read.probe(preflopAggressor),
@@ -220,11 +220,11 @@ class StreetReader {
 
   constructor(
     private readonly hero: string,
-    private readonly situation: StreetSituation,
-    private readonly before: StreetSituation | null,
+    private readonly start: StreetStart,
+    private readonly before: StreetStart | null,
     bigBlind: number,
   ) {
-    this.decisions = decisionsOf(situation.steps, bigBlind);
+    this.decisions = decisionsOf(start.actions, bigBlind);
     this.own = this.decisions.filter((d) => d.action.screenName === hero);
   }
 
@@ -300,7 +300,7 @@ class StreetReader {
    * bets the turn first.
    */
   delayedCbet(aggressor: string | undefined): ActionQuartet {
-    if (this.situation.street !== 'turn' || !this.checkedThrough()) {
+    if (this.start.street !== 'turn' || !this.checkedThrough()) {
       return NONE;
     }
     return this.firstBetBy(aggressor);
@@ -319,11 +319,11 @@ class StreetReader {
    * aggressor among them, and a player out of position to them bets first.
    */
   probe(aggressor: string | undefined): ActionQuartet {
-    if (this.situation.street === 'flop' || !this.checkedThrough()) {
+    if (this.start.street === 'flop' || !this.checkedThrough()) {
       return NONE;
     }
-    const checked = this.before!.steps.some(
-      (s) => s.action.screenName === aggressor,
+    const checked = this.before!.actions.some(
+      (a) => a.action.screenName === aggressor,
     );
     return checked ? this.intoBy(aggressor) : NONE;
   }
@@ -335,8 +335,8 @@ class StreetReader {
    */
   private intoBy(target: string | undefined): ActionQuartet {
     if (target === undefined) return NONE;
-    const { inHand, start } = this.situation;
-    const targetState = start.players.find((p) => p.screenName === target);
+    const { inHand, dealt } = this.start;
+    const targetState = dealt.players.find((p) => p.screenName === target);
     if (!inHand.includes(target) || !targetState || targetState.allIn) {
       return NONE;
     }
@@ -373,8 +373,8 @@ class StreetReader {
   float(): ActionQuartet {
     if (!this.before) return NONE;
     const floater = this.before.inHand.at(-1)!;
-    const lastThere = this.before.steps
-      .filter((s) => s.action.screenName === floater)
+    const lastThere = this.before.actions
+      .filter((a) => a.action.screenName === floater)
       .at(-1);
     if (lastThere?.action.type !== 'call') return NONE;
     const spot = this.unopenedFor(floater);
@@ -390,9 +390,9 @@ class StreetReader {
 
   /** The Street before had Actions, every one a check. */
   private checkedThrough(): boolean {
-    const steps = this.before?.steps ?? [];
+    const actions = this.before?.actions ?? [];
     return (
-      steps.length > 0 && steps.every((step) => step.action.type === 'check')
+      actions.length > 0 && actions.every((a) => a.action.type === 'check')
     );
   }
 
@@ -470,17 +470,20 @@ class StreetReader {
 }
 
 /** Every Action on a Street, with how the betting stood for it. */
-function decisionsOf(steps: StreetStep[], bigBlind: number): Decision[] {
+function decisionsOf(
+  actions: ActionWithTable[],
+  bigBlind: number,
+): Decision[] {
   // What a full raise adds: a big blind to begin with, then the largest.
   let fullRaise = bigBlind;
   const aggressors: string[] = [];
   // Each player's last Action that put chips in: the level then, and a full raise.
   const putIn = new Map<string, { level: number; fullRaise: number }>();
-  return steps.map((step, index) => {
-    const { action, before } = step;
+  return actions.map((played, index) => {
+    const { action, before } = played;
     const last = putIn.get(action.screenName);
     const decision: Decision = {
-      ...step,
+      ...played,
       index,
       level: aggressors.length,
       aggressors: [...aggressors],
@@ -488,7 +491,7 @@ function decisionsOf(steps: StreetStep[], bigBlind: number): Decision[] {
     };
     // The table after it; none after the Street's last Action, which no
     // later one is measured against.
-    const after = steps[index + 1]?.before ?? before;
+    const after = actions[index + 1]?.before ?? before;
     if (aggressive(action)) {
       const level = levelOf(after);
       const added = level - levelOf(before);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTranslator } from '../i18n/translator'
 import type { FactCriterion } from './facts'
-import { branchCounts, chipSummary, criterionSummaries, inapplicableReason } from './moreFilterBranches'
+import { branchCounts, chipSummary, criterionLabel, criterionSummaries, inapplicableReason } from './moreFilterBranches'
 
 const { t } = createTranslator('es')
 const en = createTranslator('en').t
@@ -28,6 +28,17 @@ describe('criterionSummaries', () => {
       ),
     ).toEqual(['Not walk pot', '≤4 players'])
     expect(criterionSummaries([{ fact: 'players', exclude: false, range: { min: 6, max: null } }], t)).toEqual(['6+ jugadores'])
+  })
+
+  it('lists the criteria the panel doesn’t offer by their names, after the others', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'flop-bets', exclude: false, range: { min: 1, max: null } },
+      { fact: 'turn-folds', exclude: true, range: { min: 1, max: 1 } },
+      potType(['3-bet']),
+    ]
+
+    expect(criterionSummaries(criteria, t)).toEqual(['Bote 3-bet', 'flop-bets: 1+', 'Excepto turn-folds: 1'])
+    expect(branchCounts(criteria).table).toBe(1)
   })
 })
 
@@ -90,6 +101,35 @@ describe('inapplicableReason', () => {
 
     expect(inapplicableReason(opener, [potType(['walk', 'limped']), opener])).toBe('library.moreFilters.inapplicable.opener-position')
     expect(inapplicableReason(opener, [opener])).toBeNull()
+  })
+
+  it('explains a Street’s criterion in a walk, where no flop is dealt', () => {
+    const turnLine: FactCriterion = { fact: 'turn-line', exclude: false, values: ['XC'] }
+    const flopSuits: FactCriterion = { fact: 'flop-suits', exclude: false, values: ['monotone'] }
+    const flopTopPair: FactCriterion = { fact: 'flop-made-hand', exclude: false, values: ['top-pair'] }
+
+    for (const criterion of [turnLine, flopSuits, flopTopPair]) {
+      expect(inapplicableReason(criterion, [potType(['walk']), criterion])).toBe('library.moreFilters.inapplicable.street-in-walk')
+    }
+    // Another pot type besides the walk, an excluded walk or an excluded criterion may keep some.
+    expect(inapplicableReason(turnLine, [potType(['walk', 'limped']), turnLine])).toBeNull()
+    expect(inapplicableReason(turnLine, [potType(['walk'], true), turnLine])).toBeNull()
+    expect(inapplicableReason({ ...turnLine, exclude: true }, [potType(['walk'])])).toBeNull()
+  })
+
+  it('explains the Hero’s criterion on a Street after the one they folded on', () => {
+    const foldedOn = (values: string[], exclude = false): FactCriterion => ({ fact: 'hero-folded-on', exclude, values })
+    const turnLine: FactCriterion = { fact: 'turn-line', exclude: false, values: ['XC'] }
+    const turnPair: FactCriterion = { fact: 'turn-made-hand', exclude: false, values: ['top-pair'] }
+
+    expect(inapplicableReason(turnLine, [foldedOn(['preflop', 'flop']), turnLine])).toBe('library.moreFilters.inapplicable.street-after-fold')
+    expect(inapplicableReason(turnPair, [foldedOn(['flop']), turnPair])).toBe('library.moreFilters.inapplicable.street-after-fold')
+    // Folding on the turn itself, or on a later Street, still saw it.
+    expect(inapplicableReason(turnLine, [foldedOn(['flop', 'turn']), turnLine])).toBeNull()
+    expect(inapplicableReason(turnLine, [foldedOn(['flop'], true), turnLine])).toBeNull()
+    // The Board is dealt whether or not the Hero is still in.
+    const turnSuits: FactCriterion = { fact: 'turn-suits', exclude: false, values: ['rainbow'] }
+    expect(inapplicableReason(turnSuits, [foldedOn(['preflop']), turnSuits])).toBeNull()
   })
 })
 
@@ -225,5 +265,20 @@ describe('criterionSummaries on a Street’s branch', () => {
       'River: bote de 10.5–40 bb',
     ])
     expect(branchCounts(criteria)).toMatchObject({ flop: 2, turn: 2, river: 1 })
+  })
+
+  it('names a Street’s 4-bet a 4-bet or more, as it keeps any raise from the 4-bet on', () => {
+    expect(criterionLabel('flop-four-bet-did', t)).toBe('4-bet+')
+    expect(criterionLabel('four-bet-did', en)).toBe('4-bet')
+    expect(criterionLabel('five-bet-did', en)).toBe('5-bet+')
+    expect(
+      criterionSummaries(
+        [
+          { fact: 'river-four-bet-did', exclude: false, values: ['true'] },
+          { fact: 'turn-four-bet-answer', exclude: false, values: ['fold'] },
+        ],
+        en,
+      ).every((line) => line.includes('4-bet+')),
+    ).toBe(true)
   })
 })

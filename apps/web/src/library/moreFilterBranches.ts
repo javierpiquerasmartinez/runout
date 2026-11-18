@@ -21,6 +21,7 @@ import {
   STREET_LINE,
   STREET_DRAWS,
   type FactCriterion,
+  type CounterFact,
   type FactKey,
   type PotType,
   type PreflopAction,
@@ -96,7 +97,9 @@ type NameOnStreet<F> = F extends `${Street}-${infer Name}` ? Name : never
 type ActionFactKey = Extract<FactKey, `${string}-${'did' | 'chance' | 'faced' | 'answer'}`>
 
 /** The name a fact's row and summary go by: the fact's own, or without its Street. */
-export type FactName = Exclude<FactKey, `${Street}-${string}` | ActionFactKey> | NameOnStreet<Exclude<FactKey, ActionFactKey>>
+export type FactName =
+  | Exclude<FactKey, `${Street}-${string}` | ActionFactKey>
+  | NameOnStreet<Exclude<FactKey, ActionFactKey | CounterFact>>
 
 /** A yes-or-no fact's name, whose "No" summary is `library.moreFilters.summary.<name>.no`. */
 type BooleanName = {
@@ -291,11 +294,14 @@ const RESULT: CriterionDefinition[] = [
 
 // The Preflop branch (facts catalogue §1–2), and the named Actions every Street's branch shares.
 
-/** A named Action, as its row and summary name it: `library.moreFilters.action.<name>`. */
-export type ActionName = PreflopAction | StreetAction
+/**
+ * A named Action, as its row and summary name it: `library.moreFilters.action.<name>`.
+ * A Street's `four-bet` is named `four-bet-plus`, as it keeps any raise from the 4-bet on.
+ */
+export type ActionName = PreflopAction | StreetAction | 'four-bet-plus'
 
 /** One an opponent can make against the Hero; `library.moreFilters.action.<name>.faced` says it with its article. */
-type FacedActionName = (typeof FACED_PREFLOP_ACTIONS)[number] | StreetAction
+type FacedActionName = (typeof FACED_PREFLOP_ACTIONS)[number] | StreetAction | 'four-bet-plus'
 
 /** What the Hero did with a named Action: made it, had the chance, faced it, or faced it and answered. */
 export const ACTION_SIDES = ['did', 'chance', 'faced', 'answer'] as const
@@ -431,7 +437,9 @@ function streetBranch(street: Street): CriterionDefinition[] {
     sized('spr', situation),
     { fact: fact('saw'), section: situation, control: yesOrNo },
     { fact: fact('all-in'), section: situation, control: yesOrNo },
-    ...STREET_ACTIONS[street].map((action) => namedAction(`${street}-${action}`, action, true, 'action')),
+    ...STREET_ACTIONS[street].map((action) =>
+      namedAction(`${street}-${action}`, action === 'four-bet' ? 'four-bet-plus' : action, true, 'action'),
+    ),
     { fact: fact('line'), section: 'action', control: { kind: 'line', common: COMMON_STREET_LINES, pattern: STREET_LINE } },
     sized('bet-size', 'sizes', 'pot'),
     sized('raise-size', 'sizes', 'times'),
@@ -514,27 +522,39 @@ export function valuesSummary(criterion: FactCriterion, t: Translator['t']): str
 
 /** One line per criterion, in branch order, as the chip and its list name them: `Bote 3-bet`, `Excepto Hero BB`. */
 export function criterionSummaries(criteria: FactCriterion[], t: Translator['t']): string[] {
-  return inBranchOrder(criteria).map((criterion) => {
-    const name = factName(criterion.fact)
-    const control = definitionOf(criterion.fact)?.definition.control
-    const preset =
-      control?.kind === 'range' && 'range' in criterion
-        ? control.presets?.find(({ range }) => range.min === criterion.range.min && range.max === criterion.range.max)
-        : undefined
-    const summary =
-      control?.kind === 'action'
-        ? actionSummary(criterion, control.action, t)
-        : preset
-        ? t(preset.summary)
-        : FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
-        ? criterion.values
-            .map((value) => t(value === 'true' ? `library.moreFilters.summary.${name as BooleanName}` : `library.moreFilters.summary.${name as BooleanName}.no`))
-            .join(', ')
-        : t(`library.moreFilters.summary.${name}`, { values: valuesSummary(criterion, t) })
-    const kept = criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
-    const street = streetOf(criterion.fact)
-    return street ? t('library.moreFilters.summary.onStreet', { street: t(`library.moreFilters.branch.${street}`), criterion: kept }) : kept
-  })
+  const offered = inBranchOrder(criteria)
+  // A link may carry a criterion the panel doesn't offer (`flop-bets`): it
+  // still filters, so it is listed too, last, by its own name.
+  const others = criteria
+    .filter((criterion) => !offered.includes(criterion))
+    .map((criterion) => {
+      const summary = `${criterion.fact}: ${valuesSummary(criterion, t)}`
+      return criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
+    })
+  return [...offered.map((criterion) => offeredSummary(criterion, t)), ...others]
+}
+
+/** An offered criterion's line, by its row's name and values. */
+function offeredSummary(criterion: FactCriterion, t: Translator['t']): string {
+  const name = factName(criterion.fact)
+  const control = definitionOf(criterion.fact)?.definition.control
+  const preset =
+    control?.kind === 'range' && 'range' in criterion
+      ? control.presets?.find(({ range }) => range.min === criterion.range.min && range.max === criterion.range.max)
+      : undefined
+  const summary =
+    control?.kind === 'action'
+      ? actionSummary(criterion, control.action, t)
+      : preset
+      ? t(preset.summary)
+      : FACTS[criterion.fact].kind === 'boolean' && 'values' in criterion
+      ? criterion.values
+          .map((value) => t(value === 'true' ? `library.moreFilters.summary.${name as BooleanName}` : `library.moreFilters.summary.${name as BooleanName}.no`))
+          .join(', ')
+      : t(`library.moreFilters.summary.${name}`, { values: valuesSummary(criterion, t) })
+  const kept = criterion.exclude ? t('library.moreFilters.summary.excluded', { criterion: summary }) : summary
+  const street = streetOf(criterion.fact)
+  return street ? t('library.moreFilters.summary.onStreet', { street: t(`library.moreFilters.branch.${street}`), criterion: kept }) : kept
 }
 
 /**
@@ -556,7 +576,29 @@ export function chipSummary(summaries: string[], budget: number): { text: string
 
 /** Why a criterion keeps no Hand alongside the others, or null when it may keep some. */
 export function inapplicableReason(criterion: FactCriterion, criteria: FactCriterion[]): MessageKey | null {
-  return definitionOf(criterion.fact)?.definition.inapplicable?.(criterion, criteria) ?? null
+  return definitionOf(criterion.fact)?.definition.inapplicable?.(criterion, criteria) ?? streetReason(criterion, criteria)
+}
+
+/**
+ * A Street's criterion keeps no Hand when the Street is never reached: in a
+ * walk nothing is dealt after preflop, and once the Hero folds, their facts
+ * on the later Streets are empty, though the Board's are still dealt. Only
+ * "didn't see it" applies there, and an exclusion keeps the empty ones.
+ */
+function streetReason(criterion: FactCriterion, criteria: FactCriterion[]): MessageKey | null {
+  const street = streetOf(criterion.fact)
+  if (!street || criterion.exclude) return null
+  if (factName(criterion.fact) === 'saw' && 'values' in criterion && criterion.values.includes('false')) return null
+  const only = (fact: FactKey, within: (value: string) => boolean) => {
+    const other = criteria.find((candidate) => candidate.fact === fact && !candidate.exclude)
+    return !!other && 'values' in other && other.values.length > 0 && other.values.every(within)
+  }
+  if (only('pot-type', (value) => value === 'walk')) return 'library.moreFilters.inapplicable.street-in-walk'
+  const before = (value: string) => HAND_STREETS.indexOf(value as (typeof HAND_STREETS)[number]) < HAND_STREETS.indexOf(street)
+  if (definitionOf(criterion.fact)?.branch !== 'board' && only('hero-folded-on', before)) {
+    return 'library.moreFilters.inapplicable.street-after-fold'
+  }
+  return null
 }
 
 /*

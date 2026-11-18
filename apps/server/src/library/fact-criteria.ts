@@ -20,12 +20,12 @@ import {
 import {
   HAND_CLASSES,
   KICKERS,
-  POSITIONS,
   POT_TYPES,
   STREET_DRAWS,
   STREETS,
 } from '../hands/replay/hero-facts.js';
-import type { PostflopStreet } from '../hands/replay/street-situation.js';
+import { POSITIONS } from '../hands/replay/positions.js';
+import type { PostflopStreet } from '../hands/replay/street-start.js';
 import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
 import {
   ANSWERS,
@@ -228,6 +228,12 @@ type KebabAction<S extends PostflopStreet> = Kebab<
 /** The rules version that added the preflop facts. */
 const PREFLOP_SINCE = 5;
 
+/**
+ * The rules version by which facing an isolation is the Hero's answer to the
+ * isolation itself: a 3-bet over it before they act again leaves it unfaced.
+ */
+const ISOLATE_FACED_SINCE = 8;
+
 /** The preflop facts: facts catalogue §1 and §2.2–2.3. */
 const PREFLOP_FACTS = {
   ...actionFacts(
@@ -250,15 +256,15 @@ const PREFLOP_FACTS = {
     { did: handFacts.limpDid, chance: handFacts.limpChance },
     PREFLOP_SINCE,
   ),
-  ...actionFacts<'isolate', ActionFact>(
+  ...actionFacts(
     'isolate',
-    {
-      did: handFacts.isolateDid,
-      chance: handFacts.isolateChance,
-      faced: handFacts.isolateFaced,
-      answer: handFacts.isolateAnswer,
-    },
+    { did: handFacts.isolateDid, chance: handFacts.isolateChance },
     PREFLOP_SINCE,
+  ),
+  ...actionFacts<'isolate', 'faced' | 'answer'>(
+    'isolate',
+    { faced: handFacts.isolateFaced, answer: handFacts.isolateAnswer },
+    ISOLATE_FACED_SINCE,
   ),
   ...actionFacts<'steal', ActionFact>(
     'steal',
@@ -707,6 +713,9 @@ const FACTS = {
 } satisfies Record<string, FactEntry>;
 
 export type FactKey = keyof typeof FACTS;
+
+/** Every fact a criterion can name. */
+export const FACT_KEYS = Object.keys(FACTS) as FactKey[];
 
 /**
  * A fact of the facts row, with the rules version that added it: for the

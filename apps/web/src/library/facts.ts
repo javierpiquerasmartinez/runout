@@ -1,4 +1,5 @@
 import { COMBINATION_DRAWS, DRAWS, MADE_HANDS } from '@runout/poker'
+import { HAND_CLASSES as LAB_HAND_CLASSES, RANKS } from '../lab/range'
 
 /*
  * The Hero's facts a Más filtros criterion can name, as the server's
@@ -25,7 +26,7 @@ export const LATER_SUITS = ['no-flush', 'flush-possible', 'four-of-a-suit', 'fiv
 export const BOARD_PAIRINGS = ['unpaired', 'paired', 'two-pair', 'trips', 'full-house', 'quads'] as const
 
 /** Ranks from the highest down, as the Lab writes them. */
-export const BOARD_RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'] as const
+export const BOARD_RANKS: readonly string[] = [...RANKS]
 
 /** The Streets, in the order they are dealt. */
 export const HAND_STREETS = ['preflop', 'flop', 'turn', 'river'] as const
@@ -46,13 +47,8 @@ const texture = (suits: readonly string[]) =>
     'high-card': { kind: 'set', values: BOARD_RANKS },
   }) as const
 
-/** Ranks from the highest down, as Hand Classes write them. */
-const RANKS = 'AKQJT98765432'
-
-/** The 169 Hand Classes the Hero can be dealt, as players write them: `AA`, `AKs`, `AKo`. */
-export const HAND_CLASSES: readonly string[] = [...RANKS].flatMap((high, h) =>
-  [...RANKS.slice(h)].flatMap((low, offset) => (offset === 0 ? [high + low] : [`${high}${low}s`, `${high}${low}o`])),
-)
+/** The 169 Hand Classes the Hero can be dealt, as the Lab writes them: `AA`, `AKs`, `AKo`. */
+const HAND_CLASSES: readonly string[] = LAB_HAND_CLASSES.map((handClass) => handClass.name)
 
 /** Every Draw and combination Draw the Hero's Combo can be in on the flop or the turn, in the Lab's order. */
 export const STREET_DRAWS = [...DRAWS, ...COMBINATION_DRAWS] as const
@@ -174,6 +170,21 @@ export const STREET_LINE = /^[XBCR]{0,30}[XBCRF]$/
 const yes = { kind: 'boolean' } as const
 
 /**
+ * How many bets, raises, calls and folds the Hero made on a Street, which
+ * AFq counts. The panel doesn't offer them, but a link may carry them, so
+ * they are read, kept and listed like the others (`flop-bets:1..`).
+ */
+const COUNTERS = {
+  bets: { kind: 'range', min: 0, max: 30 },
+  raises: { kind: 'range', min: 0, max: 30 },
+  calls: { kind: 'range', min: 0, max: 30 },
+  folds: { kind: 'range', min: 0, max: 1 },
+} as const
+
+/** A Street's counter fact: `flop-bets`. */
+export type CounterFact = `${'flop' | 'turn' | 'river'}-${keyof typeof COUNTERS}`
+
+/**
  * One Street's facts, named after it (`flop-ip`, `turn-line`,
  * `river-cbet-did`): the situation as it begins, its named Actions, the
  * Hero's line, and the sizes. Pot and stack are in big blinds, bet sizes a
@@ -195,11 +206,14 @@ function streetFacts<S extends keyof typeof STREET_ACTIONS>(street: S) {
     'bet-size-faced': { kind: 'range', min: 0, max: 1_000_000 },
     'raise-size-faced': { kind: 'range', min: 0, max: 999_999, decimals: 2 },
   } as const
-  const facts: Record<string, FactDomain> = { ...situation }
+  const facts: Record<string, FactDomain> = { ...situation, ...COUNTERS }
   for (const action of STREET_ACTIONS[street]) Object.assign(facts, actionFacts(action, true))
   return Object.fromEntries(Object.entries(facts).map(([name, domain]) => [`${street}-${name}`, domain])) as {
     [K in keyof typeof situation as `${S}-${K}`]: (typeof situation)[K]
-  } & ActionFacts<`${S}-${(typeof STREET_ACTIONS)[S][number]}`, true>
+  } & { [K in keyof typeof COUNTERS as `${S}-${K}`]: (typeof COUNTERS)[K] } & ActionFacts<
+      `${S}-${(typeof STREET_ACTIONS)[S][number]}`,
+      true
+    >
 }
 
 /** How a fact's values are written, and which ones it can take. */
