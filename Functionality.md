@@ -509,6 +509,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - A link to a Saved Filter that no longer exists opens the Library with no Más filtros criteria nor Stat criterion, and says so.
 - Saved Filters are mine alone: nobody else sees or changes them. An Administrator Impersonating my Account sees and uses them as I would.
 - A criterion on a fact the Library no longer knows is left out when a Saved Filter is read, and while that Saved Filter is applied the Library says how many were left out. Saving changes over it rewrites it without them.
+- **On a phone** (760 px wide or less) the Library only applies and drops Saved Filters. Tapping one in the side column, stacked on top, applies it, and tapping the applied one drops it; a line under the list says to create and edit Filters on a computer. There is no Más filtros button or panel, no Guardar filtro, no renaming or deleting, and no modified state. The chip of an applied Saved Filter shows its name and a ×. A link carrying Más filtros criteria opens the same Hands as on a computer, the chip showing their summary and a × to drop them, and opening nothing. A Stat's tooltip links on the Stats view keep adding their Stat criterion. The rule follows the screen's width, never the device: widening the window brings everything back.
 
 ## E8 · Accounts and preferences
 

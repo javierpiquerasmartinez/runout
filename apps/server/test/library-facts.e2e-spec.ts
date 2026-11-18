@@ -365,6 +365,64 @@ describe('Filtering the Library by the Hero’s facts (e2e)', () => {
     }
   }, 30_000);
 
+  /*
+   * The named postflop Actions of the same ten Hands and ggpoker-session.txt's
+   * three, read by hand: Hero on GGPoker check-raises the BTN's flop C-bet
+   * from the BB; HeroAI calls the BTN's flop C-bet all in; Hero4 C-bets the
+   * flop and checks the turn; Hero6 C-bets the flop and calls a check-raise;
+   * iMapleAA C-bets the flop from the BTN and takes it down. Seven see the
+   * turn: HeroAI's two, Hero9max's, Hero6's, Hero4's, iMapleAA's CO and
+   * Hero's SB all in preflop on GGPoker.
+   */
+  it('filters by the named Actions on each postflop Street, and agrees with the Stats', async () => {
+    const account = await stockedAccount([...FIXTURES, 'ggpoker-session.txt']);
+    const statsOf = async (query: string) =>
+      (await get(account.token, `/api/library/stats?${query}`).expect(200))
+        .body as {
+        hands: number;
+        stats: Record<string, { opportunities: number; taken: number }>;
+      };
+    const cases: [string, number][] = [
+      // Faced a flop C-bet and answered it with a raise.
+      [`${fact('flop-cbet-faced:true')}&${fact('flop-cbet-answer:raise')}`, 1],
+      // Had a turn C-bet chance and didn't take it.
+      [`${fact('turn-cbet-chance:true')}&${fact('turn-cbet-did:false')}`, 1],
+      [fact('flop-check-raise-did:true'), 1],
+      [fact('flop-check-raise-faced:true'), 1],
+      [fact('flop-cbet-did:true'), 3],
+      // A Street the Hero didn't see keeps no Hand, either way.
+      [fact('turn-bet-did:true,false'), 7],
+    ];
+    for (const [query, count] of cases) {
+      const got = await kept(account.token, query);
+      expect(got.total, query).toBe(count);
+      expect(got.handIds, query).toEqual(got.list);
+      expect(got.statsCount, query).toBe(count);
+    }
+
+    const everything = (await statsOf('')).stats;
+    for (const [action, stat, fold] of [
+      ['flop-cbet', 'cbet-flop', 'fold-to-cbet-flop'],
+      ['turn-cbet', 'cbet-turn', 'fold-to-cbet-turn'],
+      ['river-cbet', 'cbet-river', 'fold-to-cbet-river'],
+      ['flop-check-raise', 'check-raise-flop', undefined],
+    ] as const) {
+      const chance = await statsOf(fact(`${action}-chance:true`));
+      const did = await statsOf(fact(`${action}-did:true`));
+      expect(chance.hands, action).toBe(everything[stat].opportunities);
+      expect(chance.stats[stat], action).toEqual(everything[stat]);
+      expect(did.hands, action).toBe(everything[stat].taken);
+      if (fold) {
+        const faced = await statsOf(fact(`${action}-faced:true`));
+        const folded = await statsOf(fact(`${action}-answer:fold`));
+        expect(faced.hands, action).toBe(everything[fold].opportunities);
+        expect(faced.stats[fold], action).toEqual(everything[fold]);
+        expect(folded.hands, action).toBe(everything[fold].taken);
+      }
+    }
+    expect(everything['check-raise-flop'].taken).toBe(1);
+  }, 60_000);
+
   it('rejects an unknown fact, an impossible value or a malformed range', async () => {
     const account = await newAccount(running.httpServer);
     for (const criterion of [

@@ -1025,6 +1025,116 @@ describe('LibraryPage', () => {
 
       expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
     })
+
+    describe('at phone width', () => {
+      /** The screen's width, as `matchMedia` answers the 760 px breakpoint; changing it tells whoever listens. */
+      let narrow: boolean
+      const listeners = new Set<() => void>()
+      const resize = (toNarrow: boolean) =>
+        act(() => {
+          narrow = toNarrow
+          listeners.forEach((changed) => changed())
+        })
+
+      beforeEach(() => {
+        narrow = true
+        listeners.clear()
+        vi.stubGlobal('matchMedia', (query: string) => ({
+          get matches() {
+            return query === '(max-width: 760px)' && narrow
+          },
+          addEventListener: (_: string, changed: () => void) => listeners.add(changed),
+          removeEventListener: (_: string, changed: () => void) => listeners.delete(changed),
+        }))
+      })
+
+      it('applies and drops them from the side column, which says where to create and edit them', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+
+        expect(within(list).getByText('Create and edit filters on a computer.')).toBeTruthy()
+        expect(within(filters).queryByRole('button', { name: /^More filters/ })).toBeNull()
+
+        await userEvent.click(within(list).getByRole('button', { name: '3-bet OOP como caller' }))
+
+        expect(window.location.search).toBe('?period=all&site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO&saved=sf1')
+        await waitFor(() => expect(lastFilterQuery()).toBe('site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO'))
+        // The chip names it and drops it, and opens nothing.
+        expect(within(filters).queryByRole('button', { name: /^Saved filter/ })).toBeNull()
+        expect(within(filters).getByText('3-bet OOP como caller')).toBeTruthy()
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+        expect(within(list).getByRole('button', { name: '3-bet OOP como caller' }).getAttribute('aria-pressed')).toBe('false')
+
+        // Tapping the applied one again drops it too.
+        await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+        await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+      })
+
+      it('opens the Hands of a link carrying More filters criteria, with their summary and a ×, and nothing to open', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+        expect(within(filters).getByText('3-bet pot')).toBeTruthy()
+        expect(within(filters).queryByRole('button', { name: /^More filters/ })).toBeNull()
+        expect(within(await savedList()).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+        expect(window.location.search).toBe('?period=all')
+        await waitFor(() => expect(lastFilterQuery()).toBe(''))
+      })
+
+      it('offers no renaming or deleting, and shows no modified state nor its menu', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&fact=players:..4&saved=sf1')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+
+        expect(within(list).queryByRole('button', { name: 'Edit saved filters' })).toBeNull()
+        // A changed one shows as its criteria, with nothing to open.
+        expect(within(filters).getByText('3-bet pot · ≤4 players')).toBeTruthy()
+        expect(within(filters).queryByText('· modified')).toBeNull()
+        expect(within(filters).queryByRole('button', { name: /^Saved filter/ })).toBeNull()
+
+        // Widened, they are back.
+        resize(false)
+        expect(within(list).getByRole('button', { name: 'Edit saved filters' })).toBeTruthy()
+        expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' })).toBeTruthy()
+      })
+
+      it('keeps adding a Stat criterion from a Stat’s tooltip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+        const shown = await screen.findByRole('region', { name: 'Stats' })
+
+        await userEvent.hover(within(shown).getByRole('button', { name: 'VPIP 33.3%' }))
+        await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'You did it (1)' }))
+
+        await waitFor(() => expect(lastFilterQuery()).toBe('stat=vpip%3Ataken'))
+      })
+
+      it('brings everything back once the screen is wider', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        resize(false)
+
+        expect(within(list).getByRole('button', { name: 'Save filter' })).toBeTruthy()
+        expect(within(list).queryByText('Create and edit filters on a computer.')).toBeNull()
+        await userEvent.click(within(filters).getByRole('button', { name: /^More filters: / }))
+        expect(screen.getByRole('dialog', { name: 'More filters' })).toBeTruthy()
+
+        // Narrowed again, the panel goes with the rest.
+        resize(true)
+        expect(screen.queryByRole('dialog', { name: 'More filters' })).toBeNull()
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+      })
+    })
   })
 
   describe('filters', () => {

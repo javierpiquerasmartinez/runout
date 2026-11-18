@@ -1134,6 +1134,7 @@ export const es = {
   'library.moreFilters.save': 'Guardar filtro…',
   'library.moreFilters.chip.saved': 'Filtro guardado {name}',
   'library.savedFilters': 'Filtros guardados',
+  'library.savedFilters.elsewhere': 'Crea y edita filtros desde el ordenador.',
   'library.savedFilters.save': 'Guardar filtro',
   'library.saveFilter.title': 'Guardar filtro',
   'library.saveFilter.name': 'Nombre',

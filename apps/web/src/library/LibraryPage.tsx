@@ -57,6 +57,7 @@ import {
 import { LibraryTags, TagSelection } from './LibraryTags'
 import { SaveFilterDialog } from './SaveFilterDialog'
 import { SavedFiltersList } from './SavedFiltersList'
+import { useBuildsFilters } from './buildsFilters'
 import {
   applySavedFilter,
   droppedCriteria,
@@ -118,6 +119,12 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [savedGone, setSavedGone] = useState(false)
   const [savedFiltersRevision, setSavedFiltersRevision] = useState(0)
   const [savingFilter, setSavingFilter] = useState(false)
+  // At phone width Filters are only applied and dropped: narrowing the window closes what builds them.
+  const buildsFilters = useBuildsFilters()
+  if (!buildsFilters && (moreFiltersOpen || savingFilter)) {
+    setMoreFiltersOpen(false)
+    setSavingFilter(false)
+  }
   // While the Más filtros panel is open it says how many Hands the rest of the filter keeps, besides what it keeps.
   const [handsBeforeMoreFilters, setHandsBeforeMoreFilters] = useState<{ query: string; total: number } | null>(null)
   const beforeMoreFiltersQuery = libraryFilterQuery({ ...filter, facts: [] }).toString()
@@ -284,7 +291,7 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
     setSavedFailure(null)
     replaceFilter(next)
   }
-  const openSaveFilter = hasSavedCriteria(filter) ? () => setSavingFilter(true) : undefined
+  const openSaveFilter = buildsFilters && hasSavedCriteria(filter) ? () => setSavingFilter(true) : undefined
   // A link to a Saved Filter that is gone opens with no Más filtros criteria, and says so.
   const goneSaved = savedFiltersRead !== null && filter.saved !== null && !savedFiltersRead.some((saved) => saved.id === filter.saved)
   if (goneSaved && !savedGone) setSavedGone(true)

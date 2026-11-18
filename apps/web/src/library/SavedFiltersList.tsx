@@ -3,6 +3,7 @@ import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
+import { useBuildsFilters } from './buildsFilters'
 import { CollectionName } from './LibraryTags'
 import type { SavedFilter } from './savedFilters'
 import './LibraryPage.css'
@@ -13,7 +14,9 @@ import './SavedFilters.css'
  * Account's Saved Filters after its Tags, the applied one lit. Choosing one
  * applies it; choosing the applied one again drops it. "Guardar filtro" ends
  * the list while there is something to save. The pencil renames and
- * deletes them, as the Tags' does.
+ * deletes them, as the Tags' does. At phone width (`useBuildsFilters`)
+ * they are only applied: a line ends the list instead, saying they are
+ * created and edited on a computer.
  */
 export function SavedFiltersList({
   savedFilters,
@@ -39,7 +42,13 @@ export function SavedFiltersList({
   // The Saved Filter whose deletion waits for a second click.
   const [deleting, setDeleting] = useState<string | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)
-  if (savedFilters.length === 0 && !onSave) return null
+  const builds = useBuildsFilters()
+  // Narrowed to a phone mid-edit, the list goes back to applying them.
+  if (!builds && (editing || deleting !== null)) {
+    setEditing(false)
+    setDeleting(null)
+  }
+  if (savedFilters.length === 0 && !(builds && onSave)) return null
 
   // Any refusal is said under the list, whichever change it was.
   const attempt = (change: Promise<void>) =>
@@ -60,7 +69,8 @@ export function SavedFiltersList({
         <span id={titleId} className="library__group-title ro-mono">
           {t('library.savedFilters')}
         </span>
-        {savedFilters.length > 0 &&
+        {builds &&
+          savedFilters.length > 0 &&
           (editing ? (
             <button
               type="button"
@@ -125,7 +135,8 @@ export function SavedFiltersList({
           </div>
         ),
       )}
-      {onSave && (
+      {!builds && <span className="saved-filters__elsewhere">{t('library.savedFilters.elsewhere')}</span>}
+      {builds && onSave && (
         <button type="button" className="library__collection library__tag-new" onClick={onSave}>
           <Icon name="add" size={14} />
           {t('library.savedFilters.save')}
