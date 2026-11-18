@@ -13,7 +13,7 @@ import {
   type LibraryFilter,
   type QuickRange,
 } from './libraryFilter'
-import { MoreFilters } from './MoreFilters'
+import { MoreFilters, type AppliedSavedFilter } from './MoreFilters'
 import './LibraryFilters.css'
 
 /**
@@ -28,14 +28,14 @@ export function LibraryFilters({
   options,
   onChange,
   moreFilters,
-  savedName = null,
+  saved = null,
   onSave,
 }: {
   filter: LibraryFilter
   options: LibraryPage['options']
   onChange: (filter: LibraryFilter) => void
-  /** The name of the Saved Filter applied, while unchanged: Más filtros shows it, and its × drops the whole of it. */
-  savedName?: string | null
+  /** The Saved Filter applied: Más filtros shows it, and its × drops the whole of it. */
+  saved?: AppliedSavedFilter | null
   /** Opens "Guardar filtro"; without it nothing is offered for saving. */
   onSave?: () => void
   /** Whether the Más filtros panel is open, and the counts of Hands it shows. */
@@ -118,8 +118,8 @@ export function LibraryFilters({
       <MoreFilters
         value={{ facts: filter.facts, stat: filter.stat }}
         onChange={set}
-        savedName={savedName}
-        onRemove={() => set(savedName === null ? { facts: [], stat: null } : { facts: [], stat: null, saved: null })}
+        saved={saved}
+        onRemove={() => set(saved === null ? { facts: [], stat: null } : { facts: [], stat: null, saved: null })}
         onSave={onSave}
         open={moreFilters.open}
         onOpenChange={moreFilters.onOpenChange}

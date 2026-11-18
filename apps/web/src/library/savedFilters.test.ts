@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_LIBRARY_FILTER, type LibraryFilter } from './libraryFilter'
-import { applySavedFilter, appliedSavedFilter, savedCriteriaOf, type SavedFilter } from './savedFilters'
+import { applySavedFilter, droppedCriteria, restoreSavedFilter, savedCriteriaOf, savedFilterState, type SavedFilter } from './savedFilters'
 
 const threeBet: SavedFilter = {
   id: 'sf1',
@@ -56,13 +56,33 @@ describe('Saved Filters', () => {
     expect(applySavedFilter(applySavedFilter(rest, threeBet), threeBet)).toEqual(rest)
   })
 
-  it('is the applied one while the filter holds its criteria unchanged', () => {
+  it('is applied while the filter names it, and modified once its criteria differ from the saved ones', () => {
     const applied = applySavedFilter(rest, threeBet)
 
-    expect(appliedSavedFilter(applied, [threeBet])).toBe(threeBet)
-    expect(appliedSavedFilter({ ...applied, sites: [] }, [threeBet])).toBe(threeBet)
-    expect(appliedSavedFilter({ ...applied, facts: applied.facts.slice(1) }, [threeBet])).toBeNull()
-    expect(appliedSavedFilter(applied, [])).toBeNull()
-    expect(appliedSavedFilter(rest, [threeBet])).toBeNull()
+    expect(savedFilterState(applied, [threeBet])).toEqual({ saved: threeBet, modified: false })
+    expect(savedFilterState({ ...applied, sites: [] }, [threeBet])).toEqual({ saved: threeBet, modified: false })
+    expect(savedFilterState({ ...applied, facts: applied.facts.slice(1) }, [threeBet])).toEqual({ saved: threeBet, modified: true })
+    expect(savedFilterState({ ...applied, stat: { key: 'vpip', side: 'taken' } }, [threeBet])).toEqual({ saved: threeBet, modified: true })
+    expect(savedFilterState(applied, [])).toBeNull()
+    expect(savedFilterState(rest, [threeBet])).toBeNull()
+  })
+
+  it('is unchanged again once a change is undone by hand, whatever the order the criteria come back in', () => {
+    const applied = applySavedFilter(rest, threeBet)
+    const undone = { ...applied, facts: [applied.facts[1], applied.facts[0]] }
+
+    expect(savedFilterState(undone, [threeBet])).toEqual({ saved: threeBet, modified: false })
+  })
+
+  it('discarding the changes goes back to the saved criteria and keeps it applied', () => {
+    const changed: LibraryFilter = { ...applySavedFilter(rest, threeBet), facts: [], stat: { key: 'pfr', side: 'taken' } }
+
+    expect(restoreSavedFilter(changed, threeBet)).toEqual(applySavedFilter(rest, threeBet))
+  })
+
+  it('counts the criteria dropped when it was read, by the server or by the Library', () => {
+    expect(droppedCriteria(threeBet)).toBe(0)
+    expect(droppedCriteria({ ...threeBet, dropped: 2 })).toBe(2)
+    expect(droppedCriteria({ ...threeBet, criteria: { facts: ['pot-type:3-bet', 'no-such-fact:x'], stat: 'nope:taken' } })).toBe(2)
   })
 })
