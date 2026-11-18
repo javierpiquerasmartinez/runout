@@ -729,6 +729,15 @@ describe('Replay: the Hero’s facts, their cards on each Street', () => {
       flopMadeHand: 'trips',
       flopKicker: 'top',
     });
+    // Two pair with one hole card on a paired Board: the Lab calls A5 on
+    // A77 top pair, and the five plays beside the aces, with K, Q, J… above
+    // it.
+    expect(dealt('Ah 5d', 'As 7c 7d')).toMatchObject({
+      flopMadeHand: 'top-pair',
+      flopKicker: 'weak',
+    });
+    // The same with the king: the highest rank not on the Board.
+    expect(dealt('Ah Kd', 'As 7c 7d').flopKicker).toBe('top');
     // A pocket pair, and a hand using both cards.
     expect(dealt('Kh Kd', 'As 7c 2d').flopKicker).toBeNull();
     expect(dealt('Ah 7d', 'As 7c 2d')).toMatchObject({

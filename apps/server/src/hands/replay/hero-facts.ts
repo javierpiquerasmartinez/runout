@@ -368,7 +368,11 @@ export type Kicker = (typeof KICKERS)[number];
 /** How many Board cards each postflop Street has dealt. */
 const BOARD_SIZE = { flop: 3, turn: 4, river: 5 } as const;
 
-/** The Made Hands that use exactly one of the Hero's cards. */
+/**
+ * The Made Hands that use exactly one of the Hero's cards. Two pair with one
+ * card on a paired Board (A5 on A77) is among them: the Lab calls it top pair,
+ * as its two pair always pairs both cards.
+ */
 const ONE_CARD_HANDS: readonly MadeHandCategory[] = [
   'top-pair',
   'middle-pair',
