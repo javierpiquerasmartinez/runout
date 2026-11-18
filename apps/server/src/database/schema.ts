@@ -22,7 +22,12 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { fromStored, type Hand, type StoredHand } from '../hands/hand.js';
+import {
+  fromStored,
+  type Hand,
+  type Stake,
+  type StoredHand,
+} from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
 import type { StoredCriteria } from '../library/saved-filter-criteria.js';
 import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
@@ -717,6 +722,45 @@ export const libraryEntries = pgTable(
   (table) => [
     primaryKey({ columns: [table.identityId, table.handId] }),
     index('library_entries_hand_id_idx').on(table.handId),
+  ],
+);
+
+/**
+ * How many Hands of each Poker Site, Hero and Stake an Account's Library
+ * holds: what the Library offers to filter by, and how many Hands it holds,
+ * without reading every Hand. Never written by the server: triggers on
+ * `library_entries` and `hands` keep it exact in the same statement that
+ * adds, removes or changes a Hand (migration 0046), and a row whose count
+ * reaches 0 is deleted.
+ */
+export const libraryTallies = pgTable(
+  'library_tallies',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    site: text('site').notNull(),
+    heroScreenName: text('hero_screen_name').notNull(),
+    /** The Stake's limit, which `hands` keeps only in its content. */
+    stakeLimit: text('stake_limit').$type<Stake['limit']>().notNull(),
+    smallBlind: integer('small_blind').notNull(),
+    bigBlind: integer('big_blind').notNull(),
+    currency: text('currency').notNull(),
+    hands: integer('hands').notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'library_tallies_pk',
+      columns: [
+        table.identityId,
+        table.site,
+        table.heroScreenName,
+        table.stakeLimit,
+        table.smallBlind,
+        table.bigBlind,
+        table.currency,
+      ],
+    }),
   ],
 );
 
