@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { and, asc, eq, gt, isNotNull } from 'drizzle-orm';
 import type { Database } from '../database/database.js';
 import { hands } from '../database/schema.js';
-import { handKey, keyOf, replaceStats, writeFacts } from './hand-store.js';
+import { handKey, keyOf, writeFacts } from './hand-store.js';
 import { fromStored, type Hand } from './hand.js';
 import { importHandHistory } from './import/import.js';
 import { heroResult } from './replay/hero-result.js';
@@ -132,7 +132,6 @@ export async function rereadHands(db: Database): Promise<RereadCount> {
         id,
         hand: columns.content,
       }));
-      await replaceStats(tx, rewritten);
       await writeFacts(tx, rewritten);
     });
     count.rewritten += changed.length;

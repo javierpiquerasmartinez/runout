@@ -172,7 +172,6 @@ async function forget(identityId: string) {
   );
   for (const table of [
     'hand_facts',
-    'hand_stats',
     'marks',
     'tag_links',
     'notes',
@@ -225,7 +224,6 @@ async function copy(identityId: string, originals: string[], cycle: string[]) {
     };
   };
   const facts = await byHand('hand_facts');
-  const stats = await byHand('hand_stats');
 
   await db.query(
     `create temp table base (i int primary key, id uuid not null)`,
@@ -260,10 +258,6 @@ async function copy(identityId: string, originals: string[], cycle: string[]) {
     await db.query(
       `insert into hand_facts (${facts.list})
        select ${facts.select} from m join hand_facts t on t.hand_id = m.old_id`,
-    );
-    await db.query(
-      `insert into hand_stats (${stats.list})
-       select ${stats.select} from m join hand_stats t on t.hand_id = m.old_id`,
     );
     await db.query(
       `insert into library_entries (identity_id, hand_id, added_at)

@@ -45,9 +45,9 @@ const NONE: StatCount = { opportunities: 0, taken: 0 };
 
 /**
  * The Hero's Stats in one Hand: for every Stat, how many opportunities they
- * had and how many they took, as the per-Stat rows (`hand_stats`) keep them.
- * The Library counts its Stats from the facts row instead (`STAT_FACTS` in
- * `library/stat-facts.ts`); both must agree until these rows are retired.
+ * had and how many they took. The Library counts its Stats from the facts
+ * row (`STAT_FACTS` in `library/stat-facts.ts`); this stays as the reference
+ * the facts' tests check those Stats against, Hand by Hand.
  */
 export function heroStats(hand: Hand): HeroStats {
   const stats = {
@@ -317,7 +317,10 @@ function reRaiseStats(
 }
 
 /** Every preflop Action, in order, with how the betting stood for it. */
-export function preflopDecisions(hand: Hand, states: TableState[]): PreflopDecision[] {
+export function preflopDecisions(
+  hand: Hand,
+  states: TableState[],
+): PreflopDecision[] {
   const decisions: PreflopDecision[] = [];
   const level = (state: TableState) =>
     Math.max(...state.players.map((player) => player.bet));

@@ -1,11 +1,10 @@
 import { and, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database, Transaction } from '../database/database.js';
-import { handFacts, handStats, hands } from '../database/schema.js';
+import { handFacts, hands } from '../database/schema.js';
 import { heroSeat, type Hand } from './hand.js';
 import type { HeroResults } from './hero-results.js';
 import { FACTS_VERSION, heroFacts } from './replay/hero-facts.js';
 import { heroOutcome, type HeroResult } from './replay/hero-result.js';
-import { heroStats, STAT_KEYS } from './replay/hero-stats.js';
 import { finalPot } from './replay/overview.js';
 
 /*
@@ -157,7 +156,6 @@ export async function fillHistoriesAndReread(
         id,
         hand: byKey.get(keyById.get(id)!)!,
       }));
-      await replaceStats(tx, rewritten);
       await writeFacts(tx, rewritten);
     }
   });
@@ -210,7 +208,6 @@ export async function storeHands(
       id: row.id,
       hand: toStore.get(rowKey(row))!,
     }));
-    await replaceStats(tx, storedHands);
     await writeFacts(tx, storedHands);
   }
   const missing = [...toStore.values()].filter((hand) => !ids.has(keyOf(hand)));
@@ -252,35 +249,6 @@ function handRow(
     handHistory: histories.get(keyOf(hand)) ?? null,
     importedAt: now,
   };
-}
-
-/**
- * Writes the Hero's Stat rows of the stored Hands given, each worked out from
- * the Hand given with it, in place of any rows they had: one per Stat they
- * had an opportunity at (see `heroStats`).
- */
-export async function replaceStats(
-  db: Database | Transaction,
-  stored: { id: string; hand: Hand }[],
-): Promise<void> {
-  if (stored.length === 0) return;
-  for (const chunk of inChunks(stored, 1)) {
-    await db.delete(handStats).where(
-      inArray(
-        handStats.handId,
-        chunk.map(({ id }) => id),
-      ),
-    );
-  }
-  const rows = stored.flatMap(({ id, hand }) => {
-    const stats = heroStats(hand);
-    return STAT_KEYS.filter((stat) => stats[stat].opportunities > 0).map(
-      (stat) => ({ handId: id, stat, ...stats[stat] }),
-    );
-  });
-  for (const chunk of inChunks(rows, 4)) {
-    await db.insert(handStats).values(chunk);
-  }
 }
 
 /** The parameters one facts row takes to write: every column, which `factsRow` sets. */

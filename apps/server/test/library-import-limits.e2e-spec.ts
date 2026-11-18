@@ -221,7 +221,7 @@ describe('How many Hands one import adds to a Library (e2e)', () => {
         .expect(500);
 
       const counts = await db.query<{ hands: string; stats: string }>(
-        'select (select count(*) from hands) as hands, (select count(*) from hand_stats) as stats',
+        'select (select count(*) from hands) as hands, (select count(*) from hand_facts) as stats',
       );
       expect(counts.rows[0]).toEqual({ hands: '0', stats: '0' });
     } finally {

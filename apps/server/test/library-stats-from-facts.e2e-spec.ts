@@ -4,6 +4,8 @@ import request from 'supertest';
 import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
+import type { Hand } from '../src/hands/hand.js';
+import { heroStats, STAT_KEYS } from '../src/hands/replay/hero-stats.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -29,9 +31,9 @@ const FIXTURES = [
 ];
 
 /*
- * The Stats are counted from each Hand's facts row (ADR 0012), which took
- * over from the per-Stat rows of `hand_stats`. Until those rows are retired,
- * this checks both sources agree on every fixture. A Hand whose facts row
+ * The Stats are counted from each Hand's facts row (ADR 0012). This checks
+ * them against the Hero's Stats worked out from each stored Hand, Stat by
+ * Stat, on every fixture. A Hand whose facts row
  * is missing or older than a Stat needs counts towards no such Stat until
  * the re-derive job reaches it.
  */
@@ -94,22 +96,23 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
     }
   }
 
-  /** The per-Stat rows of these Hands: each Stat's sums, and its Hands on each side. */
+  /** The Hero's Stats worked out from these stored Hands: each Stat's sums, and its Hands on each side. */
   async function perStatRows(ids: string[]) {
-    const rows = await withDatabase(
+    const stored = await withDatabase(
       async (db) =>
         (
-          await db.query<{
-            stat: string;
-            hand_id: string;
-            opportunities: number;
-            taken: number;
-          }>(
-            'select stat, hand_id, opportunities, taken from hand_stats where hand_id = any($1)',
+          await db.query<{ id: string; content: Hand }>(
+            'select id, content from hands where id = any($1)',
             [ids],
           )
         ).rows,
     );
+    const rows = stored.flatMap(({ id, content }) => {
+      const counts = heroStats(content);
+      return STAT_KEYS.filter((stat) => counts[stat].opportunities > 0).map(
+        (stat) => ({ stat, hand_id: id, ...counts[stat] }),
+      );
+    });
     const byStat = new Map<
       string,
       {
@@ -135,7 +138,7 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
     return byStat;
   }
 
-  it('counts every Stat as the per-Stat rows do, on every fixture', async () => {
+  it('counts every Stat as the Hero’s Stats of each Hand do, on every fixture', async () => {
     const account = await stockedAccount();
     const ids = await handIds(account.token);
     const fromFacts = await stats(account.token);
@@ -173,23 +176,6 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
       fromFacts.handsWith.afq.opportunity,
     );
   }, 120_000);
-
-  it('reads a Hand’s Stats off its facts row, not its per-Stat rows', async () => {
-    const account = await newAccount(running.httpServer);
-    await importText(
-      account.token,
-      freshHandHistory('pokerstars-showdown.txt'),
-    );
-    const before = await stats(account.token);
-    const [handId] = await handIds(account.token);
-
-    await withDatabase((db) =>
-      db.query('delete from hand_stats where hand_id = $1', [handId]),
-    );
-
-    expect(await stats(account.token)).toEqual(before);
-    expect(await handIds(account.token, 'stat=vpip:taken')).toEqual([handId]);
-  });
 
   it('counts a Hand whose facts row is missing, or older than a Stat needs, towards no such Stat until the re-derive job reaches it', async () => {
     const account = await newAccount(running.httpServer);
