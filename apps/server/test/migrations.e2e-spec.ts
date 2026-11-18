@@ -9,6 +9,7 @@ import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
 import * as schema from '../src/database/schema.js';
+import { rederiveFacts } from '../src/hands/facts-rederive.js';
 import { heroSeat } from '../src/hands/hand.js';
 import { importHandHistory } from '../src/hands/import/import.js';
 import { heroResult } from '../src/hands/replay/hero-result.js';
@@ -644,6 +645,9 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
         expect(await backfillStats(db)).toBe(4);
         once = await statRows();
         expect(await backfillStats(db)).toBe(4);
+        // Estadísticas count from the facts row, which the re-derive job
+        // gives Hands stored before it.
+        expect(await rederiveFacts(db)).toBe(4);
       } finally {
         await db.$client.end();
       }
