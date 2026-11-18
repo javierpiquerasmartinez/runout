@@ -1,5 +1,5 @@
 {
-  "id": "2fb5e2ee-0db1-427a-bbea-4debcb34fe3e",
+  "id": "6e20201b-47cf-489b-97db-6edb4e8b73a1",
   "prevId": "52033681-2f90-43c5-abe9-6125c21738d3",
   "version": "7",
   "dialect": "postgresql",
@@ -1900,65 +1900,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.hand_stats": {
-      "name": "hand_stats",
-      "schema": "",
-      "columns": {
-        "hand_id": {
-          "name": "hand_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stat": {
-          "name": "stat",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "opportunities": {
-          "name": "opportunities",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "taken": {
-          "name": "taken",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "hand_stats_hand_id_hands_id_fk": {
-          "name": "hand_stats_hand_id_hands_id_fk",
-          "tableFrom": "hand_stats",
-          "tableTo": "hands",
-          "columnsFrom": [
-            "hand_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "hand_stats_hand_id_stat_pk": {
-          "name": "hand_stats_hand_id_stat_pk",
-          "columns": [
-            "hand_id",
-            "stat"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.hands": {
       "name": "hands",
       "schema": "",
@@ -2785,94 +2726,6 @@
           "columns": [
             "identity_id",
             "hand_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.library_tallies": {
-      "name": "library_tallies",
-      "schema": "",
-      "columns": {
-        "identity_id": {
-          "name": "identity_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "site": {
-          "name": "site",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hero_screen_name": {
-          "name": "hero_screen_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stake_limit": {
-          "name": "stake_limit",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "small_blind": {
-          "name": "small_blind",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "big_blind": {
-          "name": "big_blind",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hands": {
-          "name": "hands",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "library_tallies_identity_id_identities_id_fk": {
-          "name": "library_tallies_identity_id_identities_id_fk",
-          "tableFrom": "library_tallies",
-          "tableTo": "identities",
-          "columnsFrom": [
-            "identity_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "library_tallies_pk": {
-          "name": "library_tallies_pk",
-          "columns": [
-            "identity_id",
-            "site",
-            "hero_screen_name",
-            "stake_limit",
-            "small_blind",
-            "big_blind",
-            "currency"
           ]
         }
       },

@@ -14,7 +14,6 @@ import { heroSeat } from '../src/hands/hand.js';
 import { importHandHistory } from '../src/hands/import/import.js';
 import { heroResult } from '../src/hands/replay/hero-result.js';
 import { finalPot } from '../src/hands/replay/overview.js';
-import { backfillStats } from '../src/hands/stats-backfill.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 import { fixture, withFreshHandIds } from './support/hand-histories.js';
@@ -572,7 +571,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
     };
   }
 
-  it('gives the Hands stored before Stats their Stat rows once the backfill has run, the same rows each time', async () => {
+  it('counts the Stats of Hands stored before Stats once the deploy’s backfills have run, and has nothing left to do the second time', async () => {
     await migrateUpTo('0026_rake_not_null');
     const client = new pg.Client(databaseUrl);
     await client.connect();
@@ -623,7 +622,7 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
       await migrateWith(MIGRATIONS_FOLDER);
       running = await startApp({ databaseUrl });
       // The same Hands into a Library: they are already stored, so the
-      // Library keeps them as they are, with no Stat rows yet.
+      // Library keeps them as they are, with no facts rows yet.
       const ana = await newAccount(running.httpServer);
       await importText(running, ana.token, text);
       const before = await libraryStats(running, ana.token);
@@ -634,31 +633,23 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
         client: new pg.Pool({ connectionString: databaseUrl }),
         schema,
       });
-      const statRows = async () =>
-        (
-          await client.query(
-            'select hand_id, stat, opportunities, taken from hand_stats order by hand_id, stat',
-          )
-        ).rows;
-      let once: unknown[];
       try {
-        expect(await backfillStats(db)).toBe(4);
-        once = await statRows();
-        expect(await backfillStats(db)).toBe(4);
         // Estadísticas count from the facts row, which the deploy's
         // backfills give Hands stored before it.
         const report: string[] = [];
+        await runBackfills(db, (line) => report.push(line));
         await runBackfills(db, (line) => report.push(line));
         expect(report).toEqual([
           expect.stringMatching(
             /^hand-facts: 4 Hands brought up to rules version \d+ \(\d+ ms\)$/,
           ),
+          expect.stringMatching(
+            /^hand-facts: 0 Hands brought up to rules version \d+ \(\d+ ms\)$/,
+          ),
         ]);
       } finally {
         await db.$client.end();
       }
-      expect(once.length).toBeGreaterThan(0);
-      expect(await statRows()).toEqual(once);
 
       const after = await libraryStats(running, ana.token);
       expect(after.hands).toBe(4);
