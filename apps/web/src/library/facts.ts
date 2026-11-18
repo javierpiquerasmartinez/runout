@@ -153,6 +153,55 @@ const PREFLOP_FACTS = {
   antes: { kind: 'boolean' },
 } as const
 
+// The facts of each Street after the flop is dealt (facts catalogue §3.1–3.3).
+
+/**
+ * The named Actions on each Street, as the server names them: the flop's
+ * seven, then on the turn a delayed C-bet, a probe and a float, and on the
+ * river a probe and a float. Each can be faced, so each has all four facts.
+ */
+export const STREET_ACTIONS = {
+  flop: ['cbet', 'donk-bet', 'bet', 'check-raise', 'raise', 'three-bet', 'four-bet'],
+  turn: ['cbet', 'delayed-cbet', 'donk-bet', 'probe', 'float', 'bet', 'check-raise', 'raise', 'three-bet', 'four-bet'],
+  river: ['cbet', 'donk-bet', 'probe', 'float', 'bet', 'check-raise', 'raise', 'three-bet', 'four-bet'],
+} as const
+
+export type StreetAction = (typeof STREET_ACTIONS)[keyof typeof STREET_ACTIONS][number]
+
+/** The Hero's line on a Street: X check, B bet, C call, R raise, F fold, a fold only last. */
+export const STREET_LINE = /^[XBCR]{0,30}[XBCRF]$/
+
+const yes = { kind: 'boolean' } as const
+
+/**
+ * One Street's facts, named after it (`flop-ip`, `turn-line`,
+ * `river-cbet-did`): the situation as it begins, its named Actions, the
+ * Hero's line, and the sizes. Pot and stack are in big blinds, bet sizes a
+ * whole % of the pot before the bet, raise sizes a multiple of the bet raised.
+ */
+function streetFacts<S extends keyof typeof STREET_ACTIONS>(street: S) {
+  const situation = {
+    saw: yes,
+    players: { kind: 'range', min: 2, max: 10 },
+    ip: yes,
+    first: yes,
+    pot: { kind: 'range', min: 0, max: 99_999_999, decimals: 2 },
+    'effective-stack': { kind: 'range', min: 0, max: 99_999_999, decimals: 2 },
+    spr: { kind: 'range', min: 0, max: 99_999_999, decimals: 1 },
+    'all-in': yes,
+    line: { kind: 'pattern', pattern: STREET_LINE },
+    'bet-size': { kind: 'range', min: 0, max: 1_000_000 },
+    'raise-size': { kind: 'range', min: 0, max: 999_999, decimals: 2 },
+    'bet-size-faced': { kind: 'range', min: 0, max: 1_000_000 },
+    'raise-size-faced': { kind: 'range', min: 0, max: 999_999, decimals: 2 },
+  } as const
+  const facts: Record<string, FactDomain> = { ...situation }
+  for (const action of STREET_ACTIONS[street]) Object.assign(facts, actionFacts(action, true))
+  return Object.fromEntries(Object.entries(facts).map(([name, domain]) => [`${street}-${name}`, domain])) as {
+    [K in keyof typeof situation as `${S}-${K}`]: (typeof situation)[K]
+  } & ActionFacts<`${S}-${(typeof STREET_ACTIONS)[S][number]}`, true>
+}
+
 /** How a fact's values are written, and which ones it can take. */
 export type FactDomain =
   | { kind: 'set'; values: readonly string[] }
@@ -228,6 +277,9 @@ export const FACTS = {
   result: BIG_BLINDS,
   'all-in-ev': BIG_BLINDS,
   ...PREFLOP_FACTS,
+  ...streetFacts('flop'),
+  ...streetFacts('turn'),
+  ...streetFacts('river'),
 } as const satisfies Record<string, FactDomain>
 
 export type FactKey = keyof typeof FACTS
