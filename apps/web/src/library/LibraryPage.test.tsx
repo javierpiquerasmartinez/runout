@@ -591,7 +591,7 @@ describe('LibraryPage', () => {
         'Table', 'Preflop', 'Flop', 'Turn', 'River', 'Cards', 'Board', 'Result', 'Stat',
       ])
       // Their criteria are still to come.
-      expect(within(panel).getByRole('tab', { name: 'Flop' }).hasAttribute('disabled')).toBe(true)
+      expect(within(panel).getByRole('tab', { name: 'Cards' }).hasAttribute('disabled')).toBe(true)
 
       await userEvent.click(within(criterion(panel, 'Pot type')).getByRole('button', { name: '3-bet' }))
       await userEvent.click(within(criterion(panel, 'Pot type')).getByRole('button', { name: '4-bet' }))
@@ -756,6 +756,90 @@ describe('LibraryPage', () => {
       })
     })
 
+    describe('the Street branches', () => {
+      /** The panel on a Street's branch. */
+      async function openStreet(name: 'Flop' | 'Turn' | 'River') {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name }))
+        return panel
+      }
+
+      it('sets where the Hero sat as the Street began, heads-up or multiway, and the SPR', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        const situation = within(panel).getByRole('group', { name: 'Situation as the flop begins' })
+
+        await userEvent.click(within(criterion(situation, 'Position')).getByRole('button', { name: 'Out of position (OOP)' }))
+        await userEvent.click(within(criterion(situation, 'Players')).getByRole('button', { name: 'Multiway' }))
+        expect(lastFilterQuery()).toBe('fact=flop-ip%3Afalse&fact=flop-players%3A3..')
+
+        await userEvent.click(within(criterion(situation, 'Players')).getByRole('button', { name: 'Heads-up' }))
+        expect(within(criterion(situation, 'Players')).getByRole('button', { name: 'Multiway' }).getAttribute('aria-pressed')).toBe('false')
+        expect(lastFilterQuery()).toBe('fact=flop-ip%3Afalse&fact=flop-players%3A2..2')
+
+        await userEvent.click(within(criterion(situation, 'Players')).getByRole('switch', { name: /^Exclude Players \(flop\)/ }))
+        await userEvent.type(within(criterion(situation, 'SPR')).getByRole('spinbutton', { name: 'SPR (flop), to' }), '1.5')
+        expect(lastFilterQuery()).toBe('fact=flop-ip%3Afalse&fact=%21flop-players%3A2..2&fact=flop-spr%3A..1.5')
+        expect(within(panel).getByRole('tab', { name: 'Flop, 3 criteria' })).toBeTruthy()
+      })
+
+      it('sets a named Action, faced and answered, the Hero’s line, and a size as a % of the pot', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        const cbet = criterion(panel, 'C-bet')
+
+        await userEvent.click(within(cbet).getByRole('button', { name: 'I faced it' }))
+        const answered = within(cbet).getByRole('group', { name: 'C-bet (flop), I answered' })
+        await userEvent.click(within(answered).getByRole('button', { name: 'call' }))
+        await userEvent.click(within(answered).getByRole('button', { name: 'raise' }))
+        await userEvent.click(within(criterion(panel, 'My line')).getByRole('button', { name: 'XC' }))
+        await userEvent.type(within(criterion(panel, 'My line')).getByRole('textbox', { name: 'My line (flop), another line' }), 'xrc{Enter}')
+        await userEvent.type(within(criterion(panel, 'Bet I faced')).getByRole('spinbutton', { name: 'Bet I faced (flop), from' }), '75')
+
+        expect(lastFilterQuery()).toBe('fact=flop-cbet-answer%3Acall%2Craise&fact=flop-line%3AXC%2CXRC&fact=flop-bet-size-faced%3A75..')
+        expect(within(criterion(panel, 'Bet I faced')).getByText('% of the pot')).toBeTruthy()
+      })
+
+      it('offers each Street’s own named Actions only', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        const actions = () =>
+          within(within(panel).getByRole('group', { name: 'Action' }))
+            .getAllByRole('group')
+            .filter((group) => within(group).queryByRole('button', { name: 'I made it' }))
+            .map((group) => group.querySelector('.more-filters__label')?.textContent)
+
+        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Turn' }))
+        expect(actions()).toEqual(['C-bet', 'Delayed C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        await userEvent.click(within(panel).getByRole('tab', { name: 'River' }))
+        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+      })
+
+      it('describes one line through the same Hand with criteria on two Streets', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        await userEvent.click(within(criterion(panel, 'C-bet')).getByRole('button', { name: 'I made it' }))
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Turn' }))
+        await userEvent.click(within(criterion(panel, 'Raise')).getByRole('button', { name: 'I faced it' }))
+
+        // Both go to the API, which keeps the Hands meeting every criterion.
+        expect(lastFilterQuery()).toBe('fact=flop-cbet-did%3Atrue&fact=turn-raise-faced%3Atrue')
+        await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Flop: C-bet made · Turn: Faced a raise')
+      })
+
+      it('reads its criteria from the address, in the chip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=flop-ip:false&fact=flop-cbet-answer:call,raise&fact=!river-players:3..')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe(
+          'Flop: OOP · Flop: Faced a C-bet → call, raise+1',
+        )
+      })
+    })
+
     it('explains a criterion the pot types picked never meet', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
       const panel = await openPanel()
@@ -831,6 +915,8 @@ describe('LibraryPage', () => {
       // The arrows skip the branches that have nothing to offer yet, and wrap.
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Preflop' }))
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'River' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Board' }))
       await userEvent.keyboard('{ArrowDown}')

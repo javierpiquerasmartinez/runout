@@ -143,3 +143,24 @@ describe('branchCounts on preflop', () => {
     expect(counts.preflop).toBe(3)
   })
 })
+
+describe('criterionSummaries on a Street’s branch', () => {
+  it('reads heads-up and multiway as such, sizes in their unit, and a Street’s named Actions as preflop’s', () => {
+    const criteria: FactCriterion[] = [
+      { fact: 'turn-raise-size-faced', exclude: false, range: { min: 3, max: null } },
+      { fact: 'flop-players', exclude: true, range: { min: 3, max: null } },
+      { fact: 'turn-players', exclude: false, range: { min: 3, max: 4 } },
+      { fact: 'flop-donk-bet-chance', exclude: false, values: ['true'] },
+      { fact: 'river-pot', exclude: false, range: { min: 10.5, max: 40 } },
+    ]
+
+    expect(criterionSummaries(criteria, t)).toEqual([
+      'Flop: Excepto multiway',
+      'Flop: Pude hacer donk bet',
+      'Turn: 3–4 jugadores',
+      'Turn: enfrento raise de 3+×',
+      'River: bote de 10.5–40 bb',
+    ])
+    expect(branchCounts(criteria)).toMatchObject({ flop: 2, turn: 2, river: 1 })
+  })
+})

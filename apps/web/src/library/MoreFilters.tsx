@@ -454,24 +454,40 @@ function CriterionControlFor({
               <OptionButton
                 key={value}
                 pressed={picked}
-                label={t(value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no')}
+                label={t(control.labels?.[value] ?? (value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no'))}
                 onClick={() => onPut(picked ? null : { fact, exclude, values: [value] })}
               />
             )
           })}
         </>
       )
-    case 'range':
+    case 'range': {
+      const range = criterion && 'range' in criterion ? criterion.range : null
       return (
-        <RangeControl
-          label={label}
-          min={control.min}
-          max={control.max}
-          decimals={control.decimals ?? 0}
-          criterion={criterion}
-          onPut={(range) => onPut(range && { fact, exclude, range })}
-        />
+        <>
+          {control.presets?.map((preset) => {
+            const picked = range !== null && range.min === preset.range.min && range.max === preset.range.max
+            return (
+              <OptionButton
+                key={preset.label}
+                pressed={picked}
+                label={t(preset.label)}
+                onClick={() => onPut(picked ? null : { fact, exclude, range: preset.range })}
+              />
+            )
+          })}
+          <RangeControl
+            label={label}
+            min={control.min}
+            max={control.max}
+            decimals={control.decimals ?? 0}
+            criterion={criterion}
+            onPut={(range) => onPut(range && { fact, exclude, range })}
+          />
+          {control.unit && <span className="more-filters__dim">{t(`library.moreFilters.unit.${control.unit}`)}</span>}
+        </>
       )
+    }
     case 'line':
       return (
         <LineControl
