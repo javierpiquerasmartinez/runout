@@ -25,7 +25,7 @@ import {
   STREET_DRAWS,
   STREETS,
 } from '../hands/replay/hero-facts.js';
-import type { PostflopStreet } from '../hands/replay/street-situation.js';
+import type { PostflopStreet } from '../hands/replay/street-start.js';
 import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
 import {
   ANSWERS,

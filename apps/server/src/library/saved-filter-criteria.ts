@@ -4,7 +4,7 @@ import { parseLibraryFilter } from './library-filter.js';
 /**
  * What a Saved Filter keeps: the Más filtros part of a Filter (CONTEXT.md,
  * Saved Filter), never the period, Poker Sites, Heroes, Stakes, Marks or
- * Tags. Each criterion is written as the Library's query writes it: `facts`
+ * Tags. Each criterion is written as the Library's address writes it: `facts`
  * as `fact` values (`!hero-position:BB`), `stat` as the `stat` value
  * (`vpip:taken`), so the web applies them as they come.
  */
@@ -48,7 +48,7 @@ export function storedCriteria(criteria: SavedCriteria): StoredCriteria {
 
 /**
  * The criteria of a stored document, without any on a fact or Stat the
- * Library no longer knows: `dropped` says how many, so the player is told.
+ * Library no longer knows: `dropped` says how many, so the Account is told.
  */
 export function readSavedCriteria(stored: StoredCriteria): {
   criteria: SavedCriteria;
@@ -62,7 +62,7 @@ export function readSavedCriteria(stored: StoredCriteria): {
   return { criteria: { facts, stat }, dropped };
 }
 
-/** Whether the Library's query would accept these criteria. */
+/** Whether the Library's address would accept these criteria. */
 function readable(facts: string[], stat: string | null): boolean {
   try {
     parseLibraryFilter(stat === null ? { fact: facts } : { fact: facts, stat });

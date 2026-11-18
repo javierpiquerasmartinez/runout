@@ -19,11 +19,11 @@ import {
 import { positions, type Position } from './positions.js';
 import {
   POSTFLOP_STREETS,
-  streetSituations,
+  streetStarts,
+  type ActionWithTable,
   type PostflopStreet,
-  type StreetSituation,
-  type StreetStep,
-} from './street-situation.js';
+  type StreetStart,
+} from './street-start.js';
 import {
   preflopFacts,
   type Answer,
@@ -528,7 +528,7 @@ export interface StreetFacts {
   first: boolean | null;
   /** In big blinds as it began, to two decimals. */
   pot: number | null;
-  /** In big blinds as it began, to two decimals; see `StreetSituation`. */
+  /** In big blinds as it began, to two decimals; see `StreetStart`. */
   effectiveStack: number | null;
   /** The effective stack over the pot as it began, to one decimal. */
   spr: number | null;
@@ -580,11 +580,11 @@ export function onStreet<S extends PostflopStreet, T extends object>(
 }
 
 function postflopFacts(hand: Hand): PostflopFacts {
-  const situations = streetSituations(hand);
-  const actions = streetActions(hand, situations);
+  const starts = streetStarts(hand);
+  const actions = streetActions(hand, starts);
   const facts = POSTFLOP_STREETS.map((street) =>
     onStreet(street, {
-      ...streetFacts(hand, situations[street]),
+      ...streetFacts(hand, starts[street]),
       ...actions[street],
     }),
   );
@@ -601,9 +601,9 @@ const LETTERS: Record<Action['type'], string> = {
 
 function streetFacts(
   hand: Hand,
-  situation: StreetSituation | null,
+  start: StreetStart | null,
 ): StreetFacts {
-  if (!situation) {
+  if (!start) {
     return {
       saw: false,
       players: null,
@@ -626,30 +626,30 @@ function streetFacts(
   }
   const hero = hand.hero.screenName;
   const bb = (amount: number) => round(amount / hand.stake.bigBlind, 2);
-  const { start, steps } = situation;
-  const own = steps.filter((step) => step.action.screenName === hero);
+  const { dealt, actions } = start;
+  const own = actions.filter((played) => played.action.screenName === hero);
   const count = (type: Action['type']) =>
-    own.filter((step) => step.action.type === type).length;
+    own.filter((played) => played.action.type === type).length;
   // Faced: an opponent's, with the Hero still to answer it on the Street.
   const faced = (type: Action['type']) =>
-    steps.find(
-      (step, index) =>
-        step.action.type === type &&
-        step.action.screenName !== hero &&
-        steps.slice(index + 1).some((s) => s.action.screenName === hero),
+    actions.find(
+      (played, index) =>
+        played.action.type === type &&
+        played.action.screenName !== hero &&
+        actions.slice(index + 1).some((a) => a.action.screenName === hero),
     );
   return {
     saw: true,
-    players: situation.inHand.length,
-    ip: situation.heroIp,
-    first: situation.heroFirst,
-    pot: bb(start.pot),
-    effectiveStack: bb(situation.effectiveStack),
-    spr: round(situation.effectiveStack / start.pot, 1),
-    allIn: situation.heroAllIn,
-    line: own.map((step) => LETTERS[step.action.type]).join('') || null,
-    betSize: betSize(own.find((step) => step.action.type === 'bet')),
-    raiseSize: raiseSize(own.find((step) => step.action.type === 'raise')),
+    players: start.inHand.length,
+    ip: start.heroIp,
+    first: start.heroFirst,
+    pot: bb(dealt.pot),
+    effectiveStack: bb(start.effectiveStack),
+    spr: round(start.effectiveStack / dealt.pot, 1),
+    allIn: start.heroAllIn,
+    line: own.map((played) => LETTERS[played.action.type]).join('') || null,
+    betSize: betSize(own.find((played) => played.action.type === 'bet')),
+    raiseSize: raiseSize(own.find((played) => played.action.type === 'raise')),
     betSizeFaced: betSize(faced('bet')),
     raiseSizeFaced: raiseSize(faced('raise')),
     bets: count('bet'),
@@ -660,16 +660,16 @@ function streetFacts(
 }
 
 /** A bet as a whole % of the pot before it. */
-function betSize(step: StreetStep | undefined): number | null {
-  if (step?.action.type !== 'bet') return null;
-  return round((step.action.amount / step.before.pot) * 100, 0);
+function betSize(played: ActionWithTable | undefined): number | null {
+  if (played?.action.type !== 'bet') return null;
+  return round((played.action.amount / played.before.pot) * 100, 0);
 }
 
 /** A raise's total as a multiple of the bet or raise it raised. */
-function raiseSize(step: StreetStep | undefined): number | null {
-  if (step?.action.type !== 'raise') return null;
-  const raised = Math.max(...step.before.players.map((p) => p.bet));
-  return round(step.action.to / raised, 2);
+function raiseSize(played: ActionWithTable | undefined): number | null {
+  if (played?.action.type !== 'raise') return null;
+  const raised = Math.max(...played.before.players.map((p) => p.bet));
+  return round(played.action.to / raised, 2);
 }
 
 function round(value: number, decimals: number): number {
