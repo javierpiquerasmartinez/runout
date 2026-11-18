@@ -294,11 +294,14 @@ const RESULT: CriterionDefinition[] = [
 
 // The Preflop branch (facts catalogue §1–2), and the named Actions every Street's branch shares.
 
-/** A named Action, as its row and summary name it: `library.moreFilters.action.<name>`. */
-export type ActionName = PreflopAction | StreetAction
+/**
+ * A named Action, as its row and summary name it: `library.moreFilters.action.<name>`.
+ * A Street's `four-bet` is named `four-bet-plus`, as it keeps any raise from the 4-bet on.
+ */
+export type ActionName = PreflopAction | StreetAction | 'four-bet-plus'
 
 /** One an opponent can make against the Hero; `library.moreFilters.action.<name>.faced` says it with its article. */
-type FacedActionName = (typeof FACED_PREFLOP_ACTIONS)[number] | StreetAction
+type FacedActionName = (typeof FACED_PREFLOP_ACTIONS)[number] | StreetAction | 'four-bet-plus'
 
 /** What the Hero did with a named Action: made it, had the chance, faced it, or faced it and answered. */
 export const ACTION_SIDES = ['did', 'chance', 'faced', 'answer'] as const
@@ -434,7 +437,9 @@ function streetBranch(street: Street): CriterionDefinition[] {
     sized('spr', situation),
     { fact: fact('saw'), section: situation, control: yesOrNo },
     { fact: fact('all-in'), section: situation, control: yesOrNo },
-    ...STREET_ACTIONS[street].map((action) => namedAction(`${street}-${action}`, action, true, 'action')),
+    ...STREET_ACTIONS[street].map((action) =>
+      namedAction(`${street}-${action}`, action === 'four-bet' ? 'four-bet-plus' : action, true, 'action'),
+    ),
     { fact: fact('line'), section: 'action', control: { kind: 'line', common: COMMON_STREET_LINES, pattern: STREET_LINE } },
     sized('bet-size', 'sizes', 'pot'),
     sized('raise-size', 'sizes', 'times'),

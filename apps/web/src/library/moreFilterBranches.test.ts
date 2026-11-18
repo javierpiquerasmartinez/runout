@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTranslator } from '../i18n/translator'
 import type { FactCriterion } from './facts'
-import { branchCounts, chipSummary, criterionSummaries, inapplicableReason } from './moreFilterBranches'
+import { branchCounts, chipSummary, criterionLabel, criterionSummaries, inapplicableReason } from './moreFilterBranches'
 
 const { t } = createTranslator('es')
 const en = createTranslator('en').t
@@ -265,5 +265,20 @@ describe('criterionSummaries on a Street’s branch', () => {
       'River: bote de 10.5–40 bb',
     ])
     expect(branchCounts(criteria)).toMatchObject({ flop: 2, turn: 2, river: 1 })
+  })
+
+  it('names a Street’s 4-bet a 4-bet or more, as it keeps any raise from the 4-bet on', () => {
+    expect(criterionLabel('flop-four-bet-did', t)).toBe('4-bet+')
+    expect(criterionLabel('four-bet-did', en)).toBe('4-bet')
+    expect(criterionLabel('five-bet-did', en)).toBe('5-bet+')
+    expect(
+      criterionSummaries(
+        [
+          { fact: 'river-four-bet-did', exclude: false, values: ['true'] },
+          { fact: 'turn-four-bet-answer', exclude: false, values: ['fold'] },
+        ],
+        en,
+      ).every((line) => line.includes('4-bet+')),
+    ).toBe(true)
   })
 })

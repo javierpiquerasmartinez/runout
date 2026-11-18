@@ -966,11 +966,11 @@ describe('LibraryPage', () => {
             .filter((group) => within(group).queryByRole('button', { name: 'I made it' }))
             .map((group) => group.querySelector('.more-filters__label')?.textContent)
 
-        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet+'])
         await userEvent.click(within(panel).getByRole('tab', { name: 'Turn' }))
-        expect(actions()).toEqual(['C-bet', 'Delayed C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        expect(actions()).toEqual(['C-bet', 'Delayed C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet+'])
         await userEvent.click(within(panel).getByRole('tab', { name: 'River' }))
-        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet+'])
       })
 
       it('describes one line through the same Hand with criteria on two Streets', async () => {
