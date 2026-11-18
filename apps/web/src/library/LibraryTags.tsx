@@ -125,7 +125,7 @@ export function LibraryTags<T extends Pick<Tag, 'id' | 'name'>>({
         ) : (
           <div key={tag.id} className="library__tag-edit">
             <TagSwatch tagId={tag.id} />
-            <TagName
+            <CollectionName
               label={t('library.tag.rename', { name: tag.name })}
               initial={tag.name}
               onSubmit={(name) => (name === tag.name ? Promise.resolve(true) : attempt(onRename(tag.id, name)))}
@@ -142,7 +142,7 @@ export function LibraryTags<T extends Pick<Tag, 'id' | 'name'>>({
       {creating ? (
         <div className="library__tag-edit">
           <Icon name="add" size={14} />
-          <TagName
+          <CollectionName
             label={t('library.tag.name')}
             initial=""
             autoFocus
@@ -168,8 +168,8 @@ export function LibraryTags<T extends Pick<Tag, 'id' | 'name'>>({
   )
 }
 
-/** A Tag's name being written: Enter keeps it, Escape leaves it. */
-function TagName({
+/** A Tag's or a Saved Filter's name being written: Enter keeps it, Escape leaves it. */
+export function CollectionName({
   label,
   initial,
   autoFocus,

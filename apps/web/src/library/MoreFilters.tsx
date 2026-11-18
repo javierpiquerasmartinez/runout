@@ -1,10 +1,13 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { Fragment, lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { useI18n } from '../i18n'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { Toggle } from '../ui/Toggle'
-import { writeFactCriterion, type FactCriterion, type FactKey } from './facts'
+import { ANSWERS, writeFactCriterion, rangeNumber, type FactCriterion, type FactKey } from './facts'
+import type { LibraryFilter, StatCriterion, StatSide } from './libraryFilter'
 import {
+  ACTION_SIDES,
+  actionSide,
   BRANCH_CRITERIA,
   BRANCHES,
   branchCounts,
@@ -15,11 +18,26 @@ import {
   definitionOf,
   inapplicableReason,
   inBranchOrder,
+  rowFacts,
+  statSummary,
+  type ActionSide,
   type Branch,
+  type CriterionControl,
   type CriterionDefinition,
   type Section,
 } from './moreFilterBranches'
+import { useBuildsFilters } from './buildsFilters'
+import type { SavedCriteria } from './savedFilters'
+import { STAT_GROUPS, STAT_TILES } from './stats'
 import './MoreFilters.css'
+
+/** The Lab's matrix, for the hole cards: fetched once the Cards branch is opened, never with the page. */
+const HandClassMatrix = lazy(() => import('./HandClassMatrix'))
+
+/** What Más filtros sets: the criteria on the Hero's facts, and the Stat criterion. */
+export type MoreFiltersCriteria = Pick<LibraryFilter, 'facts' | 'stat'>
+
+const NONE: MoreFiltersCriteria = { facts: [], stat: null }
 
 /** How many characters of summary the chip shows before it counts the rest as "+N". */
 const CHIP_BUDGET = 56
@@ -31,19 +49,19 @@ const CHIP_BUDGET = 56
  * Apply. Escape, "Listo", the × or a click outside close it.
  */
 export function MoreFilters({
-  criteria,
+  value,
   onChange,
   open,
   onOpenChange,
   count,
-  savedName = null,
-  onRemove = () => onChange([]),
+  saved = null,
+  onRemove = () => onChange(NONE),
   onSave,
 }: {
-  criteria: FactCriterion[]
-  onChange: (criteria: FactCriterion[]) => void
-  /** The name of the Saved Filter applied, while its criteria are unchanged: the chip shows it instead of their summary. */
-  savedName?: string | null
+  value: MoreFiltersCriteria
+  onChange: (value: MoreFiltersCriteria) => void
+  /** The Saved Filter applied: the chip shows its name instead of the criteria's summary, and, once modified, a menu. */
+  saved?: AppliedSavedFilter | null
   /** What the chip's × drops; by default every criterion. */
   onRemove?: () => void
   /** Without it the panel offers no "Guardar filtro…". */
@@ -55,34 +73,69 @@ export function MoreFilters({
 }) {
   const root = useRef<HTMLSpanElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const builds = useBuildsFilters()
+  // The menu is only for a modified Saved Filter, and not on a phone; changed back, or saved, it goes.
+  const showMenu = builds && menuOpen && saved?.modified === true
 
   const close = () => {
     onOpenChange(false)
     trigger.current?.focus()
   }
+  const closeMenu = () => {
+    setMenuOpen(false)
+    trigger.current?.focus()
+  }
 
   useEffect(() => {
-    if (!open) return
+    if (!open && !showMenu) return
     const closeOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) onOpenChange(false)
+      if (root.current?.contains(event.target as Node)) return
+      onOpenChange(false)
+      setMenuOpen(false)
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
-  }, [open, onOpenChange])
+  }, [open, showMenu, onOpenChange])
+
+  // A phone has no modified state: a changed Saved Filter shows as its criteria.
+  if (!builds) return <AppliedChip value={value} savedName={saved && !saved.modified ? saved.name : null} onRemove={onRemove} />
 
   return (
     <span className="more-filters" ref={root}>
       <MoreFiltersChip
-        criteria={criteria}
-        savedName={savedName}
+        value={value}
+        saved={saved}
         trigger={trigger}
         open={open}
-        onOpen={() => onOpenChange(!open)}
+        menuOpen={showMenu}
+        onOpen={() => {
+          if (saved?.modified) {
+            setMenuOpen(!showMenu)
+            return
+          }
+          onOpenChange(!open)
+        }}
         onRemove={onRemove}
-      />
+      >
+        {showMenu && saved && (
+          <SavedFilterMenu
+            saved={saved}
+            onClose={closeMenu}
+            onEdit={() => {
+              setMenuOpen(false)
+              onOpenChange(true)
+            }}
+            onPick={(action) => {
+              closeMenu()
+              action()
+            }}
+          />
+        )}
+      </MoreFiltersChip>
       {open && (
         <MoreFiltersPanel
-          criteria={criteria}
+          value={value}
           onChange={onChange}
           count={count}
           onClose={close}
@@ -99,26 +152,44 @@ export function MoreFilters({
   )
 }
 
+/** The Saved Filter applied, as the Más filtros chip shows it, and what its menu does once it is modified. */
+export interface AppliedSavedFilter {
+  name: string
+  modified: boolean
+  /** Its criteria as saved, written as the address writes them, so the chip's list can tell which are new. */
+  criteria: SavedCriteria
+  onSaveChanges: () => void
+  onSaveAsNew: () => void
+  onDiscard: () => void
+}
+
 function MoreFiltersChip({
-  criteria,
-  savedName,
+  value,
+  saved,
   trigger,
   open,
+  menuOpen,
   onOpen,
   onRemove,
+  children,
 }: {
-  criteria: FactCriterion[]
-  savedName: string | null
+  value: MoreFiltersCriteria
+  saved: AppliedSavedFilter | null
   trigger: RefObject<HTMLButtonElement | null>
   open: boolean
+  menuOpen: boolean
   onOpen: () => void
   onRemove: () => void
+  /** The modified Saved Filter's menu, placed under the chip. */
+  children?: ReactNode
 }) {
   const { t } = useI18n()
   const [listing, setListing] = useState(false)
   const tooltipId = useId()
-  const summaries = criterionSummaries(criteria, t)
+  // The Stat criterion is the Estadística branch's, the last.
+  const summaries = [...criterionSummaries(value.facts, t), ...(value.stat ? [statSummary(value.stat, t)] : [])]
 
+  const savedName = saved?.name ?? null
   if (summaries.length === 0 && savedName === null) {
     return (
       <button type="button" ref={trigger} className="more-filters__idle" aria-expanded={open} onClick={onOpen}>
@@ -129,9 +200,11 @@ function MoreFiltersChip({
   }
 
   const { text, more } = chipSummary(summaries, CHIP_BUDGET)
-  const branchOf = (criterion: FactCriterion) => definitionOf(criterion.fact)!.branch
   // As the summaries are, line for line.
-  const ordered = inBranchOrder(criteria)
+  const branches: Branch[] = [
+    ...inBranchOrder(value.facts).map((criterion) => definitionOf(criterion.fact)!.branch),
+    ...(value.stat ? (['stat'] as const) : []),
+  ]
   return (
     <span className="more-filters__chip" onMouseEnter={() => setListing(true)} onMouseLeave={() => setListing(false)}>
       <button
@@ -139,11 +212,12 @@ function MoreFiltersChip({
         ref={trigger}
         className="more-filters__open"
         aria-label={
-          savedName === null
+          saved === null
             ? t('library.moreFilters.chip.open', { summary: summaries.join(' · ') })
-            : t('library.moreFilters.chip.saved', { name: savedName })
+            : t(saved.modified ? 'library.moreFilters.chip.savedModified' : 'library.moreFilters.chip.saved', { name: saved.name })
         }
-        aria-expanded={open}
+        aria-haspopup={saved?.modified ? 'menu' : undefined}
+        aria-expanded={saved?.modified ? menuOpen : open}
         aria-describedby={listing ? tooltipId : undefined}
         onClick={onOpen}
         onFocus={() => setListing(true)}
@@ -151,42 +225,166 @@ function MoreFiltersChip({
       >
         <Icon name={savedName === null ? 'filter' : 'saved-filter'} size={14} />
         <span className="more-filters__summary">{savedName ?? text}</span>
-        {savedName === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
+        {saved?.modified && <span className="more-filters__modified">{t('library.moreFilters.chip.modified')}</span>}
+        {saved === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
       </button>
       <span className="more-filters__sep" aria-hidden="true" />
       <button type="button" className="more-filters__remove" aria-label={t('library.moreFilters.chip.remove')} onClick={onRemove}>
         <Icon name="close" size={12} />
       </button>
-      {listing && !open && ordered.length > 0 && (
+      {listing && !open && !menuOpen && branches.length > 0 && (
         <ul className="more-filters__tip" role="tooltip" id={tooltipId}>
-          {ordered.map((criterion, index) => (
-            <li key={criterion.fact}>
-              <b>{t(`library.moreFilters.branch.${branchOf(criterion)}`)}</b> {summaries[index]}
-            </li>
-          ))}
+          {branches.map((branch, index) => {
+            const unsaved = saved?.modified ? unsavedChange(value, index, saved.criteria) : null
+            return (
+              <li key={index} className={unsaved ? 'more-filters__tip-unsaved' : undefined}>
+                <b>{t(`library.moreFilters.branch.${branch}`)}</b> {summaries[index]}
+                {unsaved && ` ${t(`library.moreFilters.chip.${unsaved}`)}`}
+              </li>
+            )
+          })}
         </ul>
       )}
+      {children}
+    </span>
+  )
+}
+
+/**
+ * Whether the chip's line (a fact criterion in branch order, then the Stat
+ * criterion) is one the Saved Filter doesn't hold: added, on something it
+ * has no criterion on, or changed, with other values.
+ */
+function unsavedChange(value: MoreFiltersCriteria, line: number, saved: SavedCriteria): 'added' | 'changed' | null {
+  const facts = inBranchOrder(value.facts)
+  if (line >= facts.length) {
+    const stat = value.stat && `${value.stat.key}:${value.stat.side}`
+    return stat === saved.stat ? null : saved.stat === null ? 'added' : 'changed'
+  }
+  const criterion = facts[line]
+  if (saved.facts.includes(writeFactCriterion(criterion))) return null
+  const fact = (text: string) => text.replace(/^!/, '').split(':')[0]
+  return saved.facts.some((text) => fact(text) === criterion.fact) ? 'changed' : 'added'
+}
+
+/**
+ * The "Biblioteca · Filtro guardado modificado" board's menu, under the
+ * chip of a modified Saved Filter: back to Más filtros, or keep the changes
+ * (over it, or as a new one), or drop them. It opens on its first item;
+ * the arrows move through them and Escape closes it.
+ */
+function SavedFilterMenu({
+  saved,
+  onClose,
+  onEdit,
+  onPick,
+}: {
+  saved: AppliedSavedFilter
+  onClose: () => void
+  onEdit: () => void
+  onPick: (action: () => void) => void
+}) {
+  const { t } = useI18n()
+  const items = useRef<(HTMLButtonElement | null)[]>([])
+  const [focused, setFocused] = useState(0)
+  useEffect(() => {
+    items.current[focused]?.focus()
+  }, [focused])
+
+  const entries: { label: string; hint?: string; act: () => void; ruled?: boolean }[] = [
+    { label: t('library.savedFilter.edit'), hint: t('library.savedFilter.edit.hint'), act: onEdit },
+    {
+      label: t('library.savedFilter.saveChanges'),
+      hint: t('library.savedFilter.saveChanges.hint', { name: saved.name }),
+      act: () => onPick(saved.onSaveChanges),
+      ruled: true,
+    },
+    { label: t('library.savedFilter.saveAsNew'), act: () => onPick(saved.onSaveAsNew) },
+    { label: t('library.savedFilter.discard'), hint: t('library.savedFilter.discard.hint'), act: () => onPick(saved.onDiscard) },
+  ]
+  const onKeyDown = (event: KeyboardEvent) => {
+    const last = entries.length - 1
+    const moves: Record<string, number> = {
+      ArrowDown: Math.min(focused + 1, last),
+      ArrowUp: Math.max(focused - 1, 0),
+      Home: 0,
+      End: last,
+    }
+    if (event.key in moves) {
+      event.preventDefault()
+      setFocused(moves[event.key])
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+    }
+  }
+
+  return (
+    <div role="menu" aria-label={t('library.savedFilter.menu', { name: saved.name })} className="more-filters__menu" onKeyDown={onKeyDown}>
+      {entries.map((entry, index) => (
+        <Fragment key={entry.label}>
+          {entry.ruled && <span className="more-filters__menu-rule" aria-hidden="true" />}
+          <button
+            type="button"
+            role="menuitem"
+            ref={(element) => {
+              items.current[index] = element
+            }}
+            className="more-filters__menu-item"
+            tabIndex={index === focused ? 0 : -1}
+            onClick={entry.act}
+          >
+            {entry.label}
+            {entry.hint && <small>{entry.hint}</small>}
+          </button>
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
+/** The chip at phone width: what is applied and a × to drop it, nothing to open; nothing while there is nothing applied. */
+function AppliedChip({ value, savedName, onRemove }: { value: MoreFiltersCriteria; savedName: string | null; onRemove: () => void }) {
+  const { t } = useI18n()
+  const summaries = [...criterionSummaries(value.facts, t), ...(value.stat ? [statSummary(value.stat, t)] : [])]
+  if (summaries.length === 0 && savedName === null) return null
+  const { text, more } = chipSummary(summaries, CHIP_BUDGET)
+  return (
+    <span className="more-filters">
+      <span className="more-filters__chip">
+        <span className="more-filters__applied">
+          <Icon name={savedName === null ? 'filter' : 'saved-filter'} size={14} />
+          <span className="more-filters__summary">{savedName ?? text}</span>
+          {savedName === null && more > 0 && <span className="more-filters__more">{t('library.moreFilters.chip.more', { count: more })}</span>}
+        </span>
+        <span className="more-filters__sep" aria-hidden="true" />
+        <button type="button" className="more-filters__remove" aria-label={t('library.moreFilters.chip.remove')} onClick={onRemove}>
+          <Icon name="close" size={12} />
+        </button>
+      </span>
     </span>
   )
 }
 
 function MoreFiltersPanel({
-  criteria,
+  value,
   onChange,
   count,
   onClose,
   onSave,
 }: {
-  criteria: FactCriterion[]
-  onChange: (criteria: FactCriterion[]) => void
+  value: MoreFiltersCriteria
+  onChange: (value: MoreFiltersCriteria) => void
   count: { hands: number | null; of: number | null }
   onClose: () => void
   onSave?: () => void
 }) {
   const { t, formatNumber } = useI18n()
   const id = useId()
-  const counts = branchCounts(criteria)
-  const offered = BRANCHES.filter((branch) => BRANCH_CRITERIA[branch].length > 0)
+  const criteria = value.facts
+  const counts = { ...branchCounts(criteria), stat: value.stat ? 1 : 0 }
+  const offered = BRANCHES.filter((branch) => branch === 'stat' || BRANCH_CRITERIA[branch].length > 0)
   const [branch, setBranch] = useState<Branch>(offered[0])
   const tabs = useRef<Partial<Record<Branch, HTMLButtonElement | null>>>({})
 
@@ -217,10 +415,18 @@ function MoreFiltersPanel({
     moveTo(next)
   }
 
-  const put = (fact: FactKey, next: FactCriterion | null) => {
-    const at = criteria.findIndex((criterion) => criterion.fact === fact)
-    if (at === -1) onChange(next ? [...criteria, next] : criteria)
-    else onChange(next ? criteria.map((criterion, index) => (index === at ? next : criterion)) : criteria.filter((_, index) => index !== at))
+  /** Puts a row's criterion, on whichever of its facts, in place of the one it held. */
+  const put = (facts: FactKey[], next: FactCriterion | null) => {
+    const at = criteria.findIndex((criterion) => facts.includes(criterion.fact))
+    const kept =
+      at === -1
+        ? next
+          ? [...criteria, next]
+          : criteria
+        : next
+          ? criteria.map((criterion, index) => (index === at ? next : criterion))
+          : criteria.filter((_, index) => index !== at)
+    onChange({ ...value, facts: kept })
   }
 
   const hands = count.hands === null ? null : formatNumber(count.hands)
@@ -292,7 +498,8 @@ function MoreFiltersPanel({
           })}
         </div>
         <div className="more-filters__main" role="tabpanel" id={`${id}-branch`} aria-labelledby={`${id}-tab-${branch}`}>
-          {sections.length === 0 && <p className="more-filters__dim">{t('library.moreFilters.soon')}</p>}
+          {branch === 'stat' && <StatBranch stat={value.stat} onPut={(stat) => onChange({ ...value, stat })} />}
+          {branch !== 'stat' && sections.length === 0 && <p className="more-filters__dim">{t('library.moreFilters.soon')}</p>}
           {sections.map(({ section, definitions }) => (
             <div className="more-filters__section" key={section} role="group" aria-labelledby={`${id}-section-${section}`}>
               <div className="more-filters__section-title ro-mono" id={`${id}-section-${section}`}>
@@ -302,9 +509,9 @@ function MoreFiltersPanel({
                 <CriterionRow
                   key={definition.fact}
                   definition={definition}
-                  criterion={criteria.find((criterion) => criterion.fact === definition.fact) ?? null}
+                  criterion={criteria.find((criterion) => rowFacts(definition).includes(criterion.fact)) ?? null}
                   criteria={criteria}
-                  onPut={(next) => put(definition.fact, next)}
+                  onPut={(next) => put(rowFacts(definition), next)}
                 />
               ))}
             </div>
@@ -312,7 +519,7 @@ function MoreFiltersPanel({
         </div>
       </div>
       <div className="more-filters__foot">
-        <Button variant="ghost" onClick={() => onChange([])}>
+        <Button variant="ghost" onClick={() => onChange(NONE)}>
           {t('library.moreFilters.removeAll')}
         </Button>
         <span className="more-filters__spacer" />
@@ -357,50 +564,7 @@ function CriterionRow({
         {label}
       </span>
       <div className="more-filters__control">
-        {control.kind === 'options' ? (
-          control.values.map((value) => {
-            const picked = criterion !== null && 'values' in criterion && criterion.values.includes(value)
-            const values = criterion && 'values' in criterion ? criterion.values : []
-            return (
-              <button
-                key={value}
-                type="button"
-                className="more-filters__option"
-                aria-pressed={picked}
-                onClick={() => {
-                  // In the order the panel offers them, whatever order they were picked in.
-                  const next = control.values.filter((each) => (each === value ? !picked : values.includes(each)))
-                  onPut(next.length > 0 ? { fact: definition.fact, exclude, values: next } : null)
-                }}
-              >
-                <span>{control.label(value, t)}</span>
-              </button>
-            )
-          })
-        ) : control.kind === 'boolean' ? (
-          (['true', 'false'] as const).map((value) => {
-            const picked = criterion !== null && 'values' in criterion && criterion.values.length === 1 && criterion.values[0] === value
-            return (
-              <button
-                key={value}
-                type="button"
-                className="more-filters__option"
-                aria-pressed={picked}
-                onClick={() => onPut(picked ? null : { fact: definition.fact, exclude, values: [value] })}
-              >
-                <span>{t(value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no')}</span>
-              </button>
-            )
-          })
-        ) : (
-          <RangeControl
-            label={fullLabel}
-            min={control.min}
-            max={control.max}
-            criterion={criterion}
-            onPut={(range) => onPut(range && { fact: definition.fact, exclude, range })}
-          />
-        )}
+        <CriterionControlFor control={control} fact={definition.fact} label={fullLabel} criterion={criterion} exclude={exclude} onPut={onPut} />
       </div>
       <span className="more-filters__exclude" data-on={exclude ? '' : undefined}>
         <span aria-hidden="true">{t('library.moreFilters.exclude')}</span>
@@ -416,6 +580,252 @@ function CriterionRow({
   )
 }
 
+/** A row's control, as its definition says. */
+function CriterionControlFor({
+  control,
+  fact,
+  label,
+  criterion,
+  exclude,
+  onPut,
+}: {
+  control: CriterionControl
+  fact: FactKey
+  label: string
+  criterion: FactCriterion | null
+  exclude: boolean
+  onPut: (criterion: FactCriterion | null) => void
+}) {
+  const { t } = useI18n()
+  const values = criterion && 'values' in criterion ? criterion.values : []
+  switch (control.kind) {
+    case 'options':
+      return (
+        <>
+          {control.values.map((value) => {
+            const picked = values.includes(value)
+            return (
+              <OptionButton
+                key={value}
+                pressed={picked}
+                label={control.label(value, t)}
+                onClick={() => {
+                  // In the order the panel offers them, whatever order they were picked in.
+                  const next = control.values.filter((each) => (each === value ? !picked : values.includes(each)))
+                  onPut(next.length > 0 ? { fact, exclude, values: next } : null)
+                }}
+              />
+            )
+          })}
+        </>
+      )
+    case 'boolean':
+      return (
+        <>
+          {(['true', 'false'] as const).map((value) => {
+            const picked = values.length === 1 && values[0] === value
+            return (
+              <OptionButton
+                key={value}
+                pressed={picked}
+                label={t(control.labels?.[value] ?? (value === 'true' ? 'library.moreFilters.value.yes' : 'library.moreFilters.value.no'))}
+                onClick={() => onPut(picked ? null : { fact, exclude, values: [value] })}
+              />
+            )
+          })}
+        </>
+      )
+    case 'range': {
+      const range = criterion && 'range' in criterion ? criterion.range : null
+      return (
+        <>
+          {control.presets?.map((preset) => {
+            const picked = range !== null && range.min === preset.range.min && range.max === preset.range.max
+            return (
+              <OptionButton
+                key={preset.label}
+                pressed={picked}
+                label={t(preset.label)}
+                onClick={() => onPut(picked ? null : { fact, exclude, range: preset.range })}
+              />
+            )
+          })}
+          <RangeControl
+            label={label}
+            min={control.min}
+            max={control.max}
+            signed={control.signed ?? false}
+            decimals={control.decimals ?? 0}
+            criterion={criterion}
+            onPut={(range) => onPut(range && { fact, exclude, range })}
+          />
+          {control.unit && <span className="more-filters__dim">{t(`library.moreFilters.unit.${control.unit}`)}</span>}
+        </>
+      )
+    }
+    case 'hand-classes':
+      return (
+        <Suspense fallback={<span className="more-filters__dim">{t('library.moreFilters.handClasses.loading')}</span>}>
+          <HandClassMatrix values={values} onChange={(next) => onPut(next.length > 0 ? { fact, exclude, values: next } : null)} />
+        </Suspense>
+      )
+    case 'line':
+      return (
+        <LineControl
+          label={label}
+          common={control.common}
+          pattern={control.pattern}
+          values={values}
+          onPut={(next) => onPut(next.length > 0 ? { fact, exclude, values: next } : null)}
+        />
+      )
+    case 'action':
+      return <ActionControl fact={fact} label={label} faced={control.faced} criterion={criterion} exclude={exclude} onPut={onPut} />
+  }
+}
+
+function OptionButton({ pressed, label, onClick }: { pressed: boolean; label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="more-filters__option" aria-pressed={pressed} onClick={onClick}>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+/** The sides a named Action's row offers as buttons; an answer is set under "Me enfrenté". */
+type PickedSide = Exclude<ActionSide, 'answer'>
+
+/**
+ * A named Action (`namedAction`): "La hice", "Tuve la oportunidad" or "Me
+ * enfrenté", one at a time, and once faced, "Respondí" with any of fold,
+ * call and raise, which puts the criterion on the answer instead. Dropping
+ * every answer goes back to faced; another side drops the answer.
+ */
+function ActionControl({
+  fact,
+  label,
+  faced,
+  criterion,
+  exclude,
+  onPut,
+}: {
+  fact: FactKey
+  label: string
+  faced: boolean
+  criterion: FactCriterion | null
+  exclude: boolean
+  onPut: (criterion: FactCriterion | null) => void
+}) {
+  const { t } = useI18n()
+  // The row's facts are `<prefix>-<side>`, and `fact` is its did.
+  const prefix = fact.slice(0, -'-did'.length)
+  const on = (side: ActionSide) => `${prefix}-${side}` as FactKey
+  const held = criterion ? actionSide(criterion.fact) : null
+  const side: PickedSide | null = held === 'answer' ? 'faced' : held
+  const answers = held === 'answer' && criterion && 'values' in criterion ? criterion.values : []
+  const sides = ACTION_SIDES.filter((each): each is PickedSide => each !== 'answer' && (faced || each !== 'faced'))
+
+  return (
+    <>
+      {sides.map((each) => (
+        <OptionButton
+          key={each}
+          pressed={side === each}
+          label={t(`library.moreFilters.action.side.${each}`)}
+          onClick={() => onPut(side === each ? null : { fact: on(each), exclude, values: ['true'] })}
+        />
+      ))}
+      {side === 'faced' && (
+        <span className="more-filters__answer" role="group" aria-label={t('library.moreFilters.action.answeredLabel', { action: label })}>
+          <span className="more-filters__dim" aria-hidden="true">
+            {t('library.moreFilters.action.answered')}
+          </span>
+          {ANSWERS.map((answer) => {
+            const picked = answers.includes(answer)
+            return (
+              <OptionButton
+                key={answer}
+                pressed={picked}
+                label={answer}
+                onClick={() => {
+                  const next = ANSWERS.filter((each) => (each === answer ? !picked : answers.includes(each)))
+                  onPut(next.length > 0 ? { fact: on('answer'), exclude, values: next } : { fact: on('faced'), exclude, values: ['true'] })
+                }}
+              />
+            )
+          })}
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
+ * The common lines as buttons, and a field for any other: Enter adds what
+ * is typed once it is a line, in capitals. A line picked that isn't common
+ * shows as a button too, to drop it.
+ */
+function LineControl({
+  label,
+  common,
+  pattern,
+  values,
+  onPut,
+}: {
+  label: string
+  common: readonly string[]
+  pattern: RegExp
+  values: string[]
+  onPut: (values: string[]) => void
+}) {
+  const { t } = useI18n()
+  const [draft, setDraft] = useState('')
+  const [invalid, setInvalid] = useState(false)
+  const shown = [...common, ...values.filter((value) => !common.includes(value))]
+  const toggle = (value: string) => onPut(values.includes(value) ? values.filter((each) => each !== value) : [...values, value])
+
+  const add = () => {
+    const line = draft.trim().toUpperCase()
+    if (line === '') return
+    if (!pattern.test(line)) {
+      setInvalid(true)
+      return
+    }
+    setDraft('')
+    setInvalid(false)
+    if (!values.includes(line)) onPut([...values, line])
+  }
+
+  return (
+    <>
+      {shown.map((value) => (
+        <OptionButton key={value} pressed={values.includes(value)} label={value} onClick={() => toggle(value)} />
+      ))}
+      <input
+        type="text"
+        className="more-filters__number more-filters__line"
+        placeholder={t('library.moreFilters.line.other')}
+        aria-label={t('library.moreFilters.line.otherLabel', { criterion: label })}
+        aria-invalid={invalid || undefined}
+        autoCapitalize="characters"
+        spellCheck={false}
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value)
+          setInvalid(false)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          add()
+        }}
+        onBlur={add}
+      />
+      {invalid && <span className="more-filters__line-note">{t('library.moreFilters.line.invalid')}</span>}
+    </>
+  )
+}
+
 type Range = { min: number | null; max: number | null }
 
 /**
@@ -427,12 +837,18 @@ function RangeControl({
   label,
   min,
   max,
+  signed,
+  decimals,
   criterion,
   onPut,
 }: {
   label: string
   min: number
   max: number
+  /** Its ends may be negative, as an amount in big blinds, and have any decimals unless `decimals` says. */
+  signed: boolean
+  /** How many decimal places either end may have. */
+  decimals: number
   criterion: FactCriterion | null
   onPut: (range: Range | null) => void
 }) {
@@ -451,9 +867,10 @@ function RangeControl({
   }
 
   function parse(fields: { from: string; to: string }): { valid: boolean; range: Range | null } {
-    const end = (text: string) => (text.trim() === '' ? null : Number(text))
+    const number = rangeNumber({ signed, decimals })
+    const end = (text: string) => (text.trim() === '' ? null : number.test(text.trim()) ? Number(text) : NaN)
     const ends = { min: end(fields.from), max: end(fields.to) }
-    const inside = (value: number | null) => value === null || (Number.isInteger(value) && value >= min && value <= max)
+    const inside = (value: number | null) => value === null || (!Number.isNaN(value) && value >= min && value <= max)
     if (!inside(ends.min) || !inside(ends.max)) return { valid: false, range: null }
     if (ends.min !== null && ends.max !== null && ends.min > ends.max) return { valid: false, range: null }
     return { valid: true, range: ends.min === null && ends.max === null ? null : ends }
@@ -471,9 +888,10 @@ function RangeControl({
       <input
         type="number"
         className="more-filters__number"
-        inputMode="numeric"
-        min={min}
-        max={max}
+        inputMode={signed || decimals > 0 ? 'decimal' : 'numeric'}
+        min={Number.isFinite(min) ? min : undefined}
+        max={Number.isFinite(max) ? max : undefined}
+        step={decimals > 0 ? 10 ** -decimals : signed ? 'any' : 1}
         placeholder={t('library.moreFilters.range.from')}
         aria-label={t('library.moreFilters.range.fromLabel', { criterion: label })}
         aria-invalid={invalid || undefined}
@@ -486,15 +904,69 @@ function RangeControl({
       <input
         type="number"
         className="more-filters__number"
-        inputMode="numeric"
-        min={min}
-        max={max}
+        inputMode={signed || decimals > 0 ? 'decimal' : 'numeric'}
+        min={Number.isFinite(min) ? min : undefined}
+        max={Number.isFinite(max) ? max : undefined}
+        step={decimals > 0 ? 10 ** -decimals : signed ? 'any' : 1}
         placeholder={t('library.moreFilters.range.to')}
         aria-label={t('library.moreFilters.range.toLabel', { criterion: label })}
         aria-invalid={invalid || undefined}
         value={draft.to}
         onChange={(event) => change({ ...draft, to: event.target.value })}
       />
+    </>
+  )
+}
+
+const STAT_SIDES: StatSide[] = ['taken', 'opportunity']
+
+/**
+ * The Estadística branch: every Stat by its group, as the Stats view shows
+ * them, each with "La hice" and "Tuve la oportunidad", the two links of its
+ * tooltip. One is picked at most; picking another replaces it.
+ */
+function StatBranch({ stat, onPut }: { stat: StatCriterion | null; onPut: (stat: StatCriterion | null) => void }) {
+  const { t } = useI18n()
+  const id = useId()
+  return (
+    <>
+      <p className="more-filters__dim">{t('library.moreFilters.stat.one')}</p>
+      {STAT_GROUPS.map((group) => (
+        <div className="more-filters__section" key={group} role="group" aria-labelledby={`${id}-section-${group}`}>
+          <div className="more-filters__section-title ro-mono" id={`${id}-section-${group}`}>
+            {t(`library.stats.group.${group}`)}
+          </div>
+          {STAT_TILES.filter((tile) => tile.group === group).map((tile) => (
+            <div
+              key={tile.key}
+              className="more-filters__row"
+              data-on={stat?.key === tile.key ? '' : undefined}
+              role="group"
+              aria-labelledby={`${id}-stat-${tile.key}`}
+            >
+              <span className="more-filters__label" id={`${id}-stat-${tile.key}`} title={t(tile.name)}>
+                {tile.abbreviation}
+              </span>
+              <div className="more-filters__control">
+                {STAT_SIDES.map((side) => {
+                  const picked = stat?.key === tile.key && stat.side === side
+                  return (
+                    <button
+                      key={side}
+                      type="button"
+                      className="more-filters__option"
+                      aria-pressed={picked}
+                      onClick={() => onPut(picked ? null : { key: tile.key, side })}
+                    >
+                      <span>{t(`library.moreFilters.stat.${side}`)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
     </>
   )
 }

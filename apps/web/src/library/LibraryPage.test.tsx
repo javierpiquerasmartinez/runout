@@ -168,8 +168,19 @@ beforeEach(() => {
       }
       if (url.startsWith('/api/library/saved-filters')) {
         if (method === 'GET') return Response.json(savedFilters)
-        savedFilterRequests.push(`${method} ${url} ${String(init?.body)}`)
-        return saveFilterReply(JSON.parse(String(init?.body)))
+        savedFilterRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
+        if (method === 'POST') return saveFilterReply(JSON.parse(String(init?.body)))
+        const id = url.split('/')[4]
+        if (method === 'DELETE') {
+          savedFilters = savedFilters.filter((saved) => saved.id !== id)
+          return new Response(null, { status: 204 })
+        }
+        const body = JSON.parse(String(init?.body)) as Partial<Pick<SavedFilter, 'name' | 'criteria'>>
+        // As the server does, ignoring case.
+        if (savedFilters.some((saved) => saved.id !== id && saved.name.toLowerCase() === body.name?.toLowerCase()))
+          return Response.json({ reason: 'saved-filter-name-taken' }, { status: 409 })
+        savedFilters = savedFilters.map((saved) => (saved.id === id ? { ...saved, ...body, dropped: 0 } : saved))
+        return Response.json(savedFilters.find((saved) => saved.id === id))
       }
       if (url.startsWith('/api/library/tags')) {
         tagRequests.push(`${method} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
@@ -541,21 +552,35 @@ describe('LibraryPage', () => {
       await waitFor(() => expect(lastFilterQuery()).toBe('stat=pfr%3Aopportunity'))
     })
 
-    it.each(['/library', '/library/graph', '/library/stats'])('names the Stat and the side in the filters bar at %s, as after a reload, and reads only those Hands', async (path) => {
+    it.each(['/library', '/library/graph', '/library/stats'])('names the Stat and the side in the Más filtros chip at %s, as after a reload or from an old link, and reads only those Hands', async (path) => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, `${path}?period=all&hero=iMapleAA&stat=vpip:taken`)
 
       const filters = await screen.findByRole('group', { name: 'Filters' })
-      expect(within(filters).getByText('VPIP · you did it')).toBeTruthy()
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('VPIP · you did it')
+      // It has no chip of its own any more.
+      expect(within(filters).queryByRole('button', { name: /^Remove filter/ })).toBeNull()
       expect(lastFilterQuery()).toBe('hero=iMapleAA&stat=vpip%3Ataken')
       if (path.endsWith('graph')) await waitFor(() => expect(resultsRequests.at(-1)).toBe('/api/library/results?hero=iMapleAA&stat=vpip%3Ataken'))
       if (path.endsWith('stats')) await waitFor(() => expect(statsRequests.at(-1)).toBe('/api/library/stats?hero=iMapleAA&stat=vpip%3Ataken'))
     })
 
-    it('clears the Stat criterion when its chip is removed, keeping the view and the other filters', async () => {
+    it('adds the Stat criterion to the other Más filtros criteria, asking for the Hands the link counted', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&fact=pot-type:3-bet')
+      const shown = await screen.findByRole('region', { name: 'Stats' })
+
+      await userEvent.hover(within(shown).getByRole('button', { name: 'PFR 50.0%' }))
+      await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'Opportunities (2)' }))
+
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot · PFR · opportunities')
+      await waitFor(() => expect(lastFilterQuery()).toBe('stat=pfr%3Aopportunity&fact=pot-type%3A3-bet'))
+    })
+
+    it('clears the Stat criterion with the other Más filtros criteria, keeping the view and the other filters', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all&site=pokerstars&stat=pfr:opportunity')
       const filters = await screen.findByRole('group', { name: 'Filters' })
 
-      await userEvent.click(within(filters).getByRole('button', { name: 'Remove filter PFR · opportunities' }))
+      await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
 
       expect(window.location.pathname).toBe('/library/stats')
       expect(window.location.search).toBe('?period=all&site=pokerstars')
@@ -590,8 +615,6 @@ describe('LibraryPage', () => {
       expect(within(panel).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
         'Table', 'Preflop', 'Flop', 'Turn', 'River', 'Cards', 'Board', 'Result', 'Stat',
       ])
-      // Their criteria are still to come.
-      expect(within(panel).getByRole('tab', { name: 'Flop' }).hasAttribute('disabled')).toBe(true)
 
       await userEvent.click(within(criterion(panel, 'Pot type')).getByRole('button', { name: '3-bet' }))
       await userEvent.click(within(criterion(panel, 'Pot type')).getByRole('button', { name: '4-bet' }))
@@ -686,6 +709,294 @@ describe('LibraryPage', () => {
       })
     })
 
+    describe('the Cards branch', () => {
+      async function cardsBranch() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Cards' }))
+        return panel
+      }
+
+      it('picks Hand Classes on the Lab’s matrix, a cell or a whole kind, and sums them up in the chip', async () => {
+        renderLibrary()
+        const panel = await cardsBranch()
+        const holeCards = criterion(panel, 'My hole cards')
+        const matrix = await within(holeCards).findByRole('group', { name: 'Range matrix' })
+        expect(within(matrix).getAllByRole('button')).toHaveLength(169)
+
+        await userEvent.click(within(matrix).getByRole('button', { name: 'AKs' }))
+        await userEvent.click(within(holeCards).getByRole('button', { name: 'Pairs' }))
+
+        expect(within(matrix).getByRole('button', { name: 'AKs' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(matrix).getByRole('button', { name: '77' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(holeCards).getByRole('button', { name: 'Pairs' }).getAttribute('aria-pressed')).toBe('true')
+        expect(lastFilterQuery()).toBe(`fact=${encodeURIComponent('hero-class:AA,AKs,KK,QQ,JJ,TT,99,88,77,66,55,44,33,22')}`)
+
+        // A kind already all picked is taken out whole.
+        await userEvent.click(within(holeCards).getByRole('button', { name: 'Pairs' }))
+        expect(lastFilterQuery()).toBe('fact=hero-class%3AAKs')
+        await userEvent.click(within(matrix).getByRole('button', { name: 'AKo' }))
+        await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('AK')
+      })
+
+      it('offers the Made Hand, the kicker and the nuts on every Street, the Draws on the flop and the turn only', async () => {
+        renderLibrary()
+        const panel = await cardsBranch()
+        const flop = within(panel).getByRole('group', { name: 'Flop' })
+        const river = within(panel).getByRole('group', { name: 'River' })
+
+        await userEvent.click(within(criterion(flop, 'Made hand')).getByRole('button', { name: 'Top pair' }))
+        await userEvent.click(within(criterion(flop, 'Kicker')).getByRole('button', { name: 'top' }))
+        await userEvent.click(within(criterion(flop, 'Draws')).getByRole('button', { name: 'Flush draw + gutshot' }))
+        await userEvent.click(within(criterion(river, 'The nuts')).getByRole('button', { name: 'Yes' }))
+
+        expect(lastFilterQuery()).toBe(
+          'fact=flop-made-hand%3Atop-pair&fact=flop-kicker%3Atop&fact=flop-draw%3Aflush-draw-gutshot&fact=river-nuts%3Atrue',
+        )
+        expect(within(panel).getByRole('tab', { name: 'Cards, 4 criteria' })).toBeTruthy()
+        expect(within(river).queryByRole('group', { name: 'Draws' })).toBeNull()
+        expect(within(river).queryByRole('group', { name: 'Nut flush draw' })).toBeNull()
+        expect(
+          within(criterion(flop, 'Made hand'))
+            .getAllByRole('button')
+            .map((button) => button.textContent)
+            .slice(0, 3),
+        ).toEqual(['Straight flush', 'Quads', 'Full house'])
+      })
+    })
+
+    describe('the Result branch', () => {
+      async function resultBranch() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Result' }))
+        return panel
+      }
+
+      it('sets how the Hand ended, excludes it, and clears it', async () => {
+        renderLibrary()
+        const panel = await resultBranch()
+
+        await userEvent.click(within(criterion(panel, 'I folded on')).getByRole('button', { name: 'turn' }))
+        await userEvent.click(within(criterion(panel, 'I folded on')).getByRole('button', { name: 'river' }))
+        await userEvent.click(within(criterion(panel, 'I answered the all-in')).getByRole('button', { name: 'call' }))
+        await userEvent.click(within(criterion(panel, 'I won at Showdown')).getByRole('button', { name: 'No' }))
+        await userEvent.click(within(criterion(panel, 'I folded on')).getByRole('switch', { name: /^Exclude I folded on/ }))
+
+        expect(lastFilterQuery()).toBe('fact=%21hero-folded-on%3Aturn%2Criver&fact=faced-all-in-answer%3Acall&fact=won-at-showdown%3Afalse')
+        expect(within(panel).getByRole('tab', { name: 'Result, 3 criteria' })).toBeTruthy()
+
+        await userEvent.click(within(criterion(panel, 'I answered the all-in')).getByRole('button', { name: 'call' }))
+        expect(lastFilterQuery()).toBe('fact=%21hero-folded-on%3Aturn%2Criver&fact=won-at-showdown%3Afalse')
+      })
+
+      it('takes a Result or an All-in EV in big blinds, negative or with decimals', async () => {
+        renderLibrary()
+        const panel = await resultBranch()
+
+        await userEvent.type(within(criterion(panel, 'Result')).getByRole('spinbutton', { name: 'Result, to' }), '-20.5')
+        await userEvent.type(within(criterion(panel, 'All-in EV')).getByRole('spinbutton', { name: 'All-in EV, from' }), '1.25')
+
+        expect(lastFilterQuery()).toBe('fact=result%3A..-20.5&fact=all-in-ev%3A1.25..')
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Result ≤-20.5 bb · All-in EV 1.25+ bb')
+      })
+    })
+
+    describe('the Stat branch', () => {
+      async function statBranch() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: /^Stat/ }))
+        return panel
+      }
+
+      it('picks a Stat’s chance or when the Hero took it, one Stat at a time, as its tooltip links do', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const panel = await statBranch()
+        const preflop = within(panel).getByRole('group', { name: 'Preflop' })
+
+        await userEvent.click(within(criterion(preflop, 'VPIP')).getByRole('button', { name: 'I did it' }))
+
+        expect(lastFilterQuery()).toBe('stat=vpip%3Ataken&fact=pot-type%3A3-bet')
+        expect(window.location.search).toBe('?period=all&stat=vpip%3Ataken&fact=pot-type%3A3-bet')
+        expect(within(panel).getByRole('tab', { name: 'Stat, 1 criterion' })).toBeTruthy()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('3-bet pot · VPIP · you did it')
+
+        await userEvent.click(within(criterion(panel, 'W$SD')).getByRole('button', { name: 'I had the chance' }))
+        expect(lastFilterQuery()).toBe('stat=wsd%3Aopportunity&fact=pot-type%3A3-bet')
+        expect(within(criterion(preflop, 'VPIP')).getByRole('button', { name: 'I did it' }).getAttribute('aria-pressed')).toBe('false')
+
+        await userEvent.click(within(criterion(panel, 'W$SD')).getByRole('button', { name: 'I had the chance' }))
+        expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+      })
+
+      it('goes with Remove all', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=vpip:taken&fact=pot-type:3-bet')
+        const panel = await statBranch()
+
+        expect(within(criterion(panel, 'VPIP')).getByRole('button', { name: 'I did it' }).getAttribute('aria-pressed')).toBe('true')
+        await userEvent.click(within(panel).getByRole('button', { name: 'Remove all' }))
+
+        expect(lastFilterQuery()).toBe('')
+      })
+    })
+
+    describe('the Preflop branch', () => {
+      async function openPreflop() {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Preflop' }))
+        return panel
+      }
+
+      it('sets a named Action as made, a chance, or faced and answered, one at a time in its row', async () => {
+        renderLibrary()
+        const panel = await openPreflop()
+        const threeBet = criterion(panel, '3-bet')
+        // Nobody makes a VPIP against the Hero.
+        expect(within(criterion(panel, 'VPIP')).queryByRole('button', { name: 'I faced it' })).toBeNull()
+
+        await userEvent.click(within(threeBet).getByRole('button', { name: 'I faced it' }))
+        expect(lastFilterQuery()).toBe('fact=three-bet-faced%3Atrue')
+
+        const answered = within(threeBet).getByRole('group', { name: '3-bet, I answered' })
+        await userEvent.click(within(answered).getByRole('button', { name: 'fold' }))
+        await userEvent.click(within(answered).getByRole('button', { name: 'call' }))
+        expect(lastFilterQuery()).toBe('fact=three-bet-answer%3Afold%2Ccall')
+        expect(within(threeBet).getByRole('button', { name: 'I faced it' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(panel).getByRole('tab', { name: 'Preflop, 1 criterion' })).toBeTruthy()
+
+        await userEvent.click(within(threeBet).getByRole('switch', { name: /^Exclude 3-bet/ }))
+        expect(lastFilterQuery()).toBe('fact=%21three-bet-answer%3Afold%2Ccall')
+
+        // Another side drops the answer, and keeps the exclusion.
+        await userEvent.click(within(threeBet).getByRole('button', { name: 'I made it' }))
+        expect(lastFilterQuery()).toBe('fact=%21three-bet-did%3Atrue')
+        expect(within(threeBet).queryByRole('group', { name: '3-bet, I answered' })).toBeNull()
+
+        await userEvent.click(within(threeBet).getByRole('button', { name: 'I made it' }))
+        expect(lastFilterQuery()).not.toContain('fact')
+      })
+
+      it('offers the common lines and takes any other typed, sizes in big blinds with decimals', async () => {
+        renderLibrary()
+        const panel = await openPreflop()
+        const line = criterion(panel, 'My line')
+
+        await userEvent.click(within(line).getByRole('button', { name: 'RC' }))
+        await userEvent.type(within(line).getByRole('textbox', { name: 'My line, another line' }), 'rz{Enter}')
+        expect(within(line).getByText(/A line is X, B, C, R or F/)).toBeTruthy()
+        await userEvent.clear(within(line).getByRole('textbox', { name: 'My line, another line' }))
+        await userEvent.type(within(line).getByRole('textbox', { name: 'My line, another line' }), 'rrc{Enter}')
+        expect(lastFilterQuery()).toBe('fact=preflop-line%3ARC%2CRRC')
+        expect(within(line).getByRole('button', { name: 'RRC' }).getAttribute('aria-pressed')).toBe('true')
+
+        await userEvent.type(within(criterion(panel, 'Open (bb)')).getByRole('spinbutton', { name: 'Open (bb), from' }), '2.5')
+        expect(lastFilterQuery()).toBe('fact=preflop-line%3ARC%2CRRC&fact=open-size%3A2.5..')
+      })
+
+      it('reads its criteria from the address, in the panel and in the chip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=straddle:false&fact=three-bet-answer:fold&fact=preflop-role:called-open')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe(
+          'Role: called an open · Faced a 3-bet → fold+1',
+        )
+
+        await userEvent.click(within(filters).getByRole('button', { name: /^More filters: / }))
+        const panel = screen.getByRole('dialog', { name: 'More filters' })
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Preflop, 3 criteria' }))
+        const answered = within(criterion(panel, '3-bet')).getByRole('group', { name: '3-bet, I answered' })
+        expect(within(answered).getByRole('button', { name: 'fold' }).getAttribute('aria-pressed')).toBe('true')
+        expect(within(criterion(panel, 'Straddle')).getByRole('button', { name: 'No' }).getAttribute('aria-pressed')).toBe('true')
+      })
+    })
+
+    describe('the Street branches', () => {
+      /** The panel on a Street's branch. */
+      async function openStreet(name: 'Flop' | 'Turn' | 'River') {
+        const panel = await openPanel()
+        await userEvent.click(within(panel).getByRole('tab', { name }))
+        return panel
+      }
+
+      it('sets where the Hero sat as the Street began, heads-up or multiway, and the SPR', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        const situation = within(panel).getByRole('group', { name: 'Situation as the flop begins' })
+
+        await userEvent.click(within(criterion(situation, 'Position')).getByRole('button', { name: 'Out of position (OOP)' }))
+        await userEvent.click(within(criterion(situation, 'Players')).getByRole('button', { name: 'Multiway' }))
+        expect(lastFilterQuery()).toBe('fact=flop-ip%3Afalse&fact=flop-players%3A3..')
+
+        await userEvent.click(within(criterion(situation, 'Players')).getByRole('button', { name: 'Heads-up' }))
+        expect(within(criterion(situation, 'Players')).getByRole('button', { name: 'Multiway' }).getAttribute('aria-pressed')).toBe('false')
+        expect(lastFilterQuery()).toBe('fact=flop-ip%3Afalse&fact=flop-players%3A2..2')
+
+        await userEvent.click(within(criterion(situation, 'Players')).getByRole('switch', { name: /^Exclude Players \(flop\)/ }))
+        await userEvent.type(within(criterion(situation, 'SPR')).getByRole('spinbutton', { name: 'SPR (flop), to' }), '1.5')
+        expect(lastFilterQuery()).toBe('fact=flop-ip%3Afalse&fact=%21flop-players%3A2..2&fact=flop-spr%3A..1.5')
+        expect(within(panel).getByRole('tab', { name: 'Flop, 3 criteria' })).toBeTruthy()
+      })
+
+      it('sets a named Action, faced and answered, the Hero’s line, and a size as a % of the pot', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        const cbet = criterion(panel, 'C-bet')
+
+        await userEvent.click(within(cbet).getByRole('button', { name: 'I faced it' }))
+        const answered = within(cbet).getByRole('group', { name: 'C-bet (flop), I answered' })
+        await userEvent.click(within(answered).getByRole('button', { name: 'call' }))
+        await userEvent.click(within(answered).getByRole('button', { name: 'raise' }))
+        await userEvent.click(within(criterion(panel, 'My line')).getByRole('button', { name: 'XC' }))
+        await userEvent.type(within(criterion(panel, 'My line')).getByRole('textbox', { name: 'My line (flop), another line' }), 'xrc{Enter}')
+        await userEvent.type(within(criterion(panel, 'Bet I faced')).getByRole('spinbutton', { name: 'Bet I faced (flop), from' }), '75')
+
+        expect(lastFilterQuery()).toBe('fact=flop-cbet-answer%3Acall%2Craise&fact=flop-line%3AXC%2CXRC&fact=flop-bet-size-faced%3A75..')
+        expect(within(criterion(panel, 'Bet I faced')).getByText('% of the pot')).toBeTruthy()
+      })
+
+      it('offers each Street’s own named Actions only', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        const actions = () =>
+          within(within(panel).getByRole('group', { name: 'Action' }))
+            .getAllByRole('group')
+            .filter((group) => within(group).queryByRole('button', { name: 'I made it' }))
+            .map((group) => group.querySelector('.more-filters__label')?.textContent)
+
+        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Turn' }))
+        expect(actions()).toEqual(['C-bet', 'Delayed C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+        await userEvent.click(within(panel).getByRole('tab', { name: 'River' }))
+        expect(actions()).toEqual(['C-bet', 'Donk bet', 'Probe', 'Float', 'Bet', 'Check-raise', 'Raise', '3-bet', '4-bet'])
+      })
+
+      it('describes one line through the same Hand with criteria on two Streets', async () => {
+        renderLibrary()
+        const panel = await openStreet('Flop')
+        await userEvent.click(within(criterion(panel, 'C-bet')).getByRole('button', { name: 'I made it' }))
+        await userEvent.click(within(panel).getByRole('tab', { name: 'Turn' }))
+        await userEvent.click(within(criterion(panel, 'Raise')).getByRole('button', { name: 'I faced it' }))
+
+        // Both go to the API, which keeps the Hands meeting every criterion.
+        expect(lastFilterQuery()).toBe('fact=flop-cbet-did%3Atrue&fact=turn-raise-faced%3Atrue')
+        await userEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Flop: C-bet made · Turn: Faced a raise')
+      })
+
+      it('reads its criteria from the address, in the chip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=flop-ip:false&fact=flop-cbet-answer:call,raise&fact=!river-players:3..')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe(
+          'Flop: OOP · Flop: Faced a C-bet → call, raise+1',
+        )
+      })
+    })
+
     it('explains a criterion the pot types picked never meet', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:single-raised')
       const panel = await openPanel()
@@ -758,9 +1069,19 @@ describe('LibraryPage', () => {
       await userEvent.keyboard('{Enter}')
       const panel = screen.getByRole('dialog', { name: 'More filters' })
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
-      // The arrows skip the branches that have nothing to offer yet, and wrap.
+      // The arrows move through every branch, and wrap.
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Preflop' }))
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'River' }))
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Cards' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Board' }))
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Result' }))
+      await userEvent.keyboard('{ArrowDown}')
+      expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Stat' }))
       await userEvent.keyboard('{ArrowDown}')
       expect(document.activeElement).toBe(within(panel).getByRole('tab', { name: 'Table' }))
 
@@ -787,7 +1108,11 @@ describe('LibraryPage', () => {
         expect.stringMatching(/^Tags/),
         expect.stringMatching(/^Saved filters/),
       ])
-      expect(within(list).getAllByRole('button').map((button) => button.textContent)).toEqual(['3-bet OOP como caller', 'BTN vs BB'])
+      expect(within(list).getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual([
+        'Edit saved filters',
+        '3-bet OOP como caller',
+        'BTN vs BB',
+      ])
     })
 
     it('applies one in place of the More filters criteria, keeping the rest, with its name on the chip and its id in the address', async () => {
@@ -814,7 +1139,7 @@ describe('LibraryPage', () => {
       expect(within(list).getByRole('button', { name: 'BTN vs BB' }).getAttribute('aria-pressed')).toBe('false')
     })
 
-    it('stays applied on a reload, and the chip shows the criteria once one changes', async () => {
+    it('stays applied on a reload, is modified once a criterion changes, and unchanged again once the change is undone', async () => {
       renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&fact=!hero-position:BTN,CO&saved=sf1')
       const list = await savedList()
       const filters = screen.getByRole('group', { name: 'Filters' })
@@ -824,9 +1149,148 @@ describe('LibraryPage', () => {
 
       await userEvent.click(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' }))
       const panel = screen.getByRole('dialog', { name: 'More filters' })
-      await userEvent.click(within(within(panel).getByRole('group', { name: 'Pot type' })).getByRole('button', { name: '4-bet' }))
+      const fourBet = () => within(within(panel).getByRole('group', { name: 'Pot type' })).getByRole('button', { name: '4-bet' })
+      await userEvent.click(fourBet())
 
-      expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toContain('3-bet, 4-bet pot')
+      const chip = within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' })
+      expect(chip.textContent).toBe('3-bet OOP como caller· modified')
+      expect(window.location.search).toBe('?period=all&fact=pot-type%3A3-bet%2C4-bet&fact=%21hero-position%3ABTN%2CCO&saved=sf1')
+      expect(within(list).getByRole('button', { name: '3-bet OOP como caller' }).getAttribute('aria-pressed')).toBe('true')
+
+      await userEvent.click(fourBet())
+      expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' })).toBeTruthy()
+    })
+
+    it('keeps a modified one modified on a reload, and its menu discards the changes', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars&fact=pot-type:3-bet&fact=players:..4&saved=sf1')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      const chip = await within(filters).findByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' })
+
+      // Its list says which criteria it doesn't hold.
+      await userEvent.hover(chip)
+      expect(within(screen.getByRole('tooltip')).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'Table 3-bet pot',
+        'Table ≤4 players (added, not saved)',
+      ])
+
+      await userEvent.click(chip)
+      const menu = screen.getByRole('menu', { name: 'Changes to 3-bet OOP como caller' })
+      expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+        'Edit criteriaOpens More filters',
+        'Save changesReplaces the criteria of “3-bet OOP como caller”',
+        'Save as new filter…',
+        'Discard changesGoes back to the saved criteria',
+      ])
+      await userEvent.click(within(menu).getByRole('menuitem', { name: /^Discard changes/ }))
+
+      expect(window.location.search).toBe('?period=all&site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO&saved=sf1')
+      expect(screen.queryByRole('menu')).toBeNull()
+      expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' })).toBeTruthy()
+      expect(savedFilterRequests).toEqual([])
+    })
+
+    it('marks a changed Stat criterion as not saved too', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=pfr:taken&fact=hero-position:BTN&saved=sf2')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+
+      await userEvent.hover(await within(filters).findByRole('button', { name: 'Saved filter BTN vs BB, modified' }))
+
+      const lines = within(screen.getByRole('tooltip')).getAllByRole('listitem').map((item) => item.textContent)
+      expect(lines[0]).not.toContain('not saved')
+      expect(lines.at(-1)).toMatch(/^Stat .*\(changed, not saved\)$/)
+    })
+
+    it('edits the criteria of a modified one from its menu', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&saved=sf1')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await userEvent.click(await within(filters).findByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' }))
+
+      await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /^Edit criteria/ }))
+
+      expect(screen.queryByRole('menu')).toBeNull()
+      expect(screen.getByRole('dialog', { name: 'More filters' })).toBeTruthy()
+    })
+
+    it('saves the changes over the saved criteria', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&fact=players:..4&saved=sf1')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await userEvent.click(await within(filters).findByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' }))
+
+      await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /^Save changes/ }))
+
+      expect(savedFilterRequests).toEqual(['PUT /api/library/saved-filters/sf1/criteria {"criteria":{"facts":["pot-type:3-bet","players:..4"],"stat":null}}'])
+      expect(await within(filters).findByRole('button', { name: 'Saved filter 3-bet OOP como caller' })).toBeTruthy()
+      expect(window.location.search).toBe('?period=all&fact=pot-type:3-bet&fact=players:..4&saved=sf1')
+    })
+
+    it('saves the changes as a new filter, which is then the one applied', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&fact=players:..4&saved=sf1')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      await userEvent.click(await within(filters).findByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' }))
+
+      await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Save as new filter…' }))
+      const dialog = screen.getByRole('dialog', { name: 'Save filter' })
+      expect((within(dialog).getByRole('textbox', { name: 'Name' }) as HTMLInputElement).value).toBe('')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), '3-bet a 4{Enter}')
+
+      expect(savedFilterRequests).toEqual([
+        'POST /api/library/saved-filters {"name":"3-bet a 4","criteria":{"facts":["pot-type:3-bet","players:..4"],"stat":null}}',
+      ])
+      await waitFor(() => expect(window.location.search).toBe('?period=all&fact=pot-type%3A3-bet&fact=players%3A..4&saved=sf3'))
+      expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet a 4' })).toBeTruthy()
+    })
+
+    it('renames and deletes them from the side column, deleting the applied one with its criteria', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars&stat=vpip:taken&fact=hero-position:BTN&saved=sf2')
+      const list = await savedList()
+
+      await userEvent.click(within(list).getByRole('button', { name: 'Edit saved filters' }))
+      const name = within(list).getByRole('textbox', { name: 'Rename 3-bet OOP como caller' })
+      await userEvent.clear(name)
+      await userEvent.type(name, '3-bet OOP{Enter}')
+      expect(savedFilterRequests).toEqual(['PATCH /api/library/saved-filters/sf1 {"name":"3-bet OOP"}'])
+
+      await userEvent.click(within(list).getByRole('button', { name: 'Delete BTN vs BB' }))
+      await userEvent.click(within(list).getByRole('button', { name: 'Delete the filter BTN vs BB' }))
+
+      expect(savedFilterRequests.at(-1)).toBe('DELETE /api/library/saved-filters/sf2')
+      await waitFor(() => expect(window.location.search).toBe('?period=all&site=pokerstars'))
+      await userEvent.click(within(list).getByRole('button', { name: 'Done' }))
+      expect(within(list).getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Edit saved filters', '3-bet OOP'])
+    })
+
+    it('says so when a rename is refused', async () => {
+      renderLibrary()
+      const list = await savedList()
+      await userEvent.click(within(list).getByRole('button', { name: 'Edit saved filters' }))
+      const name = within(list).getByRole('textbox', { name: 'Rename 3-bet OOP como caller' })
+
+      await userEvent.clear(name)
+      await userEvent.type(name, 'btn vs bb{Enter}')
+
+      expect(await within(list).findByText('You already have a saved filter with that name.')).toBeTruthy()
+    })
+
+    it('opens a link to a deleted one with no More filters criteria, and says so', async () => {
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars&fact=pot-type:3-bet&stat=vpip:taken&saved=gone')
+
+      expect(await screen.findByText('That saved filter no longer exists, so the Library opens with no More filters criteria.')).toBeTruthy()
+      expect(window.location.search).toBe('?period=all&site=pokerstars')
+      const filters = await screen.findByRole('group', { name: 'Filters' })
+      expect(within(filters).getByRole('button', { name: 'More filters' })).toBeTruthy()
+    })
+
+    it('says when criteria it held were dropped, being on facts the Library no longer has', async () => {
+      savedFilters = [{ ...savedFilters[0], criteria: { facts: ['pot-type:3-bet', 'retired-fact:x'], stat: null }, dropped: 1 }]
+      renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all')
+      const list = await savedList()
+
+      await userEvent.click(within(list).getByRole('button', { name: '3-bet OOP como caller' }))
+
+      expect(await screen.findByText('2 criteria of “3-bet OOP como caller” are on things the Library no longer has, and were left out.')).toBeTruthy()
+      expect(window.location.search).toBe('?period=all&fact=pot-type%3A3-bet&saved=sf1')
+      const filters = screen.getByRole('group', { name: 'Filters' })
+      expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller' })).toBeTruthy()
     })
 
     it('saves the More filters criteria under a name, says what it leaves out, and applies it', async () => {
@@ -881,6 +1345,116 @@ describe('LibraryPage', () => {
       const list = await savedList()
 
       expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+    })
+
+    describe('at phone width', () => {
+      /** The screen's width, as `matchMedia` answers the 760 px breakpoint; changing it tells whoever listens. */
+      let narrow: boolean
+      const listeners = new Set<() => void>()
+      const resize = (toNarrow: boolean) =>
+        act(() => {
+          narrow = toNarrow
+          listeners.forEach((changed) => changed())
+        })
+
+      beforeEach(() => {
+        narrow = true
+        listeners.clear()
+        vi.stubGlobal('matchMedia', (query: string) => ({
+          get matches() {
+            return query === '(max-width: 760px)' && narrow
+          },
+          addEventListener: (_: string, changed: () => void) => listeners.add(changed),
+          removeEventListener: (_: string, changed: () => void) => listeners.delete(changed),
+        }))
+      })
+
+      it('applies and drops them from the side column, which says where to create and edit them', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&site=pokerstars')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+
+        expect(within(list).getByText('Create and edit filters on a computer.')).toBeTruthy()
+        expect(within(filters).queryByRole('button', { name: /^More filters/ })).toBeNull()
+
+        await userEvent.click(within(list).getByRole('button', { name: '3-bet OOP como caller' }))
+
+        expect(window.location.search).toBe('?period=all&site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO&saved=sf1')
+        await waitFor(() => expect(lastFilterQuery()).toBe('site=pokerstars&fact=pot-type%3A3-bet&fact=%21hero-position%3ABTN%2CCO'))
+        // The chip names it and drops it, and opens nothing.
+        expect(within(filters).queryByRole('button', { name: /^Saved filter/ })).toBeNull()
+        expect(within(filters).getByText('3-bet OOP como caller')).toBeTruthy()
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+        expect(within(list).getByRole('button', { name: '3-bet OOP como caller' }).getAttribute('aria-pressed')).toBe('false')
+
+        // Tapping the applied one again drops it too.
+        await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+        await userEvent.click(within(list).getByRole('button', { name: 'BTN vs BB' }))
+        expect(window.location.search).toBe('?period=all&site=pokerstars')
+      })
+
+      it('opens the Hands of a link carrying More filters criteria, with their summary and a ×, and nothing to open', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const filters = await screen.findByRole('group', { name: 'Filters' })
+
+        expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+        expect(within(filters).getByText('3-bet pot')).toBeTruthy()
+        expect(within(filters).queryByRole('button', { name: /^More filters/ })).toBeNull()
+        expect(within(await savedList()).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        await userEvent.click(within(filters).getByRole('button', { name: 'Remove every More filters criterion' }))
+        expect(window.location.search).toBe('?period=all')
+        await waitFor(() => expect(lastFilterQuery()).toBe(''))
+      })
+
+      it('offers no renaming or deleting, and shows no modified state nor its menu', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet&fact=players:..4&saved=sf1')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+
+        expect(within(list).queryByRole('button', { name: 'Edit saved filters' })).toBeNull()
+        // A changed one shows as its criteria, with nothing to open.
+        expect(within(filters).getByText('3-bet pot · ≤4 players')).toBeTruthy()
+        expect(within(filters).queryByText('· modified')).toBeNull()
+        expect(within(filters).queryByRole('button', { name: /^Saved filter/ })).toBeNull()
+
+        // Widened, they are back.
+        resize(false)
+        expect(within(list).getByRole('button', { name: 'Edit saved filters' })).toBeTruthy()
+        expect(within(filters).getByRole('button', { name: 'Saved filter 3-bet OOP como caller, modified' })).toBeTruthy()
+      })
+
+      it('keeps adding a Stat criterion from a Stat’s tooltip', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library/stats?period=all')
+        const shown = await screen.findByRole('region', { name: 'Stats' })
+
+        await userEvent.hover(within(shown).getByRole('button', { name: 'VPIP 33.3%' }))
+        await userEvent.click(within(screen.getByRole('tooltip')).getByRole('link', { name: 'You did it (1)' }))
+
+        await waitFor(() => expect(lastFilterQuery()).toBe('stat=vpip%3Ataken'))
+      })
+
+      it('brings everything back once the screen is wider', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&fact=pot-type:3-bet')
+        const list = await savedList()
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+
+        resize(false)
+
+        expect(within(list).getByRole('button', { name: 'Save filter' })).toBeTruthy()
+        expect(within(list).queryByText('Create and edit filters on a computer.')).toBeNull()
+        await userEvent.click(within(filters).getByRole('button', { name: /^More filters: / }))
+        expect(screen.getByRole('dialog', { name: 'More filters' })).toBeTruthy()
+
+        // Narrowed again, the panel goes with the rest.
+        resize(true)
+        expect(screen.queryByRole('dialog', { name: 'More filters' })).toBeNull()
+        expect(within(list).queryByRole('button', { name: 'Save filter' })).toBeNull()
+      })
     })
   })
 
