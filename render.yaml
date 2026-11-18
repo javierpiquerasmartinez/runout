@@ -71,7 +71,10 @@ projects:
     # The import service: the same code from a second entry point, adding
     # Bulk Imports to Libraries. A Private Service, not a Background Worker,
     # because the API wakes it over the private network; it has no public
-    # address. Migrations run only in the API's pre-deploy.
+    # address. Migrations and backfills run only in the API's pre-deploy; this
+    # service, deploying from the same commit at the same time, waits at
+    # startup until the database has this build's migrations (see the
+    # README's "Deploying").
     - type: pserv
       name: runout-imports
       runtime: node
