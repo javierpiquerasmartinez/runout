@@ -45,9 +45,9 @@ const NONE: StatCount = { opportunities: 0, taken: 0 };
 
 /**
  * The Hero's Stats in one Hand: for every Stat, how many opportunities they
- * had and how many they took. This is the only place Stat definitions live;
- * everything else counts what it returns. Stats not defined yet count no
- * opportunity.
+ * had and how many they took, as the per-Stat rows (`hand_stats`) keep them.
+ * The Library counts its Stats from the facts row instead (`STAT_FACTS` in
+ * `library/stat-facts.ts`); both must agree until these rows are retired.
  */
 export function heroStats(hand: Hand): HeroStats {
   const stats = {

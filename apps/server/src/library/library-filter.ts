@@ -1,11 +1,5 @@
 import { and, eq, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
-import {
-  handStats,
-  hands,
-  libraryEntries,
-  marks,
-  tagLinks,
-} from '../database/schema.js';
+import { hands, libraryEntries, marks, tagLinks } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { PokerSite, Stake } from '../hands/hand.js';
 import { STAT_KEYS, type StatKey } from '../hands/replay/hero-stats.js';
@@ -15,6 +9,7 @@ import {
   parseFactCriterion,
   type FactCriterion,
 } from './fact-criteria.js';
+import { statCriterionWhere } from './stat-facts.js';
 
 /**
  * Which Hands of a Library to look at. The list and the Results Graph read
@@ -121,13 +116,7 @@ export function libraryFilterWhere(
     );
   }
   if (filter.stat) {
-    const counted =
-      filter.stat.side === 'taken'
-        ? sql`${handStats.taken} > 0`
-        : sql`${handStats.opportunities} > 0`;
-    conditions.push(
-      sql`exists (select 1 from ${handStats} where ${handStats.handId} = ${hands.id} and ${handStats.stat} = ${filter.stat.key} and ${counted})`,
-    );
+    conditions.push(statCriterionWhere(filter.stat.key, filter.stat.side));
   }
   if (filter.facts.length > 0) {
     conditions.push(factCriteriaWhere(filter.facts));
