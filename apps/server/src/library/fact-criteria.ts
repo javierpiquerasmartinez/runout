@@ -20,11 +20,11 @@ import {
 import {
   HAND_CLASSES,
   KICKERS,
-  POSITIONS,
   POT_TYPES,
   STREET_DRAWS,
   STREETS,
 } from '../hands/replay/hero-facts.js';
+import { POSITIONS } from '../hands/replay/positions.js';
 import type { PostflopStreet } from '../hands/replay/street-start.js';
 import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
 import {

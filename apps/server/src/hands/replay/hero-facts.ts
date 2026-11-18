@@ -10,6 +10,7 @@ import {
 } from '@runout/poker';
 import type { Action, Hand, Street } from '../hand.js';
 import {
+  BOARD_RANKS,
   boardTexture,
   cardChange,
   type BoardPairing,
@@ -40,19 +41,6 @@ import { timeline } from './timeline.js';
  */
 export const FACTS_VERSION = 8;
 
-/** Every Position, in preflop acting order. */
-export const POSITIONS = [
-  'UTG',
-  'UTG+1',
-  'MP',
-  'LJ',
-  'HJ',
-  'CO',
-  'BTN',
-  'SB',
-  'BB',
-] as const satisfies readonly Position[];
-
 /** What kind of pot the Hand was, by its preflop raises. */
 export const POT_TYPES = [
   'walk',
@@ -74,19 +62,16 @@ export const STREETS = [
 ] as const satisfies readonly Street[];
 
 /** Ranks from the highest down, as the Lab writes them. */
-const RANKS = 'AKQJT98765432';
+const RANKS: readonly string[] = BOARD_RANKS;
 
 /**
  * The 169 Hand Classes: pairs (`77`), and the higher rank first with `s`
  * for suited and `o` for offsuit (`AKs`, `T9o`).
  */
-export const HAND_CLASSES: readonly string[] = RANKS.split('').flatMap(
-  (high, h) =>
-    RANKS.split('')
-      .slice(h)
-      .flatMap((low, offset) =>
-        offset === 0 ? [`${high}${low}`] : [`${high}${low}s`, `${high}${low}o`],
-      ),
+export const HAND_CLASSES: readonly string[] = RANKS.flatMap((high, h) =>
+  RANKS.slice(h).flatMap((low, offset) =>
+    offset === 0 ? [`${high}${low}`] : [`${high}${low}s`, `${high}${low}o`],
+  ),
 );
 
 /**

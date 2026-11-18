@@ -1,7 +1,19 @@
 import type { Hand } from '../hand.js';
 
-export type Position =
-  'UTG' | 'UTG+1' | 'MP' | 'LJ' | 'HJ' | 'CO' | 'BTN' | 'SB' | 'BB';
+/** Every Position, in preflop acting order. */
+export const POSITIONS = [
+  'UTG',
+  'UTG+1',
+  'MP',
+  'LJ',
+  'HJ',
+  'CO',
+  'BTN',
+  'SB',
+  'BB',
+] as const;
+
+export type Position = (typeof POSITIONS)[number];
 
 /**
  * Position names by how many players were dealt in, in preflop acting order.

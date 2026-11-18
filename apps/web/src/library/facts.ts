@@ -1,4 +1,5 @@
 import { COMBINATION_DRAWS, DRAWS, MADE_HANDS } from '@runout/poker'
+import { HAND_CLASSES as LAB_HAND_CLASSES, RANKS } from '../lab/range'
 
 /*
  * The Hero's facts a Más filtros criterion can name, as the server's
@@ -25,7 +26,7 @@ export const LATER_SUITS = ['no-flush', 'flush-possible', 'four-of-a-suit', 'fiv
 export const BOARD_PAIRINGS = ['unpaired', 'paired', 'two-pair', 'trips', 'full-house', 'quads'] as const
 
 /** Ranks from the highest down, as the Lab writes them. */
-export const BOARD_RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'] as const
+export const BOARD_RANKS: readonly string[] = [...RANKS]
 
 /** The Streets, in the order they are dealt. */
 export const HAND_STREETS = ['preflop', 'flop', 'turn', 'river'] as const
@@ -46,13 +47,8 @@ const texture = (suits: readonly string[]) =>
     'high-card': { kind: 'set', values: BOARD_RANKS },
   }) as const
 
-/** Ranks from the highest down, as Hand Classes write them. */
-const RANKS = 'AKQJT98765432'
-
-/** The 169 Hand Classes the Hero can be dealt, as players write them: `AA`, `AKs`, `AKo`. */
-export const HAND_CLASSES: readonly string[] = [...RANKS].flatMap((high, h) =>
-  [...RANKS.slice(h)].flatMap((low, offset) => (offset === 0 ? [high + low] : [`${high}${low}s`, `${high}${low}o`])),
-)
+/** The 169 Hand Classes the Hero can be dealt, as the Lab writes them: `AA`, `AKs`, `AKo`. */
+const HAND_CLASSES: readonly string[] = LAB_HAND_CLASSES.map((handClass) => handClass.name)
 
 /** Every Draw and combination Draw the Hero's Combo can be in on the flop or the turn, in the Lab's order. */
 export const STREET_DRAWS = [...DRAWS, ...COMBINATION_DRAWS] as const
