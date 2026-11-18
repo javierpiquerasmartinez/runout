@@ -1,3 +1,5 @@
+import { COMBINATION_DRAWS, DRAWS, MADE_HANDS } from '@runout/poker'
+
 /*
  * The Hero's facts a Más filtros criterion can name, as the server's
  * `FACTS` catalogue in `fact-criteria.ts` defines them (ADR 0001: no shared
@@ -25,6 +27,15 @@ export const BOARD_PAIRINGS = ['unpaired', 'paired', 'two-pair', 'trips', 'full-
 /** Ranks from the highest down, as the Lab writes them. */
 export const BOARD_RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'] as const
 
+/** The Streets, in the order they are dealt. */
+export const HAND_STREETS = ['preflop', 'flop', 'turn', 'river'] as const
+
+/** What the Hero answered an Action with. */
+export const ANSWERS = ['fold', 'call', 'raise'] as const
+
+/** An amount in big blinds: negative or with decimals, any size. */
+const BIG_BLINDS = { kind: 'range', min: -Infinity, max: Infinity, signed: true } as const
+
 /** The Board's texture on a Street (facts catalogue §3.5), the same facts on each. */
 const texture = (suits: readonly string[]) =>
   ({
@@ -35,6 +46,20 @@ const texture = (suits: readonly string[]) =>
     'high-card': { kind: 'set', values: BOARD_RANKS },
   }) as const
 
+/** Ranks from the highest down, as Hand Classes write them. */
+const RANKS = 'AKQJT98765432'
+
+/** The 169 Hand Classes the Hero can be dealt, as players write them: `AA`, `AKs`, `AKo`. */
+export const HAND_CLASSES: readonly string[] = [...RANKS].flatMap((high, h) =>
+  [...RANKS.slice(h)].flatMap((low, offset) => (offset === 0 ? [high + low] : [`${high}${low}s`, `${high}${low}o`])),
+)
+
+/** Every Draw and combination Draw the Hero's Combo can be in on the flop or the turn, in the Lab's order. */
+export const STREET_DRAWS = [...DRAWS, ...COMBINATION_DRAWS] as const
+
+/** How good the Hero's other card is when the Made Hand uses only one of them. */
+export const KICKERS = ['top', 'second', 'weak'] as const
+
 /** What the turn or the river card changed on the Board before it. */
 const change = { kind: 'boolean' } as const
 
@@ -42,11 +67,13 @@ const change = { kind: 'boolean' } as const
 export type FactDomain =
   | { kind: 'set'; values: readonly string[] }
   | { kind: 'boolean' }
-  | { kind: 'range'; min: number; max: number }
+  /** With `signed`, its ends may be negative or have decimals. */
+  | { kind: 'range'; min: number; max: number; signed?: boolean }
 
 export const FACTS = {
   players: { kind: 'range', min: 2, max: 10 },
   'hero-position': { kind: 'set', values: POSITIONS },
+  'hero-class': { kind: 'set', values: HAND_CLASSES },
   'pot-type': { kind: 'set', values: POT_TYPES },
   'opener-position': { kind: 'set', values: POSITIONS },
   'three-bettor-position': { kind: 'set', values: POSITIONS },
@@ -76,6 +103,31 @@ export const FACTS = {
   'river-brings-flush': change,
   'river-brings-straight': change,
   'river-overcard': change,
+  // The Hero's cards on each Street (facts catalogue §3.4). The Draws are a
+  // list on the server (`members`): a criterion keeps a Hand in any of them.
+  'flop-made-hand': { kind: 'set', values: MADE_HANDS },
+  'flop-draw': { kind: 'set', values: STREET_DRAWS },
+  'flop-nuts': { kind: 'boolean' },
+  'flop-kicker': { kind: 'set', values: KICKERS },
+  'flop-nut-flush-draw': { kind: 'boolean' },
+  'turn-made-hand': { kind: 'set', values: MADE_HANDS },
+  'turn-draw': { kind: 'set', values: STREET_DRAWS },
+  'turn-nuts': { kind: 'boolean' },
+  'turn-kicker': { kind: 'set', values: KICKERS },
+  'turn-nut-flush-draw': { kind: 'boolean' },
+  'river-made-hand': { kind: 'set', values: MADE_HANDS },
+  'river-nuts': { kind: 'boolean' },
+  'river-kicker': { kind: 'set', values: KICKERS },
+  // Showdown and Result (facts catalogue §4).
+  'hero-folded-on': { kind: 'set', values: HAND_STREETS },
+  'hero-all-in-on': { kind: 'set', values: HAND_STREETS },
+  'faced-all-in-on': { kind: 'set', values: HAND_STREETS },
+  'faced-all-in-answer': { kind: 'set', values: ANSWERS },
+  'reached-showdown': { kind: 'boolean' },
+  'won-money': { kind: 'boolean' },
+  'won-at-showdown': { kind: 'boolean' },
+  result: BIG_BLINDS,
+  'all-in-ev': BIG_BLINDS,
 } as const satisfies Record<string, FactDomain>
 
 export type FactKey = keyof typeof FACTS
@@ -107,7 +159,8 @@ export function readFactCriterion(text: string): FactCriterion | null {
   if (domain.kind === 'range') {
     const ends = written.split('..')
     if (ends.length !== 2) return null
-    const [min, max] = ends.map((end) => (end === '' ? null : /^\d+$/.test(end) ? Number(end) : NaN))
+    const number = domain.signed ? /^-?\d+(\.\d+)?$/ : /^\d+$/
+    const [min, max] = ends.map((end) => (end === '' ? null : number.test(end) ? Number(end) : NaN))
     const inside = (end: number | null) => end === null || (end >= domain.min && end <= domain.max)
     if (Number.isNaN(min) || Number.isNaN(max) || !inside(min) || !inside(max)) return null
     if ((min === null && max === null) || (min !== null && max !== null && min > max)) return null
