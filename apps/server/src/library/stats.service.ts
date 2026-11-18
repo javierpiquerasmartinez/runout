@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
-import { handStats, hands, libraryEntries } from '../database/schema.js';
+import { handFacts, hands, libraryEntries } from '../database/schema.js';
 import {
   STAT_KEYS,
   type HeroStats,
@@ -9,6 +9,7 @@ import {
 } from '../hands/replay/hero-stats.js';
 import type { Identity } from '../identity/identity.service.js';
 import { libraryFilterWhere, type LibraryFilter } from './library-filter.js';
+import { countsTowards, handCounts, STAT_FACTS } from './stat-facts.js';
 
 /** The Hero's Stats over the Hands a Library filter keeps. */
 export interface LibraryStats {
@@ -40,59 +41,52 @@ export interface StatHands {
 export class StatsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
+  /**
+   * One pass over the Hands the filter keeps, so the count and the sums
+   * share one snapshot. Each Hand counts from its facts row (`STAT_FACTS`);
+   * one whose row is missing, or older than a Stat needs, still counts in
+   * `hands` but not towards that Stat.
+   */
   async stats(account: Identity, filter: LibraryFilter): Promise<LibraryStats> {
     const kept = libraryFilterWhere(account.id, filter);
-    // One snapshot, so an import landing in between can't set the count
-    // apart from the sums.
-    return this.db.transaction(
-      async (tx) => {
-        const counted = await tx.execute<{ hands: number }>(sql`
-          select count(*)::int as hands
-          from ${libraryEntries}
-          inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
-          where ${kept}
-        `);
-        const summed = await tx.execute<{
-          stat: StatKey;
-          opportunities: number;
-          taken: number;
-          handsWithOpportunity: number;
-          handsWithTaken: number;
-        }>(sql`
-          select
-            ${handStats.stat} as stat,
-            sum(${handStats.opportunities})::int as opportunities,
-            sum(${handStats.taken})::int as taken,
-            count(*) filter (where ${handStats.opportunities} > 0)::int as "handsWithOpportunity",
-            count(*) filter (where ${handStats.taken} > 0)::int as "handsWithTaken"
-          from ${libraryEntries}
-          inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
-          inner join ${handStats} on ${eq(handStats.handId, hands.id)}
-          where ${kept}
-          group by ${handStats.stat}
-        `);
-        const byKey = new Map(summed.rows.map((row) => [row.stat, row]));
-        const stats = Object.fromEntries(
-          STAT_KEYS.map((key) => [
-            key,
-            {
-              opportunities: byKey.get(key)?.opportunities ?? 0,
-              taken: byKey.get(key)?.taken ?? 0,
-            },
-          ]),
-        ) as HeroStats;
-        const handsWith = Object.fromEntries(
-          STAT_KEYS.map((key) => [
-            key,
-            {
-              opportunity: byKey.get(key)?.handsWithOpportunity ?? 0,
-              taken: byKey.get(key)?.handsWithTaken ?? 0,
-            },
-          ]),
-        ) as Record<StatKey, StatHands>;
-        return { hands: counted.rows[0].hands, stats, handsWith };
-      },
-      { isolationLevel: 'repeatable read', accessMode: 'read only' },
-    );
+    // Each Stat's Hands on either side, and for one counted per Action, its
+    // sums too; for any other the sums are those Hands.
+    const sums = STAT_KEYS.flatMap((key, index) => {
+      const stat = STAT_FACTS[key];
+      const counts = countsTowards(key);
+      return [
+        sql`count(*) filter (where ${counts} and ${handCounts(key, 'opportunity')})::int as ${sql.identifier(`ho${index}`)}`,
+        sql`count(*) filter (where ${counts} and ${handCounts(key, 'taken')})::int as ${sql.identifier(`ht${index}`)}`,
+        ...(stat.perAction
+          ? [
+              sql`coalesce(sum(${stat.opportunities}) filter (where ${counts}), 0)::int as ${sql.identifier(`o${index}`)}`,
+              sql`coalesce(sum(${stat.taken}) filter (where ${counts}), 0)::int as ${sql.identifier(`t${index}`)}`,
+            ]
+          : []),
+      ];
+    });
+    const result = await this.db.execute<Record<string, number>>(sql`
+      select count(*)::int as hands, ${sql.join(sums, sql`, `)}
+      from ${libraryEntries}
+      inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
+      left join ${handFacts} on ${eq(handFacts.handId, hands.id)}
+      where ${kept}
+    `);
+    const [row] = result.rows;
+    const stats = Object.fromEntries(
+      STAT_KEYS.map((key, index) => [
+        key,
+        STAT_FACTS[key].perAction
+          ? { opportunities: row[`o${index}`], taken: row[`t${index}`] }
+          : { opportunities: row[`ho${index}`], taken: row[`ht${index}`] },
+      ]),
+    ) as HeroStats;
+    const handsWith = Object.fromEntries(
+      STAT_KEYS.map((key, index) => [
+        key,
+        { opportunity: row[`ho${index}`], taken: row[`ht${index}`] },
+      ]),
+    ) as Record<StatKey, StatHands>;
+    return { hands: row.hands, stats, handsWith };
   }
 }

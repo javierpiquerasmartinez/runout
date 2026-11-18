@@ -1,15 +1,15 @@
 import { and, eq, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
-import {
-  handStats,
-  hands,
-  libraryEntries,
-  marks,
-  tagLinks,
-} from '../database/schema.js';
+import { hands, libraryEntries, marks, tagLinks } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import type { PokerSite, Stake } from '../hands/hand.js';
 import { STAT_KEYS, type StatKey } from '../hands/replay/hero-stats.js';
 import { Rejected } from '../rejection/rejection.js';
+import {
+  factCriteriaWhere,
+  parseFactCriterion,
+  type FactCriterion,
+} from './fact-criteria.js';
+import { statCriterionWhere } from './stat-facts.js';
 
 /**
  * Which Hands of a Library to look at. The list and the Results Graph read
@@ -21,7 +21,8 @@ import { Rejected } from '../rejection/rejection.js';
  * repeated for each value allowed, `stake` written `limit:small:big:currency`,
  * `marked=true`, and `tag` repeated with the id of each Tag allowed (a Hand
  * carrying any of them is kept), and `stat` once, written `<key>:opportunity`
- * or `<key>:taken`.
+ * or `<key>:taken`, and `fact` repeated for each criterion on the Hero's
+ * facts (see `FactCriterion`).
  */
 export interface LibraryFilter {
   from: Date | null;
@@ -34,6 +35,8 @@ export interface LibraryFilter {
   tags: string[];
   /** Only the Hands where the Hero had this Stat's opportunity, or took it. */
   stat: StatCriterion | null;
+  /** Criteria on the Hero's facts: a Hand must meet every one. */
+  facts: FactCriterion[];
 }
 
 /** One Stat and a side: the Hands that count toward its opportunities, or toward its taken. */
@@ -72,6 +75,7 @@ export function parseLibraryFilter(
     markedOnly: marked === 'true',
     tags: list(query.tag).map(tagId),
     stat: statCriterion(query.stat),
+    facts: list(query.fact).map(parseFactCriterion),
   };
 }
 
@@ -112,13 +116,10 @@ export function libraryFilterWhere(
     );
   }
   if (filter.stat) {
-    const counted =
-      filter.stat.side === 'taken'
-        ? sql`${handStats.taken} > 0`
-        : sql`${handStats.opportunities} > 0`;
-    conditions.push(
-      sql`exists (select 1 from ${handStats} where ${handStats.handId} = ${hands.id} and ${handStats.stat} = ${filter.stat.key} and ${counted})`,
-    );
+    conditions.push(statCriterionWhere(filter.stat.key, filter.stat.side));
+  }
+  if (filter.facts.length > 0) {
+    conditions.push(factCriteriaWhere(filter.facts));
   }
   return and(...conditions)!;
 }

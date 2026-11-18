@@ -45,9 +45,9 @@ const NONE: StatCount = { opportunities: 0, taken: 0 };
 
 /**
  * The Hero's Stats in one Hand: for every Stat, how many opportunities they
- * had and how many they took. This is the only place Stat definitions live;
- * everything else counts what it returns. Stats not defined yet count no
- * opportunity.
+ * had and how many they took, as the per-Stat rows (`hand_stats`) keep them.
+ * The Library counts its Stats from the facts row instead (`STAT_FACTS` in
+ * `library/stat-facts.ts`); both must agree until these rows are retired.
  */
 export function heroStats(hand: Hand): HeroStats {
   const stats = {
@@ -90,14 +90,14 @@ export function heroStats(hand: Hand): HeroStats {
 type Decision = { action: Action; before: TableState };
 
 /** The Positions a raise folded to them is a steal from. */
-const STEALING: ReadonlySet<Position | undefined> = new Set([
+export const STEALING: ReadonlySet<Position | undefined> = new Set([
   'CO',
   'BTN',
   'SB',
 ]);
 
 /** The posts that put a player's money in at the open's level. */
-const BLINDS: ReadonlySet<Post['kind']> = new Set([
+export const BLINDS: ReadonlySet<Post['kind']> = new Set([
   'small-blind',
   'big-blind',
   'small-and-big-blinds',
@@ -249,7 +249,7 @@ type ReRaiseKey =
   | 'squeeze';
 
 /** A preflop Action, with how the betting stood when its player made it. */
-interface PreflopDecision {
+export interface PreflopDecision {
   action: Action;
   before: TableState;
   /**
@@ -317,7 +317,7 @@ function reRaiseStats(
 }
 
 /** Every preflop Action, in order, with how the betting stood for it. */
-function preflopDecisions(hand: Hand, states: TableState[]): PreflopDecision[] {
+export function preflopDecisions(hand: Hand, states: TableState[]): PreflopDecision[] {
   const decisions: PreflopDecision[] = [];
   const level = (state: TableState) =>
     Math.max(...state.players.map((player) => player.bet));
@@ -411,7 +411,7 @@ function continuationBets(hand: Hand): Partial<HeroStats> {
  * in has chips behind to answer a raise. Facing an all-in their Stack
  * can't cover, or with everyone else folded or all in, they can only call.
  */
-function couldRaise(name: string, before: TableState): boolean {
+export function couldRaise(name: string, before: TableState): boolean {
   const toCall = Math.max(...before.players.map((player) => player.bet));
   const player = before.players.find((p) => p.screenName === name)!;
   const answerable = before.players.some(

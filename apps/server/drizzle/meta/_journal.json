@@ -260,6 +260,69 @@
       "when": 1794835060336,
       "tag": "0036_plan_changes_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794903507906,
+      "tag": "0037_hand_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794903917003,
+      "tag": "0038_board_texture",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794921136632,
+      "tag": "0039_hero_cards_per_street",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794923828726,
+      "tag": "0040_postflop_street_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794924016822,
+      "tag": "0041_hand_facts_preflop",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794924128225,
+      "tag": "0042_showdown_and_result_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794938954068,
+      "tag": "0043_saved_filters",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794939377059,
+      "tag": "0044_postflop_named_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794989612609,
+      "tag": "0045_hands_played_at_index",
+      "breakpoints": true
     }
   ]
 }

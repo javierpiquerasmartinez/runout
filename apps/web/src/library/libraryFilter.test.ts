@@ -134,6 +134,8 @@ describe('the filter in the address', () => {
     markedOnly: true,
     tags: ['t1', 't2'],
     stat: { key: 'three-bet', side: 'taken' },
+    facts: [],
+    saved: null,
   }
 
   it('writes the viewer’s days as they are, and reads back the same filter', () => {
@@ -168,5 +170,86 @@ describe('the filter in the address', () => {
 
   it('ignores what isn’t a filter, and days that aren’t days', () => {
     expect(libraryFilterFromSearch('?page=3&from=yesterday&to=2026-13-01&marked=yes&site=', now)).toEqual(defaultLibraryFilter(now))
+  })
+})
+
+describe('Más filtros criteria in the query and the address', () => {
+  const criteria: LibraryFilter['facts'] = [
+    { fact: 'pot-type', exclude: false, values: ['3-bet', '4-bet'] },
+    { fact: 'hero-position', exclude: true, values: ['BB'] },
+    { fact: 'players', exclude: false, range: { min: null, max: 4 } },
+  ]
+
+  it('writes each criterion as the server reads it, `!` for an exclusion and `..` for a range', () => {
+    const query = libraryFilterQuery({ ...EMPTY_LIBRARY_FILTER, facts: criteria })
+
+    expect(query.getAll('fact')).toEqual(['pot-type:3-bet,4-bet', '!hero-position:BB', 'players:..4'])
+  })
+
+  it('keeps them in the address and reads back the same criteria', () => {
+    const search = librarySearch({ ...EMPTY_LIBRARY_FILTER, facts: criteria }, now)
+
+    expect(search).toBe('?period=all&fact=pot-type%3A3-bet%2C4-bet&fact=%21hero-position%3ABB&fact=players%3A..4')
+    expect(libraryFilterFromSearch(search, now).facts).toEqual(criteria)
+  })
+
+  it('counts them as narrowing the Library', () => {
+    expect(differsFromDefault({ ...defaultLibraryFilter(now), facts: criteria }, now)).toBe(true)
+  })
+
+  it('drops a criterion it cannot read: an unknown fact, a value it cannot take, a broken range', () => {
+    const search =
+      '?period=all&fact=nope:1&fact=pot-type:6-bet&fact=players:7..3&fact=players:..&fact=hero-position&fact=players:2..11&fact=opener-position:BTN,CO'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([{ fact: 'opener-position', exclude: false, values: ['BTN', 'CO'] }])
+  })
+
+  it('reads a Result or an All-in EV in big blinds, negative or with decimals, and nothing else as a number', () => {
+    const search = '?period=all&fact=result:..-20.5&fact=all-in-ev:-3..12.25&fact=result:1e3..&fact=all-in-ev:..&fact=players:-1..4'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([
+      { fact: 'result', exclude: false, range: { min: null, max: -20.5 } },
+      { fact: 'all-in-ev', exclude: false, range: { min: -3, max: 12.25 } },
+    ])
+  })
+
+  it('reads how the Hand ended for the Hero', () => {
+    const search = '?period=all&fact=hero-folded-on:turn,river&fact=faced-all-in-answer:call&fact=!won-at-showdown:true&fact=hero-all-in-on:showdown'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([
+      { fact: 'hero-folded-on', exclude: false, values: ['turn', 'river'] },
+      { fact: 'faced-all-in-answer', exclude: false, values: ['call'] },
+      { fact: 'won-at-showdown', exclude: true, values: ['true'] },
+    ])
+  })
+
+  it('reads sizes to two decimals and any line, as the server does, and drops the rest', () => {
+    const search =
+      '?period=all&fact=open-size:2.25..3&fact=limpers:1.5..&fact=three-bet-size:3.125..&fact=preflop-line:RC,RRC&fact=preflop-line:RZ'
+
+    expect(libraryFilterFromSearch(search, now).facts).toEqual([
+      { fact: 'open-size', exclude: false, range: { min: 2.25, max: 3 } },
+      { fact: 'preflop-line', exclude: false, values: ['RC', 'RRC'] },
+    ])
+  })
+})
+
+describe('a Saved Filter in the address', () => {
+  const applied: LibraryFilter = {
+    ...EMPTY_LIBRARY_FILTER,
+    stakes: ['no-limit:5:10:EUR'],
+    facts: [{ fact: 'pot-type', exclude: false, values: ['3-bet'] }],
+    saved: 'sf1',
+  }
+
+  it('names it by id after its criteria, written out, and reads it back', () => {
+    const search = librarySearch(applied, now)
+
+    expect(search).toBe('?period=all&stake=no-limit%3A5%3A10%3AEUR&fact=pot-type%3A3-bet&saved=sf1')
+    expect(libraryFilterFromSearch(search, now)).toEqual(applied)
+  })
+
+  it('never asks the server for it: the criteria are what narrow the Hands', () => {
+    expect(libraryFilterQuery(applied).toString()).toBe('stake=no-limit%3A5%3A10%3AEUR&fact=pot-type%3A3-bet')
   })
 })

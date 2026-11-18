@@ -1,6 +1,5 @@
 import { useI18n } from '../i18n'
 import { siteLabel, stakeLabel } from '../room/queueEntryView'
-import { Chip } from '../ui/Chip'
 import { Dropdown } from '../ui/Dropdown'
 import type { LibraryPage } from './library'
 import {
@@ -14,34 +13,42 @@ import {
   type LibraryFilter,
   type QuickRange,
 } from './libraryFilter'
-import { STAT_TILES } from './stats'
+import { MoreFilters, type AppliedSavedFilter } from './MoreFilters'
 import './LibraryFilters.css'
 
 /**
  * The "Biblioteca" board's filters bar: the period, then one filter per
  * Poker Site, Hero and Stake offering only what the Library holds, any
  * number of each ticked, and a way to clear them all. Marked only is the "Marcadas" collection beside it.
- * A Stat criterion, set from a Stat's links, shows as a chip naming the Stat
- * and the side, removed on its own.
+ * "Más filtros" follows them, as one chip once it holds criteria
+ * (`MoreFilters`), the Stat criterion a Stat's links set among them.
  */
 export function LibraryFilters({
   filter,
   options,
   onChange,
+  moreFilters,
+  saved = null,
+  onSave,
 }: {
   filter: LibraryFilter
   options: LibraryPage['options']
   onChange: (filter: LibraryFilter) => void
+  /** The Saved Filter applied: Más filtros shows it, and its × drops the whole of it. */
+  saved?: AppliedSavedFilter | null
+  /** Opens "Guardar filtro"; without it nothing is offered for saving. */
+  onSave?: () => void
+  /** Whether the Más filtros panel is open, and the counts of Hands it shows. */
+  moreFilters: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    count: { hands: number | null; of: number | null }
+  }
 }) {
   const i18n = useI18n()
   const { t } = i18n
   const period = periodOf(filter)
   const set = (part: Partial<LibraryFilter>) => onChange({ ...filter, ...part })
-  const statChip =
-    filter.stat &&
-    t(`library.stats.chip.${filter.stat.side}`, {
-      stat: STAT_TILES.find((tile) => tile.key === filter.stat?.key)?.abbreviation ?? filter.stat.key,
-    })
   const stakes = options.stakes.map((stake) => ({ key: stakeKey(stake), label: stakeLabel({ stake }), stake }))
   // Two Stakes read alike when only their currency tells them apart.
   const stakeName = ({ label, stake }: (typeof stakes)[number]) =>
@@ -108,11 +115,16 @@ export function LibraryFilters({
         options={stakes.map((stake) => ({ value: stake.key, label: stakeName(stake) }))}
         onChange={(stakes) => set({ stakes })}
       />
-      {statChip && (
-        <Chip variant="active" onRemove={() => set({ stat: null })} removeLabel={t('library.stats.chip.remove', { filter: statChip })}>
-          {statChip}
-        </Chip>
-      )}
+      <MoreFilters
+        value={{ facts: filter.facts, stat: filter.stat }}
+        onChange={set}
+        saved={saved}
+        onRemove={() => set(saved === null ? { facts: [], stat: null } : { facts: [], stat: null, saved: null })}
+        onSave={onSave}
+        open={moreFilters.open}
+        onOpenChange={moreFilters.onOpenChange}
+        count={moreFilters.count}
+      />
       <span className="library-filters__spacer" />
       {/* Always there, as on the board; it does nothing while the filter is the default. */}
       <button

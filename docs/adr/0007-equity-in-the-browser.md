@@ -1,6 +1,6 @@
 # 0007 · Equity between Ranges is worked out in the browser
 
-Date: 2026-10-30 · Status: accepted
+Date: 2026-10-30 · Status: accepted · Amended by ADR 0013 (the Lab's Categories are shared too)
 
 An Analysis shows the Equity of one Range against another, preflop or on any Board. Enumerating every pair of Combos over every completion of the Board is exact but far too slow before the river: preflop it is about a million Combo pairs times 1.7 million boards. The Equity is worked out in the person's own browser, in a Web Worker, by sampling random deals and showing the result as it converges with its margin of error ("±0.1 %"), and by exact enumeration whenever the work is small enough (on the turn and the river). The hand evaluator the server uses for All-in EV moves into a package both apps share, so the two never disagree on who wins a showdown.
 

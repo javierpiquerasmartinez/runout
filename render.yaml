@@ -57,9 +57,11 @@ projects:
         value: "800"
       region: frankfurt
       buildCommand: pnpm install --frozen-lockfile && pnpm run build
-      # Runs after the build and before the new version starts. If a
-      # migration fails, the deploy fails and the running version stays.
-      preDeployCommand: pnpm run db:migrate
+      # Runs after the build and before the new version starts: the
+      # migrations, then the backfills that bring stored data up to date (see
+      # the README). If either fails, the deploy fails and the running
+      # version stays.
+      preDeployCommand: pnpm run db:migrate && pnpm run db:backfill
       startCommand: pnpm run start:prod
       autoDeployTrigger: commit
       # No healthCheckPath: /api/health queries the database, and Render

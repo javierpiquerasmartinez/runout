@@ -55,6 +55,19 @@ import {
   type LibrarySortColumn,
 } from './librarySort'
 import { LibraryTags, TagSelection } from './LibraryTags'
+import { SaveFilterDialog } from './SaveFilterDialog'
+import { SavedFiltersList } from './SavedFiltersList'
+import { useBuildsFilters } from './buildsFilters'
+import {
+  applySavedFilter,
+  droppedCriteria,
+  hasSavedCriteria,
+  restoreSavedFilter,
+  savedCriteriaOf,
+  savedFilterState,
+  withoutSavedCriteria,
+  type SavedFilter,
+} from './savedFilters'
 import type { Results } from './results'
 import { ResultsGraph } from './ResultsGraph'
 import type { LibraryStats } from './stats'
@@ -97,6 +110,24 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const [results, setResults] = useState<Results | null>(null)
   const [stats, setStats] = useState<{ state: 'loaded'; stats: LibraryStats } | { state: 'failed'; reason: FailureReason } | null>(null)
   const [importing, setImporting] = useState(false)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  // The Account's Saved Filters, whatever the filter, null until read; read again after one changes.
+  const [savedFiltersRead, setSavedFilters] = useState<SavedFilter[] | null>(null)
+  const savedFilters = savedFiltersRead ?? []
+  // What became of a Saved Filter that an action can't show: a refused change, or a link to one deleted.
+  const [savedFailure, setSavedFailure] = useState<FailureReason | null>(null)
+  const [savedGone, setSavedGone] = useState(false)
+  const [savedFiltersRevision, setSavedFiltersRevision] = useState(0)
+  const [savingFilter, setSavingFilter] = useState(false)
+  // At phone width Filters are only applied and dropped: narrowing the window closes what builds them.
+  const buildsFilters = useBuildsFilters()
+  if (!buildsFilters && (moreFiltersOpen || savingFilter)) {
+    setMoreFiltersOpen(false)
+    setSavingFilter(false)
+  }
+  // While the Más filtros panel is open it says how many Hands the rest of the filter keeps, besides what it keeps.
+  const [handsBeforeMoreFilters, setHandsBeforeMoreFilters] = useState<{ query: string; total: number } | null>(null)
+  const beforeMoreFiltersQuery = libraryFilterQuery({ ...filter, facts: [], stat: null }).toString()
   // The Hands of this page chosen for a Tag or for removal; another page or filter starts with none.
   const [selected, setSelected] = useState<string[]>([])
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
@@ -126,6 +157,33 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
       cancelled = true
     }
   }, [token, pageNumber, filter, sort, revision])
+
+  useEffect(() => {
+    if (!moreFiltersOpen) return
+    let cancelled = false
+    const query = new URLSearchParams({ page: '1', pageSize: '1' })
+    new URLSearchParams(beforeMoreFiltersQuery).forEach((value, key) => query.append(key, value))
+    api<Page>(`/library/hands?${query}`, { token })
+      .then((read) => !cancelled && setHandsBeforeMoreFilters({ query: beforeMoreFiltersQuery, total: read.total }))
+      // Without it the panel counts only the Hands kept.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [token, moreFiltersOpen, beforeMoreFiltersQuery, revision])
+
+  useEffect(() => {
+    let cancelled = false
+    api<SavedFilter[]>('/library/saved-filters', { token })
+      .then((listed) => !cancelled && setSavedFilters(listed))
+      // Without them the side column lists none; the Hands still show.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [token, savedFiltersRevision])
+  const appliedSaved = savedFilterState(filter, savedFilters)
+  const droppedFromApplied = appliedSaved ? droppedCriteria(appliedSaved.saved) : 0
 
   // The Results Graph reads the same filter, so it describes the same Hands, and its Zoom; paging leaves it be.
   useEffect(() => {
@@ -225,7 +283,47 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
   const selectedHands = page ? page.hands.filter((hand) => selected.includes(hand.id)) : []
   const openImport = () => setImporting(true)
   // Replaced, not pushed: going back leaves the Library rather than undoing each filter. The sort stays as it was.
-  const changeFilter = (next: LibraryFilter) => redirect(`${path}${withLibrarySort(librarySearch(next), sort)}`)
+  // A Saved Filter goes with the last of the criteria it named.
+  const replaceFilter = (next: LibraryFilter) =>
+    redirect(`${path}${withLibrarySort(librarySearch(hasSavedCriteria(next) ? next : { ...next, saved: null }), sort)}`)
+  const changeFilter = (next: LibraryFilter) => {
+    setSavedGone(false)
+    setSavedFailure(null)
+    replaceFilter(next)
+  }
+  const openSaveFilter = buildsFilters && hasSavedCriteria(filter) ? () => setSavingFilter(true) : undefined
+  // A link to a Saved Filter that is gone opens with no Más filtros criteria, and says so.
+  const goneSaved = savedFiltersRead !== null && filter.saved !== null && !savedFiltersRead.some((saved) => saved.id === filter.saved)
+  if (goneSaved && !savedGone) setSavedGone(true)
+  // The address follows once rendered, as it can't change during a render.
+  useEffect(() => {
+    if (goneSaved) replaceFilter(withoutSavedCriteria(filter))
+  })
+
+  const savedFiltersPath = '/library/saved-filters'
+  const savedFilterPath = (id: string) => `${savedFiltersPath}/${encodeURIComponent(id)}`
+  // The Saved Filter as the server has it now, in place of the one listed.
+  const keepSaved = (changed: SavedFilter) => {
+    setSavedFilters((listed) => listed && listed.map((saved) => (saved.id === changed.id ? changed : saved)))
+    setSavedFiltersRevision((n) => n + 1)
+  }
+  const saveChanges = (saved: SavedFilter) =>
+    api<SavedFilter>(`${savedFilterPath(saved.id)}/criteria`, { token, method: 'PUT', body: { criteria: savedCriteriaOf(filter) } })
+      .then(keepSaved)
+      .catch((error: unknown) => {
+        setSavedFailure(reasonOf(error))
+        // One deleted meanwhile drops out of the list, and its criteria with it.
+        setSavedFiltersRevision((n) => n + 1)
+      })
+  const renameSaved = (id: string, name: string) =>
+    api<SavedFilter>(savedFilterPath(id), { token, method: 'PATCH', body: { name } }).then(keepSaved)
+  const deleteSaved = (id: string) =>
+    api(savedFilterPath(id), { token, method: 'DELETE' }).then(() => {
+      setSavedFilters((listed) => listed && listed.filter((saved) => saved.id !== id))
+      setSavedFiltersRevision((n) => n + 1)
+      // Deleting the one applied drops its criteria too.
+      if (filter.saved === id) changeFilter(withoutSavedCriteria(filter))
+    })
   const changeSort = (by: LibrarySortColumn) =>
     redirect(`${path}${withLibraryPage(withLibrarySort(search, nextLibrarySort(sort, by)), 1)}`)
   // A Stat's links open Manos on the Hands behind it, every other filter and the sort kept; going back returns to the Stats.
@@ -352,6 +450,14 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
               onDelete={deleteTag}
             />
           )}
+          <SavedFiltersList
+            savedFilters={savedFilters}
+            applied={filter.saved}
+            onApply={(saved) => changeFilter(applySavedFilter(filter, saved))}
+            onSave={openSaveFilter}
+            onRename={renameSaved}
+            onDelete={deleteSaved}
+          />
         </nav>
 
         <main className="library__main" data-view={view}>
@@ -414,13 +520,54 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
             </p>
           )}
 
+          {savedGone && (
+            <p className="library__notice" role="status">
+              {t('library.savedFilters.gone')}
+            </p>
+          )}
+          {appliedSaved && droppedFromApplied > 0 && (
+            <p className="library__notice" role="status">
+              {t(droppedFromApplied === 1 ? 'library.savedFilters.dropped.one' : 'library.savedFilters.dropped.other', {
+                count: droppedFromApplied,
+                name: appliedSaved.saved.name,
+              })}
+            </p>
+          )}
+          {savedFailure && (
+            <p className="library__failure" role="alert">
+              {t(`reason.${savedFailure}`)}
+            </p>
+          )}
           {load?.state === 'failed' && (
             <p className="library__failure" role="alert">
               {t(`reason.${load.reason}`)}
             </p>
           )}
           {page && page.counts.all > 0 && view !== 'imports' && (
-            <LibraryFilters filter={filter} options={page.options} onChange={changeFilter} />
+            <LibraryFilters
+              filter={filter}
+              options={page.options}
+              onChange={changeFilter}
+              saved={
+                appliedSaved && {
+                  name: appliedSaved.saved.name,
+                  modified: appliedSaved.modified,
+                  criteria: appliedSaved.saved.criteria,
+                  onSaveChanges: () => void saveChanges(appliedSaved.saved),
+                  onSaveAsNew: () => setSavingFilter(true),
+                  onDiscard: () => changeFilter(restoreSavedFilter(filter, appliedSaved.saved)),
+                }
+              }
+              onSave={openSaveFilter}
+              moreFilters={{
+                open: moreFiltersOpen,
+                onOpenChange: setMoreFiltersOpen,
+                count: {
+                  hands: page.total,
+                  of: handsBeforeMoreFilters?.query === beforeMoreFiltersQuery ? handsBeforeMoreFilters.total : null,
+                },
+              }}
+            />
           )}
           {!room && (
             <SegmentedControl
@@ -499,6 +646,19 @@ export function LibraryPage({ room }: { room?: RoomSummary } = {}) {
 
       {confirmingRemoval && selectedHands.length > 0 && (
         <RemoveDialog count={selectedHands.length} onRemove={removeSelected} onClose={() => setConfirmingRemoval(false)} />
+      )}
+      {savingFilter && (
+        <SaveFilterDialog
+          filter={filter}
+          onClose={() => setSavingFilter(false)}
+          onSaved={(saved) => {
+            setSavingFilter(false)
+            setSavedFilters((listed) => [...(listed ?? []), saved])
+            setSavedFiltersRevision((n) => n + 1)
+            // Saved, it is the one applied: the same criteria, now under its name.
+            changeFilter({ ...filter, saved: saved.id })
+          }}
+        />
       )}
       {importing && (
         <ImportDialog

@@ -9,6 +9,7 @@ import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
 import * as schema from '../src/database/schema.js';
+import { runBackfills } from '../src/backfills/backfills.js';
 import { heroSeat } from '../src/hands/hand.js';
 import { importHandHistory } from '../src/hands/import/import.js';
 import { heroResult } from '../src/hands/replay/hero-result.js';
@@ -644,6 +645,15 @@ describe('Migrating a database with Hands already imported (e2e)', () => {
         expect(await backfillStats(db)).toBe(4);
         once = await statRows();
         expect(await backfillStats(db)).toBe(4);
+        // Estadísticas count from the facts row, which the deploy's
+        // backfills give Hands stored before it.
+        const report: string[] = [];
+        await runBackfills(db, (line) => report.push(line));
+        expect(report).toEqual([
+          expect.stringMatching(
+            /^hand-facts: 4 Hands brought up to rules version \d+ \(\d+ ms\)$/,
+          ),
+        ]);
       } finally {
         await db.$client.end();
       }

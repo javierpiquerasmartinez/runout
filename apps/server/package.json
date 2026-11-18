@@ -27,6 +27,9 @@
     "db:local": "node scripts/local-db.ts",
     "db:backfill-stats": "nest build && node dist/backfill-stats.js",
     "db:reread-hands": "nest build && node dist/reread-hands.js",
+    "db:backfill": "node dist/backfill.js",
+    "db:seed-library": "node scripts/seed-library.ts",
+    "db:library-bench": "nest build && node scripts/library-bench.ts",
     "e2e:stack": "pnpm build && node scripts/e2e-stack.ts"
   },
   "dependencies": {

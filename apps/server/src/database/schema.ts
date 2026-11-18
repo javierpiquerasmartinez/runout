@@ -7,6 +7,7 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -14,6 +15,7 @@ import {
   numeric,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -22,6 +24,8 @@ import {
 import { sql } from 'drizzle-orm';
 import { fromStored, type Hand, type StoredHand } from '../hands/hand.js';
 import type { Combos } from '../lab/combos.js';
+import type { StoredCriteria } from '../library/saved-filter-criteria.js';
+import { STREET_ACTIONS } from '../hands/replay/street-actions.js';
 import {
   INVITATION_DEFAULT_PLAN,
   PLAN_CHANGE_HOWS,
@@ -399,6 +403,10 @@ export const hands = pgTable(
       table.heroScreenName,
       table.heroSeat,
     ),
+    // The Library's date range and its order by date (and the Results
+    // Graph's played order) read Hands by when they were played; measured in
+    // docs/research/library-indexes.md.
+    index('hands_played_at_idx').on(table.playedAt, table.id),
   ],
 );
 
@@ -420,6 +428,231 @@ export const handStats = pgTable(
   },
   (table) => [primaryKey({ columns: [table.handId, table.stat] })],
 );
+
+/**
+ * What a Hand tells about its Hero (ADR 0012): one row per Hand, worked out
+ * from `content` by `heroFacts` when the Hand is stored, so that Filters read
+ * typed columns. Each fact is defined in the facts catalogue; null where it
+ * doesn't apply. `version` is the rules version that worked the row out:
+ * the `hand-facts` backfill (`db:backfill`) rewrites the rows behind it. Deleted with the Hand.
+ */
+export const handFacts = pgTable('hand_facts', {
+  handId: uuid('hand_id')
+    .primaryKey()
+    .references(() => hands.id),
+  version: integer('version').notNull(),
+  playersDealt: smallint('players_dealt').notNull(),
+  heroPosition: text('hero_position'),
+  /** As the Lab writes a Combo, e.g. `AhKd`. */
+  heroCombo: text('hero_combo'),
+  /** One of the 169, e.g. `AKs`, `77`, `T9o`. */
+  heroHandClass: text('hero_hand_class'),
+  potType: text('pot_type').notNull(),
+  openerPosition: text('opener_position'),
+  threeBettorPosition: text('three_bettor_position'),
+  fourBettorPosition: text('four_bettor_position'),
+  aggressorPosition: text('aggressor_position'),
+  heroAggressor: boolean('hero_aggressor').notNull(),
+  ...streetFactColumns('flop'),
+  ...streetFactColumns('turn'),
+  ...streetFactColumns('river'),
+  // The named Actions on each postflop Street (facts catalogue §3.2), each
+  // with did, chance, faced and answer (fold, call or raise), all null when
+  // the Hero didn't see the Street: `flop_cbet_did`, `turn_probe_answer`.
+  ...streetActionColumns('flop', STREET_ACTIONS.flop),
+  ...streetActionColumns('turn', STREET_ACTIONS.turn),
+  ...streetActionColumns('river', STREET_ACTIONS.river),
+  // Preflop (facts catalogue §1, §2.2–2.3). Each named Action has did and
+  // chance; those an opponent can make against the Hero, faced and answer
+  // (fold, call or raise). Sizes and stacks are in big blinds, or a multiple.
+  // A row worked out before version 5 has them all null.
+  vpipDid: boolean('vpip_did'),
+  vpipChance: boolean('vpip_chance'),
+  pfrDid: boolean('pfr_did'),
+  pfrChance: boolean('pfr_chance'),
+  openDid: boolean('open_did'),
+  openChance: boolean('open_chance'),
+  limpDid: boolean('limp_did'),
+  limpChance: boolean('limp_chance'),
+  isolateDid: boolean('isolate_did'),
+  isolateChance: boolean('isolate_chance'),
+  isolateFaced: boolean('isolate_faced'),
+  isolateAnswer: text('isolate_answer'),
+  stealDid: boolean('steal_did'),
+  stealChance: boolean('steal_chance'),
+  stealFaced: boolean('steal_faced'),
+  stealAnswer: text('steal_answer'),
+  threeBetDid: boolean('three_bet_did'),
+  threeBetChance: boolean('three_bet_chance'),
+  threeBetFaced: boolean('three_bet_faced'),
+  threeBetAnswer: text('three_bet_answer'),
+  squeezeDid: boolean('squeeze_did'),
+  squeezeChance: boolean('squeeze_chance'),
+  squeezeFaced: boolean('squeeze_faced'),
+  squeezeAnswer: text('squeeze_answer'),
+  coldCallDid: boolean('cold_call_did'),
+  coldCallChance: boolean('cold_call_chance'),
+  fourBetDid: boolean('four_bet_did'),
+  fourBetChance: boolean('four_bet_chance'),
+  fourBetFaced: boolean('four_bet_faced'),
+  fourBetAnswer: text('four_bet_answer'),
+  fiveBetDid: boolean('five_bet_did'),
+  fiveBetChance: boolean('five_bet_chance'),
+  fiveBetFaced: boolean('five_bet_faced'),
+  fiveBetAnswer: text('five_bet_answer'),
+  restealDid: boolean('resteal_did'),
+  restealChance: boolean('resteal_chance'),
+  restealFaced: boolean('resteal_faced'),
+  restealAnswer: text('resteal_answer'),
+  preflopRole: text('preflop_role'),
+  preflopFacedFirst: text('preflop_faced_first'),
+  limpers: smallint('limpers'),
+  /** The Hero's preflop Actions, one letter each: X, B, C, R, F. */
+  preflopLine: text('preflop_line'),
+  openSize: doublePrecision('open_size'),
+  threeBetSize: doublePrecision('three_bet_size'),
+  fourBetSize: doublePrecision('four_bet_size'),
+  heroRaiseSize: doublePrecision('hero_raise_size'),
+  heroRaiseMultiple: doublePrecision('hero_raise_multiple'),
+  heroSecondRaiseSize: doublePrecision('hero_second_raise_size'),
+  heroSecondRaiseMultiple: doublePrecision('hero_second_raise_multiple'),
+  sizeFaced: doublePrecision('size_faced'),
+  heroStartingStack: doublePrecision('hero_starting_stack'),
+  preflopEffectiveStack: doublePrecision('preflop_effective_stack'),
+  straddle: boolean('straddle'),
+  antes: boolean('antes'),
+  // The Board's texture on each Street, null when it wasn't dealt.
+  flopSuits: text('flop_suits'),
+  flopPairing: text('flop_pairing'),
+  flopStraightPossible: boolean('flop_straight_possible'),
+  flopConnectedness: smallint('flop_connectedness'),
+  /** As the Lab writes a rank: `A`, `T`, `2`. */
+  flopHighCard: text('flop_high_card'),
+  turnSuits: text('turn_suits'),
+  turnPairing: text('turn_pairing'),
+  turnStraightPossible: boolean('turn_straight_possible'),
+  turnConnectedness: smallint('turn_connectedness'),
+  /** As the Lab writes a rank: `A`, `T`, `2`. */
+  turnHighCard: text('turn_high_card'),
+  turnPairsBoard: boolean('turn_pairs_board'),
+  turnBringsFlush: boolean('turn_brings_flush'),
+  turnBringsStraight: boolean('turn_brings_straight'),
+  turnOvercard: boolean('turn_overcard'),
+  riverSuits: text('river_suits'),
+  riverPairing: text('river_pairing'),
+  riverStraightPossible: boolean('river_straight_possible'),
+  riverConnectedness: smallint('river_connectedness'),
+  /** As the Lab writes a rank: `A`, `T`, `2`. */
+  riverHighCard: text('river_high_card'),
+  riverPairsBoard: boolean('river_pairs_board'),
+  riverBringsFlush: boolean('river_brings_flush'),
+  riverBringsStraight: boolean('river_brings_straight'),
+  riverOvercard: boolean('river_overcard'),
+  // The Hero's cards on each Street (facts catalogue §3.4). A Made Hand and
+  // the Draws are the Lab's Categories; the Draws, the combination Draws
+  // among them, are an array so a criterion keeps any Hand that overlaps it.
+  flopMadeHand: text('flop_made_hand'),
+  flopDraws: text('flop_draws').array(),
+  flopNuts: boolean('flop_nuts'),
+  /** `top`, `second` or `weak`; null unless the Made Hand uses one hole card. */
+  flopKicker: text('flop_kicker'),
+  flopNutFlushDraw: boolean('flop_nut_flush_draw'),
+  turnMadeHand: text('turn_made_hand'),
+  turnDraws: text('turn_draws').array(),
+  turnNuts: boolean('turn_nuts'),
+  turnKicker: text('turn_kicker'),
+  turnNutFlushDraw: boolean('turn_nut_flush_draw'),
+  riverMadeHand: text('river_made_hand'),
+  riverNuts: boolean('river_nuts'),
+  riverKicker: text('river_kicker'),
+  // Showdown and Result. Reached Showdown, the Result and All-in EV are on
+  // `hands` already, and criteria read them there.
+  /** A Street: `preflop`, `flop`, `turn` or `river`. */
+  heroFoldedOn: text('hero_folded_on'),
+  heroAllInOn: text('hero_all_in_on'),
+  heroFacedAllInOn: text('hero_faced_all_in_on'),
+  /** `fold`, `call` or `raise`. */
+  heroFacedAllInAnswer: text('hero_faced_all_in_answer'),
+  /** Null on a row worked out before the rules had it. */
+  heroWonMoney: boolean('hero_won_money'),
+  heroWonAtShowdown: boolean('hero_won_at_showdown'),
+});
+
+/**
+ * One postflop Street's facts (`StreetFacts` in `hero-facts.ts`), each named
+ * after the Street: `flopIp` in `flop_ip`. Quantities in big blinds.
+ */
+function streetFactColumns<S extends 'flop' | 'turn' | 'river'>(street: S) {
+  const bigBlinds = (name: string) =>
+    numeric(`${street}_${name}`, { precision: 10, scale: 2, mode: 'number' });
+  const columns = {
+    // Rows from before the Street's facts read false until re-derived.
+    Saw: boolean(`${street}_saw`).notNull().default(false),
+    Players: smallint(`${street}_players`),
+    Ip: boolean(`${street}_ip`),
+    First: boolean(`${street}_first`),
+    Pot: bigBlinds('pot'),
+    EffectiveStack: bigBlinds('effective_stack'),
+    Spr: numeric(`${street}_spr`, { precision: 9, scale: 1, mode: 'number' }),
+    AllIn: boolean(`${street}_all_in`),
+    /** `XR`, `BC`: X check, B bet, C call, R raise, F fold. */
+    Line: text(`${street}_line`),
+    /** Whole % of the pot before the bet. */
+    BetSize: integer(`${street}_bet_size`),
+    /** Multiple of the bet raised. */
+    RaiseSize: numeric(`${street}_raise_size`, {
+      precision: 8,
+      scale: 2,
+      mode: 'number',
+    }),
+    BetSizeFaced: integer(`${street}_bet_size_faced`),
+    RaiseSizeFaced: numeric(`${street}_raise_size_faced`, {
+      precision: 8,
+      scale: 2,
+      mode: 'number',
+    }),
+    Bets: smallint(`${street}_bets`),
+    Raises: smallint(`${street}_raises`),
+    Calls: smallint(`${street}_calls`),
+    Folds: smallint(`${street}_folds`),
+  };
+  return Object.fromEntries(
+    Object.entries(columns).map(([key, column]) => [`${street}${key}`, column]),
+  ) as { [K in keyof typeof columns as `${S}${K}`]: (typeof columns)[K] };
+}
+
+/**
+ * The named Actions of one postflop Street (`StreetActionFacts` in
+ * `street-actions.ts`), four columns each, named after the Street and the
+ * Action: `flopCbetDid` in `flop_cbet_did`, `turnDelayedCbetAnswer` in
+ * `turn_delayed_cbet_answer`.
+ */
+function streetActionColumns<
+  S extends 'flop' | 'turn' | 'river',
+  A extends string,
+>(street: S, actions: readonly A[]) {
+  const snake = (name: string) =>
+    name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  const capital = (name: string) => `${name[0].toUpperCase()}${name.slice(1)}`;
+  return Object.fromEntries(
+    actions.flatMap((action) => {
+      const column = `${street}_${snake(action)}`;
+      const key = `${street}${capital(action)}`;
+      return [
+        [`${key}Did`, boolean(`${column}_did`)],
+        [`${key}Chance`, boolean(`${column}_chance`)],
+        [`${key}Faced`, boolean(`${column}_faced`)],
+        [`${key}Answer`, text(`${column}_answer`)],
+      ];
+    }),
+  ) as {
+    [K in A as `${S}${Capitalize<K>}${'Did' | 'Chance' | 'Faced'}`]: ReturnType<
+      typeof boolean
+    >;
+  } & {
+    [K in A as `${S}${Capitalize<K>}Answer`]: ReturnType<typeof text>;
+  };
+}
 
 /**
  * A Hand placed in a Room's Queue, with its Author in that Room. Removing it
@@ -604,6 +837,32 @@ export const tagLinks = pgTable(
     index('tag_links_identity_id_hand_id_idx').on(
       table.identityId,
       table.handId,
+    ),
+  ],
+);
+
+/**
+ * A Saved Filter: the Más filtros part of a Filter an Account named to apply
+ * again over any period, Poker Site, Hero or Stake. Its criteria are one JSON
+ * document with its own format, which nothing queries inside. Only its owner
+ * sees it. Its name is unique within the Account, ignoring case.
+ */
+export const savedFilters = pgTable(
+  'saved_filters',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    name: text('name').notNull(),
+    criteria: jsonb('criteria').$type<StoredCriteria>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('saved_filters_identity_id_name_idx').on(
+      table.identityId,
+      sql`lower(${table.name})`,
     ),
   ],
 );
