@@ -57,6 +57,16 @@ Each Stat counts the Hands where the Hero did X (numerator) out of the Hands whe
 
 ### 2.2 Edge cases
 
+**Settled for Runout.** The cases below still have no tracker source, but Runout has settled them. The Advanced Filters grilling (2026-11-16) adopted the proposed rules into the facts catalogue, and the new Stats grilling (2026-11-19) confirmed that every Stat inherits them unchanged:
+- A straddle is a forced post. It is not VPIP, and it counts as the first bet for 3-bets.
+- Antes, dead blinds and small-and-big posts are forced.
+- A short all-in raise counts as a raise for whoever makes it, but reopens the betting only when it is a full raise.
+- C-bets and Fold to C-bet count multiway pots.
+- A blind cold-calls only from a 3-bet on.
+- Straddled Hands are not left out of any Stat.
+
+Each "Unverified" below means only that no tracker documents the case.
+
 - **Walks:** a walk is not a VPIP opportunity: "if you get a walk in the big blind you have no chance to put money in the pot". It still counts as a Hand. ([kraada, 2016-04-07](https://www.pokertracker.com/forums/viewtopic.php?f=61&t=91436); [WhiteRider, 2013-03-26](https://pt4.pokertracker.com/forums/viewtopic.php?t=47731))
 - **Blinds:** "Calling from the blinds counts towards VPIP" ([kraada, 2016-04-07](https://www.pokertracker.com/forums/viewtopic.php?f=61&t=91436)). Checking the BB option in a limped pot is not voluntary, so it is not VPIP (PT3 guide: VPIP "does not include posting any blind money").
 - **All-in for more than the Hero's Stack:** the Hero has a VPIP opportunity but no PFR opportunity, so PFR can exceed VPIP. (WhiteRider, 2013-03-31, [forum](https://www.pokertracker.com/forums/viewtopic.php?f=64&t=47852))
