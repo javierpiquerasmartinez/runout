@@ -5,7 +5,7 @@ import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
 import type { Hand } from '../src/hands/hand.js';
-import { heroStats, STAT_KEYS } from '../src/hands/replay/hero-stats.js';
+import { heroStats } from '../src/hands/replay/hero-stats.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -31,10 +31,11 @@ const FIXTURES = [
 ];
 
 /**
- * The 21 Stats `heroStats` works out; the newer ones are read from the
- * facts row alone, and `library-stats.e2e-spec.ts` covers them.
+ * The 21 Stats `heroStats` works out from a Hand: the reference this file
+ * checks the facts against. Every later Stat is read from the facts alone,
+ * and `library-stats.e2e-spec.ts` covers it.
  */
-const HERO_STATS: string[] = [
+const HERO_STATS = [
   'vpip',
   'pfr',
   'three-bet',
@@ -56,7 +57,7 @@ const HERO_STATS: string[] = [
   'wwsf',
   'wtsd',
   'wsd',
-];
+] as const;
 
 /*
  * The Stats are counted from each Hand's facts row (ADR 0012). This checks
@@ -137,7 +138,7 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
     );
     const rows = stored.flatMap(({ id, content }) => {
       const counts = heroStats(content);
-      return STAT_KEYS.filter((stat) => counts[stat].opportunities > 0).map(
+      return HERO_STATS.filter((stat) => counts[stat].opportunities > 0).map(
         (stat) => ({ stat, hand_id: id, ...counts[stat] }),
       );
     });
