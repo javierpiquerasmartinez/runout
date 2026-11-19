@@ -12,11 +12,13 @@ import {
   STAT_CATALOGUE,
   STAT_STREETS,
   statName,
+  statSideName,
   type LibraryStats,
   type Stat,
   type StatCount,
   type StatHands,
   type StatKey,
+  type StatRatio,
 } from './stats'
 import './StatsView.css'
 
@@ -156,7 +158,41 @@ function Group({ level, title, children }: { level: 2 | 3; title: string; childr
 }
 
 /**
- * One Stat: its abbreviation and percentage, with its tooltip under it on
+ * A Stat's value as its tile shows it, whether there is nothing to count,
+ * and its counts as its tooltip gives them. A frequency reads as a
+ * percentage; a ratio (AF) reads as one decimal with no percent sign, "∞"
+ * with aggressive Actions and no calls.
+ */
+function useStatReading(count: StatCount | StatRatio) {
+  const { t, formatNumber } = useI18n()
+  if ('ratio' in count) {
+    const none = count.aggressive === 0 && count.calls === 0
+    return {
+      none,
+      value: none
+        ? '—'
+        : count.calls === 0
+          ? '∞'
+          : formatNumber(count.aggressive / count.calls, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+      counts: none
+        ? t('library.stats.ratio.none')
+        : t('library.stats.ratio.count', { aggressive: formatNumber(count.aggressive), calls: formatNumber(count.calls) }),
+    }
+  }
+  const none = count.opportunities === 0
+  return {
+    none,
+    value: none
+      ? '—'
+      : formatNumber(count.taken / count.opportunities, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    counts: none
+      ? t('library.stats.noChance')
+      : t('library.stats.count', { taken: formatNumber(count.taken), opportunities: formatNumber(count.opportunities) }),
+  }
+}
+
+/**
+ * One Stat: its abbreviation and percentage (or ratio), with its tooltip under it on
  * hover or focus. While the person chooses their Stats (`choice`), it has no
  * tooltip: a click shows or hides it instead, and it is marked shown or faded.
  */
@@ -168,7 +204,7 @@ function StatTileView({
   choice,
 }: {
   stat: Stat
-  count: StatCount
+  count: StatCount | StatRatio
   handsWith: StatHands
   statHref: (criterion: StatCriterion) => string
   choice: { shown: boolean; toggle: () => void } | null
@@ -178,10 +214,7 @@ function StatTileView({
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const open = !choice && (hovered || focused)
-  const none = count.opportunities === 0
-  const value = none
-    ? '—'
-    : formatNumber(count.taken / count.opportunities, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const { none, value, counts } = useStatReading(count)
   // Focus moving from the tile to the tooltip's links keeps it open.
   const leave = (event: FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
@@ -194,7 +227,7 @@ function StatTileView({
   // The links count Hands, as the list behind them does, not the Stat's own counts.
   const link = (side: StatSide) => (
     <a className="stats__tip-link" href={statHref({ key: stat.key, side })} onClick={follow}>
-      {t(`library.stats.link.${side}`, { count: formatNumber(handsWith[side]) })}
+      {t(statSideName(stat, side, 'link'), { count: formatNumber(handsWith[side]) })}
     </a>
   )
   return (
@@ -226,11 +259,7 @@ function StatTileView({
         <div id={tipId} className="stats__tip" role="tooltip">
           <div className="stats__tip-card">
             <span className="stats__tip-name">{t(statName(stat))}</span>
-            <span className="stats__tip-count ro-mono">
-              {none
-                ? t('library.stats.noChance')
-                : t('library.stats.count', { taken: formatNumber(count.taken), opportunities: formatNumber(count.opportunities) })}
-            </span>
+            <span className="stats__tip-count ro-mono">{counts}</span>
             {!none && (
               <span className="stats__tip-links">
                 {link('opportunity')}

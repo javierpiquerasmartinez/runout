@@ -1,7 +1,10 @@
 import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
-import { freshHandHistory } from './support/hand-histories.js';
+import {
+  freshHandHistory,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -12,6 +15,7 @@ interface StatCount {
 
 interface Stats {
   hands: number;
+  /** AF instead answers `{ ratio: true, aggressive, calls }`. */
   stats: Record<string, StatCount>;
   handsWith: Record<string, { opportunity: number; taken: number }>;
 }
@@ -30,15 +34,68 @@ const STAT_KEYS = [
   'cbet-flop',
   'fold-to-cbet-flop',
   'check-raise-flop',
+  'af-flop',
   'cbet-turn',
   'fold-to-cbet-turn',
+  'af-turn',
   'cbet-river',
   'fold-to-cbet-river',
+  'af-river',
+  'af',
   'afq',
   'wwsf',
   'wtsd',
   'wsd',
 ];
+
+const AF_KEYS = ['af-flop', 'af-turn', 'af-river', 'af'];
+
+/**
+ * A three-handed $0.50/$1 PokerStars Hand with hand IDs of its own: Btn on
+ * the button, then Sb and Bb; the Hero is the Btn, with Ah Kd. The Board is
+ * Kh 9c 4d 2s 7h.
+ */
+function threeHanded(streets: {
+  preflop: string;
+  flop?: string;
+  turn?: string;
+  river?: string;
+}): string {
+  const lines = (block: string) => block.trim().replace(/^\s+/gm, '');
+  const history = [
+    "PokerStars Hand #262199000001:  Hold'em No Limit ($0.50/$1 USD) - 2026/09/10 21:00:00 CET [2026/09/10 15:00:00 ET]",
+    "Table 'Spec' 3-max Seat #1 is the button",
+    'Seat 1: Btn ($100 in chips)',
+    'Seat 2: Sb ($100 in chips)',
+    'Seat 3: Bb ($100 in chips)',
+    'Sb: posts small blind $0.50',
+    'Bb: posts big blind $1',
+    '*** HOLE CARDS ***',
+    'Dealt to Btn [Ah Kd]',
+    lines(streets.preflop),
+    ...(streets.flop !== undefined
+      ? ['*** FLOP *** [Kh 9c 4d]', lines(streets.flop)]
+      : []),
+    ...(streets.turn !== undefined
+      ? ['*** TURN *** [Kh 9c 4d] [2s]', lines(streets.turn)]
+      : []),
+    ...(streets.river !== undefined
+      ? ['*** RIVER *** [Kh 9c 4d 2s] [7h]', lines(streets.river)]
+      : []),
+    'Btn collected $1 from pot',
+    '*** SUMMARY ***',
+    'Total pot $1 | Rake $0',
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
+  return withFreshHandIds(`${history}\n`);
+}
+
+/** The Btn opens, the Sb folds and the Bb calls: heads-up to the flop. */
+const OPEN_CALLED = `
+  Btn: raises $2 to $3
+  Sb: folds
+  Bb: calls $2`;
 
 /*
  * The fixtures this file imports, iMapleAA's Hands at €0.05/€0.10 in the
@@ -248,6 +305,84 @@ describe('The Library’s Stats (e2e)', () => {
     ).toEqual({ opportunity: 2, taken: 2 });
   });
 
+  it('sums AF per Street and in total as bets and raises against calls, never dividing them', async () => {
+    const account = await newAccount(running.httpServer);
+    await importText(
+      account.token,
+      [
+        // Flop: a bet, raised, called; turn: a call; river: a bet.
+        threeHanded({
+          preflop: OPEN_CALLED,
+          flop: `
+            Bb: checks
+            Btn: bets $3
+            Bb: raises $6 to $9
+            Btn: calls $6`,
+          turn: `
+            Bb: bets $10
+            Btn: calls $10`,
+          river: `
+            Bb: checks
+            Btn: bets $20
+            Bb: calls $20`,
+        }),
+        // Flop: a bet that takes it.
+        threeHanded({
+          preflop: OPEN_CALLED,
+          flop: `
+            Bb: checks
+            Btn: bets $3
+            Bb: folds`,
+        }),
+        // Flop: a fold, which AF leaves out, unlike AFq.
+        threeHanded({
+          preflop: OPEN_CALLED,
+          flop: `
+            Bb: bets $3
+            Btn: folds`,
+        }),
+      ].join('\n\n\n'),
+    );
+
+    const all = await stats(account.token);
+
+    expect({
+      'af-flop': all.stats['af-flop'],
+      'af-turn': all.stats['af-turn'],
+      'af-river': all.stats['af-river'],
+      af: all.stats.af,
+    }).toEqual({
+      'af-flop': { ratio: true, aggressive: 2, calls: 1 },
+      'af-turn': { ratio: true, aggressive: 0, calls: 1 },
+      // Aggression and no call: "∞" on screen, two counts here.
+      'af-river': { ratio: true, aggressive: 1, calls: 0 },
+      af: { ratio: true, aggressive: 3, calls: 2 },
+    });
+    // Its Hands: with a bet, raise or call there ("Con acción"), and with a
+    // bet or raise ("Agresivas").
+    expect({
+      'af-flop': all.handsWith['af-flop'],
+      'af-turn': all.handsWith['af-turn'],
+      'af-river': all.handsWith['af-river'],
+      af: all.handsWith.af,
+    }).toEqual({
+      'af-flop': { opportunity: 2, taken: 2 },
+      'af-turn': { opportunity: 1, taken: 0 },
+      'af-river': { opportunity: 1, taken: 1 },
+      af: { opportunity: 2, taken: 2 },
+    });
+    // The Stat criterion keeps as many Hands as each link says.
+    for (const key of AF_KEYS) {
+      for (const side of ['opportunity', 'taken'] as const) {
+        expect(
+          await resultsCount(account.token, `stat=${key}:${side}`),
+          `${key}:${side}`,
+        ).toBe(all.handsWith[key][side]);
+      }
+    }
+    expect(all.stats.afq).toEqual({ opportunities: 6, taken: 3 });
+  });
+
   it('answers every Stat, with zero opportunities where the Hero had none', async () => {
     const account = await stockedAccount();
 
@@ -339,7 +474,12 @@ describe('The Library’s Stats (e2e)', () => {
     expect(await stats(account.token)).toEqual({
       hands: 0,
       stats: Object.fromEntries(
-        STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }]),
+        STAT_KEYS.map((key) => [
+          key,
+          AF_KEYS.includes(key)
+            ? { ratio: true, aggressive: 0, calls: 0 }
+            : { opportunities: 0, taken: 0 },
+        ]),
       ),
       handsWith: Object.fromEntries(
         STAT_KEYS.map((key) => [key, { opportunity: 0, taken: 0 }]),

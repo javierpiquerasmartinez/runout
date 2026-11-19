@@ -30,6 +30,34 @@ const FIXTURES = [
   'coinpoker-ante.txt',
 ];
 
+/**
+ * The 21 Stats `heroStats` works out; the newer ones are read from the
+ * facts row alone, and `library-stats.e2e-spec.ts` covers them.
+ */
+const HERO_STATS: string[] = [
+  'vpip',
+  'pfr',
+  'three-bet',
+  'fold-to-three-bet',
+  'four-bet',
+  'fold-to-four-bet',
+  'squeeze',
+  'cold-call',
+  'fold-bb-to-steal',
+  'steal',
+  'cbet-flop',
+  'fold-to-cbet-flop',
+  'check-raise-flop',
+  'cbet-turn',
+  'fold-to-cbet-turn',
+  'cbet-river',
+  'fold-to-cbet-river',
+  'afq',
+  'wwsf',
+  'wtsd',
+  'wsd',
+];
+
 /*
  * The Stats are counted from each Hand's facts row (ADR 0012). This checks
  * them against the Hero's Stats worked out from each stored Hand, Stat by
@@ -145,7 +173,7 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
     const fromRows = await perStatRows(ids);
     expect(fromFacts.hands).toBe(ids.length);
 
-    for (const key of Object.keys(fromFacts.stats)) {
+    for (const key of HERO_STATS) {
       const rows = fromRows.get(key) ?? {
         opportunities: 0,
         taken: 0,

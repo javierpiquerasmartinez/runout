@@ -8,15 +8,20 @@ import { SessionContext } from '../identity/context'
 import { PreferencesContext } from '../preferences/context'
 import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
 import { fakeSession } from '../test/fakeSession'
-import { STAT_KEYS, type LibraryStats, type StatKey } from './stats'
+import { STAT_CATALOGUE, STAT_KEYS, type LibraryStats, type StatKey } from './stats'
 import type { StatCriterion } from './libraryFilter'
 import { StatsView } from './StatsView'
+
+/** AF, the one Stat answered as a ratio. */
+const AF_KEYS: StatKey[] = ['af-flop', 'af-turn', 'af-river', 'af']
 
 /** 1,860 Hands where the Hero put money in 412 times out of 1,838 and raised 334 times out of 1,830; nothing else counted. */
 const stats: LibraryStats = {
   hands: 1860,
   stats: {
-    ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }])),
+    ...Object.fromEntries(
+      STAT_KEYS.map((key) => [key, AF_KEYS.includes(key) ? { ratio: true, aggressive: 0, calls: 0 } : { opportunities: 0, taken: 0 }]),
+    ),
     vpip: { opportunities: 1838, taken: 412 },
     pfr: { opportunities: 1830, taken: 334 },
   } as LibraryStats['stats'],
@@ -322,6 +327,103 @@ describe('StatsView', () => {
   })
 })
 
+describe('StatsView, AF', () => {
+  /** AF on every Street and in total, shown, with 45 bets and raises against 19 calls on the flop. */
+  function renderAf(af: Partial<LibraryStats['stats']>, locale: Locale = 'en') {
+    return renderStats(
+      {
+        ...stats,
+        stats: { ...stats.stats, ...af },
+        handsWith: { ...stats.handsWith, 'af-flop': { opportunity: 52, taken: 38 } },
+      },
+      locale,
+      ['cbet-flop', 'check-raise-flop', 'af-flop', 'af-turn', 'af-river', 'wsd', 'af', 'afq'],
+    )
+  }
+  const flop = { 'af-flop': { ratio: true, aggressive: 45, calls: 19 } } as const
+
+  it('is hidden by default', () => {
+    const view = renderStats()
+
+    expect(within(view).queryByRole('button', { name: /^AF / })).toBeNull()
+  })
+
+  it('sits last in each Street column and before AFq in the totals, as a ratio to one decimal with no percent sign', () => {
+    const view = renderAf({ ...flop, af: { ratio: true, aggressive: 120, calls: 50 } })
+
+    expect(tilesOf(column(view, 'Flop'))).toEqual(['C-bet —', 'Check-raise —', 'AF 2.4'])
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['AF —'])
+    expect(tilesOf(column(view, 'River'))).toEqual(['AF —'])
+    expect(tilesOf(within(view).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['W$SD —', 'AF 2.4', 'AFq —'])
+  })
+
+  it('writes the ratio the way the language does', () => {
+    const view = renderAf(flop, 'es')
+
+    expect(within(column(view, 'Flop')).getByRole('button', { name: 'AF 2,4' })).toBeTruthy()
+  })
+
+  it('reads “∞” with aggressive Actions and no calls, and “—” with neither', () => {
+    const view = renderAf({
+      'af-turn': { ratio: true, aggressive: 7, calls: 0 },
+      'af-river': { ratio: true, aggressive: 0, calls: 0 },
+    })
+
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['AF ∞'])
+    expect(tilesOf(column(view, 'River'))).toEqual(['AF —'])
+  })
+
+  it('reads 0.0 with calls and no aggressive Action', () => {
+    const view = renderAf({ 'af-turn': { ratio: true, aggressive: 0, calls: 4 } })
+
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['AF 0.0'])
+  })
+
+  it('gives its bets and raises against its calls, and links to the Hands with action and the aggressive ones', async () => {
+    const view = renderAf(flop)
+
+    await userEvent.hover(within(column(view, 'Flop')).getByRole('button', { name: 'AF 2.4' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('Aggression factor on the flop')).toBeTruthy()
+    expect(within(tip).getByText('45 bets and raises / 19 calls')).toBeTruthy()
+    expect(within(tip).getByRole('link', { name: 'With action (52)' }).getAttribute('href')).toBe('/library?stat=af-flop:opportunity')
+    expect(within(tip).getByRole('link', { name: 'Aggressive (38)' }).getAttribute('href')).toBe('/library?stat=af-flop:taken')
+  })
+
+  it('says it in Spanish', async () => {
+    const view = renderAf(flop, 'es')
+
+    await userEvent.hover(within(column(view, 'Flop')).getByRole('button', { name: 'AF 2,4' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('Factor de agresión en el flop')).toBeTruthy()
+    expect(within(tip).getByText('45 bets y raises / 19 calls')).toBeTruthy()
+    expect(within(tip).getByRole('link', { name: 'Con acción (52)' })).toBeTruthy()
+    expect(within(tip).getByRole('link', { name: 'Agresivas (38)' })).toBeTruthy()
+  })
+
+  it('still links to its Hands when there were no calls', async () => {
+    renderAf({ af: { ratio: true, aggressive: 3, calls: 0 } })
+
+    await userEvent.hover(screen.getByRole('button', { name: 'AF ∞' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('3 bets and raises / 0 calls')).toBeTruthy()
+    expect(within(tip).getAllByRole('link')).toHaveLength(2)
+  })
+
+  it('says there was no action rather than “0 / 0”, with no links', async () => {
+    const view = renderAf({})
+
+    await userEvent.hover(within(column(view, 'River')).getByRole('button', { name: 'AF —' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('No bets, raises or calls')).toBeTruthy()
+    expect(within(tip).queryByRole('link')).toBeNull()
+  })
+})
+
 describe('StatsView, choosing which Stats one sees', () => {
   it('shows only the chosen Stats, in the catalogue’s order whatever order they were chosen in', () => {
     const view = renderStats(stats, 'en', ['pfr', 'cbet-turn', 'vpip', 'wsd'])
@@ -384,7 +486,7 @@ describe('StatsView, choosing which Stats one sees', () => {
 
     await userEvent.click(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
 
-    expect(changes).toEqual([{ shownStats: STAT_KEYS.filter((key) => key !== 'vpip') }])
+    expect(changes).toEqual([{ shownStats: STAT_CATALOGUE.filter((stat) => stat.shownByDefault && stat.key !== 'vpip').map((stat) => stat.key) }])
   })
 
   it('has no tooltips nor links while editing', async () => {

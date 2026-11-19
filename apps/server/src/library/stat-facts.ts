@@ -8,10 +8,13 @@ import { factOnRow, type FactKey } from './fact-criteria.js';
  * reaching Showdown, its own row). Most Stats count at most once per Hand:
  * whether it had the opportunity and whether it took it, as conditions.
  * AFq counts per Action: how many opportunities and taken, as integers.
+ * AF is a ratio, not a frequency: how many aggressive Actions and calls, as
+ * integers; its Hands are those with either, and those with an aggressive one.
  */
 export type StatFacts = (
   | { perAction: false; opportunity: SQL; taken: SQL }
   | { perAction: true; opportunities: SQL; taken: SQL }
+  | { ratio: true; aggressive: SQL; calls: SQL }
 ) & {
   /**
    * The rules version that added the last of the facts it reads. A Hand
@@ -75,10 +78,15 @@ function foldOverFaced(action: FacedAction): StatFacts {
   return perHand(faced, sql`${faced} and ${answer} = 'fold'`, since);
 }
 
-/** The Hero's postflop Actions of the given kinds, from the per-Street counters. */
-function postflopActions(kinds: Counter[]) {
+type PostflopStreet = 'flop' | 'turn' | 'river';
+
+/** The Hero's postflop Actions of the given kinds, from the per-Street counters, on the given Streets. */
+function postflopActions(
+  kinds: Counter[],
+  streets: PostflopStreet[] = ['flop', 'turn', 'river'],
+) {
   const { columns, since } = read(
-    ...(['flop', 'turn', 'river'] as const).flatMap((street) =>
+    ...streets.flatMap((street) =>
       kinds.map((kind): FactKey => `${street}-${kind}`),
     ),
   );
@@ -99,6 +107,18 @@ function afq(): StatFacts {
     opportunities: all.count,
     taken: aggressive.count,
     since: Math.max(all.since, aggressive.since),
+  };
+}
+
+/** AF: bets plus raises, against calls, on one Street or over all three. */
+function af(...streets: PostflopStreet[]): StatFacts {
+  const aggressive = postflopActions(['bets', 'raises'], streets);
+  const calls = postflopActions(['calls'], streets);
+  return {
+    ratio: true,
+    aggressive: aggressive.count,
+    calls: calls.count,
+    since: Math.max(aggressive.since, calls.since),
   };
 }
 
@@ -151,10 +171,14 @@ export const STAT_FACTS: Record<StatKey, StatFacts> = {
   'cbet-flop': didOverChance('flop-cbet'),
   'fold-to-cbet-flop': foldOverFaced('flop-cbet'),
   'check-raise-flop': didOverChance('flop-check-raise'),
+  'af-flop': af('flop'),
   'cbet-turn': didOverChance('turn-cbet'),
   'fold-to-cbet-turn': foldOverFaced('turn-cbet'),
+  'af-turn': af('turn'),
   'cbet-river': didOverChance('river-cbet'),
   'fold-to-cbet-river': foldOverFaced('river-cbet'),
+  'af-river': af('river'),
+  af: af('flop', 'turn', 'river'),
   // Per Action: every postflop bet, raise, call or fold is an opportunity.
   afq: afq(),
   ...showdownStats(),
@@ -171,6 +195,12 @@ export function countsTowards(key: StatKey): SQL {
  */
 export function handCounts(key: StatKey, side: 'opportunity' | 'taken'): SQL {
   const stat = STAT_FACTS[key];
+  if ('ratio' in stat) {
+    // "Con acción": a bet, raise or call; "Agresivas": a bet or raise.
+    return side === 'taken'
+      ? sql`${stat.aggressive} > 0`
+      : sql`${stat.aggressive} + ${stat.calls} > 0`;
+  }
   if (!stat.perAction) {
     return side === 'taken' ? stat.taken : stat.opportunity;
   }
