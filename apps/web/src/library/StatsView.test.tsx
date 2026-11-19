@@ -384,7 +384,92 @@ describe('StatsView, choosing which Stats one sees', () => {
 
     await userEvent.click(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
 
-    expect(changes).toEqual([{ shownStats: STAT_KEYS.filter((key) => key !== 'vpip') }])
+    // Today's 21, less VPIP: the Stats the catalogue added later stay hidden.
+    expect(changes).toEqual([
+      {
+        shownStats: [
+          'pfr',
+          'steal',
+          'three-bet',
+          'fold-to-three-bet',
+          'squeeze',
+          'cold-call',
+          'four-bet',
+          'fold-to-four-bet',
+          'fold-bb-to-steal',
+          'cbet-flop',
+          'fold-to-cbet-flop',
+          'check-raise-flop',
+          'cbet-turn',
+          'fold-to-cbet-turn',
+          'cbet-river',
+          'fold-to-cbet-river',
+          'wwsf',
+          'wtsd',
+          'wsd',
+          'afq',
+        ],
+      },
+    ])
+  })
+
+  it('offers the newer preflop Stats in editing, hidden until added, each in its place', async () => {
+    const view = renderStats(stats, 'en', ['vpip'])
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    expect(tilesOf(within(view).getByRole('group', { name: 'Preflop' }))).toEqual([
+      'VPIP 22.4%',
+      'PFR 18.3%',
+      'RFI —',
+      'ATS —',
+      'Limp —',
+      'Limp-fold —',
+      'Limp-call —',
+      'Limp-raise —',
+      'Isolate —',
+      '3-bet —',
+      'Fold to 3-bet —',
+      'Squeeze —',
+      'Fold to Squeeze —',
+      'Cold Call —',
+      '4-bet —',
+      'Fold to 4-bet —',
+      '5-bet+ —',
+      'Fold to 5-bet+ —',
+      'Fold SB to Steal —',
+      'Fold BB to Steal —',
+      'Resteal —',
+      'Fold to Resteal —',
+    ])
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Resteal —', pressed: false }))
+
+    expect(changes).toEqual([{ shownStats: ['vpip', 'resteal'] }])
+  })
+
+  it.each([
+    ['en', [
+      ['RFI —', 'Raise first in'],
+      ['Limp-raise —', 'Re-raise a raise after your limp'],
+      ['5-bet+ —', 'Re-raise a 4-bet'],
+      ['Fold SB to Steal —', 'Fold small blind to steal'],
+      ['Fold to Resteal —', 'Fold to a re-raise of your steal'],
+    ]],
+    ['es', [
+      ['RFI —', 'Abre subiendo cuando nadie ha entrado antes'],
+      ['Limp-raise —', 'Resube una subida tras su limp'],
+      ['5-bet+ —', 'Resube un 4-bet'],
+      ['Fold SB to Steal —', 'Se retira en la ciega pequeña ante un robo'],
+      ['Fold to Resteal —', 'Se retira ante una resubida a su robo'],
+    ]],
+  ] as const)('names the newer preflop Stats in full once added (%s)', async (locale, named) => {
+    const view = renderStats(stats, locale, ['rfi', 'limp-raise', 'five-bet', 'fold-sb-to-steal', 'fold-to-resteal'])
+
+    for (const [tile, name] of named) {
+      await userEvent.hover(within(view).getByRole('button', { name: tile }))
+      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
+      await userEvent.unhover(within(view).getByRole('button', { name: tile }))
+    }
   })
 
   it('has no tooltips nor links while editing', async () => {
