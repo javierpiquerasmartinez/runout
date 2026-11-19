@@ -37,9 +37,12 @@ type StatEntry<Key extends string = string> = {
  * Street columns and the Stat criterion show them in. A Stat's full name,
  * translated, is the message `library.stats.name.<key>`.
  *
- * Adding a Stat is adding its entry here, in its place, with its full name in
- * every language (`library.stats.name.<key>`); the view, the Stat criterion
- * and the address of a filter take it from here.
+ * Adding a Stat touches five places: its entry here, in its place; its full
+ * name in the `es.ts` and `en.ts` messages (`library.stats.name.<key>`); the
+ * server's `STAT_KEYS` (`hands/replay/hero-stats.ts`); its mapping onto the
+ * facts in the server's `STAT_FACTS` (`library/stat-facts.ts`); and its key
+ * in the e2e list of the server's `test/library-stats.e2e-spec.ts`. The
+ * view, the Stat criterion and the address of a filter take it from here.
  */
 export const STAT_CATALOGUE = [
   { key: 'vpip', band: 'preflop', short: 'VPIP', shownByDefault: true },
@@ -148,7 +151,10 @@ export function statLabel(stat: Stat): string {
   return stat.street ? `${STREET_ABBREVIATION[stat.street]} ${stat.short}` : stat.short
 }
 
-/** Where no column splits Postflop, as in the Stat criterion's list, each Street is a group of its own. */
+/**
+ * The sections of the Stat criterion's list, where no column splits
+ * Postflop: the bands, with each Street a section of its own.
+ */
 export const STAT_SECTIONS = ['preflop', ...STAT_STREETS, 'showdown'] as const
 export type StatSection = (typeof STAT_SECTIONS)[number]
 
@@ -156,9 +162,9 @@ export function statSection(stat: Stat): StatSection {
   return stat.street ?? stat.band
 }
 
-/** A band's or a Street's heading. */
+/** A section's heading: its band's, or its Street's. */
 export function sectionTitle(section: StatSection): MessageKey {
-  return section === 'preflop' || section === 'showdown' ? `library.stats.group.${section}` : `library.stats.street.${section}`
+  return section === 'preflop' || section === 'showdown' ? `library.stats.band.${section}` : `library.stats.street.${section}`
 }
 
 /**

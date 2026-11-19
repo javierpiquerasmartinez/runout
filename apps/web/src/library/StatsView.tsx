@@ -10,6 +10,7 @@ import type { StatCriterion, StatSide } from './libraryFilter'
 import {
   STAT_BANDS,
   STAT_CATALOGUE,
+  STAT_KEYS,
   STAT_STREETS,
   statName,
   statSideName,
@@ -58,7 +59,7 @@ export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: 
   }
   // The choice is a set; it is kept in the catalogue's order only to read well.
   const toggle = (key: StatKey) =>
-    change(STAT_CATALOGUE.map((stat) => stat.key).filter((each) => (each === key ? !chosen.has(each) : chosen.has(each))))
+    change(STAT_KEYS.filter((each) => (each === key ? !chosen.has(each) : chosen.has(each))))
 
   const tiles = (of: Stat[]) => (
     <div className="stats__tiles">
@@ -117,25 +118,25 @@ export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: 
         if (inBand.length === 0) return null
         if (band !== 'postflop') {
           return (
-            <Group key={band} level={2} title={t(`library.stats.group.${band}`)}>
+            <Titled key={band} level={2} title={t(`library.stats.band.${band}`)}>
               {tiles(inBand)}
-            </Group>
+            </Titled>
           )
         }
         return (
-          <Group key={band} level={2} title={t('library.stats.group.postflop')}>
+          <Titled key={band} level={2} title={t('library.stats.band.postflop')}>
             <div className="stats__streets">
               {STAT_STREETS.map((street) => {
                 const inStreet = inBand.filter((stat) => stat.street === street)
                 if (inStreet.length === 0) return null
                 return (
-                  <Group key={street} level={3} title={t(`library.stats.street.${street}`)}>
+                  <Titled key={street} level={3} title={t(`library.stats.street.${street}`)}>
                     {tiles(inStreet)}
-                  </Group>
+                  </Titled>
                 )
               })}
             </div>
-          </Group>
+          </Titled>
         )
       })}
       {narrow && <p className="stats__elsewhere">{t('library.stats.phone')}</p>}
@@ -143,13 +144,17 @@ export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: 
   )
 }
 
-/** A band, or a Street's column within Postflop, named by its heading. */
-function Group({ level, title, children }: { level: 2 | 3; title: string; children: ReactNode }) {
+/**
+ * A band, or a Street's column within Postflop, named by its heading. The
+ * view says band for its three rows; the Stat criterion's `STAT_SECTIONS`
+ * split Postflop by Street instead.
+ */
+function Titled({ level, title, children }: { level: 2 | 3; title: string; children: ReactNode }) {
   const titleId = useId()
   const Heading = level === 2 ? 'h2' : 'h3'
   return (
     <div className={level === 2 ? 'stats__band' : 'stats__street'} role="group" aria-labelledby={titleId}>
-      <Heading id={titleId} className={`${level === 2 ? 'stats__group' : 'stats__street-title'} ro-mono`}>
+      <Heading id={titleId} className={`${level === 2 ? 'stats__band-title' : 'stats__street-title'} ro-mono`}>
         {title}
       </Heading>
       {children}

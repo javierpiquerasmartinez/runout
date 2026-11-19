@@ -34,7 +34,7 @@
 .stats__failure {
   color: var(--alert-ink);
 }
-.stats__group {
+.stats__band-title {
   margin: 0 0 8px;
   font-size: 10px;
   font-weight: 400;
