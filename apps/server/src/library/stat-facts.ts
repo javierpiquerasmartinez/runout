@@ -86,13 +86,42 @@ function answerOverFaced(
   return perHand(faced, sql`${faced} and ${answered} = ${answer}`, since);
 }
 
-type PostflopStreet = 'flop' | 'turn' | 'river';
+/** The Streets after preflop, whose Stats sit in their own columns. */
+type Street = 'flop' | 'turn' | 'river';
+const STREETS: Street[] = ['flop', 'turn', 'river'];
 
-/** The Hero's postflop Actions of the given kinds, from the per-Street counters, on the given Streets. */
-function postflopActions(
-  kinds: Counter[],
-  streets: PostflopStreet[] = ['flop', 'turn', 'river'],
-) {
+/** A raise answered to a C-bet faced, over C-bet faced. */
+function raiseCbet(street: Street): StatFacts {
+  return answerOverFaced(`${street}-cbet`, 'raise');
+}
+
+/**
+ * Check-call or Check-fold: over Check-raise's chance (the Hero checked,
+ * then faced a bet they could raise), the Hero's line on the Street begins
+ * with the check and that answer. With Check-raise, they add up to 100 %.
+ */
+function checkThen(street: Street, line: 'XC' | 'XF'): StatFacts {
+  const {
+    columns: [chance, heroLine],
+    since,
+  } = read(`${street}-check-raise-chance`, `${street}-line`);
+  return perHand(
+    chance,
+    sql`${chance} and ${heroLine} like ${`${line}%`}`,
+    since,
+  );
+}
+
+/**
+ * Bet-fold: the Hero's bet raised (check-raised too), answered with a fold.
+ * The Raise Action's faced is a raise of the Hero's bet.
+ */
+function betFold(street: Street): StatFacts {
+  return foldOverFaced(`${street}-raise`);
+}
+
+/** The Hero's Actions of the given kinds on those Streets, from the per-Street counters. */
+function postflopActions(kinds: Counter[], streets: Street[] = STREETS) {
   const { columns, since } = read(
     ...streets.flatMap((street) =>
       kinds.map((kind): FactKey => `${street}-${kind}`),
@@ -107,9 +136,10 @@ function postflopActions(
   };
 }
 
-function afq(): StatFacts {
-  const all = postflopActions(['bets', 'raises', 'calls', 'folds']);
-  const aggressive = postflopActions(['bets', 'raises']);
+/** AFq over every postflop Street, or over one: counted Action by Action. */
+function afq(streets: Street[] = STREETS): StatFacts {
+  const all = postflopActions(['bets', 'raises', 'calls', 'folds'], streets);
+  const aggressive = postflopActions(['bets', 'raises'], streets);
   return {
     perAction: true,
     opportunities: all.count,
@@ -119,7 +149,7 @@ function afq(): StatFacts {
 }
 
 /** AF: bets plus raises, against calls, on one Street or over all three. */
-function af(...streets: PostflopStreet[]): StatFacts {
+function af(...streets: Street[]): StatFacts {
   const aggressive = postflopActions(['bets', 'raises'], streets);
   const calls = postflopActions(['calls'], streets);
   return {
@@ -169,6 +199,7 @@ export const STAT_FACTS: Record<StatKey, StatFacts> = {
   vpip: didOverChance('vpip'),
   pfr: didOverChance('pfr'),
   rfi: didOverChance('open'),
+  steal: didOverChance('steal'),
   limp: didOverChance('limp'),
   // The limp's answers to the first raise after it, its Isolate.
   'limp-fold': answerOverFaced('isolate', 'fold'),
@@ -177,26 +208,32 @@ export const STAT_FACTS: Record<StatKey, StatFacts> = {
   isolate: didOverChance('isolate'),
   'three-bet': didOverChance('three-bet'),
   'fold-to-three-bet': foldOverFaced('three-bet'),
+  squeeze: didOverChance('squeeze'),
+  'fold-to-squeeze': foldOverFaced('squeeze'),
+  'cold-call': didOverChance('cold-call'),
   'four-bet': didOverChance('four-bet'),
   'fold-to-four-bet': foldOverFaced('four-bet'),
   'five-bet': didOverChance('five-bet'),
   'fold-to-five-bet': foldOverFaced('five-bet'),
-  squeeze: didOverChance('squeeze'),
-  'fold-to-squeeze': foldOverFaced('squeeze'),
-  'cold-call': didOverChance('cold-call'),
   'fold-sb-to-steal': foldToStealIn('SB'),
   'fold-bb-to-steal': foldToStealIn('BB'),
-  steal: didOverChance('steal'),
   resteal: didOverChance('resteal'),
   'fold-to-resteal': foldOverFaced('resteal'),
   'cbet-flop': didOverChance('flop-cbet'),
   'fold-to-cbet-flop': foldOverFaced('flop-cbet'),
+  'raise-cbet-flop': raiseCbet('flop'),
   'donk-flop': didOverChance('flop-donk-bet'),
   'fold-to-donk-flop': foldOverFaced('flop-donk-bet'),
   'check-raise-flop': didOverChance('flop-check-raise'),
+  'fold-to-check-raise-flop': foldOverFaced('flop-check-raise'),
+  'check-call-flop': checkThen('flop', 'XC'),
+  'check-fold-flop': checkThen('flop', 'XF'),
+  'bet-fold-flop': betFold('flop'),
   'af-flop': af('flop'),
+  'afq-flop': afq(['flop']),
   'cbet-turn': didOverChance('turn-cbet'),
   'fold-to-cbet-turn': foldOverFaced('turn-cbet'),
+  'raise-cbet-turn': raiseCbet('turn'),
   'delayed-cbet-turn': didOverChance('turn-delayed-cbet'),
   'fold-to-delayed-cbet-turn': foldOverFaced('turn-delayed-cbet'),
   'probe-turn': didOverChance('turn-probe'),
@@ -205,20 +242,33 @@ export const STAT_FACTS: Record<StatKey, StatFacts> = {
   'fold-to-float-turn': foldOverFaced('turn-float'),
   'donk-turn': didOverChance('turn-donk-bet'),
   'fold-to-donk-turn': foldOverFaced('turn-donk-bet'),
+  'check-raise-turn': didOverChance('turn-check-raise'),
+  'fold-to-check-raise-turn': foldOverFaced('turn-check-raise'),
+  'check-call-turn': checkThen('turn', 'XC'),
+  'check-fold-turn': checkThen('turn', 'XF'),
+  'bet-fold-turn': betFold('turn'),
   'af-turn': af('turn'),
+  'afq-turn': afq(['turn']),
   'cbet-river': didOverChance('river-cbet'),
   'fold-to-cbet-river': foldOverFaced('river-cbet'),
+  'raise-cbet-river': raiseCbet('river'),
   'probe-river': didOverChance('river-probe'),
   'fold-to-probe-river': foldOverFaced('river-probe'),
   'float-river': didOverChance('river-float'),
   'fold-to-float-river': foldOverFaced('river-float'),
   'donk-river': didOverChance('river-donk-bet'),
   'fold-to-donk-river': foldOverFaced('river-donk-bet'),
+  'check-raise-river': didOverChance('river-check-raise'),
+  'fold-to-check-raise-river': foldOverFaced('river-check-raise'),
+  'check-call-river': checkThen('river', 'XC'),
+  'check-fold-river': checkThen('river', 'XF'),
+  'bet-fold-river': betFold('river'),
   'af-river': af('river'),
+  'afq-river': afq(['river']),
+  ...showdownStats(),
   af: af('flop', 'turn', 'river'),
   // Per Action: every postflop bet, raise, call or fold is an opportunity.
   afq: afq(),
-  ...showdownStats(),
 };
 
 /** The Hand's facts row is recent enough for the Stat. */

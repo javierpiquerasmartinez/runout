@@ -872,14 +872,21 @@ describe('LibraryPage', () => {
         expect(names(within(panel).getByRole('group', { name: 'Flop' }))).toEqual([
           'Flop C-bet',
           'Flop Fold to C-bet',
+          'Flop Raise C-bet',
           'Flop Donk',
           'Flop Fold to Donk',
           'Flop Check-raise',
+          'Flop Fold to Check-raise',
+          'Flop Check-call',
+          'Flop Check-fold',
+          'Flop Bet-fold',
           'Flop AF',
+          'Flop AFq',
         ])
         expect(names(within(panel).getByRole('group', { name: 'Turn' }))).toEqual([
           'Turn C-bet',
           'Turn Fold to C-bet',
+          'Turn Raise C-bet',
           'Turn Delayed C-bet',
           'Turn Fold to Delayed C-bet',
           'Turn Probe',
@@ -888,18 +895,31 @@ describe('LibraryPage', () => {
           'Turn Fold to Float',
           'Turn Donk',
           'Turn Fold to Donk',
+          'Turn Check-raise',
+          'Turn Fold to Check-raise',
+          'Turn Check-call',
+          'Turn Check-fold',
+          'Turn Bet-fold',
           'Turn AF',
+          'Turn AFq',
         ])
         expect(names(within(panel).getByRole('group', { name: 'River' }))).toEqual([
           'River C-bet',
           'River Fold to C-bet',
+          'River Raise C-bet',
           'River Probe',
           'River Fold to Probe',
           'River Float',
           'River Fold to Float',
           'River Donk',
           'River Fold to Donk',
+          'River Check-raise',
+          'River Fold to Check-raise',
+          'River Check-call',
+          'River Check-fold',
+          'River Bet-fold',
           'River AF',
+          'River AFq',
         ])
         expect(names(within(panel).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF', 'WTSD', 'W$SD', 'AF', 'AFq'])
 

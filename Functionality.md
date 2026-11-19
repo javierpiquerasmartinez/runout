@@ -494,10 +494,14 @@ The Library is a person's own repository: the Hands they imported into it, whate
   - **RFI** is the open (raising first in) over the times I was first in; **Limp** the limps over the times I could limp; **Isolate** the raises over limpers over the times I could make one; **5-bet+** a re-raise of a 4-bet or more; **Resteal** a re-raise of a steal from the blinds;
   - **Limp-fold**, **Limp-call** and **Limp-raise** are my answer to the first raise after my limp, over the times it came, so the three add up to 100 %;
   - **Fold to Squeeze**, **Fold to 5-bet+** and **Fold to Resteal** are the folds over the times I faced one; **Fold SB to Steal** is the small blind's Fold BB to Steal.
-- The Postflop ones are hidden too. Each of these Postflop Stats sits in its Street's column, after Fold to C-bet, and counts as its did over its chance; its Fold to counts the times I faced it and folded:
-  - **Flop:** Donk, Fold to Donk;
-  - **Turn:** Delayed C-bet, Fold to Delayed C-bet, Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk;
-  - **River:** Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk.
+- The Postflop ones are hidden too, except Check-raise on the flop. Each sits in its Street's column, in the catalogue's order, and counts as its did over its chance; its Fold to counts the times I faced it and folded:
+  - **Flop:** Raise C-bet, Donk, Fold to Donk, Check-raise, Fold to Check-raise, Check-call, Check-fold, Bet-fold, AFq;
+  - **Turn:** Raise C-bet, Delayed C-bet, Fold to Delayed C-bet, Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk, Check-raise, Fold to Check-raise, Check-call, Check-fold, Bet-fold, AFq;
+  - **River:** Raise C-bet, Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk, Check-raise, Fold to Check-raise, Check-call, Check-fold, Bet-fold, AFq;
+  - **Raise C-bet** is a C-bet I faced, answered with a raise;
+  - **Check-raise**, **Check-call** and **Check-fold** share one chance, I checked and then faced a bet I could raise, so the three add up to 100 %; Check-call and Check-fold read my line on the Street (it begins XC or XF);
+  - **Fold to Check-raise** is a check-raise I faced, answered with a fold; **Bet-fold** a bet of mine raised (check-raised too), answered with a fold;
+  - **AFq** of the Street is counted Action by Action as the total AFq is, its links counting Hands.
 - **Editar**, on the line of the Hand count, lets me choose which Stats of the catalogue I see:
   - while editing, every Stat of the catalogue shows in its band and column with its value; the ones I see are outlined in the accent colour with a ✓, the hidden ones are faded, with a dashed outline and a +;
   - the line reads "Elige qué estadísticas ves: un clic pone o quita cada una. Las atenuadas están ocultas.", with **Restablecer** and **Listo**;
@@ -510,7 +514,7 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - Hovering or focusing a tile shows its full name in my language, with its Street ("Apuesta de continuación en el turn"), and how many times I made the decision out of how many I could ("57 / 312"), so I judge the sample myself. A Stat with no chance says so instead.
 - The tooltip links to the Hands behind the number: **Oportunidades (312)** and **Lo hiciste (57)** open the list on the Hands where I had the chance, or where I took it, with that Stat criterion added to Más filtros and every other filter, Más filtros criterion and the sort kept (H7.3). The list then counts as many Hands as the link said, and going back returns to the Stats. With the criterion on, the Results Graph and the Stats narrow to those Hands too, even if that makes the Stat I came from read 100 %.
 - Every Stat but AFq counts at most one chance per Hand. AFq counts my postflop bets and raises out of my postflop bets, raises, calls and folds, Action by Action; checks don't count.
-- **AF**, the aggression factor, is the one Stat that is a ratio, not a frequency: my bets plus raises over my calls, on the flop, the turn and the river, each last in its Street's column, and over every postflop Street in Showdown y totales, before AFq. None of the four is shown by default; I add them from Editar.
+- **AF**, the aggression factor, is the one Stat that is a ratio, not a frequency: my bets plus raises over my calls, on the flop, the turn and the river, each in its Street's column after Bet-fold, before the Street's AFq, and over every postflop Street in Showdown y totales, before AFq. None of the four is shown by default; I add them from Editar.
   - It reads with one decimal in my language's format and no percent sign ("2,4"), "∞" when I bet or raised but never called, and "—" when I neither bet, raised nor called.
   - Its tooltip gives my bets and raises against my calls ("45 bets y raises / 19 calls"), and links to **Con acción (52)**, the Hands with a bet, raise or call on that Street (on any postflop Street for the total), and **Agresivas (38)**, those with a bet or raise there. Its Stat criterion in Más filtros offers the same two sides, **Agresivas** and **Con acción**, and its chip reads "River AF · con acción".
 - The definitions follow PokerTracker 4's, with Runout's own rules where no Tracker documents the case (straddles, antes, walks, short all-ins), as [docs/research/hero-stats.md](docs/research/hero-stats.md) records them.
