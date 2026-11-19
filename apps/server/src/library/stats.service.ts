@@ -4,12 +4,19 @@ import { DATABASE, type Database } from '../database/database.js';
 import { handFacts, hands, libraryEntries } from '../database/schema.js';
 import {
   STAT_KEYS,
-  type HeroStats,
+  type StatCount,
   type StatKey,
 } from '../hands/replay/hero-stats.js';
 import type { Identity } from '../identity/identity.service.js';
 import { libraryFilterWhere, type LibraryFilter } from './library-filter.js';
-import { countsTowards, handCounts, STAT_FACTS } from './stat-facts.js';
+import {
+  countsTowards,
+  STAT_FACTS,
+  type StatHands,
+  type StatRatio,
+} from './stat-facts.js';
+
+export type { StatHands, StatRatio } from './stat-facts.js';
 
 /** The Hero's Stats over the Hands a Library filter keeps. */
 export interface LibraryStats {
@@ -18,9 +25,11 @@ export interface LibraryStats {
   /**
    * Every Stat, in the Stats view's order, with its opportunities and taken
    * counts summed over those Hands; zero for a Stat the Hero never had the
-   * chance at. Counts, not percentages.
+   * chance at. Counts, not percentages. AF, a ratio, answers its
+   * aggressive Actions and its calls instead, never their quotient, so a
+   * Hero who never called is a count of zero, not an infinity.
    */
-  stats: HeroStats;
+  stats: Record<StatKey, StatCount | StatRatio>;
   /**
    * Every Stat, with how many of those Hands had its opportunity and how
    * many had it taken: the Hands the `stat=` criterion keeps for each side,
@@ -28,12 +37,6 @@ export interface LibraryStats {
    * from the sums because a Stat such as AFq counts several Actions per Hand.
    */
   handsWith: Record<StatKey, StatHands>;
-}
-
-/** How many Hands had a Stat's opportunity, and how many had it taken. */
-export interface StatHands {
-  opportunity: number;
-  taken: number;
 }
 
 /** The Library's Stats, answered by the database. */
@@ -49,44 +52,45 @@ export class StatsService {
    */
   async stats(account: Identity, filter: LibraryFilter): Promise<LibraryStats> {
     const kept = libraryFilterWhere(account.id, filter);
-    // Each Stat's Hands on either side, and for one counted per Action, its
-    // sums too; for any other the sums are those Hands.
-    const sums = STAT_KEYS.flatMap((key, index) => {
+    // Each Stat's Hands on either side, and whatever sums it adds up.
+    const columns = STAT_KEYS.flatMap((key, index) => {
       const stat = STAT_FACTS[key];
       const counts = countsTowards(key);
       return [
-        sql`count(*) filter (where ${counts} and ${handCounts(key, 'opportunity')})::int as ${sql.identifier(`ho${index}`)}`,
-        sql`count(*) filter (where ${counts} and ${handCounts(key, 'taken')})::int as ${sql.identifier(`ht${index}`)}`,
-        ...(stat.perAction
-          ? [
-              sql`coalesce(sum(${stat.opportunities}) filter (where ${counts}), 0)::int as ${sql.identifier(`o${index}`)}`,
-              sql`coalesce(sum(${stat.taken}) filter (where ${counts}), 0)::int as ${sql.identifier(`t${index}`)}`,
-            ]
-          : []),
+        sql`count(*) filter (where ${counts} and ${stat.opportunity})::int as ${sql.identifier(`ho${index}`)}`,
+        sql`count(*) filter (where ${counts} and ${stat.taken})::int as ${sql.identifier(`ht${index}`)}`,
+        ...Object.entries(stat.sums).map(
+          ([name, sum]) =>
+            sql`coalesce(sum(${sum}) filter (where ${counts}), 0)::int as ${sql.identifier(`s${index}_${name}`)}`,
+        ),
       ];
     });
     const result = await this.db.execute<Record<string, number>>(sql`
-      select count(*)::int as hands, ${sql.join(sums, sql`, `)}
+      select count(*)::int as hands, ${sql.join(columns, sql`, `)}
       from ${libraryEntries}
       inner join ${hands} on ${eq(hands.id, libraryEntries.handId)}
       left join ${handFacts} on ${eq(handFacts.handId, hands.id)}
       where ${kept}
     `);
     const [row] = result.rows;
-    const stats = Object.fromEntries(
-      STAT_KEYS.map((key, index) => [
-        key,
-        STAT_FACTS[key].perAction
-          ? { opportunities: row[`o${index}`], taken: row[`t${index}`] }
-          : { opportunities: row[`ho${index}`], taken: row[`ht${index}`] },
-      ]),
-    ) as HeroStats;
     const handsWith = Object.fromEntries(
-      STAT_KEYS.map((key, index) => [
+      STAT_KEYS.map((key, index): [StatKey, StatHands] => [
         key,
         { opportunity: row[`ho${index}`], taken: row[`ht${index}`] },
       ]),
     ) as Record<StatKey, StatHands>;
+    const stats = Object.fromEntries(
+      STAT_KEYS.map((key, index): [StatKey, StatCount | StatRatio] => {
+        const stat = STAT_FACTS[key];
+        const sums = Object.fromEntries(
+          Object.keys(stat.sums).map((name) => [
+            name,
+            row[`s${index}_${name}`],
+          ]),
+        );
+        return [key, stat.answer(handsWith[key], sums)];
+      }),
+    ) as LibraryStats['stats'];
     return { hands: row.hands, stats, handsWith };
   }
 }

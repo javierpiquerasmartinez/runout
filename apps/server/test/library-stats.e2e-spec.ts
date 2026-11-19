@@ -1,7 +1,10 @@
 import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
-import { freshHandHistory } from './support/hand-histories.js';
+import {
+  freshHandHistory,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -12,6 +15,7 @@ interface StatCount {
 
 interface Stats {
   hands: number;
+  /** AF instead answers `{ ratio: true, aggressive, calls }`. */
   stats: Record<string, StatCount>;
   handsWith: Record<string, { opportunity: number; taken: number }>;
 }
@@ -19,26 +23,196 @@ interface Stats {
 const STAT_KEYS = [
   'vpip',
   'pfr',
+  'rfi',
+  'steal',
+  'limp',
+  'limp-fold',
+  'limp-call',
+  'limp-raise',
+  'isolate',
   'three-bet',
   'fold-to-three-bet',
+  'squeeze',
+  'fold-to-squeeze',
+  'cold-call',
   'four-bet',
   'fold-to-four-bet',
-  'squeeze',
-  'cold-call',
+  'five-bet',
+  'fold-to-five-bet',
+  'fold-sb-to-steal',
   'fold-bb-to-steal',
-  'steal',
+  'resteal',
+  'fold-to-resteal',
   'cbet-flop',
   'fold-to-cbet-flop',
+  'raise-cbet-flop',
+  'donk-flop',
+  'fold-to-donk-flop',
   'check-raise-flop',
+  'fold-to-check-raise-flop',
+  'check-call-flop',
+  'check-fold-flop',
+  'bet-fold-flop',
+  'af-flop',
+  'afq-flop',
   'cbet-turn',
   'fold-to-cbet-turn',
+  'raise-cbet-turn',
+  'delayed-cbet-turn',
+  'fold-to-delayed-cbet-turn',
+  'probe-turn',
+  'fold-to-probe-turn',
+  'float-turn',
+  'fold-to-float-turn',
+  'donk-turn',
+  'fold-to-donk-turn',
+  'check-raise-turn',
+  'fold-to-check-raise-turn',
+  'check-call-turn',
+  'check-fold-turn',
+  'bet-fold-turn',
+  'af-turn',
+  'afq-turn',
   'cbet-river',
   'fold-to-cbet-river',
-  'afq',
+  'raise-cbet-river',
+  'probe-river',
+  'fold-to-probe-river',
+  'float-river',
+  'fold-to-float-river',
+  'donk-river',
+  'fold-to-donk-river',
+  'check-raise-river',
+  'fold-to-check-raise-river',
+  'check-call-river',
+  'check-fold-river',
+  'bet-fold-river',
+  'af-river',
+  'afq-river',
   'wwsf',
   'wtsd',
   'wsd',
+  'af',
+  'afq',
 ];
+
+/**
+ * A three-handed PokerStars Hand ($0.50/$1) with hand IDs of its own: Btn
+ * on the button, then Sb and Bb, $100 each, played as `streets` lists, with
+ * `hero` dealt Ah Kd. The Board is Kh 9c 4d 2s 7h.
+ */
+function threeHanded(
+  hero: 'Btn' | 'Sb' | 'Bb',
+  streets: { preflop: string; flop?: string; turn?: string; river?: string },
+): string {
+  const lines = (block: string) => block.trim().replace(/^\s+/gm, '');
+  return withFreshHandIds(
+    [
+      "PokerStars Hand #262199000001:  Hold'em No Limit ($0.50/$1 USD) - 2026/09/10 21:00:00 CET [2026/09/10 15:00:00 ET]",
+      "Table 'Spec' 3-max Seat #1 is the button",
+      'Seat 1: Btn ($100 in chips)',
+      'Seat 2: Sb ($100 in chips)',
+      'Seat 3: Bb ($100 in chips)',
+      'Sb: posts small blind $0.50',
+      'Bb: posts big blind $1',
+      '*** HOLE CARDS ***',
+      `Dealt to ${hero} [Ah Kd]`,
+      lines(streets.preflop),
+      ...(streets.flop !== undefined
+        ? ['*** FLOP *** [Kh 9c 4d]', lines(streets.flop)]
+        : []),
+      ...(streets.turn !== undefined
+        ? ['*** TURN *** [Kh 9c 4d] [2s]', lines(streets.turn)]
+        : []),
+      ...(streets.river !== undefined
+        ? ['*** RIVER *** [Kh 9c 4d 2s] [7h]', lines(streets.river)]
+        : []),
+      'Btn collected $1 from pot',
+      '*** SUMMARY ***',
+      'Total pot $1 | Rake $0',
+    ].join('\n') + '\n',
+  );
+}
+
+/** The Btn limps, the Sb folds and the Bb raises it: the limp's Isolate. */
+const LIMP_ISOLATED = `
+  Btn: calls $1
+  Sb: folds
+  Bb: raises $3 to $4`;
+
+/** Two limps, and the Bb checks: an Isolate passed up. */
+const LIMPED = `
+  Btn: calls $1
+  Sb: calls $0.50
+  Bb: checks`;
+
+/** Nobody bets the flop of a limped pot. */
+const CHECKED_FLOP = `
+  Sb: checks
+  Bb: checks
+  Btn: checks`;
+
+/** The Btn opens and the Sb re-raises it: a Resteal. */
+const RESTEAL = `
+  Btn: raises $2 to $3
+  Sb: raises $7 to $10
+  Bb: folds`;
+
+/** The Btn opens, the Sb folds and the Bb calls: heads-up to the flop. */
+const OPEN_CALLED = `
+  Btn: raises $2 to $3
+  Sb: folds
+  Bb: calls $2`;
+
+const AF_KEYS = ['af-flop', 'af-turn', 'af-river', 'af'];
+
+const STREETS = ['flop', 'turn', 'river'] as const;
+type Street = (typeof STREETS)[number];
+
+/**
+ * A three-handed $0.50/$1 PokerStars Hand, seen by `hero`: the Btn opens and
+ * the Bb calls; the Btn bets every Street before `street` and the Bb calls
+ * it, `spot` is played on `street`, and the later Streets, if the Hand gets
+ * there, are checked. The Board is Kh 9c 4d 2s 7h.
+ */
+function onStreet(street: Street, hero: 'Btn' | 'Bb', spot: string): string {
+  const lines = (block: string) => block.trim().replace(/^\s+/gm, '');
+  const at = STREETS.indexOf(street);
+  const continued = !/folds/.test(spot);
+  const play = (index: number) =>
+    index < at
+      ? 'Bb: checks\nBtn: bets $2\nBb: calls $2'
+      : index === at
+        ? lines(spot)
+        : 'Bb: checks\nBtn: checks';
+  const boards = [
+    '*** FLOP *** [Kh 9c 4d]',
+    '*** TURN *** [Kh 9c 4d] [2s]',
+    '*** RIVER *** [Kh 9c 4d 2s] [7h]',
+  ];
+  return withFreshHandIds(
+    [
+      "PokerStars Hand #262199000001:  Hold'em No Limit ($0.50/$1 USD) - 2026/09/10 21:00:00 CET [2026/09/10 15:00:00 ET]",
+      "Table 'Spec' 3-max Seat #1 is the button",
+      'Seat 1: Btn ($100 in chips)',
+      'Seat 2: Sb ($100 in chips)',
+      'Seat 3: Bb ($100 in chips)',
+      'Sb: posts small blind $0.50',
+      'Bb: posts big blind $1',
+      '*** HOLE CARDS ***',
+      `Dealt to ${hero} [Ah Kd]`,
+      'Btn: raises $2 to $3',
+      'Sb: folds',
+      'Bb: calls $2',
+      ...STREETS.flatMap((_, index) =>
+        index <= at || continued ? [boards[index], play(index)] : [],
+      ),
+      'Btn collected $1 from pot',
+      '*** SUMMARY ***',
+      'Total pot $1 | Rake $0',
+    ].join('\n') + '\n',
+  );
+}
 
 /*
  * The fixtures this file imports, iMapleAA's Hands at €0.05/€0.10 in the
@@ -89,6 +263,14 @@ describe('The Library’s Stats (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     return res.body as Stats;
+  }
+
+  async function handCount(token: string, query: string): Promise<number> {
+    const res = await request(running.httpServer)
+      .get(`/api/library/hand-ids?${query}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    return (res.body.ids as string[]).length;
   }
 
   async function resultsCount(token: string, query: string): Promise<number> {
@@ -248,6 +430,70 @@ describe('The Library’s Stats (e2e)', () => {
     ).toEqual({ opportunity: 2, taken: 2 });
   });
 
+  it('sums AF per Street and in total as bets and raises against calls, never dividing them', async () => {
+    const account = await newAccount(running.httpServer);
+    await importText(
+      account.token,
+      [
+        // Flop: a bet, raised, called; turn: a call; river: a bet.
+        threeHanded('Btn', {
+          preflop: OPEN_CALLED,
+          flop: 'Bb: checks\nBtn: bets $3\nBb: raises $6 to $9\nBtn: calls $6',
+          turn: 'Bb: bets $10\nBtn: calls $10',
+          river: 'Bb: checks\nBtn: bets $20\nBb: calls $20',
+        }),
+        // Flop: a bet that takes it.
+        threeHanded('Btn', {
+          preflop: OPEN_CALLED,
+          flop: 'Bb: checks\nBtn: bets $3\nBb: folds',
+        }),
+        // Flop: a fold, which AF leaves out, unlike AFq.
+        threeHanded('Btn', {
+          preflop: OPEN_CALLED,
+          flop: 'Bb: bets $3\nBtn: folds',
+        }),
+      ].join('\n\n\n'),
+    );
+
+    const all = await stats(account.token);
+
+    expect({
+      'af-flop': all.stats['af-flop'],
+      'af-turn': all.stats['af-turn'],
+      'af-river': all.stats['af-river'],
+      af: all.stats.af,
+    }).toEqual({
+      'af-flop': { ratio: true, aggressive: 2, calls: 1 },
+      'af-turn': { ratio: true, aggressive: 0, calls: 1 },
+      // Aggression and no call: "∞" on screen, two counts here.
+      'af-river': { ratio: true, aggressive: 1, calls: 0 },
+      af: { ratio: true, aggressive: 3, calls: 2 },
+    });
+    // Its Hands: with a bet, raise or call there ("Con acción"), and with a
+    // bet or raise ("Agresivas").
+    expect({
+      'af-flop': all.handsWith['af-flop'],
+      'af-turn': all.handsWith['af-turn'],
+      'af-river': all.handsWith['af-river'],
+      af: all.handsWith.af,
+    }).toEqual({
+      'af-flop': { opportunity: 2, taken: 2 },
+      'af-turn': { opportunity: 1, taken: 0 },
+      'af-river': { opportunity: 1, taken: 1 },
+      af: { opportunity: 2, taken: 2 },
+    });
+    // The Stat criterion keeps as many Hands as each link says.
+    for (const key of AF_KEYS) {
+      for (const side of ['opportunity', 'taken'] as const) {
+        expect(
+          await resultsCount(account.token, `stat=${key}:${side}`),
+          `${key}:${side}`,
+        ).toBe(all.handsWith[key][side]);
+      }
+    }
+    expect(all.stats.afq).toEqual({ opportunities: 6, taken: 3 });
+  });
+
   it('answers every Stat, with zero opportunities where the Hero had none', async () => {
     const account = await stockedAccount();
 
@@ -312,6 +558,240 @@ describe('The Library’s Stats (e2e)', () => {
     });
   });
 
+  /**
+   * Each Stat's opportunities and taken, checking on the way that the Hands
+   * behind its links, and those its Stat criterion keeps, are as many.
+   */
+  async function perHandStats(token: string, keys: string[]) {
+    const all = await stats(token);
+    const hands = async (query: string) => {
+      const res = await request(running.httpServer)
+        .get(`/api/library/hand-ids?${query}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      return (res.body.ids as string[]).length;
+    };
+    const counted: Record<string, [number, number]> = {};
+    for (const key of keys) {
+      const { opportunities, taken } = all.stats[key];
+      // Counted once per Hand: the links list as many Hands as the counts.
+      expect(all.handsWith[key], key).toEqual({
+        opportunity: opportunities,
+        taken,
+      });
+      expect(await hands(`stat=${key}:opportunity`), key).toBe(opportunities);
+      expect(await hands(`stat=${key}:taken`), key).toBe(taken);
+      counted[key] = [opportunities, taken];
+    }
+    return counted;
+  }
+
+  it('sums RFI, Limp, the answers to an Isolate, and Isolate', async () => {
+    const account = await newAccount(running.httpServer);
+    await importText(
+      account.token,
+      [
+        // The Btn limps, is isolated and raises.
+        threeHanded('Btn', { preflop: `${LIMP_ISOLATED}\nBtn: raises $8 to $12\nBb: folds` }),
+        // The Btn limps, is isolated and calls.
+        threeHanded('Btn', { preflop: `${LIMP_ISOLATED}\nBtn: calls $3`, flop: 'Bb: checks\nBtn: checks' }),
+        // The Btn limps, is isolated and folds.
+        threeHanded('Btn', { preflop: `${LIMP_ISOLATED}\nBtn: folds` }),
+        // The Btn opens.
+        threeHanded('Btn', { preflop: 'Btn: raises $2 to $3\nSb: folds\nBb: folds' }),
+        // The Btn limps and nobody raises.
+        threeHanded('Btn', { preflop: LIMPED, flop: CHECKED_FLOP }),
+        // The Bb isolates the Btn's limp.
+        threeHanded('Bb', { preflop: `${LIMP_ISOLATED}\nBtn: folds` }),
+        // The Bb checks behind two limps.
+        threeHanded('Bb', { preflop: LIMPED, flop: CHECKED_FLOP }),
+      ].join('\n\n\n'),
+    );
+
+    expect(
+      await perHandStats(account.token, [
+        'rfi',
+        'limp',
+        'limp-fold',
+        'limp-call',
+        'limp-raise',
+        'isolate',
+      ]),
+    ).toEqual({
+      // The Btn is first in every time: one open, four limps.
+      rfi: [5, 1],
+      limp: [5, 4],
+      // Three of the limps are isolated, and answered each way once.
+      'limp-fold': [3, 1],
+      'limp-call': [3, 1],
+      'limp-raise': [3, 1],
+      // The Bb behind a limp twice: one raise, one check.
+      isolate: [2, 1],
+    });
+  });
+
+  it('sums the answers to a Squeeze and a 5-bet, and the fights over a steal', async () => {
+    const account = await newAccount(running.httpServer);
+    const fiveBet = `${RESTEAL}\nBtn: raises $15 to $25\nSb: raises $35 to $60\nBtn: folds`;
+    await importText(
+      account.token,
+      [
+        // The Sb folds to the Btn's steal.
+        threeHanded('Sb', { preflop: 'Btn: raises $2 to $3\nSb: folds\nBb: folds' }),
+        // The Sb resteals, and the Btn folds to it.
+        threeHanded('Sb', { preflop: `${RESTEAL}\nBtn: folds` }),
+        threeHanded('Btn', { preflop: `${RESTEAL}\nBtn: folds` }),
+        // The Sb resteals, the Btn 4-bets, the Sb 5-bets and the Btn folds.
+        threeHanded('Sb', { preflop: fiveBet }),
+        threeHanded('Btn', { preflop: fiveBet }),
+        // The Bb squeezes the Btn's open and the Sb's call; the Btn folds.
+        threeHanded(
+          'Btn',
+          {
+            preflop:
+              'Btn: raises $2 to $3\nSb: calls $2\nBb: raises $11 to $14\nBtn: folds\nSb: folds',
+          },
+        ),
+      ].join('\n\n\n'),
+    );
+
+    expect(
+      await perHandStats(account.token, [
+        'fold-to-squeeze',
+        'five-bet',
+        'fold-to-five-bet',
+        'fold-sb-to-steal',
+        'resteal',
+        'fold-to-resteal',
+      ]),
+    ).toEqual({
+      'fold-to-squeeze': [1, 1],
+      // The Sb 5-bets; the Btn, facing it, could have raised again.
+      'five-bet': [2, 1],
+      'fold-to-five-bet': [1, 1],
+      // The Sb faces a steal three times and folds once.
+      'fold-sb-to-steal': [3, 1],
+      resteal: [3, 2],
+      // The Btn folds to one Resteal and 4-bets the other.
+      'fold-to-resteal': [2, 1],
+    });
+  });
+
+  it('sums Donk, Probe, Float and Delayed C-bet, and their Fold to, on each Street, keeping the same Hands behind each', async () => {
+    const account = await newAccount(running.httpServer);
+    // The Btn opens and the Bb calls in every Hand; each Hand is imported
+    // twice, once from each seat. The fixtures reach almost none of these
+    // spots.
+    const spots = {
+      // The Bb leads the flop into the opener, who folds.
+      flopDonkFolded: {
+        flop: 'Bb: bets $3\nBtn: folds\nUncalled bet ($3) returned to Bb',
+      },
+      // The Bb leads the turn into the flop's C-bettor, who calls, then
+      // checks the river to him; he bets, a float, and the Bb folds.
+      turnDonkThenFloat: {
+        flop: 'Bb: checks\nBtn: bets $3\nBb: calls $3',
+        turn: 'Bb: bets $6\nBtn: calls $6',
+        river:
+          'Bb: checks\nBtn: bets $10\nBb: folds\nUncalled bet ($10) returned to Btn',
+      },
+      // A flop C-bet called and a turn checked through; the Bb probes the
+      // river and the Btn folds.
+      riverProbeFolded: {
+        flop: 'Bb: checks\nBtn: bets $3\nBb: calls $3',
+        turn: 'Bb: checks\nBtn: checks',
+        river: 'Bb: bets $5\nBtn: folds\nUncalled bet ($5) returned to Bb',
+      },
+      // A flop checked through; the Btn's turn bet, a delayed C-bet, is
+      // check-raised and he folds.
+      delayedCbetRaised: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: checks\nBtn: bets $4\nBb: raises $8 to $12\nBtn: folds\nUncalled bet ($8) returned to Bb',
+      },
+      // A flop checked through; the Bb probes the turn and the Btn folds.
+      turnProbeFolded: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: bets $3\nBtn: folds\nUncalled bet ($3) returned to Bb',
+      },
+      // C-bets on the flop and the turn, both called; the Bb leads the
+      // river into the turn's bettor, who folds.
+      riverDonkFolded: {
+        flop: 'Bb: checks\nBtn: bets $3\nBb: calls $3',
+        turn: 'Bb: checks\nBtn: bets $6\nBb: calls $6',
+        river: 'Bb: bets $10\nBtn: folds\nUncalled bet ($10) returned to Bb',
+      },
+      // The Bb leads the flop and the Btn calls in position; the Bb checks
+      // the turn, the Btn floats it and the Bb folds.
+      turnFloatFolded: {
+        flop: 'Bb: bets $3\nBtn: calls $3',
+        turn: 'Bb: checks\nBtn: bets $6\nBb: folds\nUncalled bet ($6) returned to Btn',
+      },
+      // A flop checked through; the Btn's delayed C-bet, folded to.
+      delayedCbetFolded: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: checks\nBtn: bets $4\nBb: folds\nUncalled bet ($4) returned to Btn',
+      },
+      // Every Street checked through: chances, none taken.
+      checkedDown: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: checks\nBtn: checks',
+        river: 'Bb: checks\nBtn: checks',
+      },
+    };
+    await importText(
+      account.token,
+      Object.values(spots)
+        .flatMap((streets) =>
+          (['Btn', 'Bb'] as const).map((hero) =>
+            threeHanded(hero, { preflop: OPEN_CALLED, ...streets }),
+          ),
+        )
+        .join('\n\n\n'),
+    );
+
+    const all = await stats(account.token);
+    expect(all.hands).toBe(18);
+    const expected: Record<string, StatCount> = {
+      // The Bb could lead every flop; it led two.
+      'donk-flop': { opportunities: 9, taken: 2 },
+      'fold-to-donk-flop': { opportunities: 2, taken: 1 },
+      // Only after a bet the Bb called: a flop checked through is a probe.
+      'donk-turn': { opportunities: 3, taken: 1 },
+      'fold-to-donk-turn': { opportunities: 1, taken: 0 },
+      'donk-river': { opportunities: 1, taken: 1 },
+      'fold-to-donk-river': { opportunities: 1, taken: 1 },
+      'delayed-cbet-turn': { opportunities: 3, taken: 2 },
+      // Raised once, folded once.
+      'fold-to-delayed-cbet-turn': { opportunities: 2, taken: 1 },
+      'probe-turn': { opportunities: 4, taken: 1 },
+      'fold-to-probe-turn': { opportunities: 1, taken: 1 },
+      'float-turn': { opportunities: 1, taken: 1 },
+      'fold-to-float-turn': { opportunities: 1, taken: 1 },
+      'probe-river': { opportunities: 2, taken: 1 },
+      'fold-to-probe-river': { opportunities: 1, taken: 1 },
+      'float-river': { opportunities: 1, taken: 1 },
+      'fold-to-float-river': { opportunities: 1, taken: 1 },
+    };
+    for (const [key, count] of Object.entries(expected)) {
+      expect(all.stats[key], key).toEqual(count);
+      // Counted once per Hand: the Hands behind the links are as many.
+      expect(all.handsWith[key], key).toEqual({
+        opportunity: count.opportunities,
+        taken: count.taken,
+      });
+      // The Stat criterion keeps those same Hands.
+      for (const side of ['opportunity', 'taken'] as const) {
+        const res = await request(running.httpServer)
+          .get(`/api/library/hand-ids?stat=${key}:${side}`)
+          .set('Authorization', `Bearer ${account.token}`)
+          .expect(200);
+        expect((res.body.ids as string[]).length, `${key}:${side}`).toBe(
+          all.handsWith[key][side],
+        );
+      }
+    }
+  });
+
   it('sums the steal and blind Stats', async () => {
     const account = await stockedAccount();
 
@@ -339,7 +819,12 @@ describe('The Library’s Stats (e2e)', () => {
     expect(await stats(account.token)).toEqual({
       hands: 0,
       stats: Object.fromEntries(
-        STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }]),
+        STAT_KEYS.map((key) => [
+          key,
+          AF_KEYS.includes(key)
+            ? { ratio: true, aggressive: 0, calls: 0 }
+            : { opportunities: 0, taken: 0 },
+        ]),
       ),
       handsWith: Object.fromEntries(
         STAT_KEYS.map((key) => [key, { opportunity: 0, taken: 0 }]),
@@ -407,6 +892,116 @@ describe('The Library’s Stats (e2e)', () => {
     const reread = await stats(account.token);
     expect(reread.stats.vpip).toEqual({ opportunities: 1, taken: 1 });
     expect(reread).toEqual(imported);
+  });
+
+  it('sums the answers on each Street: Raise C-bet, Check-raise, Check-call, Check-fold, Fold to Check-raise, Bet-fold and AFq', async () => {
+    for (const street of STREETS) {
+      const account = await newAccount(running.httpServer);
+      // Five Hands played out on `street`, each seen by the Bb and by the Btn.
+      const spots = [
+        // The Bb check-raises the Btn's C-bet, and the Btn folds.
+        `Bb: checks
+        Btn: bets $2
+        Bb: raises $4 to $6
+        Btn: folds
+        Uncalled bet ($4) returned to Bb`,
+        // The Bb check-raises, and the Btn calls.
+        `Bb: checks
+        Btn: bets $2
+        Bb: raises $4 to $6
+        Btn: calls $4`,
+        // The Bb check-calls.
+        `Bb: checks
+        Btn: bets $2
+        Bb: calls $2`,
+        // The Bb check-folds.
+        `Bb: checks
+        Btn: bets $2
+        Bb: folds
+        Uncalled bet ($2) returned to Btn`,
+        // The Bb bets first, the Btn raises, and the Bb folds.
+        `Bb: bets $2
+        Btn: raises $4 to $6
+        Bb: folds
+        Uncalled bet ($4) returned to Btn`,
+      ];
+      await importText(
+        account.token,
+        spots
+          .flatMap((spot) => [
+            onStreet(street, 'Bb', spot),
+            onStreet(street, 'Btn', spot),
+          ])
+          .join('\n\n\n'),
+      );
+
+      const of = async (hero: 'Bb' | 'Btn') => {
+        const { stats: all, handsWith } = await stats(
+          account.token,
+          `hero=${hero}`,
+        );
+        const keys = [
+          'raise-cbet',
+          'check-raise',
+          'fold-to-check-raise',
+          'check-call',
+          'check-fold',
+          'bet-fold',
+          'afq',
+        ].map((stat) => `${stat}-${street}`);
+        for (const key of keys) {
+          // A link's count is the Hands the Stat criterion keeps.
+          for (const side of ['opportunity', 'taken'] as const) {
+            expect(
+              await handCount(
+                account.token,
+                `hero=${hero}&stat=${key}:${side}`,
+              ),
+              `${hero} ${key}:${side}`,
+            ).toBe(handsWith[key][side]);
+          }
+        }
+        return Object.fromEntries(
+          keys.map((key) => [
+            key.slice(0, -street.length - 1),
+            { ...all[key], hands: handsWith[key] },
+          ]),
+        );
+      };
+      const count = (
+        opportunities: number,
+        taken: number,
+        hands = { opportunity: opportunities, taken },
+      ) => ({ opportunities, taken, hands });
+
+      expect(await of('Bb'), street).toEqual({
+        // The four C-bets the Bb checked to, two of them raised.
+        'raise-cbet': count(4, 2),
+        // One chance, shared by the three answers: 2 + 1 + 1 = 4.
+        'check-raise': count(4, 2),
+        'check-call': count(4, 1),
+        'check-fold': count(4, 1),
+        'fold-to-check-raise': count(0, 0),
+        // The Bb's own bet, raised, then folded.
+        'bet-fold': count(1, 1),
+        // Two raises, a call, a bet and two folds, in five Hands; the
+        // raises and the bet in three.
+        afq: count(6, 3, { opportunity: 5, taken: 3 }),
+      });
+      expect(await of('Btn'), street).toEqual({
+        'raise-cbet': count(0, 0),
+        'check-raise': count(0, 0),
+        'check-call': count(0, 0),
+        'check-fold': count(0, 0),
+        // Check-raised twice: folded once, called once.
+        'fold-to-check-raise': count(2, 1),
+        // The same two bets were raised.
+        'bet-fold': count(2, 1),
+        // Four bets, a raise, a call and a fold, in five Hands, each with
+        // a bet or a raise.
+        afq: count(7, 5, { opportunity: 5, taken: 5 }),
+      });
+    }
   });
 
   it('rejects a filter it can’t read, as the list does', async () => {

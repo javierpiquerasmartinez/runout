@@ -28,7 +28,7 @@ import {
 } from './moreFilterBranches'
 import { useBuildsFilters } from './buildsFilters'
 import type { SavedCriteria } from './savedFilters'
-import { STAT_GROUPS, STAT_TILES } from './stats'
+import { STAT_CATALOGUE, STAT_SECTIONS, sectionTitle, statLabel, statName, statSection, statSideName } from './stats'
 import './MoreFilters.css'
 
 /** The Lab's matrix, for the hole cards: fetched once the Cards branch is opened, never with the page. */
@@ -921,8 +921,10 @@ function RangeControl({
 const STAT_SIDES: StatSide[] = ['taken', 'opportunity']
 
 /**
- * The Estadística branch: every Stat by its group, as the Stats view shows
- * them, each with "La hice" and "Tuve la oportunidad", the two links of its
+ * The Estadística branch: every Stat of the catalogue, whichever the view
+ * shows, in sections Preflop, Flop, Turn, River and Showdown y totales, a
+ * postflop one named with its Street ("Turn C-bet"), each with "La hice"
+ * and "Tuve la oportunidad", the two links of its
  * tooltip. One is picked at most; picking another replaces it.
  */
 function StatBranch({ stat, onPut }: { stat: StatCriterion | null; onPut: (stat: StatCriterion | null) => void }) {
@@ -931,12 +933,12 @@ function StatBranch({ stat, onPut }: { stat: StatCriterion | null; onPut: (stat:
   return (
     <>
       <p className="more-filters__dim">{t('library.moreFilters.stat.one')}</p>
-      {STAT_GROUPS.map((group) => (
-        <div className="more-filters__section" key={group} role="group" aria-labelledby={`${id}-section-${group}`}>
-          <div className="more-filters__section-title ro-mono" id={`${id}-section-${group}`}>
-            {t(`library.stats.group.${group}`)}
+      {STAT_SECTIONS.map((section) => (
+        <div className="more-filters__section" key={section} role="group" aria-labelledby={`${id}-section-${section}`}>
+          <div className="more-filters__section-title ro-mono" id={`${id}-section-${section}`}>
+            {t(sectionTitle(section))}
           </div>
-          {STAT_TILES.filter((tile) => tile.group === group).map((tile) => (
+          {STAT_CATALOGUE.filter((tile) => statSection(tile) === section).map((tile) => (
             <div
               key={tile.key}
               className="more-filters__row"
@@ -944,8 +946,8 @@ function StatBranch({ stat, onPut }: { stat: StatCriterion | null; onPut: (stat:
               role="group"
               aria-labelledby={`${id}-stat-${tile.key}`}
             >
-              <span className="more-filters__label" id={`${id}-stat-${tile.key}`} title={t(tile.name)}>
-                {tile.abbreviation}
+              <span className="more-filters__label" id={`${id}-stat-${tile.key}`} title={t(statName(tile))}>
+                {statLabel(tile)}
               </span>
               <div className="more-filters__control">
                 {STAT_SIDES.map((side) => {
@@ -958,7 +960,7 @@ function StatBranch({ stat, onPut }: { stat: StatCriterion | null; onPut: (stat:
                       aria-pressed={picked}
                       onClick={() => onPut(picked ? null : { key: tile.key, side })}
                     >
-                      <span>{t(`library.moreFilters.stat.${side}`)}</span>
+                      <span>{t(statSideName(tile, side, 'criterion'))}</span>
                     </button>
                   )
                 })}

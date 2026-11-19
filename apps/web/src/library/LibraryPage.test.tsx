@@ -10,7 +10,7 @@ import { fakeSession } from '../test/fakeSession'
 import { libraryOpenedFrom, type LibraryHand, type LibraryPage as Page } from './library'
 import { LibraryPage } from './LibraryPage'
 import type { Results } from './results'
-import { STAT_KEYS, type LibraryStats } from './stats'
+import { STAT_KEYS, statOf, type LibraryStats } from './stats'
 import { BULK_IMPORTS_POLL_MS, type BulkImport } from './bulkImports'
 import type { SavedFilter } from './savedFilters'
 
@@ -124,7 +124,9 @@ beforeEach(() => {
   stats = {
     hands: 3,
     stats: {
-      ...Object.fromEntries(STAT_KEYS.map((key) => [key, { opportunities: 0, taken: 0 }])),
+      ...Object.fromEntries(
+        STAT_KEYS.map((key) => [key, statOf(key).ratio ? { ratio: true, aggressive: 0, calls: 0 } : { opportunities: 0, taken: 0 }]),
+      ),
       vpip: { opportunities: 3, taken: 1 },
       pfr: { opportunities: 2, taken: 1 },
     } as LibraryStats['stats'],
@@ -830,6 +832,128 @@ describe('LibraryPage', () => {
 
         await userEvent.click(within(criterion(panel, 'W$SD')).getByRole('button', { name: 'I had the chance' }))
         expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
+      })
+
+      it('groups the Stats as Preflop, Flop, Turn, River and Showdown and totals, naming a postflop Stat with its Street', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all')
+        const panel = await statBranch()
+
+        const names = (section: HTMLElement) =>
+          within(section)
+            .getAllByRole('group')
+            .map((row) => row.querySelector('.more-filters__label')?.textContent)
+        expect(
+          [...panel.querySelectorAll('.more-filters__section-title')].map((title) => title.textContent),
+        ).toEqual(['Preflop', 'Flop', 'Turn', 'River', 'Showdown and totals'])
+        expect(names(within(panel).getByRole('group', { name: 'Preflop' }))).toEqual([
+          'VPIP',
+          'PFR',
+          'RFI',
+          'ATS',
+          'Limp',
+          'Limp-fold',
+          'Limp-call',
+          'Limp-raise',
+          'Isolate',
+          '3-bet',
+          'Fold to 3-bet',
+          'Squeeze',
+          'Fold to Squeeze',
+          'Cold Call',
+          '4-bet',
+          'Fold to 4-bet',
+          '5-bet+',
+          'Fold to 5-bet+',
+          'Fold SB to Steal',
+          'Fold BB to Steal',
+          'Resteal',
+          'Fold to Resteal',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'Flop' }))).toEqual([
+          'Flop C-bet',
+          'Flop Fold to C-bet',
+          'Flop Raise C-bet',
+          'Flop Donk',
+          'Flop Fold to Donk',
+          'Flop Check-raise',
+          'Flop Fold to Check-raise',
+          'Flop Check-call',
+          'Flop Check-fold',
+          'Flop Bet-fold',
+          'Flop AF',
+          'Flop AFq',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'Turn' }))).toEqual([
+          'Turn C-bet',
+          'Turn Fold to C-bet',
+          'Turn Raise C-bet',
+          'Turn Delayed C-bet',
+          'Turn Fold to Delayed C-bet',
+          'Turn Probe',
+          'Turn Fold to Probe',
+          'Turn Float',
+          'Turn Fold to Float',
+          'Turn Donk',
+          'Turn Fold to Donk',
+          'Turn Check-raise',
+          'Turn Fold to Check-raise',
+          'Turn Check-call',
+          'Turn Check-fold',
+          'Turn Bet-fold',
+          'Turn AF',
+          'Turn AFq',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'River' }))).toEqual([
+          'River C-bet',
+          'River Fold to C-bet',
+          'River Raise C-bet',
+          'River Probe',
+          'River Fold to Probe',
+          'River Float',
+          'River Fold to Float',
+          'River Donk',
+          'River Fold to Donk',
+          'River Check-raise',
+          'River Fold to Check-raise',
+          'River Check-call',
+          'River Check-fold',
+          'River Bet-fold',
+          'River AF',
+          'River AFq',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF', 'WTSD', 'W$SD', 'AF', 'AFq'])
+
+        await userEvent.click(within(criterion(panel, 'Turn C-bet')).getByRole('button', { name: 'I did it' }))
+
+        expect(lastFilterQuery()).toBe('stat=cbet-turn%3Ataken')
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Turn C-bet · you did it')
+      })
+
+      it('offers AF’s two sides as its tooltip names them: the Hands with action and the aggressive ones', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all')
+        const panel = await statBranch()
+        const riverAf = criterion(within(panel).getByRole('group', { name: 'River' }), 'River AF')
+
+        expect(within(riverAf).getAllByRole('button').map((button) => button.textContent)).toEqual(['Aggressive', 'With action'])
+        await userEvent.click(within(riverAf).getByRole('button', { name: 'With action' }))
+
+        expect(lastFilterQuery()).toBe('stat=af-river%3Aopportunity')
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('River AF · with action')
+
+        await userEvent.click(within(criterion(panel, 'AF')).getByRole('button', { name: 'Aggressive' }))
+        expect(lastFilterQuery()).toBe('stat=af%3Ataken')
+      })
+
+      it('offers every Stat, whatever Stats the person chose to see', async () => {
+        renderLibrary({ ...DEFAULT_PREFERENCES, shownStats: ['vpip'] }, undefined, '/library?period=all')
+        const panel = await statBranch()
+
+        await userEvent.click(within(criterion(panel, 'Turn C-bet')).getByRole('button', { name: 'I did it' }))
+
+        expect(within(criterion(panel, 'PFR')).getByRole('button', { name: 'I did it' })).toBeTruthy()
+        expect(lastFilterQuery()).toBe('stat=cbet-turn%3Ataken')
       })
 
       it('goes with Remove all', async () => {

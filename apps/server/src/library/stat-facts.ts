@@ -1,18 +1,41 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { handFacts, hands } from '../database/schema.js';
-import type { StatKey } from '../hands/replay/hero-stats.js';
+import type { StatCount, StatKey } from '../hands/replay/hero-stats.js';
 import { factOnRow, type FactKey } from './fact-criteria.js';
 
+/** A ratio Stat (AF): the Hero's bets and raises, and their calls. */
+export interface StatRatio {
+  ratio: true;
+  aggressive: number;
+  calls: number;
+}
+
+/** How many Hands had a Stat's opportunity, and how many had it taken. */
+export interface StatHands {
+  opportunity: number;
+  taken: number;
+}
+
 /**
- * How one Hand counts towards a Stat, read off its facts row (and, for
- * reaching Showdown, its own row). Most Stats count at most once per Hand:
- * whether it had the opportunity and whether it took it, as conditions.
- * AFq counts per Action: how many opportunities and taken, as integers.
+ * How Hands count towards a Stat, read off each one's facts row (and, for
+ * reaching Showdown, its own row), and how the Stat answers from them. Each
+ * kind of Stat says this its own way, so whoever counts them doesn't ask
+ * which kind it is:
+ * - most count at most once per Hand, and answer their Hands on either side;
+ * - AFq counts per Action: it sums how many opportunities and taken there
+ *   were, and answers those sums;
+ * - AF is a ratio, not a frequency: it sums the aggressive Actions and the
+ *   calls, and answers those two, never their quotient.
  */
-export type StatFacts = (
-  | { perAction: false; opportunity: SQL; taken: SQL }
-  | { perAction: true; opportunities: SQL; taken: SQL }
-) & {
+export interface StatFacts {
+  /** Whether the Hand had the Stat's opportunity; a null condition doesn't hold. */
+  opportunity: SQL;
+  /** Whether the Hand took it. */
+  taken: SQL;
+  /** What the Stat adds up over its Hands, by name, besides counting them; none for most. */
+  sums: Record<string, SQL>;
+  /** The Stat's counts, from its Hands on either side and its `sums`, added up. */
+  answer(hands: StatHands, sums: Record<string, number>): StatCount | StatRatio;
   /**
    * The rules version that added the last of the facts it reads. A Hand
    * whose facts row is missing or older counts towards the Stat neither as
@@ -20,7 +43,7 @@ export type StatFacts = (
    * it, until the re-derive job reaches it (see the README).
    */
   since: number;
-};
+}
 
 /** A named Action with a did and a chance fact: `vpip`, `flop-cbet`. */
 type DidAction = {
@@ -54,7 +77,16 @@ function read(...facts: FactKey[]) {
 
 /** A Stat counted at most once per Hand; a null condition doesn't hold. */
 function perHand(opportunity: SQL, taken: SQL, since: number): StatFacts {
-  return { perAction: false, opportunity, taken, since };
+  return {
+    opportunity,
+    taken,
+    sums: {},
+    answer: (hands) => ({
+      opportunities: hands.opportunity,
+      taken: hands.taken,
+    }),
+    since,
+  };
 }
 
 /** A named Action's did over its chance: `vpip`, `flop-cbet`. */
@@ -68,17 +100,62 @@ function didOverChance(action: DidAction): StatFacts {
 
 /** A defensive Stat: the Action answered with a fold, over faced. */
 function foldOverFaced(action: FacedAction): StatFacts {
-  const {
-    columns: [faced, answer],
-    since,
-  } = read(`${action}-faced`, `${action}-answer`);
-  return perHand(faced, sql`${faced} and ${answer} = 'fold'`, since);
+  return answerOverFaced(action, 'fold');
 }
 
-/** The Hero's postflop Actions of the given kinds, from the per-Street counters. */
-function postflopActions(kinds: Counter[]) {
+/** The Action answered with `answer`, over faced: Limp-call is the Isolate called. */
+function answerOverFaced(
+  action: FacedAction,
+  answer: 'fold' | 'call' | 'raise',
+): StatFacts {
+  const {
+    columns: [faced, answered],
+    since,
+  } = read(`${action}-faced`, `${action}-answer`);
+  return perHand(faced, sql`${faced} and ${answered} = ${answer}`, since);
+}
+
+/** The Streets after preflop, whose Stats sit in their own columns. */
+type PostflopStreet = 'flop' | 'turn' | 'river';
+const POSTFLOP_STREETS: PostflopStreet[] = ['flop', 'turn', 'river'];
+
+/** A raise answered to a C-bet faced, over C-bet faced. */
+function raiseCbet(street: PostflopStreet): StatFacts {
+  return answerOverFaced(`${street}-cbet`, 'raise');
+}
+
+/**
+ * Check-call or Check-fold: over Check-raise's chance (the Hero checked,
+ * then faced a bet they could raise), the Hero's line on the Street begins
+ * with the check and that answer. With Check-raise, they add up to 100 %.
+ */
+function checkThen(street: PostflopStreet, line: 'XC' | 'XF'): StatFacts {
+  const {
+    columns: [chance, heroLine],
+    since,
+  } = read(`${street}-check-raise-chance`, `${street}-line`);
+  return perHand(
+    chance,
+    sql`${chance} and ${heroLine} like ${`${line}%`}`,
+    since,
+  );
+}
+
+/**
+ * Bet-fold: the Hero's bet raised (check-raised too), answered with a fold.
+ * The Raise Action's faced is a raise of the Hero's bet.
+ */
+function betFold(street: PostflopStreet): StatFacts {
+  return foldOverFaced(`${street}-raise`);
+}
+
+/** The Hero's Actions of the given kinds on those Streets, from the per-Street counters. */
+function postflopActions(
+  kinds: Counter[],
+  streets: PostflopStreet[] = POSTFLOP_STREETS,
+) {
   const { columns, since } = read(
-    ...(['flop', 'turn', 'river'] as const).flatMap((street) =>
+    ...streets.flatMap((street) =>
       kinds.map((kind): FactKey => `${street}-${kind}`),
     ),
   );
@@ -91,14 +168,37 @@ function postflopActions(kinds: Counter[]) {
   };
 }
 
-function afq(): StatFacts {
-  const all = postflopActions(['bets', 'raises', 'calls', 'folds']);
-  const aggressive = postflopActions(['bets', 'raises']);
+/** AFq over every postflop Street, or over one: counted Action by Action. */
+function afq(streets: PostflopStreet[] = POSTFLOP_STREETS): StatFacts {
+  const all = postflopActions(['bets', 'raises', 'calls', 'folds'], streets);
+  const aggressive = postflopActions(['bets', 'raises'], streets);
   return {
-    perAction: true,
-    opportunities: all.count,
-    taken: aggressive.count,
+    opportunity: sql`${all.count} > 0`,
+    taken: sql`${aggressive.count} > 0`,
+    sums: { opportunities: all.count, taken: aggressive.count },
+    answer: (_hands, sums) => ({
+      opportunities: sums.opportunities,
+      taken: sums.taken,
+    }),
     since: Math.max(all.since, aggressive.since),
+  };
+}
+
+/** AF: bets plus raises, against calls, on one Street or over all three. */
+function af(...streets: PostflopStreet[]): StatFacts {
+  const aggressive = postflopActions(['bets', 'raises'], streets);
+  const calls = postflopActions(['calls'], streets);
+  return {
+    // "Con acción": a bet, raise or call; "Agresivas": a bet or raise.
+    opportunity: sql`${aggressive.count} + ${calls.count} > 0`,
+    taken: sql`${aggressive.count} > 0`,
+    sums: { aggressive: aggressive.count, calls: calls.count },
+    answer: (_hands, sums) => ({
+      ratio: true,
+      aggressive: sums.aggressive,
+      calls: sums.calls,
+    }),
+    since: Math.max(aggressive.since, calls.since),
   };
 }
 
@@ -119,45 +219,98 @@ function showdownStats(): Pick<
   };
 }
 
-/** A steal faced in either blind; the Stat is the big blind's alone. */
-function foldBbToSteal(): StatFacts {
+/** A steal faced in either blind; Fold SB and Fold BB to Steal are each one blind's. */
+function foldToStealIn(blind: 'SB' | 'BB'): StatFacts {
   const {
     columns: [faced, answer, position],
     since,
   } = read('steal-faced', 'steal-answer', 'hero-position');
   return perHand(
-    sql`${faced} and ${position} = 'BB'`,
-    sql`${faced} and ${position} = 'BB' and ${answer} = 'fold'`,
+    sql`${faced} and ${position} = ${blind}`,
+    sql`${faced} and ${position} = ${blind} and ${answer} = 'fold'`,
     since,
   );
 }
 
 /**
  * Every Stat as facts (facts catalogue §5): the one place a Stat is mapped
- * onto the facts row. Each matches its definition in `heroStats`, which
- * still writes the per-Stat rows until they are retired.
+ * onto the facts row. The 21 that `heroStats` knows match its definitions
+ * there, which the facts' tests check them against.
  */
 export const STAT_FACTS: Record<StatKey, StatFacts> = {
   vpip: didOverChance('vpip'),
   pfr: didOverChance('pfr'),
+  rfi: didOverChance('open'),
+  steal: didOverChance('steal'),
+  limp: didOverChance('limp'),
+  // The limp's answers to the first raise after it, its Isolate.
+  'limp-fold': answerOverFaced('isolate', 'fold'),
+  'limp-call': answerOverFaced('isolate', 'call'),
+  'limp-raise': answerOverFaced('isolate', 'raise'),
+  isolate: didOverChance('isolate'),
   'three-bet': didOverChance('three-bet'),
   'fold-to-three-bet': foldOverFaced('three-bet'),
+  squeeze: didOverChance('squeeze'),
+  'fold-to-squeeze': foldOverFaced('squeeze'),
+  'cold-call': didOverChance('cold-call'),
   'four-bet': didOverChance('four-bet'),
   'fold-to-four-bet': foldOverFaced('four-bet'),
-  squeeze: didOverChance('squeeze'),
-  'cold-call': didOverChance('cold-call'),
-  'fold-bb-to-steal': foldBbToSteal(),
-  steal: didOverChance('steal'),
+  'five-bet': didOverChance('five-bet'),
+  'fold-to-five-bet': foldOverFaced('five-bet'),
+  'fold-sb-to-steal': foldToStealIn('SB'),
+  'fold-bb-to-steal': foldToStealIn('BB'),
+  resteal: didOverChance('resteal'),
+  'fold-to-resteal': foldOverFaced('resteal'),
   'cbet-flop': didOverChance('flop-cbet'),
   'fold-to-cbet-flop': foldOverFaced('flop-cbet'),
+  'raise-cbet-flop': raiseCbet('flop'),
+  'donk-flop': didOverChance('flop-donk-bet'),
+  'fold-to-donk-flop': foldOverFaced('flop-donk-bet'),
   'check-raise-flop': didOverChance('flop-check-raise'),
+  'fold-to-check-raise-flop': foldOverFaced('flop-check-raise'),
+  'check-call-flop': checkThen('flop', 'XC'),
+  'check-fold-flop': checkThen('flop', 'XF'),
+  'bet-fold-flop': betFold('flop'),
+  'af-flop': af('flop'),
+  'afq-flop': afq(['flop']),
   'cbet-turn': didOverChance('turn-cbet'),
   'fold-to-cbet-turn': foldOverFaced('turn-cbet'),
+  'raise-cbet-turn': raiseCbet('turn'),
+  'delayed-cbet-turn': didOverChance('turn-delayed-cbet'),
+  'fold-to-delayed-cbet-turn': foldOverFaced('turn-delayed-cbet'),
+  'probe-turn': didOverChance('turn-probe'),
+  'fold-to-probe-turn': foldOverFaced('turn-probe'),
+  'float-turn': didOverChance('turn-float'),
+  'fold-to-float-turn': foldOverFaced('turn-float'),
+  'donk-turn': didOverChance('turn-donk-bet'),
+  'fold-to-donk-turn': foldOverFaced('turn-donk-bet'),
+  'check-raise-turn': didOverChance('turn-check-raise'),
+  'fold-to-check-raise-turn': foldOverFaced('turn-check-raise'),
+  'check-call-turn': checkThen('turn', 'XC'),
+  'check-fold-turn': checkThen('turn', 'XF'),
+  'bet-fold-turn': betFold('turn'),
+  'af-turn': af('turn'),
+  'afq-turn': afq(['turn']),
   'cbet-river': didOverChance('river-cbet'),
   'fold-to-cbet-river': foldOverFaced('river-cbet'),
+  'raise-cbet-river': raiseCbet('river'),
+  'probe-river': didOverChance('river-probe'),
+  'fold-to-probe-river': foldOverFaced('river-probe'),
+  'float-river': didOverChance('river-float'),
+  'fold-to-float-river': foldOverFaced('river-float'),
+  'donk-river': didOverChance('river-donk-bet'),
+  'fold-to-donk-river': foldOverFaced('river-donk-bet'),
+  'check-raise-river': didOverChance('river-check-raise'),
+  'fold-to-check-raise-river': foldOverFaced('river-check-raise'),
+  'check-call-river': checkThen('river', 'XC'),
+  'check-fold-river': checkThen('river', 'XF'),
+  'bet-fold-river': betFold('river'),
+  'af-river': af('river'),
+  'afq-river': afq(['river']),
+  ...showdownStats(),
+  af: af('flop', 'turn', 'river'),
   // Per Action: every postflop bet, raise, call or fold is an opportunity.
   afq: afq(),
-  ...showdownStats(),
 };
 
 /** The Hand's facts row is recent enough for the Stat. */
@@ -170,11 +323,7 @@ export function countsTowards(key: StatKey): SQL {
  * facts row once that row counts towards the Stat.
  */
 export function handCounts(key: StatKey, side: 'opportunity' | 'taken'): SQL {
-  const stat = STAT_FACTS[key];
-  if (!stat.perAction) {
-    return side === 'taken' ? stat.taken : stat.opportunity;
-  }
-  return sql`${side === 'taken' ? stat.taken : stat.opportunities} > 0`;
+  return STAT_FACTS[key][side];
 }
 
 /**

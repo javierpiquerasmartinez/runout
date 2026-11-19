@@ -28,7 +28,7 @@ import {
   type StreetAction,
 } from './facts'
 import type { StatCriterion } from './libraryFilter'
-import { STAT_TILES } from './stats'
+import { statLabel, statOf, statSideName } from './stats'
 
 /*
  * What the Más filtros panel offers, branch by branch, as the "Biblioteca ·
@@ -610,6 +610,6 @@ function streetReason(criterion: FactCriterion, criteria: FactCriterion[]): Mess
 
 /** The Stat criterion as the chip and its list name it, after every fact's: `VPIP · lo hiciste`. */
 export function statSummary(stat: StatCriterion, t: Translator['t']): string {
-  const abbreviation = STAT_TILES.find((tile) => tile.key === stat.key)?.abbreviation ?? stat.key
-  return t(`library.stats.chip.${stat.side}`, { stat: abbreviation })
+  const of = statOf(stat.key)
+  return t(statSideName(of, stat.side, 'chip'), { stat: statLabel(of) })
 }

@@ -3,32 +3,94 @@ import { positions, type Position } from './positions.js';
 import { timeline, type TableState } from './timeline.js';
 
 /**
- * Every Stat, by its stable key, in the order the Stats view shows them:
- * Preflop, then Postflop, then Showdown. The keys are stored with each
- * Hand's Stat rows and travel in the Library Stats API, so they never change.
+ * Every Stat Runout knows, by its stable key: the server's one list of them,
+ * the web's catalogue's counterpart (ADR 0001: no shared code). The Library
+ * Stats API answers them in this order, the Stat criterion accepts them, and
+ * an Account's Preferences keep a choice of them (dropping, on reading, any
+ * key no longer here). The keys travel in the API and are stored in
+ * Preferences and Saved Filters, so they never change.
+ *
+ * Adding a Stat touches five places: its key here; its mapping onto the
+ * facts in `STAT_FACTS` (`library/stat-facts.ts`, which fails to compile
+ * without it); its entry in the web's `STAT_CATALOGUE`
+ * (`apps/web/src/library/stats.ts`); its full name in the web's `es.ts` and
+ * `en.ts` messages (`library.stats.name.<key>`); and its key in the e2e
+ * list of `test/library-stats.e2e-spec.ts`.
  */
 export const STAT_KEYS = [
   'vpip',
   'pfr',
+  'rfi',
+  'steal',
+  'limp',
+  'limp-fold',
+  'limp-call',
+  'limp-raise',
+  'isolate',
   'three-bet',
   'fold-to-three-bet',
+  'squeeze',
+  'fold-to-squeeze',
+  'cold-call',
   'four-bet',
   'fold-to-four-bet',
-  'squeeze',
-  'cold-call',
+  'five-bet',
+  'fold-to-five-bet',
+  'fold-sb-to-steal',
   'fold-bb-to-steal',
-  'steal',
+  'resteal',
+  'fold-to-resteal',
   'cbet-flop',
   'fold-to-cbet-flop',
+  'raise-cbet-flop',
+  'donk-flop',
+  'fold-to-donk-flop',
   'check-raise-flop',
+  'fold-to-check-raise-flop',
+  'check-call-flop',
+  'check-fold-flop',
+  'bet-fold-flop',
+  'af-flop',
+  'afq-flop',
   'cbet-turn',
   'fold-to-cbet-turn',
+  'raise-cbet-turn',
+  'delayed-cbet-turn',
+  'fold-to-delayed-cbet-turn',
+  'probe-turn',
+  'fold-to-probe-turn',
+  'float-turn',
+  'fold-to-float-turn',
+  'donk-turn',
+  'fold-to-donk-turn',
+  'check-raise-turn',
+  'fold-to-check-raise-turn',
+  'check-call-turn',
+  'check-fold-turn',
+  'bet-fold-turn',
+  'af-turn',
+  'afq-turn',
   'cbet-river',
   'fold-to-cbet-river',
-  'afq',
+  'raise-cbet-river',
+  'probe-river',
+  'fold-to-probe-river',
+  'float-river',
+  'fold-to-float-river',
+  'donk-river',
+  'fold-to-donk-river',
+  'check-raise-river',
+  'fold-to-check-raise-river',
+  'check-call-river',
+  'check-fold-river',
+  'bet-fold-river',
+  'af-river',
+  'afq-river',
   'wwsf',
   'wtsd',
   'wsd',
+  'af',
+  'afq',
 ] as const;
 
 export type StatKey = (typeof STAT_KEYS)[number];

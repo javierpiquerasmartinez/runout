@@ -1,15 +1,40 @@
-/* The Library's Estadísticas view: a band of tiles per group, all on one desktop screen. */
+/* The Library's Estadísticas view: a band of tiles per band of the catalogue, all on one desktop screen. */
 .stats {
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-height: 0;
 }
-.stats__hands {
+/* The Hand count and Editar; while editing, what to do, with Restablecer and Listo. */
+.stats__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+}
+.stats__hands,
+.stats__hint {
   font-size: 12.5px;
   color: var(--text-secondary);
 }
-.stats__group {
+.stats__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stats__none,
+.stats__elsewhere,
+.stats__failure {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.stats__failure {
+  color: var(--alert-ink);
+}
+.stats__band-title {
   margin: 0 0 8px;
   font-size: 10px;
   font-weight: 400;
@@ -20,7 +45,42 @@
 .stats__tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  /* Every row as tall as the tallest tile, so a name that wraps ("Fold to Delayed C-bet") leaves no row taller than the rest. */
+  grid-auto-rows: 1fr;
   gap: 8px;
+}
+
+/* Postflop: a column per Street side by side, each with its own grid, so a row reads across Streets. */
+.stats__streets {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.stats__street {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.stats__street-title {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.stats__street .stats__tiles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* On a phone the Street columns stack, so the tiles keep their size. */
+@media (max-width: 760px) {
+  .stats__streets {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
 }
 
 /* A tile and its tooltip, which opens under it on hover or focus. */
@@ -55,7 +115,7 @@
   font-size: 10.5px;
   letter-spacing: 0.06em;
   color: var(--text-muted);
-  /* Long abbreviations ("Fold to Flop C-bet") wrap rather than lose their end. */
+  /* Long abbreviations ("Fold BB to Steal") wrap rather than lose their end. */
   overflow-wrap: anywhere;
 }
 .stats__value {
@@ -65,6 +125,35 @@
 }
 .stats__tile[data-empty] .stats__value {
   color: var(--text-muted);
+}
+
+/* Choosing the Stats: the shown ones outlined in the accent with a ✓, the hidden ones faded and dashed with a +. */
+.stats__tile[data-choice] {
+  cursor: pointer;
+}
+.stats__tile[data-choice='shown'],
+.stats__tile[data-choice='shown']:hover {
+  border-color: var(--brass);
+}
+.stats__tile[data-choice='hidden'] {
+  border-style: dashed;
+  background: transparent;
+  opacity: 0.45;
+}
+.stats__tile[data-choice='hidden']:hover {
+  opacity: 0.7;
+}
+.stats__mark {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.stats__mark[data-shown] {
+  color: var(--brass);
 }
 .stats__tip {
   position: absolute;
