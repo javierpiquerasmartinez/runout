@@ -1,68 +1,95 @@
-import { useId, useState, type FocusEvent, type MouseEvent } from 'react'
+import { useId, useState, type FocusEvent, type MouseEvent, type ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import { isPlainClick, navigate } from '../routing'
 import type { StatCriterion, StatSide } from './libraryFilter'
-import { STAT_GROUPS, STAT_TILES, type LibraryStats, type StatCount, type StatHands, type StatTile } from './stats'
+import {
+  STAT_BANDS,
+  STAT_CATALOGUE,
+  STAT_STREETS,
+  statName,
+  type LibraryStats,
+  type Stat,
+  type StatCount,
+  type StatHands,
+} from './stats'
 import './StatsView.css'
 
 /**
  * The Library's Estadísticas view: the Hero's Stats over the Hands the
- * Library filter keeps, a band of tiles per group (Preflop, Postflop,
- * Showdown), every tile alike whatever its sample. Hovering or focusing a
- * tile names the Stat in full and gives its count, so the person judges the
- * sample themselves, and links to the Hands behind its opportunities and
- * behind the times it was taken, at the address `statHref` writes.
+ * Library filter keeps, in the catalogue's bands (Preflop, Postflop,
+ * Showdown y totales) and order, Postflop as a column per Street, every tile
+ * alike whatever its sample. Hovering or focusing a tile names the Stat in
+ * full and gives its count, so the person judges the sample themselves, and
+ * links to the Hands behind its opportunities and behind the times it was
+ * taken, at the address `statHref` writes.
  */
 export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: (criterion: StatCriterion) => string }) {
   const { t, formatNumber } = useI18n()
+  const shown: Stat[] = STAT_CATALOGUE.filter((stat) => stat.shownByDefault)
+  const tiles = (of: Stat[]) => (
+    <div className="stats__tiles">
+      {of.map((stat) => (
+        <StatTileView key={stat.key} stat={stat} count={stats.stats[stat.key]} handsWith={stats.handsWith[stat.key]} statHref={statHref} />
+      ))}
+    </div>
+  )
   return (
     <section className="stats" aria-label={t('library.stats.title')}>
       <span className="stats__hands">
         {t(stats.hands === 1 ? 'library.count.one' : 'library.count.other', { count: formatNumber(stats.hands) })}
       </span>
-      {STAT_GROUPS.map((group) => {
-        const tiles = STAT_TILES.filter((tile) => tile.group === group)
-        if (tiles.length === 0) return null
-        return <StatBand key={group} title={t(`library.stats.group.${group}`)} tiles={tiles} stats={stats} statHref={statHref} />
+      {STAT_BANDS.map((band) => {
+        const inBand = shown.filter((stat) => stat.band === band)
+        if (inBand.length === 0) return null
+        if (band !== 'postflop') {
+          return (
+            <Group key={band} level={2} title={t(`library.stats.group.${band}`)}>
+              {tiles(inBand)}
+            </Group>
+          )
+        }
+        return (
+          <Group key={band} level={2} title={t('library.stats.group.postflop')}>
+            <div className="stats__streets">
+              {STAT_STREETS.map((street) => {
+                const inStreet = inBand.filter((stat) => stat.street === street)
+                if (inStreet.length === 0) return null
+                return (
+                  <Group key={street} level={3} title={t(`library.stats.street.${street}`)}>
+                    {tiles(inStreet)}
+                  </Group>
+                )
+              })}
+            </div>
+          </Group>
+        )
       })}
     </section>
   )
 }
 
-function StatBand({
-  title,
-  tiles,
-  stats,
-  statHref,
-}: {
-  title: string
-  tiles: StatTile[]
-  stats: LibraryStats
-  statHref: (criterion: StatCriterion) => string
-}) {
+/** A band, or a Street's column within Postflop, named by its heading. */
+function Group({ level, title, children }: { level: 2 | 3; title: string; children: ReactNode }) {
   const titleId = useId()
+  const Heading = level === 2 ? 'h2' : 'h3'
   return (
-    <div className="stats__band" role="group" aria-labelledby={titleId}>
-      <h2 id={titleId} className="stats__group ro-mono">
+    <div className={level === 2 ? 'stats__band' : 'stats__street'} role="group" aria-labelledby={titleId}>
+      <Heading id={titleId} className={`${level === 2 ? 'stats__group' : 'stats__street-title'} ro-mono`}>
         {title}
-      </h2>
-      <div className="stats__tiles">
-        {tiles.map((tile) => (
-          <StatTileView key={tile.key} tile={tile} count={stats.stats[tile.key]} handsWith={stats.handsWith[tile.key]} statHref={statHref} />
-        ))}
-      </div>
+      </Heading>
+      {children}
     </div>
   )
 }
 
 /** One Stat: its abbreviation and percentage, with its tooltip under it on hover or focus. */
 function StatTileView({
-  tile,
+  stat,
   count,
   handsWith,
   statHref,
 }: {
-  tile: StatTile
+  stat: Stat
   count: StatCount
   handsWith: StatHands
   statHref: (criterion: StatCriterion) => string
@@ -87,7 +114,7 @@ function StatTileView({
   }
   // The links count Hands, as the list behind them does, not the Stat's own counts.
   const link = (side: StatSide) => (
-    <a className="stats__tip-link" href={statHref({ key: tile.key, side })} onClick={follow}>
+    <a className="stats__tip-link" href={statHref({ key: stat.key, side })} onClick={follow}>
       {t(`library.stats.link.${side}`, { count: formatNumber(handsWith[side]) })}
     </a>
   )
@@ -100,13 +127,13 @@ function StatTileView({
       onBlur={leave}
     >
       <button type="button" className="stats__tile" data-empty={none || undefined} aria-describedby={open ? tipId : undefined}>
-        <span className="stats__abbr ro-mono">{tile.abbreviation}</span>{' '}
+        <span className="stats__abbr ro-mono">{stat.short}</span>{' '}
         <span className="stats__value ro-serif">{value}</span>
       </button>
       {open && (
         <div id={tipId} className="stats__tip" role="tooltip">
           <div className="stats__tip-card">
-            <span className="stats__tip-name">{t(tile.name)}</span>
+            <span className="stats__tip-name">{t(statName(stat))}</span>
             <span className="stats__tip-count ro-mono">
               {none
                 ? t('library.stats.noChance')

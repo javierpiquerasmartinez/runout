@@ -832,6 +832,41 @@ describe('LibraryPage', () => {
         expect(lastFilterQuery()).toBe('fact=pot-type%3A3-bet')
       })
 
+      it('groups the Stats as Preflop, Flop, Turn, River and Showdown and totals, naming a postflop Stat with its Street', async () => {
+        renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all')
+        const panel = await statBranch()
+
+        const names = (section: HTMLElement) =>
+          within(section)
+            .getAllByRole('group')
+            .map((row) => row.querySelector('.more-filters__label')?.textContent)
+        expect(
+          [...panel.querySelectorAll('.more-filters__section-title')].map((title) => title.textContent),
+        ).toEqual(['Preflop', 'Flop', 'Turn', 'River', 'Showdown and totals'])
+        expect(names(within(panel).getByRole('group', { name: 'Preflop' }))).toEqual([
+          'VPIP',
+          'PFR',
+          'ATS',
+          '3-bet',
+          'Fold to 3-bet',
+          'Squeeze',
+          'Cold Call',
+          '4-bet',
+          'Fold to 4-bet',
+          'Fold BB to Steal',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'Flop' }))).toEqual(['Flop C-bet', 'Flop Fold to C-bet', 'Flop Check-raise'])
+        expect(names(within(panel).getByRole('group', { name: 'Turn' }))).toEqual(['Turn C-bet', 'Turn Fold to C-bet'])
+        expect(names(within(panel).getByRole('group', { name: 'River' }))).toEqual(['River C-bet', 'River Fold to C-bet'])
+        expect(names(within(panel).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF', 'WTSD', 'W$SD', 'AFq'])
+
+        await userEvent.click(within(criterion(panel, 'Turn C-bet')).getByRole('button', { name: 'I did it' }))
+
+        expect(lastFilterQuery()).toBe('stat=cbet-turn%3Ataken')
+        const filters = screen.getByRole('group', { name: 'Filters' })
+        expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Turn C-bet · you did it')
+      })
+
       it('goes with Remove all', async () => {
         renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=vpip:taken&fact=pot-type:3-bet')
         const panel = await statBranch()

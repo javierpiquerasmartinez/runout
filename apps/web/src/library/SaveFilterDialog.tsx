@@ -6,9 +6,8 @@ import { Button } from '../ui/Button'
 import { LengthCount } from '../ui/LengthCount'
 import { TextField } from '../ui/TextField'
 import type { LibraryFilter } from './libraryFilter'
-import { criterionSummaries, definitionOf, inBranchOrder, type Branch } from './moreFilterBranches'
+import { criterionSummaries, definitionOf, inBranchOrder, statSummary, type Branch } from './moreFilterBranches'
 import { SAVED_FILTER_NAME_MAX, savedCriteriaOf, type SavedFilter } from './savedFilters'
-import { STAT_TILES } from './stats'
 import './SavedFilters.css'
 
 /** The refusals that are about the name, said under it; any other is said for the whole dialog. */
@@ -136,13 +135,7 @@ function keptLines(filter: LibraryFilter, t: ReturnType<typeof useI18n>['t']): {
     else lines.push({ branch, criteria: [summaries[index]] })
   })
   if (filter.stat) {
-    const stat = filter.stat
-    lines.push({
-      branch: 'stat',
-      criteria: [
-        t(`library.stats.chip.${stat.side}`, { stat: STAT_TILES.find((tile) => tile.key === stat.key)?.abbreviation ?? stat.key }),
-      ],
-    })
+    lines.push({ branch: 'stat', criteria: [statSummary(filter.stat, t)] })
   }
   return lines.map((line) => ({ branch: line.branch, criteria: line.criteria.join(' · ') }))
 }

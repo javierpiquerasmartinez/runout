@@ -34,6 +34,18 @@ function renderStats(of: LibraryStats = stats, locale: Locale = 'en') {
   return screen.getByRole('region', { name: locale === 'en' ? 'Stats' : 'Estadísticas' })
 }
 
+/** A band's or a column's tiles, as they read, in the order they show. */
+function tilesOf(group: HTMLElement) {
+  return within(group)
+    .getAllByRole('button')
+    .map((tile) => tile.textContent)
+}
+
+/** A Street's column under Postflop. */
+function column(view: HTMLElement, street: string) {
+  return within(within(view).getByRole('group', { name: 'Postflop' })).getByRole('group', { name: street })
+}
+
 describe('StatsView', () => {
   it('says how many Hands the Stats cover', () => {
     const view = renderStats()
@@ -53,7 +65,7 @@ describe('StatsView', () => {
     const view = renderStats(stats, 'es')
 
     const preflop = within(view).getByRole('group', { name: 'Preflop' })
-    expect(within(preflop).getByRole('button', { name: 'VPIP 22,4\u00a0%' })).toBeTruthy()
+    expect(within(preflop).getByRole('button', { name: 'VPIP 22,4 %' })).toBeTruthy()
   })
 
   it('shows “—” for a Stat the Hero never had the chance at', () => {
@@ -92,28 +104,108 @@ describe('StatsView', () => {
     expect(within(tip).getByText('412 / 1838')).toBeTruthy()
   })
 
-  it('shows Flop Check-raise and AFq under Postflop, and WWSF, WTSD and W$SD under Showdown', () => {
+  it('lays out today’s 21 Stats in Preflop, Postflop and Showdown and totals, in the catalogue’s order', () => {
+    const view = renderStats()
+
+    expect(within(view).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Preflop',
+      'Postflop',
+      'Showdown and totals',
+    ])
+    expect(tilesOf(within(view).getByRole('group', { name: 'Preflop' }))).toEqual([
+      'VPIP 22.4%',
+      'PFR 18.3%',
+      'ATS —',
+      '3-bet —',
+      'Fold to 3-bet —',
+      'Squeeze —',
+      'Cold Call —',
+      '4-bet —',
+      'Fold to 4-bet —',
+      'Fold BB to Steal —',
+    ])
+    expect(tilesOf(within(view).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF —', 'WTSD —', 'W$SD —', 'AFq —'])
+  })
+
+  it('lays out Postflop as Flop, Turn and River columns, the Street left out of each tile', () => {
+    const view = renderStats()
+
+    const postflop = within(view).getByRole('group', { name: 'Postflop' })
+    expect(within(postflop).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['Flop', 'Turn', 'River'])
+    expect(tilesOf(column(view, 'Flop'))).toEqual(['C-bet —', 'Fold to C-bet —', 'Check-raise —'])
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['C-bet —', 'Fold to C-bet —'])
+    expect(tilesOf(column(view, 'River'))).toEqual(['C-bet —', 'Fold to C-bet —'])
+  })
+
+  it('names the bands in Spanish, and the Streets as players do', () => {
+    const view = renderStats(stats, 'es')
+
+    expect(within(view).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Preflop',
+      'Postflop',
+      'Showdown y totales',
+    ])
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['C-bet —', 'Fold to C-bet —'])
+  })
+
+  it('shows each Stat’s value in its own column', () => {
     const view = renderStats({
       ...stats,
       stats: {
         ...stats.stats,
+        'cbet-flop': { opportunities: 268, taken: 152 },
         'check-raise-flop': { opportunities: 160, taken: 18 },
+        'fold-to-cbet-turn': { opportunities: 88, taken: 39 },
+        'cbet-river': { opportunities: 48, taken: 22 },
         afq: { opportunities: 2450, taken: 980 },
-        wwsf: { opportunities: 520, taken: 241 },
-        wtsd: { opportunities: 520, taken: 146 },
         wsd: { opportunities: 146, taken: 77 },
       },
     })
 
-    const postflop = within(view).getByRole('group', { name: 'Postflop' })
-    expect(within(postflop).getByRole('button', { name: 'Flop Check-raise 11.3%' })).toBeTruthy()
-    expect(within(postflop).getByRole('button', { name: 'AFq 40.0%' })).toBeTruthy()
-    const showdown = within(view).getByRole('group', { name: 'Showdown' })
-    expect(
-      within(showdown)
-        .getAllByRole('button')
-        .map((tile) => tile.textContent),
-    ).toEqual(['WWSF 46.3%', 'WTSD 28.1%', 'W$SD 52.7%'])
+    expect(tilesOf(column(view, 'Flop'))).toEqual(['C-bet 56.7%', 'Fold to C-bet —', 'Check-raise 11.3%'])
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['C-bet —', 'Fold to C-bet 44.3%'])
+    expect(tilesOf(column(view, 'River'))).toEqual(['C-bet 45.8%', 'Fold to C-bet —'])
+    expect(tilesOf(within(view).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF —', 'WTSD —', 'W$SD 52.7%', 'AFq 40.0%'])
+  })
+
+  it('names every Stat in full in its tooltip, a postflop one with its Street', async () => {
+    const view = renderStats()
+
+    const named: [HTMLElement, string, string][] = [
+      [within(view).getByRole('group', { name: 'Preflop' }), 'ATS —', 'Attempt to steal'],
+      [within(view).getByRole('group', { name: 'Preflop' }), '3-bet —', 'Re-raise the first raise preflop'],
+      [within(view).getByRole('group', { name: 'Preflop' }), 'Fold to 4-bet —', 'Fold to a re-raise of your 3-bet'],
+      [within(view).getByRole('group', { name: 'Preflop' }), 'Cold Call —', 'Cold call'],
+      [within(view).getByRole('group', { name: 'Preflop' }), 'Fold BB to Steal —', 'Fold big blind to steal'],
+      [column(view, 'Flop'), 'C-bet —', 'Flop continuation bet'],
+      [column(view, 'Flop'), 'Check-raise —', 'Check-raise on the flop'],
+      [column(view, 'Turn'), 'Fold to C-bet —', 'Fold to turn continuation bet'],
+      [column(view, 'River'), 'C-bet —', 'River continuation bet'],
+      [within(view).getByRole('group', { name: 'Showdown and totals' }), 'AFq —', 'Aggression frequency, postflop'],
+      [within(view).getByRole('group', { name: 'Showdown and totals' }), 'WTSD —', 'Went to showdown'],
+    ]
+    for (const [group, tile, name] of named) {
+      await userEvent.hover(within(group).getByRole('button', { name: tile }))
+      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
+      await userEvent.unhover(within(group).getByRole('button', { name: tile }))
+    }
+  })
+
+  it('names them in full in Spanish too', async () => {
+    const view = renderStats(stats, 'es')
+
+    const named: [HTMLElement, string, string][] = [
+      [within(view).getByRole('group', { name: 'Preflop' }), 'Squeeze —', 'Resube una subida que ya han pagado'],
+      [column(view, 'Flop'), 'Fold to C-bet —', 'Se retira ante una apuesta de continuación en el flop'],
+      [column(view, 'Turn'), 'C-bet —', 'Apuesta de continuación en el turn'],
+      [column(view, 'River'), 'Fold to C-bet —', 'Se retira ante una apuesta de continuación en el river'],
+      [within(view).getByRole('group', { name: 'Showdown y totales' }), 'W$SD —', 'Gana dinero en el showdown'],
+    ]
+    for (const [group, tile, name] of named) {
+      await userEvent.hover(within(group).getByRole('button', { name: tile }))
+      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
+      await userEvent.unhover(within(group).getByRole('button', { name: tile }))
+    }
   })
 
   it('gives AFq’s count in Actions, more than the Hands it covers', async () => {
@@ -121,151 +213,7 @@ describe('StatsView', () => {
 
     await userEvent.hover(screen.getByRole('button', { name: 'AFq 40.0%' }))
 
-    const tip = screen.getByRole('tooltip')
-    expect(within(tip).getByText('Aggression frequency, postflop')).toBeTruthy()
-    expect(within(tip).getByText('980 / 2,450')).toBeTruthy()
-  })
-
-  it('names the Showdown Stats in full in Spanish', async () => {
-    renderStats({ ...stats, hands: 1, stats: { ...stats.stats, wsd: { opportunities: 2, taken: 1 } } }, 'es')
-
-    await userEvent.hover(screen.getByRole('button', { name: 'W$SD 50,0 %' }))
-
-    expect(within(screen.getByRole('tooltip')).getByText('Gana dinero en el showdown')).toBeTruthy()
-  })
-
-  it('shows the re-raise Stats after PFR in Preflop, each named in full', async () => {
-    renderStats({
-      ...stats,
-      hands: 40,
-      stats: {
-        ...stats.stats,
-        'three-bet': { opportunities: 40, taken: 3 },
-        'fold-to-three-bet': { opportunities: 8, taken: 5 },
-        'four-bet': { opportunities: 10, taken: 1 },
-        'fold-to-four-bet': { opportunities: 2, taken: 1 },
-        squeeze: { opportunities: 16, taken: 1 },
-      },
-    })
-
-    const preflop = screen.getByRole('group', { name: 'Preflop' })
-    const tiles = within(preflop)
-      .getAllByRole('button')
-      .map((tile) => tile.textContent)
-    expect(tiles).toEqual([
-      'VPIP 22.4%',
-      'PFR 18.3%',
-      '3-bet 7.5%',
-      'Fold to 3-bet 62.5%',
-      '4-bet 10.0%',
-      'Fold to 4-bet 50.0%',
-      'Squeeze 6.3%',
-      'Cold Call —',
-      'Fold BB to Steal —',
-      'ATS —',
-    ])
-    const names = {
-      '3-bet 7.5%': 'Re-raise the first raise preflop',
-      'Fold to 3-bet 62.5%': 'Fold to a re-raise of your open',
-      '4-bet 10.0%': 'Re-raise a 3-bet',
-      'Fold to 4-bet 50.0%': 'Fold to a re-raise of your 3-bet',
-      'Squeeze 6.3%': 'Re-raise a raise that has been called',
-    }
-    for (const [tile, name] of Object.entries(names)) {
-      await userEvent.hover(screen.getByRole('button', { name: tile }))
-      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
-      await userEvent.unhover(screen.getByRole('button', { name: tile }))
-    }
-  })
-
-  it('names the re-raise Stats in Spanish too', async () => {
-    renderStats(
-      {
-        ...stats,
-        hands: 1,
-        stats: { ...stats.stats, squeeze: { opportunities: 1, taken: 1 } },
-      },
-      'es',
-    )
-
-    await userEvent.hover(screen.getByRole('button', { name: 'Squeeze 100,0 %' }))
-
-    expect(
-      within(screen.getByRole('tooltip')).getByText('Resube una subida que ya han pagado'),
-    ).toBeTruthy()
-  })
-
-  it('shows the C-bet Stats in the Postflop group, named in full', async () => {
-    const cbets: LibraryStats = {
-      ...stats,
-      stats: {
-        ...stats.stats,
-        'cbet-flop': { opportunities: 268, taken: 152 },
-        'fold-to-cbet-flop': { opportunities: 221, taken: 96 },
-        'cbet-turn': { opportunities: 131, taken: 61 },
-        'fold-to-cbet-turn': { opportunities: 88, taken: 39 },
-        'cbet-river': { opportunities: 48, taken: 22 },
-      },
-    }
-    const view = renderStats(cbets)
-
-    const postflop = within(view).getByRole('group', { name: 'Postflop' })
-    for (const name of [
-      'Flop C-bet 56.7%',
-      'Fold to Flop C-bet 43.4%',
-      'Turn C-bet 46.6%',
-      'Fold to Turn C-bet 44.3%',
-      'River C-bet 45.8%',
-      'Fold to River C-bet —',
-    ]) {
-      expect(within(postflop).getByRole('button', { name })).toBeTruthy()
-    }
-    await userEvent.hover(screen.getByRole('button', { name: 'Fold to Turn C-bet 44.3%' }))
-    expect(within(screen.getByRole('tooltip')).getByText('Fold to turn continuation bet')).toBeTruthy()
-  })
-
-  it('names each C-bet Stat in Spanish', async () => {
-    renderStats(stats, 'es')
-
-    for (const [abbreviation, name] of [
-      ['Flop C-bet', 'Apuesta de continuación en el flop'],
-      ['Fold to Flop C-bet', 'Se retira ante una apuesta de continuación en el flop'],
-      ['Turn C-bet', 'Apuesta de continuación en el turn'],
-      ['Fold to Turn C-bet', 'Se retira ante una apuesta de continuación en el turn'],
-      ['River C-bet', 'Apuesta de continuación en el river'],
-      ['Fold to River C-bet', 'Se retira ante una apuesta de continuación en el river'],
-    ]) {
-      const tile = screen.getByRole('button', { name: `${abbreviation} —` })
-      await userEvent.hover(tile)
-      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
-      await userEvent.unhover(tile)
-    }
-  })
-
-  it('ends Preflop with Cold Call, Fold BB to Steal and Attempt to Steal, each named in full', async () => {
-    renderStats({
-      ...stats,
-      stats: {
-        ...stats.stats,
-        'cold-call': { opportunities: 690, taken: 58 },
-        'fold-bb-to-steal': { opportunities: 214, taken: 88 },
-        steal: { opportunities: 432, taken: 171 },
-      },
-    })
-
-    const preflop = screen.getByRole('group', { name: 'Preflop' })
-    const tiles = within(preflop).getAllByRole('button').map((tile) => tile.textContent)
-    expect(tiles.slice(-3)).toEqual(['Cold Call 8.4%', 'Fold BB to Steal 41.1%', 'ATS 39.6%'])
-    const named = [
-      ['Cold Call 8.4%', 'Cold call'],
-      ['Fold BB to Steal 41.1%', 'Fold big blind to steal'],
-      ['ATS 39.6%', 'Attempt to steal'],
-    ]
-    for (const [tile, fullName] of named) {
-      await userEvent.hover(within(preflop).getByRole('button', { name: tile }))
-      expect(within(screen.getByRole('tooltip')).getByText(fullName)).toBeTruthy()
-      await userEvent.unhover(within(preflop).getByRole('button', { name: tile }))
-    }
+    expect(within(screen.getByRole('tooltip')).getByText('980 / 2,450')).toBeTruthy()
   })
 
   it('says there was no chance rather than “0 / 0”', async () => {
@@ -286,6 +234,20 @@ describe('StatsView', () => {
     expect(within(tip).getByRole('link', { name: 'You did it (412)' }).getAttribute('href')).toBe('/library?stat=vpip:taken')
   })
 
+  it('links a Street’s Stat to its own Hands', async () => {
+    const view = renderStats({
+      ...stats,
+      stats: { ...stats.stats, 'cbet-turn': { opportunities: 131, taken: 61 } },
+      handsWith: { ...stats.handsWith, 'cbet-turn': { opportunity: 131, taken: 61 } },
+    })
+
+    await userEvent.hover(within(column(view, 'Turn')).getByRole('button', { name: 'C-bet 46.6%' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByRole('link', { name: 'Opportunities (131)' }).getAttribute('href')).toBe('/library?stat=cbet-turn:opportunity')
+    expect(within(tip).getByRole('link', { name: 'You did it (61)' }).getAttribute('href')).toBe('/library?stat=cbet-turn:taken')
+  })
+
   it('counts AFq’s links in Hands, as Manos will list them, not in Actions', async () => {
     renderStats({
       ...stats,
@@ -304,7 +266,7 @@ describe('StatsView', () => {
   it('names the links in the person’s language', async () => {
     renderStats(stats, 'es')
 
-    await userEvent.hover(screen.getByRole('button', { name: 'PFR 18,3\u00a0%' }))
+    await userEvent.hover(screen.getByRole('button', { name: 'PFR 18,3 %' }))
 
     const tip = screen.getByRole('tooltip')
     expect(within(tip).getByRole('link', { name: 'Oportunidades (1830)' }).getAttribute('href')).toBe('/library?stat=pfr:opportunity')
