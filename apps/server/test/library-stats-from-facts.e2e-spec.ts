@@ -31,8 +31,9 @@ const FIXTURES = [
 ];
 
 /**
- * The Stats `heroStats` works out from a Hand, the 21 Runout had before the
- * catalogue grew; the newer ones are checked in library-stats.e2e-spec.ts.
+ * The 21 Stats `heroStats` works out from a Hand: the reference this file
+ * checks the facts against. Every later Stat is read from the facts alone,
+ * and `library-stats.e2e-spec.ts` covers it.
  */
 const HERO_STATS = [
   'vpip',
