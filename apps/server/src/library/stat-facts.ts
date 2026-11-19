@@ -68,11 +68,19 @@ function didOverChance(action: DidAction): StatFacts {
 
 /** A defensive Stat: the Action answered with a fold, over faced. */
 function foldOverFaced(action: FacedAction): StatFacts {
+  return answerOverFaced(action, 'fold');
+}
+
+/** The Action answered with `answer`, over faced: Limp-call is the Isolate called. */
+function answerOverFaced(
+  action: FacedAction,
+  answer: 'fold' | 'call' | 'raise',
+): StatFacts {
   const {
-    columns: [faced, answer],
+    columns: [faced, answered],
     since,
   } = read(`${action}-faced`, `${action}-answer`);
-  return perHand(faced, sql`${faced} and ${answer} = 'fold'`, since);
+  return perHand(faced, sql`${faced} and ${answered} = ${answer}`, since);
 }
 
 /** The Hero's postflop Actions of the given kinds, from the per-Street counters. */
@@ -119,35 +127,48 @@ function showdownStats(): Pick<
   };
 }
 
-/** A steal faced in either blind; the Stat is the big blind's alone. */
-function foldBbToSteal(): StatFacts {
+/** A steal faced in either blind; Fold SB and Fold BB to Steal are each one blind's. */
+function foldToStealIn(blind: 'SB' | 'BB'): StatFacts {
   const {
     columns: [faced, answer, position],
     since,
   } = read('steal-faced', 'steal-answer', 'hero-position');
   return perHand(
-    sql`${faced} and ${position} = 'BB'`,
-    sql`${faced} and ${position} = 'BB' and ${answer} = 'fold'`,
+    sql`${faced} and ${position} = ${blind}`,
+    sql`${faced} and ${position} = ${blind} and ${answer} = 'fold'`,
     since,
   );
 }
 
 /**
  * Every Stat as facts (facts catalogue §5): the one place a Stat is mapped
- * onto the facts row. Each matches its definition in `heroStats`, which
- * still writes the per-Stat rows until they are retired.
+ * onto the facts row. The 21 that `heroStats` knows match its definitions
+ * there, which the facts' tests check them against.
  */
 export const STAT_FACTS: Record<StatKey, StatFacts> = {
   vpip: didOverChance('vpip'),
   pfr: didOverChance('pfr'),
+  rfi: didOverChance('open'),
+  limp: didOverChance('limp'),
+  // The limp's answers to the first raise after it, its Isolate.
+  'limp-fold': answerOverFaced('isolate', 'fold'),
+  'limp-call': answerOverFaced('isolate', 'call'),
+  'limp-raise': answerOverFaced('isolate', 'raise'),
+  isolate: didOverChance('isolate'),
   'three-bet': didOverChance('three-bet'),
   'fold-to-three-bet': foldOverFaced('three-bet'),
   'four-bet': didOverChance('four-bet'),
   'fold-to-four-bet': foldOverFaced('four-bet'),
+  'five-bet': didOverChance('five-bet'),
+  'fold-to-five-bet': foldOverFaced('five-bet'),
   squeeze: didOverChance('squeeze'),
+  'fold-to-squeeze': foldOverFaced('squeeze'),
   'cold-call': didOverChance('cold-call'),
-  'fold-bb-to-steal': foldBbToSteal(),
+  'fold-sb-to-steal': foldToStealIn('SB'),
+  'fold-bb-to-steal': foldToStealIn('BB'),
   steal: didOverChance('steal'),
+  resteal: didOverChance('resteal'),
+  'fold-to-resteal': foldOverFaced('resteal'),
   'cbet-flop': didOverChance('flop-cbet'),
   'fold-to-cbet-flop': foldOverFaced('flop-cbet'),
   'check-raise-flop': didOverChance('flop-check-raise'),

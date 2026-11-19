@@ -1,7 +1,10 @@
 import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
-import { freshHandHistory } from './support/hand-histories.js';
+import {
+  freshHandHistory,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -19,14 +22,26 @@ interface Stats {
 const STAT_KEYS = [
   'vpip',
   'pfr',
+  'rfi',
+  'limp',
+  'limp-fold',
+  'limp-call',
+  'limp-raise',
+  'isolate',
   'three-bet',
   'fold-to-three-bet',
   'four-bet',
   'fold-to-four-bet',
+  'five-bet',
+  'fold-to-five-bet',
   'squeeze',
+  'fold-to-squeeze',
   'cold-call',
+  'fold-sb-to-steal',
   'fold-bb-to-steal',
   'steal',
+  'resteal',
+  'fold-to-resteal',
   'cbet-flop',
   'fold-to-cbet-flop',
   'check-raise-flop',
@@ -39,6 +54,59 @@ const STAT_KEYS = [
   'wtsd',
   'wsd',
 ];
+
+type Seat = 'Btn' | 'Sb' | 'Bb';
+
+/**
+ * A three-handed PokerStars Hand ($0.50/$1, $100 each) of a hand ID of its
+ * own: Btn on the button, then Sb and Bb, played preflop as `preflop` says,
+ * seen by `hero`. For the spots the fixtures don't reach.
+ */
+function threeHanded(hero: Seat, preflop: string, flop?: string): string {
+  const lines = (block: string) => block.trim().replace(/^\s+/gm, '');
+  return withFreshHandIds(
+    [
+      "PokerStars Hand #262199000001:  Hold'em No Limit ($0.50/$1 USD) - 2026/09/10 21:00:00 CET [2026/09/10 15:00:00 ET]",
+      "Table 'Spec' 3-max Seat #1 is the button",
+      'Seat 1: Btn ($100 in chips)',
+      'Seat 2: Sb ($100 in chips)',
+      'Seat 3: Bb ($100 in chips)',
+      'Sb: posts small blind $0.50',
+      'Bb: posts big blind $1',
+      '*** HOLE CARDS ***',
+      `Dealt to ${hero} [Ah Kd]`,
+      lines(preflop),
+      ...(flop !== undefined ? ['*** FLOP *** [Kh 9c 4d]', lines(flop)] : []),
+      'Btn collected $1 from pot',
+      '*** SUMMARY ***',
+      'Total pot $1 | Rake $0',
+    ].join('\n') + '\n',
+  );
+}
+
+/** The Btn limps, the Sb folds and the Bb raises it: the limp's Isolate. */
+const LIMP_ISOLATED = `
+  Btn: calls $1
+  Sb: folds
+  Bb: raises $3 to $4`;
+
+/** Two limps, and the Bb checks: an Isolate passed up. */
+const LIMPED = `
+  Btn: calls $1
+  Sb: calls $0.50
+  Bb: checks`;
+
+/** Nobody bets the flop of a limped pot. */
+const CHECKED_FLOP = `
+  Sb: checks
+  Bb: checks
+  Btn: checks`;
+
+/** The Btn opens and the Sb re-raises it: a Resteal. */
+const RESTEAL = `
+  Btn: raises $2 to $3
+  Sb: raises $7 to $10
+  Bb: folds`;
 
 /*
  * The fixtures this file imports, iMapleAA's Hands at €0.05/€0.10 in the
@@ -309,6 +377,122 @@ describe('The Library’s Stats (e2e)', () => {
       foldTurn: none,
       river: none,
       foldRiver: none,
+    });
+  });
+
+  /**
+   * Each Stat's opportunities and taken, checking on the way that the Hands
+   * behind its links, and those its Stat criterion keeps, are as many.
+   */
+  async function perHandStats(token: string, keys: string[]) {
+    const all = await stats(token);
+    const hands = async (query: string) => {
+      const res = await request(running.httpServer)
+        .get(`/api/library/hand-ids?${query}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      return (res.body.ids as string[]).length;
+    };
+    const counted: Record<string, [number, number]> = {};
+    for (const key of keys) {
+      const { opportunities, taken } = all.stats[key];
+      // Counted once per Hand: the links list as many Hands as the counts.
+      expect(all.handsWith[key], key).toEqual({
+        opportunity: opportunities,
+        taken,
+      });
+      expect(await hands(`stat=${key}:opportunity`), key).toBe(opportunities);
+      expect(await hands(`stat=${key}:taken`), key).toBe(taken);
+      counted[key] = [opportunities, taken];
+    }
+    return counted;
+  }
+
+  it('sums RFI, Limp, the answers to an Isolate, and Isolate', async () => {
+    const account = await newAccount(running.httpServer);
+    await importText(
+      account.token,
+      [
+        // The Btn limps, is isolated and raises.
+        threeHanded('Btn', `${LIMP_ISOLATED}\nBtn: raises $8 to $12\nBb: folds`),
+        // The Btn limps, is isolated and calls.
+        threeHanded('Btn', `${LIMP_ISOLATED}\nBtn: calls $3`, 'Bb: checks\nBtn: checks'),
+        // The Btn limps, is isolated and folds.
+        threeHanded('Btn', `${LIMP_ISOLATED}\nBtn: folds`),
+        // The Btn opens.
+        threeHanded('Btn', 'Btn: raises $2 to $3\nSb: folds\nBb: folds'),
+        // The Btn limps and nobody raises.
+        threeHanded('Btn', LIMPED, CHECKED_FLOP),
+        // The Bb isolates the Btn's limp.
+        threeHanded('Bb', `${LIMP_ISOLATED}\nBtn: folds`),
+        // The Bb checks behind two limps.
+        threeHanded('Bb', LIMPED, CHECKED_FLOP),
+      ].join('\n\n\n'),
+    );
+
+    expect(
+      await perHandStats(account.token, [
+        'rfi',
+        'limp',
+        'limp-fold',
+        'limp-call',
+        'limp-raise',
+        'isolate',
+      ]),
+    ).toEqual({
+      // The Btn is first in every time: one open, four limps.
+      rfi: [5, 1],
+      limp: [5, 4],
+      // Three of the limps are isolated, and answered each way once.
+      'limp-fold': [3, 1],
+      'limp-call': [3, 1],
+      'limp-raise': [3, 1],
+      // The Bb behind a limp twice: one raise, one check.
+      isolate: [2, 1],
+    });
+  });
+
+  it('sums the answers to a Squeeze and a 5-bet, and the fights over a steal', async () => {
+    const account = await newAccount(running.httpServer);
+    const fiveBet = `${RESTEAL}\nBtn: raises $15 to $25\nSb: raises $35 to $60\nBtn: folds`;
+    await importText(
+      account.token,
+      [
+        // The Sb folds to the Btn's steal.
+        threeHanded('Sb', 'Btn: raises $2 to $3\nSb: folds\nBb: folds'),
+        // The Sb resteals, and the Btn folds to it.
+        threeHanded('Sb', `${RESTEAL}\nBtn: folds`),
+        threeHanded('Btn', `${RESTEAL}\nBtn: folds`),
+        // The Sb resteals, the Btn 4-bets, the Sb 5-bets and the Btn folds.
+        threeHanded('Sb', fiveBet),
+        threeHanded('Btn', fiveBet),
+        // The Bb squeezes the Btn's open and the Sb's call; the Btn folds.
+        threeHanded(
+          'Btn',
+          'Btn: raises $2 to $3\nSb: calls $2\nBb: raises $11 to $14\nBtn: folds\nSb: folds',
+        ),
+      ].join('\n\n\n'),
+    );
+
+    expect(
+      await perHandStats(account.token, [
+        'fold-to-squeeze',
+        'five-bet',
+        'fold-to-five-bet',
+        'fold-sb-to-steal',
+        'resteal',
+        'fold-to-resteal',
+      ]),
+    ).toEqual({
+      'fold-to-squeeze': [1, 1],
+      // The Sb 5-bets; the Btn, facing it, could have raised again.
+      'five-bet': [2, 1],
+      'fold-to-five-bet': [1, 1],
+      // The Sb faces a steal three times and folds once.
+      'fold-sb-to-steal': [3, 1],
+      resteal: [3, 2],
+      // The Btn folds to one Resteal and 4-bets the other.
+      'fold-to-resteal': [2, 1],
     });
   });
 
