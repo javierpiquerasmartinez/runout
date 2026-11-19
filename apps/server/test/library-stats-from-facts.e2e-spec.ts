@@ -61,10 +61,10 @@ const HERO_STATS = [
 
 /*
  * The Stats are counted from each Hand's facts row (ADR 0012). This checks
- * them against the Hero's Stats worked out from each stored Hand, Stat by
- * Stat, on every fixture. A Hand whose facts row
- * is missing or older than a Stat needs counts towards no such Stat until
- * the re-derive job reaches it.
+ * the 21 `heroStats` knows against the Hero's Stats worked out from each
+ * stored Hand, Stat by Stat, on every fixture. A Hand whose facts row is
+ * missing or older than a Stat needs counts towards no such Stat until the
+ * re-derive job reaches it.
  */
 describe('The Library’s Stats, counted from the facts (e2e)', () => {
   let running: RunningApp;

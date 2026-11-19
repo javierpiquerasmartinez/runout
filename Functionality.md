@@ -494,6 +494,10 @@ The Library is a person's own repository: the Hands they imported into it, whate
   - **RFI** is the open (raising first in) over the times I was first in; **Limp** the limps over the times I could limp; **Isolate** the raises over limpers over the times I could make one; **5-bet+** a re-raise of a 4-bet or more; **Resteal** a re-raise of a steal from the blinds;
   - **Limp-fold**, **Limp-call** and **Limp-raise** are my answer to the first raise after my limp, over the times it came, so the three add up to 100 %;
   - **Fold to Squeeze**, **Fold to 5-bet+** and **Fold to Resteal** are the folds over the times I faced one; **Fold SB to Steal** is the small blind's Fold BB to Steal.
+- The Postflop ones are hidden too. Each of these Postflop Stats sits in its Street's column, after Fold to C-bet, and counts as its did over its chance; its Fold to counts the times I faced it and folded:
+  - **Flop:** Donk, Fold to Donk;
+  - **Turn:** Delayed C-bet, Fold to Delayed C-bet, Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk;
+  - **River:** Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk.
 - **Editar**, on the line of the Hand count, lets me choose which Stats of the catalogue I see:
   - while editing, every Stat of the catalogue shows in its band and column with its value; the ones I see are outlined in the accent colour with a ✓, the hidden ones are faded, with a dashed outline and a +;
   - the line reads "Elige qué estadísticas ves: un clic pone o quita cada una. Las atenuadas están ocultas.", with **Restablecer** and **Listo**;
