@@ -10,9 +10,12 @@ import { timeline, type TableState } from './timeline.js';
  * key no longer here). The keys travel in the API and are stored in
  * Preferences and Saved Filters, so they never change.
  *
- * Adding a Stat is adding its key here, its mapping onto the facts in
- * `STAT_FACTS` (`library/stat-facts.ts`, which fails to compile without it),
- * and its entry in the web's `STAT_CATALOGUE`.
+ * Adding a Stat touches five places: its key here; its mapping onto the
+ * facts in `STAT_FACTS` (`library/stat-facts.ts`, which fails to compile
+ * without it); its entry in the web's `STAT_CATALOGUE`
+ * (`apps/web/src/library/stats.ts`); its full name in the web's `es.ts` and
+ * `en.ts` messages (`library.stats.name.<key>`); and its key in the e2e
+ * list of `test/library-stats.e2e-spec.ts`.
  */
 export const STAT_KEYS = [
   'vpip',

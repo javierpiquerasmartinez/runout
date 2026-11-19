@@ -1,21 +1,41 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { handFacts, hands } from '../database/schema.js';
-import type { StatKey } from '../hands/replay/hero-stats.js';
+import type { StatCount, StatKey } from '../hands/replay/hero-stats.js';
 import { factOnRow, type FactKey } from './fact-criteria.js';
 
+/** A ratio Stat (AF): the Hero's bets and raises, and their calls. */
+export interface StatRatio {
+  ratio: true;
+  aggressive: number;
+  calls: number;
+}
+
+/** How many Hands had a Stat's opportunity, and how many had it taken. */
+export interface StatHands {
+  opportunity: number;
+  taken: number;
+}
+
 /**
- * How one Hand counts towards a Stat, read off its facts row (and, for
- * reaching Showdown, its own row). Most Stats count at most once per Hand:
- * whether it had the opportunity and whether it took it, as conditions.
- * AFq counts per Action: how many opportunities and taken, as integers.
- * AF is a ratio, not a frequency: how many aggressive Actions and calls, as
- * integers; its Hands are those with either, and those with an aggressive one.
+ * How Hands count towards a Stat, read off each one's facts row (and, for
+ * reaching Showdown, its own row), and how the Stat answers from them. Each
+ * kind of Stat says this its own way, so whoever counts them doesn't ask
+ * which kind it is:
+ * - most count at most once per Hand, and answer their Hands on either side;
+ * - AFq counts per Action: it sums how many opportunities and taken there
+ *   were, and answers those sums;
+ * - AF is a ratio, not a frequency: it sums the aggressive Actions and the
+ *   calls, and answers those two, never their quotient.
  */
-export type StatFacts = (
-  | { perAction: false; opportunity: SQL; taken: SQL }
-  | { perAction: true; opportunities: SQL; taken: SQL }
-  | { ratio: true; aggressive: SQL; calls: SQL }
-) & {
+export interface StatFacts {
+  /** Whether the Hand had the Stat's opportunity; a null condition doesn't hold. */
+  opportunity: SQL;
+  /** Whether the Hand took it. */
+  taken: SQL;
+  /** What the Stat adds up over its Hands, by name, besides counting them; none for most. */
+  sums: Record<string, SQL>;
+  /** The Stat's counts, from its Hands on either side and its `sums`, added up. */
+  answer(hands: StatHands, sums: Record<string, number>): StatCount | StatRatio;
   /**
    * The rules version that added the last of the facts it reads. A Hand
    * whose facts row is missing or older counts towards the Stat neither as
@@ -23,7 +43,7 @@ export type StatFacts = (
    * it, until the re-derive job reaches it (see the README).
    */
   since: number;
-};
+}
 
 /** A named Action with a did and a chance fact: `vpip`, `flop-cbet`. */
 type DidAction = {
@@ -57,7 +77,16 @@ function read(...facts: FactKey[]) {
 
 /** A Stat counted at most once per Hand; a null condition doesn't hold. */
 function perHand(opportunity: SQL, taken: SQL, since: number): StatFacts {
-  return { perAction: false, opportunity, taken, since };
+  return {
+    opportunity,
+    taken,
+    sums: {},
+    answer: (hands) => ({
+      opportunities: hands.opportunity,
+      taken: hands.taken,
+    }),
+    since,
+  };
 }
 
 /** A named Action's did over its chance: `vpip`, `flop-cbet`. */
@@ -87,11 +116,11 @@ function answerOverFaced(
 }
 
 /** The Streets after preflop, whose Stats sit in their own columns. */
-type Street = 'flop' | 'turn' | 'river';
-const STREETS: Street[] = ['flop', 'turn', 'river'];
+type PostflopStreet = 'flop' | 'turn' | 'river';
+const POSTFLOP_STREETS: PostflopStreet[] = ['flop', 'turn', 'river'];
 
 /** A raise answered to a C-bet faced, over C-bet faced. */
-function raiseCbet(street: Street): StatFacts {
+function raiseCbet(street: PostflopStreet): StatFacts {
   return answerOverFaced(`${street}-cbet`, 'raise');
 }
 
@@ -100,7 +129,7 @@ function raiseCbet(street: Street): StatFacts {
  * then faced a bet they could raise), the Hero's line on the Street begins
  * with the check and that answer. With Check-raise, they add up to 100 %.
  */
-function checkThen(street: Street, line: 'XC' | 'XF'): StatFacts {
+function checkThen(street: PostflopStreet, line: 'XC' | 'XF'): StatFacts {
   const {
     columns: [chance, heroLine],
     since,
@@ -116,12 +145,15 @@ function checkThen(street: Street, line: 'XC' | 'XF'): StatFacts {
  * Bet-fold: the Hero's bet raised (check-raised too), answered with a fold.
  * The Raise Action's faced is a raise of the Hero's bet.
  */
-function betFold(street: Street): StatFacts {
+function betFold(street: PostflopStreet): StatFacts {
   return foldOverFaced(`${street}-raise`);
 }
 
 /** The Hero's Actions of the given kinds on those Streets, from the per-Street counters. */
-function postflopActions(kinds: Counter[], streets: Street[] = STREETS) {
+function postflopActions(
+  kinds: Counter[],
+  streets: PostflopStreet[] = POSTFLOP_STREETS,
+) {
   const { columns, since } = read(
     ...streets.flatMap((street) =>
       kinds.map((kind): FactKey => `${street}-${kind}`),
@@ -137,25 +169,35 @@ function postflopActions(kinds: Counter[], streets: Street[] = STREETS) {
 }
 
 /** AFq over every postflop Street, or over one: counted Action by Action. */
-function afq(streets: Street[] = STREETS): StatFacts {
+function afq(streets: PostflopStreet[] = POSTFLOP_STREETS): StatFacts {
   const all = postflopActions(['bets', 'raises', 'calls', 'folds'], streets);
   const aggressive = postflopActions(['bets', 'raises'], streets);
   return {
-    perAction: true,
-    opportunities: all.count,
-    taken: aggressive.count,
+    opportunity: sql`${all.count} > 0`,
+    taken: sql`${aggressive.count} > 0`,
+    sums: { opportunities: all.count, taken: aggressive.count },
+    answer: (_hands, sums) => ({
+      opportunities: sums.opportunities,
+      taken: sums.taken,
+    }),
     since: Math.max(all.since, aggressive.since),
   };
 }
 
 /** AF: bets plus raises, against calls, on one Street or over all three. */
-function af(...streets: Street[]): StatFacts {
+function af(...streets: PostflopStreet[]): StatFacts {
   const aggressive = postflopActions(['bets', 'raises'], streets);
   const calls = postflopActions(['calls'], streets);
   return {
-    ratio: true,
-    aggressive: aggressive.count,
-    calls: calls.count,
+    // "Con acción": a bet, raise or call; "Agresivas": a bet or raise.
+    opportunity: sql`${aggressive.count} + ${calls.count} > 0`,
+    taken: sql`${aggressive.count} > 0`,
+    sums: { aggressive: aggressive.count, calls: calls.count },
+    answer: (_hands, sums) => ({
+      ratio: true,
+      aggressive: sums.aggressive,
+      calls: sums.calls,
+    }),
     since: Math.max(aggressive.since, calls.since),
   };
 }
@@ -281,17 +323,7 @@ export function countsTowards(key: StatKey): SQL {
  * facts row once that row counts towards the Stat.
  */
 export function handCounts(key: StatKey, side: 'opportunity' | 'taken'): SQL {
-  const stat = STAT_FACTS[key];
-  if ('ratio' in stat) {
-    // "Con acción": a bet, raise or call; "Agresivas": a bet or raise.
-    return side === 'taken'
-      ? sql`${stat.aggressive} > 0`
-      : sql`${stat.aggressive} + ${stat.calls} > 0`;
-  }
-  if (!stat.perAction) {
-    return side === 'taken' ? stat.taken : stat.opportunity;
-  }
-  return sql`${side === 'taken' ? stat.taken : stat.opportunities} > 0`;
+  return STAT_FACTS[key][side];
 }
 
 /**

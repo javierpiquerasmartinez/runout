@@ -922,7 +922,7 @@ const STAT_SIDES: StatSide[] = ['taken', 'opportunity']
 
 /**
  * The Estadística branch: every Stat of the catalogue, whichever the view
- * shows, grouped Preflop, Flop, Turn, River and Showdown y totales, a
+ * shows, in sections Preflop, Flop, Turn, River and Showdown y totales, a
  * postflop one named with its Street ("Turn C-bet"), each with "La hice"
  * and "Tuve la oportunidad", the two links of its
  * tooltip. One is picked at most; picking another replaces it.
