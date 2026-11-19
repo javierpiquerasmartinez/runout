@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -235,6 +235,26 @@ describe('StatsView', () => {
     }
   })
 
+  it('names the answers on each Street in full, with the Street, in English and Spanish', async () => {
+    const answers: StatKey[] = ['raise-cbet-flop', 'check-call-turn', 'bet-fold-river', 'afq-turn']
+    const named: [Locale, string, string, string][] = [
+      ['en', 'Flop', 'Raise C-bet —', 'Raise flop continuation bet'],
+      ['en', 'Turn', 'Check-call —', 'Check, then call a bet on the turn'],
+      ['en', 'River', 'Bet-fold —', 'Bet, then fold to a raise on the river'],
+      ['en', 'Turn', 'AFq —', 'Aggression frequency on the turn'],
+      ['es', 'Flop', 'Raise C-bet —', 'Sube una apuesta de continuación en el flop'],
+      ['es', 'Turn', 'Check-call —', 'Pasa y paga una apuesta en el turn'],
+      ['es', 'River', 'Bet-fold —', 'Apuesta y se retira ante una subida en el river'],
+      ['es', 'Turn', 'AFq —', 'Frecuencia de agresión en el turn'],
+    ]
+    for (const [locale, street, tile, name] of named) {
+      const view = renderStats(stats, locale, answers)
+      await userEvent.hover(within(column(view, street)).getByRole('button', { name: tile }))
+      expect(within(screen.getByRole('tooltip')).getByText(name)).toBeTruthy()
+      cleanup()
+    }
+  })
+
   it('gives AFq’s count in Actions, more than the Hands it covers', async () => {
     renderStats({ ...stats, stats: { ...stats.stats, afq: { opportunities: 2450, taken: 980 } } })
 
@@ -384,7 +404,18 @@ describe('StatsView, choosing which Stats one sees', () => {
 
     await userEvent.click(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
 
-    expect(changes).toEqual([{ shownStats: STAT_KEYS.filter((key) => key !== 'vpip') }])
+    // The spec's default, today's 21, in the catalogue's order, without VPIP.
+    expect(changes).toEqual([
+      {
+        shownStats: [
+          'pfr', 'steal', 'three-bet', 'fold-to-three-bet', 'squeeze', 'cold-call', 'four-bet', 'fold-to-four-bet', 'fold-bb-to-steal',
+          'cbet-flop', 'fold-to-cbet-flop', 'check-raise-flop',
+          'cbet-turn', 'fold-to-cbet-turn',
+          'cbet-river', 'fold-to-cbet-river',
+          'wwsf', 'wtsd', 'wsd', 'afq',
+        ],
+      },
+    ])
   })
 
   it('has no tooltips nor links while editing', async () => {

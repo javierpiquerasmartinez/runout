@@ -855,9 +855,39 @@ describe('LibraryPage', () => {
           'Fold to 4-bet',
           'Fold BB to Steal',
         ])
-        expect(names(within(panel).getByRole('group', { name: 'Flop' }))).toEqual(['Flop C-bet', 'Flop Fold to C-bet', 'Flop Check-raise'])
-        expect(names(within(panel).getByRole('group', { name: 'Turn' }))).toEqual(['Turn C-bet', 'Turn Fold to C-bet'])
-        expect(names(within(panel).getByRole('group', { name: 'River' }))).toEqual(['River C-bet', 'River Fold to C-bet'])
+        expect(names(within(panel).getByRole('group', { name: 'Flop' }))).toEqual([
+          'Flop C-bet',
+          'Flop Fold to C-bet',
+          'Flop Raise C-bet',
+          'Flop Check-raise',
+          'Flop Fold to Check-raise',
+          'Flop Check-call',
+          'Flop Check-fold',
+          'Flop Bet-fold',
+          'Flop AFq',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'Turn' }))).toEqual([
+          'Turn C-bet',
+          'Turn Fold to C-bet',
+          'Turn Raise C-bet',
+          'Turn Check-raise',
+          'Turn Fold to Check-raise',
+          'Turn Check-call',
+          'Turn Check-fold',
+          'Turn Bet-fold',
+          'Turn AFq',
+        ])
+        expect(names(within(panel).getByRole('group', { name: 'River' }))).toEqual([
+          'River C-bet',
+          'River Fold to C-bet',
+          'River Raise C-bet',
+          'River Check-raise',
+          'River Fold to Check-raise',
+          'River Check-call',
+          'River Check-fold',
+          'River Bet-fold',
+          'River AFq',
+        ])
         expect(names(within(panel).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF', 'WTSD', 'W$SD', 'AFq'])
 
         await userEvent.click(within(criterion(panel, 'Turn C-bet')).getByRole('button', { name: 'I did it' }))

@@ -490,6 +490,12 @@ The Library is a person's own repository: the Hands they imported into it, whate
     - **Turn:** C-bet, Fold to C-bet;
     - **River:** C-bet, Fold to C-bet.
   - **Showdown y totales:** WWSF, WTSD, W$SD, AFq.
+- The catalogue holds more Stats, hidden until I pick them in Editar, each in its band or Street column in the catalogue's order. The answers on each Street, on the flop, the turn and the river:
+  - **Raise C-bet:** a C-bet I faced, answered with a raise;
+  - **Check-raise** (the flop's is in the default), **Check-call** and **Check-fold:** they share one chance, I checked and then faced a bet I could raise, so the three add up to 100 %; Check-call and Check-fold read my line on the Street (it begins XC or XF);
+  - **Fold to Check-raise:** a check-raise I faced, answered with a fold;
+  - **Bet-fold:** a bet of mine raised (check-raised too), answered with a fold;
+  - **AFq** of the Street, counted Action by Action as the total AFq is, its links counting Hands.
 - **Editar**, on the line of the Hand count, lets me choose which Stats of the catalogue I see:
   - while editing, every Stat of the catalogue shows in its band and column with its value; the ones I see are outlined in the accent colour with a ✓, the hidden ones are faded, with a dashed outline and a +;
   - the line reads "Elige qué estadísticas ves: un clic pone o quita cada una. Las atenuadas están ocultas.", with **Restablecer** and **Listo**;
