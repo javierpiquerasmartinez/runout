@@ -24,6 +24,12 @@ type StatEntry<Key extends string = string> = {
   short: string
   /** Whether a person who hasn't chosen their Stats sees it. */
   shownByDefault: boolean
+  /**
+   * A ratio between kinds of the Hero's Actions (AF), not a frequency: the
+   * server answers it as a `StatRatio`, and its two sides of Hands are those
+   * with any of those Actions and those with the aggressive ones.
+   */
+  ratio?: true
 } & ({ band: 'preflop' | 'showdown'; street?: never } | { band: 'postflop'; street: StatStreet })
 
 /**
@@ -64,6 +70,7 @@ export const STAT_CATALOGUE = [
   { key: 'donk-flop', band: 'postflop', street: 'flop', short: 'Donk', shownByDefault: false },
   { key: 'fold-to-donk-flop', band: 'postflop', street: 'flop', short: 'Fold to Donk', shownByDefault: false },
   { key: 'check-raise-flop', band: 'postflop', street: 'flop', short: 'Check-raise', shownByDefault: true },
+  { key: 'af-flop', band: 'postflop', street: 'flop', short: 'AF', shownByDefault: false, ratio: true },
 
   { key: 'cbet-turn', band: 'postflop', street: 'turn', short: 'C-bet', shownByDefault: true },
   { key: 'fold-to-cbet-turn', band: 'postflop', street: 'turn', short: 'Fold to C-bet', shownByDefault: true },
@@ -75,6 +82,7 @@ export const STAT_CATALOGUE = [
   { key: 'fold-to-float-turn', band: 'postflop', street: 'turn', short: 'Fold to Float', shownByDefault: false },
   { key: 'donk-turn', band: 'postflop', street: 'turn', short: 'Donk', shownByDefault: false },
   { key: 'fold-to-donk-turn', band: 'postflop', street: 'turn', short: 'Fold to Donk', shownByDefault: false },
+  { key: 'af-turn', band: 'postflop', street: 'turn', short: 'AF', shownByDefault: false, ratio: true },
 
   { key: 'cbet-river', band: 'postflop', street: 'river', short: 'C-bet', shownByDefault: true },
   { key: 'fold-to-cbet-river', band: 'postflop', street: 'river', short: 'Fold to C-bet', shownByDefault: true },
@@ -84,10 +92,13 @@ export const STAT_CATALOGUE = [
   { key: 'fold-to-float-river', band: 'postflop', street: 'river', short: 'Fold to Float', shownByDefault: false },
   { key: 'donk-river', band: 'postflop', street: 'river', short: 'Donk', shownByDefault: false },
   { key: 'fold-to-donk-river', band: 'postflop', street: 'river', short: 'Fold to Donk', shownByDefault: false },
+  { key: 'af-river', band: 'postflop', street: 'river', short: 'AF', shownByDefault: false, ratio: true },
 
   { key: 'wwsf', band: 'showdown', short: 'WWSF', shownByDefault: true },
   { key: 'wtsd', band: 'showdown', short: 'WTSD', shownByDefault: true },
   { key: 'wsd', band: 'showdown', short: 'W$SD', shownByDefault: true },
+  /** Over every postflop Street. */
+  { key: 'af', band: 'showdown', short: 'AF', shownByDefault: false, ratio: true },
   /** Counted per postflop Action, not per Hand: its opportunities can outnumber the Hands. */
   { key: 'afq', band: 'showdown', short: 'AFq', shownByDefault: true },
 ] as const satisfies readonly StatEntry[]
@@ -127,6 +138,24 @@ export function sectionTitle(section: StatSection): MessageKey {
   return section === 'preflop' || section === 'showdown' ? `library.stats.group.${section}` : `library.stats.street.${section}`
 }
 
+/**
+ * What one side of a Stat's Hands is called, where `place` names it: its
+ * tooltip's link, the Stat criterion's button or its chip. AF's sides are
+ * the Hands with action and the aggressive ones, not opportunities and times
+ * taken.
+ */
+export function statSideName(stat: Stat, side: 'opportunity' | 'taken', place: 'link' | 'criterion' | 'chip'): MessageKey {
+  const ratio = stat.ratio ? '.ratio' : ''
+  switch (place) {
+    case 'link':
+      return `library.stats.link${ratio}.${side}`
+    case 'chip':
+      return `library.stats.chip${ratio}.${side}`
+    case 'criterion':
+      return `library.moreFilters.stat${ratio}.${side}`
+  }
+}
+
 /** The Stat of a key. */
 export function statOf(key: StatKey): Stat {
   return STAT_CATALOGUE.find((stat) => stat.key === key)!
@@ -138,11 +167,18 @@ export interface StatCount {
   taken: number
 }
 
+/** A ratio Stat (AF): the Hero's bets and raises, and their calls, never divided by the server. */
+export interface StatRatio {
+  ratio: true
+  aggressive: number
+  calls: number
+}
+
 export interface LibraryStats {
   /** How many Hands the Stats cover: as many as the list and the Results Graph count. */
   hands: number
-  /** Every Stat, zero opportunities where the Hero never had the chance. */
-  stats: Record<StatKey, StatCount>
+  /** Every Stat, zero opportunities where the Hero never had the chance; AF as a ratio's two counts. */
+  stats: Record<StatKey, StatCount | StatRatio>
   /**
    * Every Stat, with how many of those Hands had its opportunity and how many
    * had it taken: what the list holds behind each of the Stat's links. Apart

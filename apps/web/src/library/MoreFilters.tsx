@@ -28,7 +28,7 @@ import {
 } from './moreFilterBranches'
 import { useBuildsFilters } from './buildsFilters'
 import type { SavedCriteria } from './savedFilters'
-import { STAT_CATALOGUE, STAT_SECTIONS, sectionTitle, statLabel, statName, statSection } from './stats'
+import { STAT_CATALOGUE, STAT_SECTIONS, sectionTitle, statLabel, statName, statSection, statSideName } from './stats'
 import './MoreFilters.css'
 
 /** The Lab's matrix, for the hole cards: fetched once the Cards branch is opened, never with the page. */
@@ -960,7 +960,7 @@ function StatBranch({ stat, onPut }: { stat: StatCriterion | null; onPut: (stat:
                       aria-pressed={picked}
                       onClick={() => onPut(picked ? null : { key: tile.key, side })}
                     >
-                      <span>{t(`library.moreFilters.stat.${side}`)}</span>
+                      <span>{t(statSideName(tile, side, 'criterion'))}</span>
                     </button>
                   )
                 })}
