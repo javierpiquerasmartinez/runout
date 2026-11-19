@@ -483,13 +483,21 @@ The Library is a person's own repository: the Hands they imported into it, whate
 **H7.11 — See my Stats.** As a player, I want my Stats as a view of my Library, so I see how I play and find my leaks after a session, without a separate Tracker.
 
 - It is the Library's Estadísticas view, at `/library/stats`, over the Hands the filters keep (H7.3). Above the Stats it says how many Hands they cover, the same count as the list and the Results Graph for the same filters.
-- It shows 21 Stats in three bands, in the catalogue's order:
+- By default it shows 21 Stats in three bands, in the catalogue's order:
   - **Preflop:** VPIP, PFR, ATS (Attempt to Steal), 3-bet, Fold to 3-bet, Squeeze, Cold Call, 4-bet, Fold to 4-bet, Fold BB to Steal.
   - **Postflop**, as three columns side by side, **Flop | Turn | River**, each in the same order so a row reads across Streets:
     - **Flop:** C-bet, Fold to C-bet, Check-raise;
     - **Turn:** C-bet, Fold to C-bet;
     - **River:** C-bet, Fold to C-bet.
   - **Showdown y totales:** WWSF, WTSD, W$SD, AFq.
+- **Editar**, on the line of the Hand count, lets me choose which Stats of the catalogue I see:
+  - while editing, every Stat of the catalogue shows in its band and column with its value; the ones I see are outlined in the accent colour with a ✓, the hidden ones are faded, with a dashed outline and a +;
+  - the line reads "Elige qué estadísticas ves: un clic pone o quita cada una. Las atenuadas están ocultas.", with **Restablecer** and **Listo**;
+  - one click shows or hides a Stat, and each click is kept at once, so closing the tab loses nothing; tooltips and links are off while editing;
+  - **Restablecer** goes back to the default, including any later change Runout makes to it, and **Listo** leaves editing;
+  - the Stats always show in the catalogue's order, whatever order I picked them in.
+- My choice is one of my Preferences, kept with my Account, so every browser and device shows me the same Stats; an Administrator Impersonating me sees and changes it as I would. A Stat Runout later retires drops out of it quietly. Only an Account has Stats, so only an Account chooses them.
+- A band, or a Street's column, with nothing I see in it isn't drawn. With nothing shown at all, the view says there are no Stats to show and offers Editar. The Hand count stays whatever I choose, and hiding a Stat changes only what the view shows: its Stat criterion in Más filtros still lists and filters on it.
 - Each Stat is a tile with its abbreviation, the same in Spanish and English as players use them, and its percentage with one decimal ("22,4 %"). A tile under a Street's column leaves the Street out ("C-bet"), since the column's heading says it. A Stat I never had the chance to make shows "—", never a 0 %. Every tile looks the same whatever its sample: nothing is dimmed and there is no threshold.
 - Hovering or focusing a tile shows its full name in my language, with its Street ("Apuesta de continuación en el turn"), and how many times I made the decision out of how many I could ("57 / 312"), so I judge the sample myself. A Stat with no chance says so instead.
 - The tooltip links to the Hands behind the number: **Oportunidades (312)** and **Lo hiciste (57)** open the list on the Hands where I had the chance, or where I took it, with that Stat criterion added to Más filtros and every other filter, Más filtros criterion and the sort kept (H7.3). The list then counts as many Hands as the link said, and going back returns to the Stats. With the criterion on, the Results Graph and the Stats narrow to those Hands too, even if that makes the Stat I came from read 100 %.
@@ -498,7 +506,8 @@ The Library is a person's own repository: the Hands they imported into it, whate
 - Stats are worked out when a Hand is imported, from the facts the server keeps of each Hand, and go when it is removed from my Library. Hands imported before a fact existed count too: every deploy works out the facts the stored Hands lack, before the new version starts.
 - They are the Hero's Stats only, Hero by Hero as the Hero filter picks, and they ignore the Results Graph's Zoom.
 - They are post-session only, over my Library. Runout never shows them at a table while playing: it is not a HUD ([docs/research/hud-feasibility.md](docs/research/hud-feasibility.md)).
-- On a desktop screen every Stat fits under the filters without scrolling. On a phone (760 px wide or less) the Flop, Turn and River columns stack one under another, so the tiles keep their size, and the Stats scroll.
+- On a desktop screen the default Stats fit under the filters without scrolling; a choice that doesn't fit makes the view scroll. On a phone (760 px wide or less) the Flop, Turn and River columns stack one under another, so the tiles keep their size, and the Stats scroll.
+- On a phone I see the Stats I chose on my computer, and the tooltip links work as there. There is no Editar: a line under the Stats says they are chosen on a computer ("Elige qué estadísticas ves desde el ordenador.").
 - An empty Library, or filters that match nothing, show the same empty states as the other views (H7.2).
 - It follows my Theme and the app's visual style.
 

@@ -1,9 +1,14 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { useState, type ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import type { Locale } from '../i18n/catalogue'
-import { STAT_KEYS, type LibraryStats } from './stats'
+import { SessionContext } from '../identity/context'
+import { PreferencesContext } from '../preferences/context'
+import { DEFAULT_PREFERENCES, type Preferences } from '../preferences/preferences'
+import { fakeSession } from '../test/fakeSession'
+import { STAT_KEYS, type LibraryStats, type StatKey } from './stats'
 import type { StatCriterion } from './libraryFilter'
 import { StatsView } from './StatsView'
 
@@ -25,10 +30,30 @@ const stats: LibraryStats = {
 /** Where a Stat's links lead, as the Library would write it. */
 const statHref = ({ key, side }: StatCriterion) => `/library?stat=${key}:${side}`
 
-function renderStats(of: LibraryStats = stats, locale: Locale = 'en') {
+/** Every change of Preferences the view asked for, as the server would get them. */
+let changes: Partial<Preferences>[] = []
+
+/** A session whose Preferences change when the view asks, as the server would keep them. */
+function Session({ shownStats, children }: { shownStats: StatKey[] | null; children: ReactNode }) {
+  const [preferences, setPreferences] = useState<Preferences>({ ...DEFAULT_PREFERENCES, shownStats })
+  const changePreferences = async (change: Partial<Preferences>) => {
+    changes.push(change)
+    setPreferences((before) => ({ ...before, ...change }))
+  }
+  return (
+    <SessionContext.Provider value={fakeSession({ preferences }, { changePreferences })}>
+      <PreferencesContext.Provider value={preferences}>{children}</PreferencesContext.Provider>
+    </SessionContext.Provider>
+  )
+}
+
+function renderStats(of: LibraryStats = stats, locale: Locale = 'en', shownStats: StatKey[] | null = null) {
+  changes = []
   render(
     <I18nProvider initialLocale={locale}>
-      <StatsView stats={of} statHref={statHref} />
+      <Session shownStats={shownStats}>
+        <StatsView stats={of} statHref={statHref} />
+      </Session>
     </I18nProvider>,
   )
   return screen.getByRole('region', { name: locale === 'en' ? 'Stats' : 'Estadísticas' })
@@ -97,6 +122,8 @@ describe('StatsView', () => {
   it('gives the same on focus, in the person’s language', async () => {
     renderStats(stats, 'es')
 
+    // Past Editar, to the first tile.
+    await userEvent.tab()
     await userEvent.tab()
 
     const tip = screen.getByRole('tooltip')
@@ -276,6 +303,8 @@ describe('StatsView', () => {
   it('keeps the tooltip open while the keyboard moves on to its links', async () => {
     renderStats()
 
+    // Past Editar, to the first tile, then on to its first link.
+    await userEvent.tab()
     await userEvent.tab()
     await userEvent.tab()
 
@@ -290,5 +319,200 @@ describe('StatsView', () => {
     await userEvent.hover(screen.getByRole('button', { name: 'PFR —' }))
 
     expect(within(screen.getByRole('tooltip')).queryByRole('link')).toBeNull()
+  })
+})
+
+describe('StatsView, choosing which Stats one sees', () => {
+  it('shows only the chosen Stats, in the catalogue’s order whatever order they were chosen in', () => {
+    const view = renderStats(stats, 'en', ['pfr', 'cbet-turn', 'vpip', 'wsd'])
+
+    expect(tilesOf(within(view).getByRole('group', { name: 'Preflop' }))).toEqual(['VPIP 22.4%', 'PFR 18.3%'])
+    expect(tilesOf(column(view, 'Turn'))).toEqual(['C-bet —'])
+    expect(tilesOf(within(view).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['W$SD —'])
+  })
+
+  it('draws no band, nor Street column, with nothing chosen in it', () => {
+    const view = renderStats(stats, 'en', ['vpip', 'cbet-river'])
+
+    expect(within(view).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Preflop', 'Postflop'])
+    const postflop = within(view).getByRole('group', { name: 'Postflop' })
+    expect(within(postflop).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['River'])
+  })
+
+  it('keeps the Hand count whatever is chosen', () => {
+    const view = renderStats(stats, 'en', ['wsd'])
+
+    expect(within(view).getByText('1,860 hands')).toBeTruthy()
+  })
+
+  it('opens editing from Editar, every Stat of the catalogue shown with its value, the chosen ones marked', async () => {
+    const view = renderStats(stats, 'en', ['vpip'])
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    expect(within(view).getByText('Choose which Stats you see: one click adds or removes each. The faded ones are hidden.')).toBeTruthy()
+    const preflop = within(view).getByRole('group', { name: 'Preflop' })
+    expect(within(preflop).getByRole('button', { name: 'VPIP 22.4%', pressed: true })).toBeTruthy()
+    // A hidden Stat shows its value too, to tell whether it is worth adding.
+    expect(within(preflop).getByRole('button', { name: 'PFR 18.3%', pressed: false })).toBeTruthy()
+    expect(within(column(view, 'River')).getByRole('button', { name: 'Fold to C-bet —', pressed: false })).toBeTruthy()
+    expect(within(view).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Preflop',
+      'Postflop',
+      'Showdown and totals',
+    ])
+  })
+
+  it('shows or hides a Stat with one click, kept at once, in the catalogue’s order', async () => {
+    const view = renderStats(stats, 'en', ['wsd', 'vpip'])
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    await userEvent.click(within(view).getByRole('button', { name: 'PFR 18.3%' }))
+
+    expect(changes).toEqual([{ shownStats: ['vpip', 'pfr', 'wsd'] }])
+    expect(within(view).getByRole('button', { name: 'PFR 18.3%', pressed: true })).toBeTruthy()
+
+    await userEvent.click(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
+
+    expect(changes.at(-1)).toEqual({ shownStats: ['pfr', 'wsd'] })
+    expect(within(view).getByRole('button', { name: 'VPIP 22.4%', pressed: false })).toBeTruthy()
+  })
+
+  it('starts a first choice from the default', async () => {
+    const view = renderStats()
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    await userEvent.click(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
+
+    expect(changes).toEqual([{ shownStats: STAT_KEYS.filter((key) => key !== 'vpip') }])
+  })
+
+  it('has no tooltips nor links while editing', async () => {
+    const view = renderStats(stats, 'en', ['vpip'])
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    await userEvent.hover(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
+    await userEvent.tab()
+
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('goes back to the default with Restablecer, and out of editing with Listo', async () => {
+    const view = renderStats(stats, 'en', ['vpip'])
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Reset' }))
+
+    expect(changes).toEqual([{ shownStats: null }])
+    expect(within(view).getByRole('button', { name: 'PFR 18.3%', pressed: true })).toBeTruthy()
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Done' }))
+
+    expect(within(view).getByText('1,860 hands')).toBeTruthy()
+    expect(within(view).getByRole('button', { name: 'Edit' })).toBeTruthy()
+    expect(tilesOf(within(view).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['WWSF —', 'WTSD —', 'W$SD —', 'AFq —'])
+    await userEvent.hover(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
+    expect(screen.getByRole('tooltip')).toBeTruthy()
+  })
+
+  it('says so when nothing is chosen, and offers Editar', async () => {
+    const view = renderStats(stats, 'en', [])
+
+    expect(within(view).queryAllByRole('group')).toEqual([])
+    expect(within(view).getByText('No Stats to show. Choose which ones you see with Edit.')).toBeTruthy()
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    expect(within(view).getByRole('button', { name: 'VPIP 22.4%', pressed: false })).toBeTruthy()
+  })
+
+  it('speaks Spanish', async () => {
+    const view = renderStats(stats, 'es', ['vpip'])
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Editar' }))
+
+    expect(within(view).getByText('Elige qué estadísticas ves: un clic pone o quita cada una. Las atenuadas están ocultas.')).toBeTruthy()
+    expect(within(view).getByRole('button', { name: 'Restablecer' })).toBeTruthy()
+    expect(within(view).getByRole('button', { name: 'Listo' })).toBeTruthy()
+  })
+
+  it('says so when a change can’t be kept', async () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <SessionContext.Provider value={fakeSession({}, { changePreferences: async () => Promise.reject(new Error('offline')) })}>
+          <StatsView stats={stats} statHref={statHref} />
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'VPIP 22.4%' }))
+
+    expect(screen.getByRole('alert').textContent).toBe("The change was not saved. We couldn't reach the server. Try again.")
+  })
+
+  it('says it in Spanish when nothing is chosen', () => {
+    const view = renderStats(stats, 'es', [])
+
+    expect(within(view).getByText('No hay estadísticas que mostrar. Elige cuáles ves con Editar.')).toBeTruthy()
+  })
+
+  describe('at phone width', () => {
+    /** The screen's width, as `matchMedia` answers the 760 px breakpoint; changing it tells whoever listens. */
+    let narrow: boolean
+    const listeners = new Set<() => void>()
+
+    beforeEach(() => {
+      narrow = true
+      listeners.clear()
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        get matches() {
+          return query === '(max-width: 760px)' && narrow
+        },
+        addEventListener: (_: string, changed: () => void) => listeners.add(changed),
+        removeEventListener: (_: string, changed: () => void) => listeners.delete(changed),
+      }))
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('shows the chosen Stats, with no Editar and a line saying they are chosen on a computer', () => {
+      const view = renderStats(stats, 'en', ['vpip', 'cbet-turn'])
+
+      expect(tilesOf(within(view).getByRole('group', { name: 'Preflop' }))).toEqual(['VPIP 22.4%'])
+      expect(tilesOf(column(view, 'Turn'))).toEqual(['C-bet —'])
+      expect(within(view).queryByRole('button', { name: 'Edit' })).toBeNull()
+      expect(within(view).getByText('Choose which Stats you see on a computer.')).toBeTruthy()
+    })
+
+    it('says it in Spanish', () => {
+      const view = renderStats(stats, 'es')
+
+      expect(within(view).queryByRole('button', { name: 'Editar' })).toBeNull()
+      expect(within(view).getByText('Elige qué estadísticas ves desde el ordenador.')).toBeTruthy()
+    })
+
+    it('says nothing is shown without offering Editar', () => {
+      const view = renderStats(stats, 'en', [])
+
+      expect(within(view).getByText('No Stats to show.')).toBeTruthy()
+      expect(within(view).queryByRole('button', { name: 'Edit' })).toBeNull()
+      expect(within(view).getByText('Choose which Stats you see on a computer.')).toBeTruthy()
+    })
+
+    it('leaves editing when the window narrows to a phone', async () => {
+      narrow = false
+      const view = renderStats(stats, 'en', ['vpip'])
+      await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+      act(() => {
+        narrow = true
+        listeners.forEach((changed) => changed())
+      })
+
+      expect(within(view).queryByRole('button', { name: 'PFR 18.3%' })).toBeNull()
+      expect(within(view).getByText('1,860 hands')).toBeTruthy()
+    })
   })
 })

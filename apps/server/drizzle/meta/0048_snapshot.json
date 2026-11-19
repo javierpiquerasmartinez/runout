@@ -1,0 +1,4372 @@
+{
+  "id": "ffd4e07b-8476-4981-939b-a0d07bd75258",
+  "prevId": "9d5ad5c5-30bd-4090-99a2-b2306c22c98f",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.bulk_imports": {
+      "name": "bulk_imports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "files": {
+          "name": "files",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total": {
+          "name": "total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processed": {
+          "name": "processed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "imported": {
+          "name": "imported",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "duplicates": {
+          "name": "duplicates",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "not_imported": {
+          "name": "not_imported",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_code": {
+          "name": "failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stalled": {
+          "name": "stalled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "files_deleted_at": {
+          "name": "files_deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_advanced_at": {
+          "name": "last_advanced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "waiting_since": {
+          "name": "waiting_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "bulk_imports_identity_id_idx": {
+          "name": "bulk_imports_identity_id_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bulk_imports_status_idx": {
+          "name": "bulk_imports_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bulk_imports_one_unfinished_idx": {
+          "name": "bulk_imports_one_unfinished_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"bulk_imports\".\"status\" not in ('completed', 'failed', 'cancelled')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bulk_imports_identity_id_identities_id_fk": {
+          "name": "bulk_imports_identity_id_identities_id_fk",
+          "tableFrom": "bulk_imports",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.goals": {
+      "name": "goals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "target": {
+          "name": "target",
+          "type": "numeric(11, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_value": {
+          "name": "current_value",
+          "type": "numeric(11, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deadline": {
+          "name": "deadline",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "goals_identity_id_idx": {
+          "name": "goals_identity_id_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "goals_identity_id_identities_id_fk": {
+          "name": "goals_identity_id_identities_id_fk",
+          "tableFrom": "goals",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.hand_facts": {
+      "name": "hand_facts",
+      "schema": "",
+      "columns": {
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "players_dealt": {
+          "name": "players_dealt",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_position": {
+          "name": "hero_position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_combo": {
+          "name": "hero_combo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_hand_class": {
+          "name": "hero_hand_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pot_type": {
+          "name": "pot_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opener_position": {
+          "name": "opener_position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "three_bettor_position": {
+          "name": "three_bettor_position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "four_bettor_position": {
+          "name": "four_bettor_position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aggressor_position": {
+          "name": "aggressor_position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_aggressor": {
+          "name": "hero_aggressor",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "flop_saw": {
+          "name": "flop_saw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "flop_players": {
+          "name": "flop_players",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_ip": {
+          "name": "flop_ip",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_first": {
+          "name": "flop_first",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_pot": {
+          "name": "flop_pot",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_effective_stack": {
+          "name": "flop_effective_stack",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_spr": {
+          "name": "flop_spr",
+          "type": "numeric(9, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_all_in": {
+          "name": "flop_all_in",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_line": {
+          "name": "flop_line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bet_size": {
+          "name": "flop_bet_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raise_size": {
+          "name": "flop_raise_size",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bet_size_faced": {
+          "name": "flop_bet_size_faced",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raise_size_faced": {
+          "name": "flop_raise_size_faced",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bets": {
+          "name": "flop_bets",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raises": {
+          "name": "flop_raises",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_calls": {
+          "name": "flop_calls",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_folds": {
+          "name": "flop_folds",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_saw": {
+          "name": "turn_saw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "turn_players": {
+          "name": "turn_players",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_ip": {
+          "name": "turn_ip",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_first": {
+          "name": "turn_first",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_pot": {
+          "name": "turn_pot",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_effective_stack": {
+          "name": "turn_effective_stack",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_spr": {
+          "name": "turn_spr",
+          "type": "numeric(9, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_all_in": {
+          "name": "turn_all_in",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_line": {
+          "name": "turn_line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bet_size": {
+          "name": "turn_bet_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raise_size": {
+          "name": "turn_raise_size",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bet_size_faced": {
+          "name": "turn_bet_size_faced",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raise_size_faced": {
+          "name": "turn_raise_size_faced",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bets": {
+          "name": "turn_bets",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raises": {
+          "name": "turn_raises",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_calls": {
+          "name": "turn_calls",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_folds": {
+          "name": "turn_folds",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_saw": {
+          "name": "river_saw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "river_players": {
+          "name": "river_players",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_ip": {
+          "name": "river_ip",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_first": {
+          "name": "river_first",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_pot": {
+          "name": "river_pot",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_effective_stack": {
+          "name": "river_effective_stack",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_spr": {
+          "name": "river_spr",
+          "type": "numeric(9, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_all_in": {
+          "name": "river_all_in",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_line": {
+          "name": "river_line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bet_size": {
+          "name": "river_bet_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raise_size": {
+          "name": "river_raise_size",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bet_size_faced": {
+          "name": "river_bet_size_faced",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raise_size_faced": {
+          "name": "river_raise_size_faced",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bets": {
+          "name": "river_bets",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raises": {
+          "name": "river_raises",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_calls": {
+          "name": "river_calls",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_folds": {
+          "name": "river_folds",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_cbet_did": {
+          "name": "flop_cbet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_cbet_chance": {
+          "name": "flop_cbet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_cbet_faced": {
+          "name": "flop_cbet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_cbet_answer": {
+          "name": "flop_cbet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_donk_bet_did": {
+          "name": "flop_donk_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_donk_bet_chance": {
+          "name": "flop_donk_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_donk_bet_faced": {
+          "name": "flop_donk_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_donk_bet_answer": {
+          "name": "flop_donk_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bet_did": {
+          "name": "flop_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bet_chance": {
+          "name": "flop_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bet_faced": {
+          "name": "flop_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_bet_answer": {
+          "name": "flop_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_check_raise_did": {
+          "name": "flop_check_raise_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_check_raise_chance": {
+          "name": "flop_check_raise_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_check_raise_faced": {
+          "name": "flop_check_raise_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_check_raise_answer": {
+          "name": "flop_check_raise_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raise_did": {
+          "name": "flop_raise_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raise_chance": {
+          "name": "flop_raise_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raise_faced": {
+          "name": "flop_raise_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_raise_answer": {
+          "name": "flop_raise_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_three_bet_did": {
+          "name": "flop_three_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_three_bet_chance": {
+          "name": "flop_three_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_three_bet_faced": {
+          "name": "flop_three_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_three_bet_answer": {
+          "name": "flop_three_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_four_bet_did": {
+          "name": "flop_four_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_four_bet_chance": {
+          "name": "flop_four_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_four_bet_faced": {
+          "name": "flop_four_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_four_bet_answer": {
+          "name": "flop_four_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_cbet_did": {
+          "name": "turn_cbet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_cbet_chance": {
+          "name": "turn_cbet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_cbet_faced": {
+          "name": "turn_cbet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_cbet_answer": {
+          "name": "turn_cbet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_delayed_cbet_did": {
+          "name": "turn_delayed_cbet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_delayed_cbet_chance": {
+          "name": "turn_delayed_cbet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_delayed_cbet_faced": {
+          "name": "turn_delayed_cbet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_delayed_cbet_answer": {
+          "name": "turn_delayed_cbet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_donk_bet_did": {
+          "name": "turn_donk_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_donk_bet_chance": {
+          "name": "turn_donk_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_donk_bet_faced": {
+          "name": "turn_donk_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_donk_bet_answer": {
+          "name": "turn_donk_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_probe_did": {
+          "name": "turn_probe_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_probe_chance": {
+          "name": "turn_probe_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_probe_faced": {
+          "name": "turn_probe_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_probe_answer": {
+          "name": "turn_probe_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_float_did": {
+          "name": "turn_float_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_float_chance": {
+          "name": "turn_float_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_float_faced": {
+          "name": "turn_float_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_float_answer": {
+          "name": "turn_float_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bet_did": {
+          "name": "turn_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bet_chance": {
+          "name": "turn_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bet_faced": {
+          "name": "turn_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_bet_answer": {
+          "name": "turn_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_check_raise_did": {
+          "name": "turn_check_raise_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_check_raise_chance": {
+          "name": "turn_check_raise_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_check_raise_faced": {
+          "name": "turn_check_raise_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_check_raise_answer": {
+          "name": "turn_check_raise_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raise_did": {
+          "name": "turn_raise_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raise_chance": {
+          "name": "turn_raise_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raise_faced": {
+          "name": "turn_raise_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_raise_answer": {
+          "name": "turn_raise_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_three_bet_did": {
+          "name": "turn_three_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_three_bet_chance": {
+          "name": "turn_three_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_three_bet_faced": {
+          "name": "turn_three_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_three_bet_answer": {
+          "name": "turn_three_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_four_bet_did": {
+          "name": "turn_four_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_four_bet_chance": {
+          "name": "turn_four_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_four_bet_faced": {
+          "name": "turn_four_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_four_bet_answer": {
+          "name": "turn_four_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_cbet_did": {
+          "name": "river_cbet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_cbet_chance": {
+          "name": "river_cbet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_cbet_faced": {
+          "name": "river_cbet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_cbet_answer": {
+          "name": "river_cbet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_donk_bet_did": {
+          "name": "river_donk_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_donk_bet_chance": {
+          "name": "river_donk_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_donk_bet_faced": {
+          "name": "river_donk_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_donk_bet_answer": {
+          "name": "river_donk_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_probe_did": {
+          "name": "river_probe_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_probe_chance": {
+          "name": "river_probe_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_probe_faced": {
+          "name": "river_probe_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_probe_answer": {
+          "name": "river_probe_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_float_did": {
+          "name": "river_float_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_float_chance": {
+          "name": "river_float_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_float_faced": {
+          "name": "river_float_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_float_answer": {
+          "name": "river_float_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bet_did": {
+          "name": "river_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bet_chance": {
+          "name": "river_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bet_faced": {
+          "name": "river_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_bet_answer": {
+          "name": "river_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_check_raise_did": {
+          "name": "river_check_raise_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_check_raise_chance": {
+          "name": "river_check_raise_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_check_raise_faced": {
+          "name": "river_check_raise_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_check_raise_answer": {
+          "name": "river_check_raise_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raise_did": {
+          "name": "river_raise_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raise_chance": {
+          "name": "river_raise_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raise_faced": {
+          "name": "river_raise_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_raise_answer": {
+          "name": "river_raise_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_three_bet_did": {
+          "name": "river_three_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_three_bet_chance": {
+          "name": "river_three_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_three_bet_faced": {
+          "name": "river_three_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_three_bet_answer": {
+          "name": "river_three_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_four_bet_did": {
+          "name": "river_four_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_four_bet_chance": {
+          "name": "river_four_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_four_bet_faced": {
+          "name": "river_four_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_four_bet_answer": {
+          "name": "river_four_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vpip_did": {
+          "name": "vpip_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vpip_chance": {
+          "name": "vpip_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pfr_did": {
+          "name": "pfr_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pfr_chance": {
+          "name": "pfr_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "open_did": {
+          "name": "open_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "open_chance": {
+          "name": "open_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "limp_did": {
+          "name": "limp_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "limp_chance": {
+          "name": "limp_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isolate_did": {
+          "name": "isolate_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isolate_chance": {
+          "name": "isolate_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isolate_faced": {
+          "name": "isolate_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isolate_answer": {
+          "name": "isolate_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "steal_did": {
+          "name": "steal_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "steal_chance": {
+          "name": "steal_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "steal_faced": {
+          "name": "steal_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "steal_answer": {
+          "name": "steal_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "three_bet_did": {
+          "name": "three_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "three_bet_chance": {
+          "name": "three_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "three_bet_faced": {
+          "name": "three_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "three_bet_answer": {
+          "name": "three_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "squeeze_did": {
+          "name": "squeeze_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "squeeze_chance": {
+          "name": "squeeze_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "squeeze_faced": {
+          "name": "squeeze_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "squeeze_answer": {
+          "name": "squeeze_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cold_call_did": {
+          "name": "cold_call_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cold_call_chance": {
+          "name": "cold_call_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "four_bet_did": {
+          "name": "four_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "four_bet_chance": {
+          "name": "four_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "four_bet_faced": {
+          "name": "four_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "four_bet_answer": {
+          "name": "four_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "five_bet_did": {
+          "name": "five_bet_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "five_bet_chance": {
+          "name": "five_bet_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "five_bet_faced": {
+          "name": "five_bet_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "five_bet_answer": {
+          "name": "five_bet_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resteal_did": {
+          "name": "resteal_did",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resteal_chance": {
+          "name": "resteal_chance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resteal_faced": {
+          "name": "resteal_faced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resteal_answer": {
+          "name": "resteal_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preflop_role": {
+          "name": "preflop_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preflop_faced_first": {
+          "name": "preflop_faced_first",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "limpers": {
+          "name": "limpers",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preflop_line": {
+          "name": "preflop_line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "open_size": {
+          "name": "open_size",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "three_bet_size": {
+          "name": "three_bet_size",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "four_bet_size": {
+          "name": "four_bet_size",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_raise_size": {
+          "name": "hero_raise_size",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_raise_multiple": {
+          "name": "hero_raise_multiple",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_second_raise_size": {
+          "name": "hero_second_raise_size",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_second_raise_multiple": {
+          "name": "hero_second_raise_multiple",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "size_faced": {
+          "name": "size_faced",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_starting_stack": {
+          "name": "hero_starting_stack",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preflop_effective_stack": {
+          "name": "preflop_effective_stack",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "straddle": {
+          "name": "straddle",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "antes": {
+          "name": "antes",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_suits": {
+          "name": "flop_suits",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_pairing": {
+          "name": "flop_pairing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_straight_possible": {
+          "name": "flop_straight_possible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_connectedness": {
+          "name": "flop_connectedness",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_high_card": {
+          "name": "flop_high_card",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_suits": {
+          "name": "turn_suits",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_pairing": {
+          "name": "turn_pairing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_straight_possible": {
+          "name": "turn_straight_possible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_connectedness": {
+          "name": "turn_connectedness",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_high_card": {
+          "name": "turn_high_card",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_pairs_board": {
+          "name": "turn_pairs_board",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_brings_flush": {
+          "name": "turn_brings_flush",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_brings_straight": {
+          "name": "turn_brings_straight",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_overcard": {
+          "name": "turn_overcard",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_suits": {
+          "name": "river_suits",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_pairing": {
+          "name": "river_pairing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_straight_possible": {
+          "name": "river_straight_possible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_connectedness": {
+          "name": "river_connectedness",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_high_card": {
+          "name": "river_high_card",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_pairs_board": {
+          "name": "river_pairs_board",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_brings_flush": {
+          "name": "river_brings_flush",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_brings_straight": {
+          "name": "river_brings_straight",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_overcard": {
+          "name": "river_overcard",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_made_hand": {
+          "name": "flop_made_hand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_draws": {
+          "name": "flop_draws",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_nuts": {
+          "name": "flop_nuts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_kicker": {
+          "name": "flop_kicker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flop_nut_flush_draw": {
+          "name": "flop_nut_flush_draw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_made_hand": {
+          "name": "turn_made_hand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_draws": {
+          "name": "turn_draws",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_nuts": {
+          "name": "turn_nuts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_kicker": {
+          "name": "turn_kicker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_nut_flush_draw": {
+          "name": "turn_nut_flush_draw",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_made_hand": {
+          "name": "river_made_hand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_nuts": {
+          "name": "river_nuts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "river_kicker": {
+          "name": "river_kicker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_folded_on": {
+          "name": "hero_folded_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_all_in_on": {
+          "name": "hero_all_in_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_faced_all_in_on": {
+          "name": "hero_faced_all_in_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_faced_all_in_answer": {
+          "name": "hero_faced_all_in_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_won_money": {
+          "name": "hero_won_money",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hero_won_at_showdown": {
+          "name": "hero_won_at_showdown",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "hand_facts_hand_id_hands_id_fk": {
+          "name": "hand_facts_hand_id_hands_id_fk",
+          "tableFrom": "hand_facts",
+          "tableTo": "hands",
+          "columnsFrom": [
+            "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.hands": {
+      "name": "hands",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "site": {
+          "name": "site",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_hand_id": {
+          "name": "site_hand_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_screen_name": {
+          "name": "hero_screen_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_seat": {
+          "name": "hero_seat",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "importer_id": {
+          "name": "importer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_format": {
+          "name": "source_format",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "played_at": {
+          "name": "played_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "small_blind": {
+          "name": "small_blind",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "big_blind": {
+          "name": "big_blind",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_result": {
+          "name": "hero_result",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_all_in_ev": {
+          "name": "hero_all_in_ev",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_reached_showdown": {
+          "name": "hero_reached_showdown",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "final_pot": {
+          "name": "final_pot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rake": {
+          "name": "rake",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_rake_generated": {
+          "name": "hero_rake_generated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_history": {
+          "name": "hand_history",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imported_at": {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "hands_site_hand_hero_seat_idx": {
+          "name": "hands_site_hand_hero_seat_idx",
+          "columns": [
+            {
+              "expression": "site",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_hand_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hero_screen_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hero_seat",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "hands_played_at_idx": {
+          "name": "hands_played_at_idx",
+          "columns": [
+            {
+              "expression": "played_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "hands_importer_id_identities_id_fk": {
+          "name": "hands_importer_id_identities_id_fk",
+          "tableFrom": "hands",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "importer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.identities": {
+      "name": "identities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "google_subject": {
+          "name": "google_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invitation_id": {
+          "name": "invitation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suspended_at": {
+          "name": "suspended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suspended_by": {
+          "name": "suspended_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_active_at": {
+          "name": "last_active_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_signed_in_at": {
+          "name": "last_signed_in_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan": {
+          "name": "plan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "identities_email_idx": {
+          "name": "identities_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "identities_invitation_id_invitations_id_fk": {
+          "name": "identities_invitation_id_invitations_id_fk",
+          "tableFrom": "identities",
+          "tableTo": "invitations",
+          "columnsFrom": [
+            "invitation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "identities_room_id_rooms_id_fk": {
+          "name": "identities_room_id_rooms_id_fk",
+          "tableFrom": "identities",
+          "tableTo": "rooms",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "identities_suspended_by_identities_id_fk": {
+          "name": "identities_suspended_by_identities_id_fk",
+          "tableFrom": "identities",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "suspended_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "identities_google_subject_unique": {
+          "name": "identities_google_subject_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "google_subject"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "identities_account_plan_check": {
+          "name": "identities_account_plan_check",
+          "value": "(\"identities\".\"google_subject\" is null and \"identities\".\"password_hash\" is null) = (\"identities\".\"plan\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.impersonations": {
+      "name": "impersonations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "administrator_id": {
+          "name": "administrator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "impersonations_administrator_id_identities_id_fk": {
+          "name": "impersonations_administrator_id_identities_id_fk",
+          "tableFrom": "impersonations",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "administrator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "impersonations_account_id_identities_id_fk": {
+          "name": "impersonations_account_id_identities_id_fk",
+          "tableFrom": "impersonations",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.import_previews": {
+      "name": "import_previews",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "destination": {
+          "name": "destination",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "importer_id": {
+          "name": "importer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hands": {
+          "name": "hands",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_histories": {
+          "name": "hand_histories",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "import_previews_created_at_idx": {
+          "name": "import_previews_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "import_previews_room_id_rooms_id_fk": {
+          "name": "import_previews_room_id_rooms_id_fk",
+          "tableFrom": "import_previews",
+          "tableTo": "rooms",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "import_previews_importer_id_identities_id_fk": {
+          "name": "import_previews_importer_id_identities_id_fk",
+          "tableFrom": "import_previews",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "importer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "import_previews_destination_room_check": {
+          "name": "import_previews_destination_room_check",
+          "value": "(\"import_previews\".\"destination\" = 'room') = (\"import_previews\".\"room_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.invitations": {
+      "name": "invitations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent_by": {
+          "name": "sent_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan": {
+          "name": "plan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'beta'"
+        }
+      },
+      "indexes": {
+        "invitations_open_email_idx": {
+          "name": "invitations_open_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"invitations\".\"accepted_at\" is null and \"invitations\".\"cancelled_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invitations_sent_by_identities_id_fk": {
+          "name": "invitations_sent_by_identities_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "sent_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "invitations_account_id_identities_id_fk": {
+          "name": "invitations_account_id_identities_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "invitations_token_hash_unique": {
+          "name": "invitations_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lab_tags": {
+      "name": "lab_tags",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "lab_tags_identity_id_name_idx": {
+          "name": "lab_tags_identity_id_name_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "lab_tags_identity_id_identities_id_fk": {
+          "name": "lab_tags_identity_id_identities_id_fk",
+          "tableFrom": "lab_tags",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.library_entries": {
+      "name": "library_entries",
+      "schema": "",
+      "columns": {
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "library_entries_hand_id_idx": {
+          "name": "library_entries_hand_id_idx",
+          "columns": [
+            {
+              "expression": "hand_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "library_entries_identity_id_identities_id_fk": {
+          "name": "library_entries_identity_id_identities_id_fk",
+          "tableFrom": "library_entries",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "library_entries_hand_id_hands_id_fk": {
+          "name": "library_entries_hand_id_hands_id_fk",
+          "tableFrom": "library_entries",
+          "tableTo": "hands",
+          "columnsFrom": [
+            "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "library_entries_identity_id_hand_id_pk": {
+          "name": "library_entries_identity_id_hand_id_pk",
+          "columns": [
+            "identity_id",
+            "hand_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.library_tallies": {
+      "name": "library_tallies",
+      "schema": "",
+      "columns": {
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site": {
+          "name": "site",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hero_screen_name": {
+          "name": "hero_screen_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stake_limit": {
+          "name": "stake_limit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "small_blind": {
+          "name": "small_blind",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "big_blind": {
+          "name": "big_blind",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hands": {
+          "name": "hands",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "library_tallies_identity_id_identities_id_fk": {
+          "name": "library_tallies_identity_id_identities_id_fk",
+          "tableFrom": "library_tallies",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "library_tallies_pk": {
+          "name": "library_tallies_pk",
+          "columns": [
+            "identity_id",
+            "site",
+            "hero_screen_name",
+            "stake_limit",
+            "small_blind",
+            "big_blind",
+            "currency"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.marks": {
+      "name": "marks",
+      "schema": "",
+      "columns": {
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marked_at": {
+          "name": "marked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "marks_identity_id_identities_id_fk": {
+          "name": "marks_identity_id_identities_id_fk",
+          "tableFrom": "marks",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "marks_hand_id_hands_id_fk": {
+          "name": "marks_hand_id_hands_id_fk",
+          "tableFrom": "marks",
+          "tableTo": "hands",
+          "columnsFrom": [
+            "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "marks_identity_id_hand_id_pk": {
+          "name": "marks_identity_id_hand_id_pk",
+          "columns": [
+            "identity_id",
+            "hand_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.milestones": {
+      "name": "milestones",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "done": {
+          "name": "done",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "milestones_identity_id_date_idx": {
+          "name": "milestones_identity_id_date_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "milestones_identity_id_identities_id_fk": {
+          "name": "milestones_identity_id_identities_id_fk",
+          "tableFrom": "milestones",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notes": {
+      "name": "notes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "seq": {
+          "name": "seq",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "writer_id": {
+          "name": "writer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "written_at": {
+          "name": "written_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "notes_hand_id_idx": {
+          "name": "notes_hand_id_idx",
+          "columns": [
+            {
+              "expression": "hand_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "notes_hand_id_hands_id_fk": {
+          "name": "notes_hand_id_hands_id_fk",
+          "tableFrom": "notes",
+          "tableTo": "hands",
+          "columnsFrom": [
+            "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "notes_writer_id_identities_id_fk": {
+          "name": "notes_writer_id_identities_id_fk",
+          "tableFrom": "notes",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "writer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.password_attempts": {
+      "name": "password_attempts",
+      "schema": "",
+      "columns": {
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "failures": {
+          "name": "failures",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "blocked_until": {
+          "name": "blocked_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.password_resets": {
+      "name": "password_resets",
+      "schema": "",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "password_resets_identity_id_idx": {
+          "name": "password_resets_identity_id_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "password_resets_identity_id_identities_id_fk": {
+          "name": "password_resets_identity_id_identities_id_fk",
+          "tableFrom": "password_resets",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plan_changes": {
+      "name": "plan_changes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan_before": {
+          "name": "plan_before",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan_after": {
+          "name": "plan_after",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_at": {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "how": {
+          "name": "how",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "administrator_id": {
+          "name": "administrator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "plan_changes_account_id_changed_at_idx": {
+          "name": "plan_changes_account_id_changed_at_idx",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "changed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "plan_changes_account_id_identities_id_fk": {
+          "name": "plan_changes_account_id_identities_id_fk",
+          "tableFrom": "plan_changes",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_changes_administrator_id_identities_id_fk": {
+          "name": "plan_changes_administrator_id_identities_id_fk",
+          "tableFrom": "plan_changes",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "administrator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "plan_changes_how_check": {
+          "name": "plan_changes_how_check",
+          "value": "\"plan_changes\".\"how\" in ('administrator', 'invitation', 'migration', 'test-mode')"
+        },
+        "plan_changes_administrator_check": {
+          "name": "plan_changes_administrator_check",
+          "value": "\"plan_changes\".\"how\" <> 'administrator' or \"plan_changes\".\"administrator_id\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.playbacks": {
+      "name": "playbacks",
+      "schema": "",
+      "columns": {
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action_index": {
+          "name": "action_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hide_opponent_names": {
+          "name": "hide_opponent_names",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "playbacks_room_id_rooms_id_fk": {
+          "name": "playbacks_room_id_rooms_id_fk",
+          "tableFrom": "playbacks",
+          "tableTo": "rooms",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "playbacks_hand_id_hands_id_fk": {
+          "name": "playbacks_hand_id_hands_id_fk",
+          "tableFrom": "playbacks",
+          "tableTo": "hands",
+          "columnsFrom": [
+            "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.preferences": {
+      "name": "preferences",
+      "schema": "",
+      "columns": {
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "deck_style": {
+          "name": "deck_style",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "four_colour": {
+          "name": "four_colour",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pot_percentage": {
+          "name": "pot_percentage",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_unit": {
+          "name": "display_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "theme": {
+          "name": "theme",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "result_colour": {
+          "name": "result_colour",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'teal'"
+        },
+        "all_in_ev_colour": {
+          "name": "all_in_ev_colour",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'amber'"
+        },
+        "showdown_colour": {
+          "name": "showdown_colour",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'blue'"
+        },
+        "non_showdown_colour": {
+          "name": "non_showdown_colour",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'red'"
+        },
+        "shown_stats": {
+          "name": "shown_stats",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "preferences_identity_id_identities_id_fk": {
+          "name": "preferences_identity_id_identities_id_fk",
+          "tableFrom": "preferences",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.queue_entries": {
+      "name": "queue_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "queue_entries_room_id_idx": {
+          "name": "queue_entries_room_id_idx",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "queue_entries_room_id_rooms_id_fk": {
+          "name": "queue_entries_room_id_rooms_id_fk",
+          "tableFrom": "queue_entries",
+          "tableTo": "rooms",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "queue_entries_hand_id_hands_id_fk": {
+          "name": "queue_entries_hand_id_hands_id_fk",
+          "tableFrom": "queue_entries",
+          "tableTo": "hands",
+          "columnsFrom": [
+            "hand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "queue_entries_author_id_identities_id_fk": {
+          "name": "queue_entries_author_id_identities_id_fk",
+          "tableFrom": "queue_entries",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.range_tag_links": {
+      "name": "range_tag_links",
+      "schema": "",
+      "columns": {
+        "range_id": {
+          "name": "range_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tag_id": {
+          "name": "tag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "range_tag_links_tag_id_idx": {
+          "name": "range_tag_links_tag_id_idx",
+          "columns": [
+            {
+              "expression": "tag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "range_tag_links_range_id_ranges_id_fk": {
+          "name": "range_tag_links_range_id_ranges_id_fk",
+          "tableFrom": "range_tag_links",
+          "tableTo": "ranges",
+          "columnsFrom": [
+            "range_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "range_tag_links_tag_id_lab_tags_id_fk": {
+          "name": "range_tag_links_tag_id_lab_tags_id_fk",
+          "tableFrom": "range_tag_links",
+          "tableTo": "lab_tags",
+          "columnsFrom": [
+            "tag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "range_tag_links_range_id_tag_id_pk": {
+          "name": "range_tag_links_range_id_tag_id_pk",
+          "columns": [
+            "range_id",
+            "tag_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ranges": {
+      "name": "ranges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "combos": {
+          "name": "combos",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "ranges_identity_id_name_idx": {
+          "name": "ranges_identity_id_name_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ranges_identity_id_identities_id_fk": {
+          "name": "ranges_identity_id_identities_id_fk",
+          "tableFrom": "ranges",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.room_memberships": {
+      "name": "room_memberships",
+      "schema": "",
+      "columns": {
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kicked": {
+          "name": "kicked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "current_entry_id": {
+          "name": "current_entry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "room_memberships_room_id_rooms_id_fk": {
+          "name": "room_memberships_room_id_rooms_id_fk",
+          "tableFrom": "room_memberships",
+          "tableTo": "rooms",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "room_memberships_identity_id_identities_id_fk": {
+          "name": "room_memberships_identity_id_identities_id_fk",
+          "tableFrom": "room_memberships",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "room_memberships_current_entry_id_queue_entries_id_fk": {
+          "name": "room_memberships_current_entry_id_queue_entries_id_fk",
+          "tableFrom": "room_memberships",
+          "tableTo": "queue_entries",
+          "columnsFrom": [
+            "current_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "room_memberships_room_id_identity_id_pk": {
+          "name": "room_memberships_room_id_identity_id_pk",
+          "columns": [
+            "room_id",
+            "identity_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rooms": {
+      "name": "rooms",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'free-review'"
+        },
+        "master_away_since": {
+          "name": "master_away_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "master_id": {
+          "name": "master_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_entered_at": {
+          "name": "last_entered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rooms_master_id_identities_id_fk": {
+          "name": "rooms_master_id_identities_id_fk",
+          "tableFrom": "rooms",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "master_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "rooms_creator_id_identities_id_fk": {
+          "name": "rooms_creator_id_identities_id_fk",
+          "tableFrom": "rooms",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "creator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rooms_code_unique": {
+          "name": "rooms_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.saved_filters": {
+      "name": "saved_filters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criteria": {
+          "name": "criteria",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "saved_filters_identity_id_name_idx": {
+          "name": "saved_filters_identity_id_name_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "saved_filters_identity_id_identities_id_fk": {
+          "name": "saved_filters_identity_id_identities_id_fk",
+          "tableFrom": "saved_filters",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.screen_names": {
+      "name": "screen_names",
+      "schema": "",
+      "columns": {
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "screen_name": {
+          "name": "screen_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "screen_names_identity_id_identities_id_fk": {
+          "name": "screen_names_identity_id_identities_id_fk",
+          "tableFrom": "screen_names",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "screen_names_identity_id_screen_name_pk": {
+          "name": "screen_names_identity_id_screen_name_pk",
+          "columns": [
+            "identity_id",
+            "screen_name"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "impersonation_id": {
+          "name": "impersonation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "sessions_identity_id_idx": {
+          "name": "sessions_identity_id_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_identity_id_identities_id_fk": {
+          "name": "sessions_identity_id_identities_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sessions_impersonation_id_impersonations_id_fk": {
+          "name": "sessions_impersonation_id_impersonations_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "impersonations",
+          "columnsFrom": [
+            "impersonation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tag_links": {
+      "name": "tag_links",
+      "schema": "",
+      "columns": {
+        "tag_id": {
+          "name": "tag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hand_id": {
+          "name": "hand_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "tag_links_identity_id_hand_id_idx": {
+          "name": "tag_links_identity_id_hand_id_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hand_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tag_links_tag_id_tags_id_fk": {
+          "name": "tag_links_tag_id_tags_id_fk",
+          "tableFrom": "tag_links",
+          "tableTo": "tags",
+          "columnsFrom": [
+            "tag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tag_links_library_entry_fk": {
+          "name": "tag_links_library_entry_fk",
+          "tableFrom": "tag_links",
+          "tableTo": "library_entries",
+          "columnsFrom": [
+            "identity_id",
+            "hand_id"
+          ],
+          "columnsTo": [
+            "identity_id",
+            "hand_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "tag_links_tag_id_hand_id_pk": {
+          "name": "tag_links_tag_id_hand_id_pk",
+          "columns": [
+            "tag_id",
+            "hand_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tags": {
+      "name": "tags",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "tags_identity_id_name_idx": {
+          "name": "tags_identity_id_name_idx",
+          "columns": [
+            {
+              "expression": "identity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tags_identity_id_identities_id_fk": {
+          "name": "tags_identity_id_identities_id_fk",
+          "tableFrom": "tags",
+          "tableTo": "identities",
+          "columnsFrom": [
+            "identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, asc, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { CLOCK, type Clock } from '../clock/clock.js';
+import { STAT_KEYS, type StatKey } from '../hands/replay/hero-stats.js';
 import {
   DATABASE,
   type Database,
@@ -78,6 +79,12 @@ export interface Preferences {
   allInEvColour: GraphColour;
   showdownColour: GraphColour;
   nonShowdownColour: GraphColour;
+  /**
+   * The Stats an Account sees in the Library's Stats view: a set of Stat
+   * keys, in no order (the catalogue orders them), or null for the default.
+   * Only an Account has Stats, so an anonymous identity always reads null.
+   */
+  shownStats: StatKey[] | null;
 }
 
 export type GraphColour = (typeof GRAPH_COLOURS)[number];
@@ -93,6 +100,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   allInEvColour: 'amber',
   showdownColour: 'blue',
   nonShowdownColour: 'red',
+  shownStats: null,
 };
 
 export type SignInMethod = 'google' | 'password';
@@ -969,20 +977,32 @@ export class IdentityService {
       .from(preferences)
       .where(eq(preferences.identityId, identityId));
     if (!row) return DEFAULT_PREFERENCES;
-    const { identityId: _owner, ...stored } = row;
-    return stored;
+    const { identityId: _owner, shownStats, ...stored } = row;
+    // A Stat Runout has since retired drops out of the choice quietly.
+    return {
+      ...stored,
+      shownStats: shownStats?.filter(isStatKey) ?? null,
+    };
   }
 
   /**
    * Changes some of the identity's preferences, keeping the rest. Anything
    * that isn't a known preference with an allowed value refuses the whole
-   * change with `invalid-preferences`.
+   * change with `invalid-preferences`; choosing Stats as an anonymous
+   * identity, with `account-required`.
    */
   async changePreferences(
     identity: Identity,
     raw: unknown,
   ): Promise<Preferences> {
     const changes = validPreferenceChanges(raw);
+    if ('shownStats' in changes) {
+      const [row] = await this.db
+        .select()
+        .from(identities)
+        .where(eq(identities.id, identity.id));
+      if (!row || !isAccount(row)) throw new Rejected('account-required');
+    }
     const next = { ...(await this.preferences(identity.id)), ...changes };
     await this.db
       .insert(preferences)
@@ -1087,8 +1107,9 @@ function validScreenNames(raw: unknown): string[] {
   return [...names.values()];
 }
 
+/** The Preferences whose value is one of a few, each with those it may take. */
 const PREFERENCE_VALUES: {
-  [K in keyof Preferences]: readonly Preferences[K][];
+  [K in Exclude<keyof Preferences, 'shownStats'>]: readonly Preferences[K][];
 } = {
   deckStyle: ['classic', 'full-suit'],
   fourColour: [true, false],
@@ -1108,15 +1129,33 @@ function validPreferenceChanges(raw: unknown): Partial<Preferences> {
     throw new Rejected('invalid-preferences');
   }
   for (const [key, value] of Object.entries(raw)) {
+    if (key === 'shownStats') {
+      if (!validShownStats(value)) throw new Rejected('invalid-preferences');
+      continue;
+    }
     const known = Object.hasOwn(PREFERENCE_VALUES, key);
     const allowed: readonly unknown[] = known
-      ? PREFERENCE_VALUES[key as keyof Preferences]
+      ? PREFERENCE_VALUES[key as keyof typeof PREFERENCE_VALUES]
       : [];
     if (!allowed.includes(value)) {
       throw new Rejected('invalid-preferences');
     }
   }
   return raw as Partial<Preferences>;
+}
+
+/** A choice of Stats: null for the default, or distinct keys of Stats Runout knows. */
+function validShownStats(value: unknown): value is StatKey[] | null {
+  if (value === null) return true;
+  return (
+    Array.isArray(value) &&
+    value.every(isStatKey) &&
+    new Set(value).size === value.length
+  );
+}
+
+function isStatKey(value: unknown): value is StatKey {
+  return (STAT_KEYS as readonly unknown[]).includes(value);
 }
 
 function toIdentity(row: IdentityRow): Identity {

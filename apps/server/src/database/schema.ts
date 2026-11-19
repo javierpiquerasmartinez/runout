@@ -307,6 +307,12 @@ export const preferences = pgTable('preferences', {
   nonShowdownColour: text('non_showdown_colour', { enum: GRAPH_COLOURS })
     .notNull()
     .default('red'),
+  /**
+   * The Stats an Account chose to see in the Library's Stats view, by key,
+   * in no order; null follows the default. Keys of Stats Runout no longer
+   * knows are dropped on reading.
+   */
+  shownStats: text('shown_stats').array(),
 });
 
 export const rooms = pgTable('rooms', {
