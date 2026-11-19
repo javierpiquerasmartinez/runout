@@ -490,6 +490,10 @@ The Library is a person's own repository: the Hands they imported into it, whate
     - **Turn:** C-bet, Fold to C-bet;
     - **River:** C-bet, Fold to C-bet.
   - **Showdown y totales:** WWSF, WTSD, W$SD, AFq.
+- The rest of the catalogue is hidden until I add it from Editar. Each of these Postflop Stats sits in its Street's column, after Fold to C-bet, and counts as its did over its chance; its Fold to counts the times I faced it and folded:
+  - **Flop:** Donk, Fold to Donk;
+  - **Turn:** Delayed C-bet, Fold to Delayed C-bet, Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk;
+  - **River:** Probe, Fold to Probe, Float, Fold to Float, Donk, Fold to Donk.
 - **Editar**, on the line of the Hand count, lets me choose which Stats of the catalogue I see:
   - while editing, every Stat of the catalogue shows in its band and column with its value; the ones I see are outlined in the accent colour with a ✓, the hidden ones are faded, with a dashed outline and a +;
   - the line reads "Elige qué estadísticas ves: un clic pone o quita cada una. Las atenuadas están ocultas.", with **Restablecer** and **Listo**;

@@ -5,7 +5,7 @@ import type { Database } from '../src/database/database.js';
 import * as schema from '../src/database/schema.js';
 import { rederiveFacts } from '../src/hands/facts-rederive.js';
 import type { Hand } from '../src/hands/hand.js';
-import { heroStats, STAT_KEYS } from '../src/hands/replay/hero-stats.js';
+import { heroStats } from '../src/hands/replay/hero-stats.js';
 import { freshHandHistory } from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
@@ -30,12 +30,41 @@ const FIXTURES = [
   'coinpoker-ante.txt',
 ];
 
+/**
+ * The Stats `heroStats` works out from a Hand: the 21 Runout counted before
+ * the catalogue grew. The rest are read off the facts row alone, and
+ * library-stats.e2e-spec.ts covers them.
+ */
+const HERO_STATS_KEYS = [
+  'vpip',
+  'pfr',
+  'three-bet',
+  'fold-to-three-bet',
+  'four-bet',
+  'fold-to-four-bet',
+  'squeeze',
+  'cold-call',
+  'fold-bb-to-steal',
+  'steal',
+  'cbet-flop',
+  'fold-to-cbet-flop',
+  'check-raise-flop',
+  'cbet-turn',
+  'fold-to-cbet-turn',
+  'cbet-river',
+  'fold-to-cbet-river',
+  'afq',
+  'wwsf',
+  'wtsd',
+  'wsd',
+] as const;
+
 /*
  * The Stats are counted from each Hand's facts row (ADR 0012). This checks
- * them against the Hero's Stats worked out from each stored Hand, Stat by
- * Stat, on every fixture. A Hand whose facts row
- * is missing or older than a Stat needs counts towards no such Stat until
- * the re-derive job reaches it.
+ * the 21 `heroStats` knows against the Hero's Stats worked out from each
+ * stored Hand, Stat by Stat, on every fixture. A Hand whose facts row is
+ * missing or older than a Stat needs counts towards no such Stat until the
+ * re-derive job reaches it.
  */
 describe('The Library’s Stats, counted from the facts (e2e)', () => {
   let running: RunningApp;
@@ -109,9 +138,9 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
     );
     const rows = stored.flatMap(({ id, content }) => {
       const counts = heroStats(content);
-      return STAT_KEYS.filter((stat) => counts[stat].opportunities > 0).map(
-        (stat) => ({ stat, hand_id: id, ...counts[stat] }),
-      );
+      return HERO_STATS_KEYS.filter(
+        (stat) => counts[stat].opportunities > 0,
+      ).map((stat) => ({ stat, hand_id: id, ...counts[stat] }));
     });
     const byStat = new Map<
       string,
@@ -145,7 +174,7 @@ describe('The Library’s Stats, counted from the facts (e2e)', () => {
     const fromRows = await perStatRows(ids);
     expect(fromFacts.hands).toBe(ids.length);
 
-    for (const key of Object.keys(fromFacts.stats)) {
+    for (const key of HERO_STATS_KEYS) {
       const rows = fromRows.get(key) ?? {
         opportunities: 0,
         taken: 0,

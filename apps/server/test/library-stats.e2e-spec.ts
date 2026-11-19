@@ -1,7 +1,10 @@
 import pg from 'pg';
 import request from 'supertest';
 import { inject } from 'vitest';
-import { freshHandHistory } from './support/hand-histories.js';
+import {
+  freshHandHistory,
+  withFreshHandIds,
+} from './support/hand-histories.js';
 import { startApp, type RunningApp } from './support/app.js';
 import { newAccount } from './support/google.js';
 
@@ -29,16 +32,72 @@ const STAT_KEYS = [
   'steal',
   'cbet-flop',
   'fold-to-cbet-flop',
+  'donk-flop',
+  'fold-to-donk-flop',
   'check-raise-flop',
   'cbet-turn',
   'fold-to-cbet-turn',
+  'delayed-cbet-turn',
+  'fold-to-delayed-cbet-turn',
+  'probe-turn',
+  'fold-to-probe-turn',
+  'float-turn',
+  'fold-to-float-turn',
+  'donk-turn',
+  'fold-to-donk-turn',
   'cbet-river',
   'fold-to-cbet-river',
+  'probe-river',
+  'fold-to-probe-river',
+  'float-river',
+  'fold-to-float-river',
+  'donk-river',
+  'fold-to-donk-river',
   'afq',
   'wwsf',
   'wtsd',
   'wsd',
 ];
+
+/** The Btn opens, the Sb folds and the Bb calls: heads-up to the flop. */
+const OPEN_CALLED = 'Btn: raises $2 to $3\nSb: folds\nBb: calls $2';
+
+/**
+ * A three-handed PokerStars Hand ($0.50/$1) with hand IDs of its own: Btn
+ * on the button, then Sb and Bb, $100 each, played as `streets` lists, with
+ * `hero` dealt Ah Kd. The Board is Kh 9c 4d 2s 7h.
+ */
+function threeHanded(
+  hero: 'Btn' | 'Sb' | 'Bb',
+  streets: { preflop: string; flop?: string; turn?: string; river?: string },
+): string {
+  return withFreshHandIds(
+    [
+      "PokerStars Hand #262199000001:  Hold'em No Limit ($0.50/$1 USD) - 2026/09/10 21:00:00 CET [2026/09/10 15:00:00 ET]",
+      "Table 'Spec' 3-max Seat #1 is the button",
+      'Seat 1: Btn ($100 in chips)',
+      'Seat 2: Sb ($100 in chips)',
+      'Seat 3: Bb ($100 in chips)',
+      'Sb: posts small blind $0.50',
+      'Bb: posts big blind $1',
+      '*** HOLE CARDS ***',
+      `Dealt to ${hero} [Ah Kd]`,
+      streets.preflop,
+      ...(streets.flop !== undefined
+        ? ['*** FLOP *** [Kh 9c 4d]', streets.flop]
+        : []),
+      ...(streets.turn !== undefined
+        ? ['*** TURN *** [Kh 9c 4d] [2s]', streets.turn]
+        : []),
+      ...(streets.river !== undefined
+        ? ['*** RIVER *** [Kh 9c 4d 2s] [7h]', streets.river]
+        : []),
+      'Btn collected $1 from pot',
+      '*** SUMMARY ***',
+      'Total pot $1 | Rake $0',
+    ].join('\n') + '\n',
+  );
+}
 
 /*
  * The fixtures this file imports, iMapleAA's Hands at €0.05/€0.10 in the
@@ -310,6 +369,121 @@ describe('The Library’s Stats (e2e)', () => {
       river: none,
       foldRiver: none,
     });
+  });
+
+  it('sums Donk, Probe, Float and Delayed C-bet, and their Fold to, on each Street, keeping the same Hands behind each', async () => {
+    const account = await newAccount(running.httpServer);
+    // The Btn opens and the Bb calls in every Hand; each Hand is imported
+    // twice, once from each seat. The fixtures reach almost none of these
+    // spots.
+    const spots = {
+      // The Bb leads the flop into the opener, who folds.
+      flopDonkFolded: {
+        flop: 'Bb: bets $3\nBtn: folds\nUncalled bet ($3) returned to Bb',
+      },
+      // The Bb leads the turn into the flop's C-bettor, who calls, then
+      // checks the river to him; he bets, a float, and the Bb folds.
+      turnDonkThenFloat: {
+        flop: 'Bb: checks\nBtn: bets $3\nBb: calls $3',
+        turn: 'Bb: bets $6\nBtn: calls $6',
+        river:
+          'Bb: checks\nBtn: bets $10\nBb: folds\nUncalled bet ($10) returned to Btn',
+      },
+      // A flop C-bet called and a turn checked through; the Bb probes the
+      // river and the Btn folds.
+      riverProbeFolded: {
+        flop: 'Bb: checks\nBtn: bets $3\nBb: calls $3',
+        turn: 'Bb: checks\nBtn: checks',
+        river: 'Bb: bets $5\nBtn: folds\nUncalled bet ($5) returned to Bb',
+      },
+      // A flop checked through; the Btn's turn bet, a delayed C-bet, is
+      // check-raised and he folds.
+      delayedCbetRaised: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: checks\nBtn: bets $4\nBb: raises $8 to $12\nBtn: folds\nUncalled bet ($8) returned to Bb',
+      },
+      // A flop checked through; the Bb probes the turn and the Btn folds.
+      turnProbeFolded: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: bets $3\nBtn: folds\nUncalled bet ($3) returned to Bb',
+      },
+      // C-bets on the flop and the turn, both called; the Bb leads the
+      // river into the turn's bettor, who folds.
+      riverDonkFolded: {
+        flop: 'Bb: checks\nBtn: bets $3\nBb: calls $3',
+        turn: 'Bb: checks\nBtn: bets $6\nBb: calls $6',
+        river: 'Bb: bets $10\nBtn: folds\nUncalled bet ($10) returned to Bb',
+      },
+      // The Bb leads the flop and the Btn calls in position; the Bb checks
+      // the turn, the Btn floats it and the Bb folds.
+      turnFloatFolded: {
+        flop: 'Bb: bets $3\nBtn: calls $3',
+        turn: 'Bb: checks\nBtn: bets $6\nBb: folds\nUncalled bet ($6) returned to Btn',
+      },
+      // A flop checked through; the Btn's delayed C-bet, folded to.
+      delayedCbetFolded: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: checks\nBtn: bets $4\nBb: folds\nUncalled bet ($4) returned to Btn',
+      },
+      // Every Street checked through: chances, none taken.
+      checkedDown: {
+        flop: 'Bb: checks\nBtn: checks',
+        turn: 'Bb: checks\nBtn: checks',
+        river: 'Bb: checks\nBtn: checks',
+      },
+    };
+    await importText(
+      account.token,
+      Object.values(spots)
+        .flatMap((streets) =>
+          (['Btn', 'Bb'] as const).map((hero) =>
+            threeHanded(hero, { preflop: OPEN_CALLED, ...streets }),
+          ),
+        )
+        .join('\n\n\n'),
+    );
+
+    const all = await stats(account.token);
+    expect(all.hands).toBe(18);
+    const expected: Record<string, StatCount> = {
+      // The Bb could lead every flop; it led two.
+      'donk-flop': { opportunities: 9, taken: 2 },
+      'fold-to-donk-flop': { opportunities: 2, taken: 1 },
+      // Only after a bet the Bb called: a flop checked through is a probe.
+      'donk-turn': { opportunities: 3, taken: 1 },
+      'fold-to-donk-turn': { opportunities: 1, taken: 0 },
+      'donk-river': { opportunities: 1, taken: 1 },
+      'fold-to-donk-river': { opportunities: 1, taken: 1 },
+      'delayed-cbet-turn': { opportunities: 3, taken: 2 },
+      // Raised once, folded once.
+      'fold-to-delayed-cbet-turn': { opportunities: 2, taken: 1 },
+      'probe-turn': { opportunities: 4, taken: 1 },
+      'fold-to-probe-turn': { opportunities: 1, taken: 1 },
+      'float-turn': { opportunities: 1, taken: 1 },
+      'fold-to-float-turn': { opportunities: 1, taken: 1 },
+      'probe-river': { opportunities: 2, taken: 1 },
+      'fold-to-probe-river': { opportunities: 1, taken: 1 },
+      'float-river': { opportunities: 1, taken: 1 },
+      'fold-to-float-river': { opportunities: 1, taken: 1 },
+    };
+    for (const [key, count] of Object.entries(expected)) {
+      expect(all.stats[key], key).toEqual(count);
+      // Counted once per Hand: the Hands behind the links are as many.
+      expect(all.handsWith[key], key).toEqual({
+        opportunity: count.opportunities,
+        taken: count.taken,
+      });
+      // The Stat criterion keeps those same Hands.
+      for (const side of ['opportunity', 'taken'] as const) {
+        const res = await request(running.httpServer)
+          .get(`/api/library/hand-ids?stat=${key}:${side}`)
+          .set('Authorization', `Bearer ${account.token}`)
+          .expect(200);
+        expect((res.body.ids as string[]).length, `${key}:${side}`).toBe(
+          all.handsWith[key][side],
+        );
+      }
+    }
   });
 
   it('sums the steal and blind Stats', async () => {

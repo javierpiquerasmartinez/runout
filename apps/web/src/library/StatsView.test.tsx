@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -331,6 +331,74 @@ describe('StatsView, choosing which Stats one sees', () => {
     expect(tilesOf(within(view).getByRole('group', { name: 'Showdown and totals' }))).toEqual(['W$SD —'])
   })
 
+  it('places Donk, Probe, Float and Delayed C-bet, hidden by default, in their Streets’ columns once chosen', () => {
+    const view = renderStats(stats, 'en', [
+      'fold-to-donk-river',
+      'donk-river',
+      'fold-to-float-river',
+      'float-river',
+      'fold-to-probe-river',
+      'probe-river',
+      'fold-to-donk-turn',
+      'donk-turn',
+      'fold-to-float-turn',
+      'float-turn',
+      'fold-to-probe-turn',
+      'probe-turn',
+      'fold-to-delayed-cbet-turn',
+      'delayed-cbet-turn',
+      'cbet-turn',
+      'fold-to-donk-flop',
+      'donk-flop',
+      'check-raise-flop',
+      'cbet-flop',
+    ])
+
+    expect(tilesOf(column(view, 'Flop'))).toEqual(['C-bet —', 'Donk —', 'Fold to Donk —', 'Check-raise —'])
+    expect(tilesOf(column(view, 'Turn'))).toEqual([
+      'C-bet —',
+      'Delayed C-bet —',
+      'Fold to Delayed C-bet —',
+      'Probe —',
+      'Fold to Probe —',
+      'Float —',
+      'Fold to Float —',
+      'Donk —',
+      'Fold to Donk —',
+    ])
+    expect(tilesOf(column(view, 'River'))).toEqual([
+      'Probe —',
+      'Fold to Probe —',
+      'Float —',
+      'Fold to Float —',
+      'Donk —',
+      'Fold to Donk —',
+    ])
+  })
+
+  it('names Donk, Probe, Float and Delayed C-bet in full with their Street, in English and Spanish', async () => {
+    const chosen: StatKey[] = ['donk-flop', 'fold-to-delayed-cbet-turn', 'float-turn', 'fold-to-probe-river']
+    const named: [string, string, string, string, string][] = [
+      ['Flop', 'Donk —', 'Donk bet into the aggressor on the flop', 'Flop', 'Apuesta contra el agresor desde fuera de posición en el flop'],
+      ['Turn', 'Fold to Delayed C-bet —', 'Fold to delayed continuation bet on the turn', 'Turn', 'Se retira ante una apuesta de continuación retrasada en el turn'],
+      ['Turn', 'Float —', 'Bet in position after calling the street before, on the turn', 'Turn', 'Apuesta en posición tras pagar la calle anterior, en el turn'],
+      ['River', 'Fold to Probe —', 'Fold to a probe bet on the river', 'River', 'Se retira ante una apuesta de sondeo en el river'],
+    ]
+    for (const [locale, nameAt] of [
+      ['en', 2],
+      ['es', 4],
+    ] as const) {
+      const view = renderStats(stats, locale, chosen)
+      for (const spot of named) {
+        const tile = within(column(view, spot[0])).getByRole('button', { name: spot[1] })
+        await userEvent.hover(tile)
+        expect(within(screen.getByRole('tooltip')).getByText(spot[nameAt])).toBeTruthy()
+        await userEvent.unhover(tile)
+      }
+      cleanup()
+    }
+  })
+
   it('draws no band, nor Street column, with nothing chosen in it', () => {
     const view = renderStats(stats, 'en', ['vpip', 'cbet-river'])
 
@@ -384,7 +452,33 @@ describe('StatsView, choosing which Stats one sees', () => {
 
     await userEvent.click(within(view).getByRole('button', { name: 'VPIP 22.4%' }))
 
-    expect(changes).toEqual([{ shownStats: STAT_KEYS.filter((key) => key !== 'vpip') }])
+    // The default's 21 but VPIP: none of the Stats hidden by default.
+    expect(changes).toEqual([
+      {
+        shownStats: [
+          'pfr',
+          'steal',
+          'three-bet',
+          'fold-to-three-bet',
+          'squeeze',
+          'cold-call',
+          'four-bet',
+          'fold-to-four-bet',
+          'fold-bb-to-steal',
+          'cbet-flop',
+          'fold-to-cbet-flop',
+          'check-raise-flop',
+          'cbet-turn',
+          'fold-to-cbet-turn',
+          'cbet-river',
+          'fold-to-cbet-river',
+          'wwsf',
+          'wtsd',
+          'wsd',
+          'afq',
+        ],
+      },
+    ])
   })
 
   it('has no tooltips nor links while editing', async () => {
