@@ -216,6 +216,7 @@ function StatTileView({
 }) {
   const { t, formatNumber } = useI18n()
   const tipId = useId()
+  const nameId = useId()
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const open = !choice && (hovered || focused)
@@ -249,12 +250,19 @@ function StatTileView({
         data-empty={none || undefined}
         data-choice={choice ? (choice.shown ? 'shown' : 'hidden') : undefined}
         aria-pressed={choice ? choice.shown : undefined}
-        aria-describedby={open ? tipId : undefined}
+        aria-describedby={open ? tipId : choice ? nameId : undefined}
         onClick={choice?.toggle}
       >
         <span className="stats__abbr ro-mono">{stat.short}</span>{' '}
         <span className="stats__value ro-serif">{value}</span>
       </button>
+      {/* While choosing there is no tooltip, so the full name, Street and all, describes the tile:
+          under a Street column the short names repeat ("AF" four times). */}
+      {choice && (
+        <span id={nameId} hidden>
+          {t(statName(stat))}
+        </span>
+      )}
       {choice && (
         <span className="stats__mark ro-mono" data-shown={choice.shown || undefined} aria-hidden="true">
           {choice.shown ? '✓' : '+'}

@@ -553,6 +553,24 @@ describe('StatsView, choosing which Stats one sees', () => {
     ])
   })
 
+  it('describes each Stat in full while editing, so tiles with the same name tell their Streets apart', async () => {
+    const view = renderStats(stats, 'en', ['vpip'])
+    await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))
+
+    expect(
+      within(column(view, 'Flop')).getByRole('button', {
+        name: /^Fold to C-bet /,
+        description: 'Fold to flop continuation bet',
+      }),
+    ).toBeTruthy()
+    expect(
+      within(column(view, 'River')).getByRole('button', {
+        name: 'Fold to C-bet —',
+        description: 'Fold to river continuation bet',
+      }),
+    ).toBeTruthy()
+  })
+
   it('shows or hides a Stat with one click, kept at once, in the catalogue’s order', async () => {
     const view = renderStats(stats, 'en', ['wsd', 'vpip'])
     await userEvent.click(within(view).getByRole('button', { name: 'Edit' }))

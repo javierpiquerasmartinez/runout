@@ -45,6 +45,8 @@
 .stats__tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  /* Every row as tall as the tallest tile, so a name that wraps ("Fold to Delayed C-bet") leaves no row taller than the rest. */
+  grid-auto-rows: 1fr;
   gap: 8px;
 }
 
