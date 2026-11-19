@@ -1,4 +1,5 @@
 import type { Locale } from '../i18n'
+import type { StatKey } from '../library/stats'
 
 /**
  * How one person reads the table, kept by the server with their identity.
@@ -18,6 +19,12 @@ export interface Preferences {
   allInEvColour: GraphColour
   showdownColour: GraphColour
   nonShowdownColour: GraphColour
+  /**
+   * The Stats an Account chose to see in the Library's Stats view, in no
+   * order (the catalogue orders them), or null for the default. The server
+   * drops the key of any Stat it no longer knows.
+   */
+  shownStats: readonly StatKey[] | null
 }
 
 export type DeckStyle = 'classic' | 'full-suit'
@@ -57,4 +64,5 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: 'dark',
   language: 'es',
   ...DEFAULT_GRAPH_COLOURS,
+  shownStats: null,
 }

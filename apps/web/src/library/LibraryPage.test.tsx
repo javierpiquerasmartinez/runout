@@ -867,6 +867,16 @@ describe('LibraryPage', () => {
         expect(within(filters).getByRole('button', { name: /^More filters: / }).textContent).toBe('Turn C-bet · you did it')
       })
 
+      it('offers every Stat, whatever Stats the person chose to see', async () => {
+        renderLibrary({ ...DEFAULT_PREFERENCES, shownStats: ['vpip'] }, undefined, '/library?period=all')
+        const panel = await statBranch()
+
+        await userEvent.click(within(criterion(panel, 'Turn C-bet')).getByRole('button', { name: 'I did it' }))
+
+        expect(within(criterion(panel, 'PFR')).getByRole('button', { name: 'I did it' })).toBeTruthy()
+        expect(lastFilterQuery()).toBe('stat=cbet-turn%3Ataken')
+      })
+
       it('goes with Remove all', async () => {
         renderLibrary(DEFAULT_PREFERENCES, undefined, '/library?period=all&stat=vpip:taken&fact=pot-type:3-bet')
         const panel = await statBranch()

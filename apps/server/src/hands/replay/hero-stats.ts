@@ -3,9 +3,16 @@ import { positions, type Position } from './positions.js';
 import { timeline, type TableState } from './timeline.js';
 
 /**
- * Every Stat, by its stable key, in the order the Stats view shows them:
- * Preflop, then Postflop, then Showdown. The keys are stored with each
- * Hand's Stat rows and travel in the Library Stats API, so they never change.
+ * Every Stat Runout knows, by its stable key: the server's one list of them,
+ * the web's catalogue's counterpart (ADR 0001: no shared code). The Library
+ * Stats API answers them in this order, the Stat criterion accepts them, and
+ * an Account's Preferences keep a choice of them (dropping, on reading, any
+ * key no longer here). The keys travel in the API and are stored in
+ * Preferences and Saved Filters, so they never change.
+ *
+ * Adding a Stat is adding its key here, its mapping onto the facts in
+ * `STAT_FACTS` (`library/stat-facts.ts`, which fails to compile without it),
+ * and its entry in the web's `STAT_CATALOGUE`.
  */
 export const STAT_KEYS = [
   'vpip',

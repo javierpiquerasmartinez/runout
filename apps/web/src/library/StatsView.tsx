@@ -1,6 +1,11 @@
 import { useId, useState, type FocusEvent, type MouseEvent, type ReactNode } from 'react'
+import { reasonOf, type FailureReason } from '../backend/api'
+import { useNarrowScreen } from '../calendar/narrowScreen'
 import { useI18n } from '../i18n'
+import { useSession } from '../identity/context'
+import { usePreferences } from '../preferences/context'
 import { isPlainClick, navigate } from '../routing'
+import { Button } from '../ui/Button'
 import type { StatCriterion, StatSide } from './libraryFilter'
 import {
   STAT_BANDS,
@@ -11,8 +16,12 @@ import {
   type Stat,
   type StatCount,
   type StatHands,
+  type StatKey,
 } from './stats'
 import './StatsView.css'
+
+/** The Stats a person who hasn't chosen theirs sees. */
+const DEFAULT_SHOWN: readonly StatKey[] = STAT_CATALOGUE.filter((stat) => stat.shownByDefault).map((stat) => stat.key)
 
 /**
  * The Library's Estadísticas view: the Hero's Stats over the Hands the
@@ -22,24 +31,87 @@ import './StatsView.css'
  * full and gives its count, so the person judges the sample themselves, and
  * links to the Hands behind its opportunities and behind the times it was
  * taken, at the address `statHref` writes.
+ *
+ * It shows the Stats the person chose (their `shownStats` Preference), or
+ * the default ones. Editar, on a computer only, shows every Stat of the
+ * catalogue, the chosen ones marked, and a click shows or hides one, kept at
+ * once; tooltips and links are off meanwhile. A band or Street column with
+ * nothing shown isn't drawn.
  */
 export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: (criterion: StatCriterion) => string }) {
   const { t, formatNumber } = useI18n()
-  const shown: Stat[] = STAT_CATALOGUE.filter((stat) => stat.shownByDefault)
+  const { shownStats } = usePreferences()
+  const { changePreferences } = useSession()
+  // A phone stays a reading screen: the Stats are chosen on a computer.
+  const narrow = useNarrowScreen()
+  const [editing, setEditing] = useState(false)
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+  const choosing = editing && !narrow
+  const chosen = new Set<StatKey>(shownStats ?? DEFAULT_SHOWN)
+  const visible: Stat[] = choosing ? [...STAT_CATALOGUE] : STAT_CATALOGUE.filter((stat) => chosen.has(stat.key))
+
+  const change = (next: StatKey[] | null) => {
+    setFailure(null)
+    changePreferences({ shownStats: next }).catch((error: unknown) => setFailure(reasonOf(error)))
+  }
+  // The choice is a set; it is kept in the catalogue's order only to read well.
+  const toggle = (key: StatKey) =>
+    change(STAT_CATALOGUE.map((stat) => stat.key).filter((each) => (each === key ? !chosen.has(each) : chosen.has(each))))
+
   const tiles = (of: Stat[]) => (
     <div className="stats__tiles">
       {of.map((stat) => (
-        <StatTileView key={stat.key} stat={stat} count={stats.stats[stat.key]} handsWith={stats.handsWith[stat.key]} statHref={statHref} />
+        <StatTileView
+          key={stat.key}
+          stat={stat}
+          count={stats.stats[stat.key]}
+          handsWith={stats.handsWith[stat.key]}
+          statHref={statHref}
+          choice={choosing ? { shown: chosen.has(stat.key), toggle: () => toggle(stat.key) } : null}
+        />
       ))}
     </div>
   )
   return (
     <section className="stats" aria-label={t('library.stats.title')}>
-      <span className="stats__hands">
-        {t(stats.hands === 1 ? 'library.count.one' : 'library.count.other', { count: formatNumber(stats.hands) })}
-      </span>
+      <div className="stats__head">
+        {choosing ? (
+          <>
+            <span className="stats__hint">{t('library.stats.edit.hint')}</span>
+            <span className="stats__actions">
+              <Button variant="ghost" size="compact" onClick={() => change(null)}>
+                {t('library.stats.edit.reset')}
+              </Button>
+              <Button variant="secondary" onClick={() => setEditing(false)}>
+                {t('library.stats.edit.done')}
+              </Button>
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="stats__hands">
+              {t(stats.hands === 1 ? 'library.count.one' : 'library.count.other', { count: formatNumber(stats.hands) })}
+            </span>
+            {!narrow && (
+              <Button variant="ghost" size="compact" onClick={() => setEditing(true)}>
+                {t('library.stats.edit')}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+      {failure && (
+        <p className="stats__failure" role="alert">
+          {t('library.stats.edit.failed', { reason: t(`reason.${failure}`) })}
+        </p>
+      )}
+      {visible.length === 0 && (
+        <p className="stats__none">
+          {narrow ? t('library.stats.none') : `${t('library.stats.none')} ${t('library.stats.none.edit')}`}
+        </p>
+      )}
       {STAT_BANDS.map((band) => {
-        const inBand = shown.filter((stat) => stat.band === band)
+        const inBand = visible.filter((stat) => stat.band === band)
         if (inBand.length === 0) return null
         if (band !== 'postflop') {
           return (
@@ -64,6 +136,7 @@ export function StatsView({ stats, statHref }: { stats: LibraryStats; statHref: 
           </Group>
         )
       })}
+      {narrow && <p className="stats__elsewhere">{t('library.stats.phone')}</p>}
     </section>
   )
 }
@@ -82,23 +155,29 @@ function Group({ level, title, children }: { level: 2 | 3; title: string; childr
   )
 }
 
-/** One Stat: its abbreviation and percentage, with its tooltip under it on hover or focus. */
+/**
+ * One Stat: its abbreviation and percentage, with its tooltip under it on
+ * hover or focus. While the person chooses their Stats (`choice`), it has no
+ * tooltip: a click shows or hides it instead, and it is marked shown or faded.
+ */
 function StatTileView({
   stat,
   count,
   handsWith,
   statHref,
+  choice,
 }: {
   stat: Stat
   count: StatCount
   handsWith: StatHands
   statHref: (criterion: StatCriterion) => string
+  choice: { shown: boolean; toggle: () => void } | null
 }) {
   const { t, formatNumber } = useI18n()
   const tipId = useId()
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
-  const open = hovered || focused
+  const open = !choice && (hovered || focused)
   const none = count.opportunities === 0
   const value = none
     ? '—'
@@ -126,10 +205,23 @@ function StatTileView({
       onFocus={() => setFocused(true)}
       onBlur={leave}
     >
-      <button type="button" className="stats__tile" data-empty={none || undefined} aria-describedby={open ? tipId : undefined}>
+      <button
+        type="button"
+        className="stats__tile"
+        data-empty={none || undefined}
+        data-choice={choice ? (choice.shown ? 'shown' : 'hidden') : undefined}
+        aria-pressed={choice ? choice.shown : undefined}
+        aria-describedby={open ? tipId : undefined}
+        onClick={choice?.toggle}
+      >
         <span className="stats__abbr ro-mono">{stat.short}</span>{' '}
         <span className="stats__value ro-serif">{value}</span>
       </button>
+      {choice && (
+        <span className="stats__mark ro-mono" data-shown={choice.shown || undefined} aria-hidden="true">
+          {choice.shown ? '✓' : '+'}
+        </span>
+      )}
       {open && (
         <div id={tipId} className="stats__tip" role="tooltip">
           <div className="stats__tip-card">

@@ -5,9 +5,34 @@
   gap: 14px;
   min-height: 0;
 }
-.stats__hands {
+/* The Hand count and Editar; while editing, what to do, with Restablecer and Listo. */
+.stats__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+}
+.stats__hands,
+.stats__hint {
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+.stats__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stats__none,
+.stats__elsewhere,
+.stats__failure {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.stats__failure {
+  color: var(--alert-ink);
 }
 .stats__group {
   margin: 0 0 8px;
@@ -98,6 +123,35 @@
 }
 .stats__tile[data-empty] .stats__value {
   color: var(--text-muted);
+}
+
+/* Choosing the Stats: the shown ones outlined in the accent with a ✓, the hidden ones faded and dashed with a +. */
+.stats__tile[data-choice] {
+  cursor: pointer;
+}
+.stats__tile[data-choice='shown'],
+.stats__tile[data-choice='shown']:hover {
+  border-color: var(--brass);
+}
+.stats__tile[data-choice='hidden'] {
+  border-style: dashed;
+  background: transparent;
+  opacity: 0.45;
+}
+.stats__tile[data-choice='hidden']:hover {
+  opacity: 0.7;
+}
+.stats__mark {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.stats__mark[data-shown] {
+  color: var(--brass);
 }
 .stats__tip {
   position: absolute;
