@@ -168,7 +168,7 @@ A Result line per 100 Hands, in big blinds whatever the currency, over the Hands
 _Avoid_: bb/100 (as a name), winnings rate
 
 **Stat**:
-How often the Hero made one particular decision, over the Hands where they had the chance to make it: PFR is the times they raised preflop out of the times they could. A frequency, never a Result. Worked out after the session over a person's Library, filtered the same way as the Results Graph; never shown at a table while playing. The Library can also be filtered by one Stat: the Hands where the Hero had its chance, or those where they took it.
+How often the Hero made one particular decision, over the Hands where they had the chance to make it: PFR is the times they raised preflop out of the times they could. Most are a frequency; a few, such as AF, are a ratio between kinds of the Hero's Actions instead. Never a Result. Worked out after the session over a person's Library, filtered the same way as the Results Graph; never shown at a table while playing. The Library can also be filtered by one Stat: the Hands where the Hero had its chance, or those where they took it.
 _Avoid_: HUD, metric, KPI
 
 ### Filters
@@ -293,7 +293,7 @@ One of the Preferences.
 ### Preferences
 
 **Preferences**:
-How one person reads the table and their Results Graph: Deck Style, four-colour classic deck, pot percentage on bets, Display Unit, Theme, Graph Colours and language. Personal and stored with their identity: they never change what anyone else in the Room sees. Hide Opponent Names is not one of them; it belongs to Playback.
+How one person reads the table, their Results Graph and their Stats: Deck Style, four-colour classic deck, pot percentage on bets, Display Unit, Theme, Graph Colours, which Stats they see and language. Personal and stored with their identity: they never change what anyone else in the Room sees. Hide Opponent Names is not one of them; it belongs to Playback.
 _Avoid_: Settings (the screen, not the choices), options, profile
 
 **Deck Style**:
