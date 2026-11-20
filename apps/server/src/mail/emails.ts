@@ -193,43 +193,65 @@ export class EmailWriter {
   }
 
   /**
-   * To an Account, when an Administrator writes in one of its Support
-   * Tickets or closes it: a short excerpt and a link to the Ticket's page.
+   * To an Account, when an Administrator opens a Support Ticket with it,
+   * writes in one of its Tickets or closes it: a short excerpt and a link to
+   * the Ticket's page.
    */
   supportToAccount(input: {
     to: string;
     language: Language;
-    event: 'written' | 'closed';
+    event: 'opened' | 'written' | 'closed';
     ticket: SupportTicketMention;
   }): Email {
     const { language, event, ticket } = input;
     const es = language === 'es';
-    const closed = event === 'closed';
-    const subject = es
-      ? `${closed ? 'Runout ha cerrado tu incidencia' : 'Runout te ha respondido'}: ${ticket.subject}`
-      : `${closed ? 'Runout has closed your ticket' : 'Runout has answered you'}: ${ticket.subject}`;
-    const lead = es
-      ? closed
-        ? 'Runout ha cerrado tu incidencia. Su último mensaje:'
-        : 'Runout ha respondido en tu incidencia:'
-      : closed
-        ? 'Runout has closed your ticket. Its last message:'
-        : 'Runout has answered in your ticket:';
-    const after = closed
-      ? es
-        ? 'Si aún necesitas ayuda, escribe en ella y se abrirá de nuevo.'
-        : 'If you still need help, write in it and it opens again.'
-      : es
-        ? 'Para responder, hazlo en Runout: este email no recibe respuestas.'
-        : 'To answer, do it on Runout: this email does not take replies.';
+    const answer = es
+      ? 'Para responder, hazlo en Runout: este email no recibe respuestas.'
+      : 'To answer, do it on Runout: this email does not take replies.';
+    const copy = {
+      opened: es
+        ? {
+            subject: 'Runout ha abierto una incidencia contigo',
+            lead: 'Runout ha abierto una incidencia contigo en Soporte:',
+            after: answer,
+          }
+        : {
+            subject: 'Runout has opened a ticket with you',
+            lead: 'Runout has opened a ticket with you in Support:',
+            after: answer,
+          },
+      written: es
+        ? {
+            subject: 'Runout te ha respondido',
+            lead: 'Runout ha respondido en tu incidencia:',
+            after: answer,
+          }
+        : {
+            subject: 'Runout has answered you',
+            lead: 'Runout has answered in your ticket:',
+            after: answer,
+          },
+      closed: es
+        ? {
+            subject: 'Runout ha cerrado tu incidencia',
+            lead: 'Runout ha cerrado tu incidencia. Su último mensaje:',
+            after:
+              'Si aún necesitas ayuda, escribe en ella y se abrirá de nuevo.',
+          }
+        : {
+            subject: 'Runout has closed your ticket',
+            lead: 'Runout has closed your ticket. Its last message:',
+            after: 'If you still need help, write in it and it opens again.',
+          },
+    }[event];
     return write(
       input.to,
       language,
-      subject,
-      [lead, `«${excerpt(ticket.message)}»`],
+      `${copy.subject}: ${ticket.subject}`,
+      [copy.lead, `«${excerpt(ticket.message)}»`],
       es ? 'Ver la incidencia' : 'See the ticket',
       `${this.frontendUrl}/support/${ticket.id}`,
-      [after],
+      [copy.after],
     );
   }
 

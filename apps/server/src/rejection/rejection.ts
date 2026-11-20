@@ -108,7 +108,8 @@ export type RejectionReason =
   | 'invalid-admin-query'
   | 'invalid-support-subject'
   | 'invalid-support-message'
-  | 'support-ticket-not-found';
+  | 'support-ticket-not-found'
+  | 'support-account-suspended';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

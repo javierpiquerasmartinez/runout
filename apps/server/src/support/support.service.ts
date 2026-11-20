@@ -16,6 +16,7 @@ import {
 } from '../identity/identity.service.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from '../admin/admin-query.js';
+import { isAccount } from '../admin/accounts.service.js';
 import { Rejected } from '../rejection/rejection.js';
 import { SupportEmail } from './support-email.js';
 
@@ -133,6 +134,11 @@ export interface NewTicketBody {
   message?: unknown;
 }
 
+/** What an Administrator opening a Support Ticket sends: the Account it is with, too. */
+export interface NewPanelTicketBody extends NewTicketBody {
+  accountId?: unknown;
+}
+
 /** What writing in a Support Ticket sends. */
 export interface NewMessageBody {
   text?: unknown;
@@ -206,29 +212,7 @@ export class SupportService {
     body: NewTicketBody,
   ): Promise<AccountTicket> {
     refuseImpersonation(account);
-    const subject = subjectOf(body.subject);
-    const text = messageOf(body.message);
-    const now = this.clock.now();
-    const ticketId = await this.db.transaction(async (tx) => {
-      const [ticket] = await tx
-        .insert(supportTickets)
-        .values({
-          identityId: account.id,
-          subject,
-          status: 'open',
-          createdAt: now,
-        })
-        .returning({ id: supportTickets.id });
-      await tx
-        .insert(supportMessages)
-        .values({ ticketId: ticket.id, text, writtenAt: now });
-      return ticket.id;
-    });
-    await this.email.toAdministrators('opened', account.id, {
-      id: ticketId,
-      subject,
-      message: text,
-    });
+    const ticketId = await this.open(account.id, null, body);
     return this.readForAccount(account, ticketId);
   }
 
@@ -394,6 +378,31 @@ export class SupportService {
     };
   }
 
+  /**
+   * An Administrator opens a Support Ticket with an Account, writing its
+   * first Support Message; the Account sees it from Runout. Never with a
+   * Suspended Account (`support-account-suspended`), nor with no such
+   * Account (`not-found`).
+   */
+  async openForPanel(
+    administrator: Identity,
+    body: NewPanelTicketBody,
+  ): Promise<PanelTicket> {
+    const [account] = isUuid(body.accountId)
+      ? await this.db
+          .select({ id: identities.id, suspendedAt: identities.suspendedAt })
+          .from(identities)
+          .where(and(eq(identities.id, body.accountId), isAccount))
+      : [];
+    if (!account) throw new Rejected('not-found');
+    if (account.suspendedAt !== null) {
+      throw new Rejected('support-account-suspended');
+    }
+    return this.readForPanel(
+      await this.open(account.id, administrator.id, body),
+    );
+  }
+
   /** An Administrator writes in any Support Ticket, a Suspended Account's included. */
   async writeForPanel(
     administrator: Identity,
@@ -423,6 +432,44 @@ export class SupportService {
       });
     }
     return this.readForPanel(ticket.id);
+  }
+
+  /**
+   * Opens an Open Support Ticket with the Account and its first Support
+   * Message, written by the Administrator who opens it, or by the Account
+   * when `administratorId` is null.
+   */
+  private async open(
+    accountId: string,
+    administratorId: string | null,
+    body: NewTicketBody,
+  ): Promise<string> {
+    const subject = subjectOf(body.subject);
+    const text = messageOf(body.message);
+    const now = this.clock.now();
+    const ticketId = await this.db.transaction(async (tx) => {
+      const [ticket] = await tx
+        .insert(supportTickets)
+        .values({
+          identityId: accountId,
+          subject,
+          status: 'open',
+          openedByAdministratorId: administratorId,
+          createdAt: now,
+        })
+        .returning({ id: supportTickets.id });
+      await tx
+        .insert(supportMessages)
+        .values({ ticketId: ticket.id, administratorId, text, writtenAt: now });
+      return ticket.id;
+    });
+    const mention = { id: ticketId, subject, message: text };
+    if (administratorId) {
+      await this.email.toAccount('opened', accountId, mention);
+    } else {
+      await this.email.toAdministrators('opened', accountId, mention);
+    }
+    return ticketId;
   }
 
   /** Writes a Support Message; in a Closed Ticket it opens it again, since something is pending once more. */

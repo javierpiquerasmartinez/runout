@@ -113,6 +113,27 @@ describe('Support emails (e2e)', () => {
   });
 
   describe('to the Account', () => {
+    it('tells the Account when an Administrator opens a Ticket with it, and no Administrator', async () => {
+      const before = running.inbox.sent.length;
+
+      const { body } = await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: 'Tu importación',
+          message: 'Hola. Lo estamos revisando.',
+        })
+        .expect(201);
+
+      const sent = since(before);
+      expect(sent.map((email) => email.to)).toEqual([anaEmail]);
+      expect(sent[0].subject).toBe(
+        'Runout ha abierto una incidencia contigo: Tu importación',
+      );
+      expect(sent[0].text).toContain('Hola. Lo estamos revisando.');
+      expect(sent[0].text).toContain(`${WEB}/support/${body.id}`);
+    });
+
     it('tells the Account when an Administrator writes in its Ticket, with an excerpt and a link to its page', async () => {
       const ticket = await open('Una mano sale mal', 'El héroe es otro.');
       const before = running.inbox.sent.length;

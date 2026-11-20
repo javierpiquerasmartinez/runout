@@ -1983,6 +1983,7 @@ export const en: Messages = {
   'reason.invalid-support-subject': 'Write a subject of up to 120 characters.',
   'reason.invalid-support-message': 'Write a message of up to 4,000 characters.',
   'reason.support-ticket-not-found': "That ticket doesn't exist or you can't see it.",
+  'reason.support-account-suspended': 'This account is suspended.',
   'support.title': 'Support',
   'support.lead': 'Your tickets with Runout. We email you when we answer.',
   'support.new': 'New ticket',
@@ -2042,4 +2043,8 @@ export const en: Messages = {
   'admin.support.filter.all': 'All',
   'admin.support.filter.open': 'Open',
   'admin.support.filter.closed': 'Closed',
+  'admin.support.open': 'Open ticket',
+  'admin.support.open.suspended': 'This account is suspended',
+  'admin.support.open.title': 'Open a ticket with {name}',
+  'admin.support.open.body': '{email}. They will see it in their Support, signed Runout, and get an email.',
 }

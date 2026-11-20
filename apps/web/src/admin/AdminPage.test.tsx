@@ -215,10 +215,9 @@ describe('the Invitations tab', () => {
 describe('the Accounts tab', () => {
   let calls: ApiCall[]
 
-  beforeEach(() => {
-    calls = fakeApi({
+  const accountsAnswers = () => ({
       'GET /admin/totals': () => Response.json(totals),
-      'GET /admin/accounts': (call) => {
+      'GET /admin/accounts': (call: ApiCall) => {
         const query = new URLSearchParams(call.search)
         const search = query.get('search')
         const plan = query.get('plan')
@@ -248,7 +247,10 @@ describe('the Accounts tab', () => {
       'PUT /admin/accounts/ana/plan': () => new Response(null, { status: 204 }),
       'POST /admin/accounts/ana/suspension': () => new Response(null, { status: 204 }),
       'DELETE /admin/accounts/bea/suspension': () => new Response(null, { status: 204 }),
-    })
+  })
+
+  beforeEach(() => {
+    calls = fakeApi(accountsAnswers())
   })
 
   it('shows the totals and each Account with its statistics', async () => {
@@ -296,7 +298,67 @@ describe('the Accounts tab', () => {
       const actions = within(row).getAllByRole('button')
       expect(actions[0].textContent).toBe('Change plan')
     }
-    expect(within(admin).getAllByRole('button')).toHaveLength(1)
+    expect(within(admin).getAllByRole('button').map((each) => each.textContent)).toEqual(['Change plan', 'Open ticket'])
+  })
+
+  it('offers opening a Ticket last on every Account, locked on a Suspended one', async () => {
+    renderTab('accounts')
+    const [, ana, bea] = await screen.findAllByRole('row')
+
+    expect(within(ana).getAllByRole('button').at(-1)?.textContent).toBe('Open ticket')
+    const locked = within(bea).getAllByRole('button').at(-1)
+    expect(locked?.getAttribute('aria-label')).toBe('Open ticket. This account is suspended')
+    await userEvent.click(locked!)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens a Ticket with an Account from a subject and a message, and lands on it in Support', async () => {
+    window.history.replaceState(null, '', '/admin/accounts')
+    calls = fakeApi({
+      ...accountsAnswers(),
+      'POST /admin/support/tickets': () => Response.json({ id: 'ticket-1' }, { status: 201 }),
+    })
+    renderTab('accounts')
+    const [, ana] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(ana).getByRole('button', { name: 'Open ticket' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading').textContent).toBe('Open a ticket with ana')
+    expect(dialog.textContent).toContain('ana@x.com. They will see it in their Support, signed Runout, and get an email.')
+    const send = within(dialog).getByRole('button', { name: /^Open ticket/ })
+    expect(send.getAttribute('aria-label')).toBe('Open ticket. Write a subject')
+    await userEvent.type(within(dialog).getByLabelText('Subject'), 'Your import')
+    expect(send.getAttribute('aria-label')).toBe('Open ticket. Write a message')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'We are looking into it.')
+    expect(dialog.textContent).toContain('23 / 4,000')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open ticket' }))
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'POST')).toMatchObject({
+        path: '/admin/support/tickets',
+        body: { accountId: 'ana', subject: 'Your import', message: 'We are looking into it.' },
+      }),
+    )
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/support/ticket-1'))
+  })
+
+  it('says why opening a Ticket was refused, keeping what was written', async () => {
+    fakeApi({
+      ...accountsAnswers(),
+      'POST /admin/support/tickets': () => refusal(403, 'support-account-suspended'),
+    })
+    renderTab('accounts')
+    const [, ana] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(ana).getByRole('button', { name: 'Open ticket' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText('Subject'), 'Your import')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'Hello')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open ticket' }))
+
+    expect((await within(dialog).findByRole('alert')).textContent).toBe('This account is suspended.')
+    expect((within(dialog).getByLabelText('Message') as HTMLTextAreaElement).value).toBe('Hello')
   })
 
   it('changes the Plan after a confirmation that says what changes', async () => {

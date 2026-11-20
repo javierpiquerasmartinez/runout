@@ -15,8 +15,8 @@ import { messageOf } from '../import-service/message-of.js';
 /**
  * Support's emails, so that each side hears about it outside Runout: to
  * every Administrator when an Account opens a Support Ticket or writes in
- * one, and to the Account when an Administrator writes in or closes one of
- * its Tickets. Never to a Suspended Account; there is no opting out. A
+ * one, and to the Account when an Administrator opens a Ticket with it, or
+ * writes in or closes one of its Tickets. Never to a Suspended Account; there is no opting out. A
  * failed send is logged, never thrown: the Support Message stays written.
  */
 @Injectable()
@@ -72,9 +72,9 @@ export class SupportEmail {
     }
   }
 
-  /** Tells the Account `accountId` that an Administrator wrote in or closed its Ticket, unless it is Suspended. */
+  /** Tells the Account `accountId` that an Administrator opened, wrote in or closed its Ticket, unless it is Suspended. */
   async toAccount(
-    event: 'written' | 'closed',
+    event: 'opened' | 'written' | 'closed',
     accountId: string,
     ticket: SupportTicketMention,
   ): Promise<void> {
