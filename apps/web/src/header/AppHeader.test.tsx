@@ -256,55 +256,69 @@ describe('AppHeader · getting around', () => {
     expect(second.getAttribute('aria-current')).toBeNull()
   })
 
-  it('opens Rooms from "New room"', async () => {
-    window.history.pushState(null, '', '/library')
+  it('offers no "New room": Rooms are created from the Rooms screen and Home', () => {
     renderHeader()
 
-    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
-
-    expect(window.location.pathname).toBe('/rooms')
+    expect(screen.queryByRole('button', { name: /New room/ })).toBeNull()
   })
 
-  it('offers an anonymous Participant neither the sections nor a new Room', () => {
-    renderHeader(fakeSession({ account: null, room: { code: 'ABCDEF' } }))
+  it('offers an anonymous Participant neither the sections nor the panel', () => {
+    renderHeader(fakeSession({ account: null, room: { code: 'ABCDEF' }, administrator: true }))
 
     expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'New room' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Administration' })).toBeNull()
     expect(screen.getByRole('link', { name: 'Runout, go to the start' }).getAttribute('href')).toBe('/')
   })
 })
 
 describe('AppHeader · the Administrator panel', () => {
-  it('offers "Administration" in the menu to an Administrator, leading to the panel', async () => {
+  it('offers an Administrator a button beside the avatar, leading to the panel', async () => {
+    window.history.pushState(null, '', '/library')
+    renderHeader(fakeSession({ administrator: true }))
+
+    const panel = screen.getByRole('link', { name: 'Administration' })
+    expect(panel.getAttribute('href')).toBe('/admin')
+    expect(panel.nextElementSibling?.contains(screen.getByRole('button', { name: 'Account menu' }))).toBe(true)
+    await userEvent.click(panel)
+
+    expect(window.location.pathname).toBe('/admin')
+  })
+
+  it('marks the button as current inside the panel', () => {
+    render(
+      <I18nProvider initialLocale="es">
+        <SessionContext.Provider value={fakeSession({ administrator: true })}>
+          <AppHeader current="admin" where="Administración" />
+        </SessionContext.Provider>
+      </I18nProvider>,
+    )
+
+    expect(screen.getByRole('link', { name: 'Administración' }).getAttribute('aria-current')).toBe('page')
+    const sections = within(screen.getByRole('navigation', { name: 'Secciones' })).getAllByRole('link')
+    expect(sections.filter((link) => link.getAttribute('aria-current'))).toEqual([])
+  })
+
+  it('leaves the button unmarked elsewhere', () => {
+    renderHeader(fakeSession({ administrator: true }))
+
+    expect(screen.getByRole('link', { name: 'Administration' }).getAttribute('aria-current')).toBeNull()
+  })
+
+  it('no longer offers "Administration" in the avatar\'s menu', async () => {
     renderHeader(fakeSession({ administrator: true }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
-    await userEvent.click(screen.getByRole('link', { name: 'Administration' }))
 
-    expect(window.location.pathname).toBe('/admin')
+    const menu = screen.getByRole('group', { name: 'Account menu' })
+    expect(within(menu).queryByRole('link', { name: 'Administration' })).toBeNull()
+    expect(within(menu).getByRole('link', { name: 'Settings' })).toBeTruthy()
   })
 
   it('offers it to nobody else', async () => {
     renderHeader(fakeSession({ administrator: false }))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
-
     expect(screen.queryByRole('link', { name: 'Administration' })).toBeNull()
-  })
-})
-
-describe('AppHeader · while impersonating', () => {
-  it('locks "New room", saying why', async () => {
-    renderHeader(
-      fakeSession({
-        impersonation: { administrator: { displayName: 'Admin', email: 'admin@x.com' }, endsAt: '2099-01-01T00:00:00Z' },
-      }),
-    )
-
-    const newRoom = screen.getByRole('button', { name: /New room/ })
-    expect(newRoom.getAttribute('aria-disabled')).toBe('true')
-    expect(newRoom.getAttribute('title')).toBe("Rooms aren't available while impersonating someone")
-    await userEvent.click(newRoom)
-    expect(window.location.pathname).toBe('/')
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    expect(screen.queryByRole('link', { name: 'Administration' })).toBeNull()
   })
 })

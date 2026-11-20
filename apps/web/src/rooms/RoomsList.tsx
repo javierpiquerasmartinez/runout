@@ -8,9 +8,11 @@ import { RoomDialog } from '../room/RoomDialog'
 import type { RoomState, RoomSummary } from '../room/roomClient'
 import { roomLink, roomPath } from '../room/roomCode'
 import { Button } from '../ui/Button'
+import { Icon } from '../ui/Icon'
 import { copyText } from '../ui/clipboard'
 import { IconButton } from '../ui/IconButton'
 import { TextField } from '../ui/TextField'
+import { requestNewRoom } from './rooms'
 import './RoomsList.css'
 
 /** Same limit the server enforces. */
@@ -54,8 +56,8 @@ export function RoomsList({
 
   return (
     <div className="rooms-list">
-      {/* "Nueva sala" is the header's, on every screen: it opens the form here. */}
       <div className="rooms-list__bar">
+        <NewRoomButton />
         <CompactJoin />
       </div>
       {creating}
@@ -76,6 +78,23 @@ export function RoomsList({
           ),
       )}
     </div>
+  )
+}
+
+/** "Nueva sala": opens the create form above the list, focused, each time it is pressed. Locked while Impersonating. */
+function NewRoomButton() {
+  const { t } = useI18n()
+  const noRooms = useImpersonationLock('rooms')
+  return (
+    <Button
+      variant="primary"
+      aria-label={noRooms ? t('header.newRoom') : undefined}
+      disabledReason={noRooms}
+      onClick={requestNewRoom}
+    >
+      <Icon name="add" size={14} />
+      {t('header.newRoom')}
+    </Button>
   )
 }
 

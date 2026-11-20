@@ -103,7 +103,7 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 
 **H1.1 — Create a Room.** As the player organising the session, I want to create a Room with a name, so I have somewhere to call the group to.
 
-- I create it on the **Salas** screen (`/rooms`). The **Nueva sala** button in the header takes me there from any screen with the shared header (H8.9), with the name field ready.
+- I create it on the **Salas** screen (`/rooms`): with no open Room the create panel is there; with some, **Nueva sala** above the list opens the form, the name field ready. Home's **Salas** card's **Nueva sala** takes me there the same way (H8.9 no longer has it in the header).
 - Creating a Room needs an Account, and **Salas** is only reached with one; without it I am sent to `/login`.
 - On creation I become the Master automatically.
 - The name allows up to 60 characters.
@@ -601,7 +601,8 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
 
-- Home, the Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, which leads to Home, **Inicio**, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, **Nueva sala** and the avatar menu.
+- Home, the Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, which leads to Home, **Inicio**, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, and the avatar menu. **Nueva sala** is not in the header: Rooms are created from **Salas** and Home's **Salas** card.
+- An Administrator also has a shield button just left of the avatar, leading to the panel and marked while in it; **Administración** is not in the avatar's menu.
 - On a phone the six sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
@@ -962,7 +963,7 @@ Home is an Account's first screen, called **Inicio**: one card per section, so t
 
 ## E10 · Administration
 
-Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administrator is an Account named as one in the server's configuration (`ADMINISTRATOR_EMAILS`), never from Runout itself. They have **Administración** in the header's menu, leading to `/admin` with three tabs, each its own route. For anyone else neither the entry nor `/admin` exists: the path leads nowhere, as any unknown path does.
+Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administrator is an Account named as one in the server's configuration (`ADMINISTRATOR_EMAILS`), never from Runout itself. They have a shield button labelled **Administración** in the header, leading to `/admin` with three tabs, each its own route. For anyone else neither the entry nor `/admin` exists: the path leads nowhere, as any unknown path does.
 
 **H10.1 — Invitations.** As an Administrator, I want to choose who can create an Account.
 
