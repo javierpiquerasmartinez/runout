@@ -5,37 +5,39 @@ import { goalsPath } from '../goals/goals'
 import { homePath } from '../home/home'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
-import { useImpersonationLock } from '../identity/impersonationLock'
 import { useSignOut } from '../identity/useSignOut'
 import { labAnalysisPath } from '../lab/lab'
 import { libraryPath } from '../library/library'
 import { roomPath } from '../room/roomCode'
-import { requestNewRoom, roomsPath } from '../rooms/rooms'
+import { roomsPath } from '../rooms/rooms'
 import { followLink } from '../routing'
 import { settingsPath } from '../settings/paths'
 import { supportPath } from '../support/paths'
 import { Avatar } from '../ui/Avatar'
 import { Brand } from '../ui/Brand'
-import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import './AppHeader.css'
 
 /** The screens of the header's navigation. */
 type Section = 'home' | 'library' | 'rooms' | 'lab' | 'calendar' | 'goals'
 
+/** Where the header can mark the person as being: a section, or the Administrator panel. */
+type Current = Section | 'admin'
+
 /**
  * The header of the Account side (Home, the Library, the Rooms screen, the Lab, the Calendar, Goals, Settings) and of
  * Settings opened from a Room. An Account gets the brand leading to its
  * Home, the navigation with the `current` section marked, `where` for a
- * screen outside it, a way back (to a Room still held, say), "Nueva sala" and
- * the avatar's menu. An anonymous Participant gets only the brand, `where`
- * and the way back: no Library, no Rooms to create, no Sign-in to end.
+ * screen outside it, a way back (to a Room still held, say), an Administrator's
+ * button to the panel (marked when `current` is `admin`) and the avatar's menu.
+ * Rooms are created from the Rooms screen and Home, not here. An anonymous
+ * Participant gets only the brand, `where` and the way back: no Library, no
+ * panel, no Sign-in to end.
  */
-export function AppHeader({ current, where, back }: { current?: Section; where?: string; back?: ReactNode }) {
+export function AppHeader({ current, where, back }: { current?: Current; where?: string; back?: ReactNode }) {
   const { t } = useI18n()
   const { identity } = useIdentity()
   const account = Boolean(identity.account)
-  const noRooms = useImpersonationLock('rooms')
   return (
     <header className="app-header">
       {account ? <Brand href={homePath} label={t('header.brandToHome')} /> : <Brand />}
@@ -45,19 +47,7 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
       {where && <span className="app-header__where">{where}</span>}
       <span className="app-header__spacer" />
       {back}
-      {account && (
-        <Button
-          variant="primary"
-          size="compact"
-          className="app-header__new-room"
-          aria-label={noRooms ? t('header.newRoom') : undefined}
-          disabledReason={noRooms}
-          onClick={requestNewRoom}
-        >
-          <Icon name="add" size={14} />
-          <span className="app-header__new-room-label">{t('header.newRoom')}</span>
-        </Button>
-      )}
+      {account && identity.administrator && <AdministratorButton current={current === 'admin'} />}
       {account && <AccountMenu />}
     </header>
   )
@@ -68,7 +58,7 @@ export function AppHeader({ current, where, back }: { current?: Section; where?:
  * in marked. Where they don't all fit (a phone), they scroll sideways, opening
  * with the current one in view, and fade out on the side where more are hidden.
  */
-function SectionNav({ current }: { current?: Section }) {
+function SectionNav({ current }: { current?: Current }) {
   const { t } = useI18n()
   const nav = useRef<HTMLElement>(null)
 
@@ -129,6 +119,24 @@ export function BackToRoom({ code, name }: { code: string; name: string }) {
   )
 }
 
+/** The Administrator's way to the panel: the shield, marked while in it. */
+function AdministratorButton({ current }: { current: boolean }) {
+  const { t } = useI18n()
+  const label = t('header.administration')
+  return (
+    <a
+      href={adminPath}
+      className="app-header__administrator ro-touch-target"
+      aria-label={label}
+      title={label}
+      aria-current={current ? 'page' : undefined}
+      onClick={followLink}
+    >
+      <Icon name="administration" size={16} />
+    </a>
+  )
+}
+
 /** The avatar, opening onto the Display Name, Support (for Accounts that aren't Administrators), Settings and signing out. */
 function AccountMenu() {
   const { t } = useI18n()
@@ -171,19 +179,6 @@ function AccountMenu() {
         <div id={menuId} className="app-header__menu" role="group" aria-label={t('header.accountMenu')}>
           <span className="app-header__menu-name">{name}</span>
           <hr className="app-header__menu-rule" />
-          {identity.administrator && (
-            <a
-              href={adminPath}
-              className="app-header__menu-item"
-              onClick={(event) => {
-                setOpen(false)
-                followLink(event)
-              }}
-            >
-              <Icon name="administration" size={16} />
-              {t('header.administration')}
-            </a>
-          )}
           {!identity.administrator && (
             <a
               href={supportPath}
