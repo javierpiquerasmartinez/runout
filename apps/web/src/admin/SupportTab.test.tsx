@@ -112,7 +112,7 @@ describe('The panel · Support tab', () => {
     expect(screen.queryByRole('link', { name: 'Winamax hands miss the final pot' })).toBeNull()
     await userEvent.click(within(filter).getByRole('radio', { name: 'Open' }))
     await waitFor(() => expect(new URLSearchParams(calls.at(-1)?.search).get('status')).toBe('open'))
-    expect(new URLSearchParams(calls[0].search).get('status')).toBe('all')
+    expect(new URLSearchParams(calls.find((call) => call.path === '/admin/support/tickets')?.search).get('status')).toBe('all')
   })
 
   it('closes a Ticket from its page, saying that writing in it opens it again', async () => {

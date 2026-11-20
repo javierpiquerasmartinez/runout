@@ -38,6 +38,8 @@ export interface AccountMessage {
   from: AccountSide;
   text: string;
   writtenAt: Date;
+  /** Whether it is from Runout and the Account had not read it before this read of the thread. */
+  unread: boolean;
 }
 
 /** A Support Ticket as its Account lists it. */
@@ -48,6 +50,8 @@ export interface AccountTicketSummary {
   createdAt: Date;
   /** Who wrote last and when. */
   lastMessage: { from: AccountSide; writtenAt: Date };
+  /** Whether it has a Support Message from Runout the Account hasn't read. */
+  unread: boolean;
 }
 
 /** A Support Ticket and its whole thread, as its Account reads it. */
@@ -64,6 +68,16 @@ export interface AccountTicket {
 /** The Account's Support Tickets, Open ones first, the latest written in on top. */
 export interface AccountTicketList {
   tickets: AccountTicketSummary[];
+}
+
+/** How many of the Account's Support Tickets have a Support Message from Runout it hasn't read. */
+export interface AccountUnreadCount {
+  unread: number;
+}
+
+/** How many Open Support Tickets wait for an answer, the same for every Administrator. */
+export interface PanelWaitingCount {
+  waiting: number;
 }
 
 /** Who wrote a Support Message, as the panel shows it: the Account, or which Administrator. */
@@ -162,6 +176,16 @@ const lastWrittenAt = sql<Date>`(select max(m.written_at) from support_messages 
 const accountWroteLast = sql<boolean>`(select m.administrator_id is null from support_messages m where m.ticket_id = support_tickets.id order by m.seq desc limit 1)`;
 
 /**
+ * Whether the Ticket has a Support Message from Runout after the last one its
+ * Account read. One it never read counts from the start, so a Ticket an
+ * Administrator opened is unread until the Account opens it.
+ */
+const unreadByAccount = sql<boolean>`exists (select 1 from support_messages m where m.ticket_id = support_tickets.id and m.administrator_id is not null and m.seq > coalesce(support_tickets.account_read_seq, 0))`;
+
+/** Open, with the Account's Support Message last: waiting for the Administrators' answer. */
+const waitingForAdministrators = sql<boolean>`(support_tickets.status = 'open' and ${accountWroteLast})`;
+
+/**
  * Support: Support Tickets between an Account and the Administrators, and
  * their Support Messages. It has two sides: the Account's, over its own
  * Tickets and never while Impersonated, where every Administrator signs
@@ -184,6 +208,7 @@ export class SupportService {
         ticket: supportTickets,
         lastWrittenAt: lastWrittenAt.mapWith(supportMessages.writtenAt),
         accountWroteLast,
+        unread: unreadByAccount,
       })
       .from(supportTickets)
       .where(eq(supportTickets.identityId, account.id))
@@ -193,17 +218,32 @@ export class SupportService {
         asc(supportTickets.id),
       );
     return {
-      tickets: rows.map(({ ticket, lastWrittenAt, accountWroteLast }) => ({
-        id: ticket.id,
-        subject: ticket.subject,
-        status: ticket.status,
-        createdAt: ticket.createdAt,
-        lastMessage: {
-          from: accountWroteLast ? 'account' : 'runout',
-          writtenAt: lastWrittenAt,
-        },
-      })),
+      tickets: rows.map(
+        ({ ticket, lastWrittenAt, accountWroteLast, unread }) => ({
+          id: ticket.id,
+          subject: ticket.subject,
+          status: ticket.status,
+          createdAt: ticket.createdAt,
+          lastMessage: {
+            from: accountWroteLast ? 'account' : 'runout',
+            writtenAt: lastWrittenAt,
+          },
+          unread,
+        }),
+      ),
     };
+  }
+
+  /** How many of the Account's Support Tickets have a Support Message from Runout it hasn't read. */
+  async unreadForAccount(account: Identity): Promise<AccountUnreadCount> {
+    refuseImpersonation(account);
+    const [{ unread }] = await this.db
+      .select({
+        unread: sql<number>`(count(*) filter (where ${unreadByAccount}))::int`,
+      })
+      .from(supportTickets)
+      .where(eq(supportTickets.identityId, account.id));
+    return { unread };
   }
 
   /** Opens a Support Ticket with a subject and its first Support Message; it is Open. */
@@ -216,7 +256,11 @@ export class SupportService {
     return this.readForAccount(account, ticketId);
   }
 
-  /** One of the Account's Support Tickets with its thread; anyone else's is `support-ticket-not-found`. */
+  /**
+   * One of the Account's Support Tickets with its thread; anyone else's is
+   * `support-ticket-not-found`. The Account reads it, so it is no longer
+   * unread; each Support Message says whether it was unread before.
+   */
   async readForAccount(
     account: Identity,
     ticketId: string,
@@ -227,6 +271,14 @@ export class SupportService {
       eq(supportTickets.identityId, account.id),
     );
     const messages = await this.messagesOf(ticket.id);
+    const readSeq = ticket.accountReadSeq ?? 0;
+    const lastSeq = messages.at(-1)?.seq;
+    if (lastSeq !== undefined && lastSeq > readSeq) {
+      await this.db
+        .update(supportTickets)
+        .set({ accountReadSeq: lastSeq })
+        .where(eq(supportTickets.id, ticket.id));
+    }
     return {
       id: ticket.id,
       subject: ticket.subject,
@@ -238,6 +290,7 @@ export class SupportService {
         from: message.administratorId ? 'runout' : 'account',
         text: message.text,
         writtenAt: message.writtenAt,
+        unread: message.administratorId !== null && message.seq > readSeq,
       })),
     };
   }
@@ -297,7 +350,7 @@ export class SupportService {
       this.db
         .select({
           total: sql<number>`(count(*) filter (where ${kept ?? sql`true`}))::int`,
-          waiting: sql<number>`(count(*) filter (where ${open} and ${accountWroteLast}))::int`,
+          waiting: sql<number>`(count(*) filter (where ${waitingForAdministrators}))::int`,
         })
         .from(supportTickets),
       this.db
@@ -347,6 +400,20 @@ export class SupportService {
         },
       })),
     };
+  }
+
+  /**
+   * How many Open Support Tickets wait for an answer: those whose last
+   * Support Message is the Account's. Every Administrator sees the same
+   * count, and one answering lowers it for all.
+   */
+  async waitingForPanel(): Promise<PanelWaitingCount> {
+    const [{ waiting }] = await this.db
+      .select({
+        waiting: sql<number>`(count(*) filter (where ${waitingForAdministrators}))::int`,
+      })
+      .from(supportTickets);
+    return { waiting };
   }
 
   /** Any Support Ticket with its thread, each Support Message showing who wrote it. */

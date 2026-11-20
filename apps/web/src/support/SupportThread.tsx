@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { Avatar } from '../ui/Avatar'
@@ -22,32 +22,45 @@ export interface ThreadEntry {
   writtenAt: string
 }
 
-/** A Support Ticket's thread, in the order it was written, each message with its writer and when. */
-export function SupportThread({ entries }: { entries: ThreadEntry[] }) {
-  const { formatDate } = useI18n()
+/**
+ * A Support Ticket's thread, in the order it was written, each message with
+ * its writer and when; "Nuevo" sets apart those from `newFrom` on, the ones
+ * not yet read.
+ */
+export function SupportThread({ entries, newFrom }: { entries: ThreadEntry[]; newFrom?: string }) {
+  const { t, formatDate } = useI18n()
   return (
     <div className="support-thread">
       {entries.map((entry) => (
-        <article key={entry.id} className="support-message" data-runout={entry.fromRunout || undefined}>
-          {entry.mark.kind === 'runout' ? (
-            <span className="support-message__brand" aria-hidden="true">
-              <BrandMark size={16} />
-            </span>
-          ) : (
-            <Avatar name={entry.name} seed={entry.mark.seed} size={28} />
-          )}
-          <div className="support-message__body">
-            <div className="support-message__head">
-              <h3 className="support-message__writer">{entry.name}</h3>
-              {entry.tag && <span className="support-message__tag">{entry.tag}</span>}
-              <span className="support-message__spacer" />
-              <time className="support-message__time ro-mono" dateTime={entry.writtenAt}>
-                {formatDate(new Date(entry.writtenAt), { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-              </time>
+        <Fragment key={entry.id}>
+          {entry.id === newFrom && (
+            <div className="support-thread__new ro-mono" role="separator" aria-label={t('support.newMessages')}>
+              <span className="support-thread__new-rule" />
+              {t('support.newDivider')}
+              <span className="support-thread__new-rule" />
             </div>
-            <p className="support-message__text">{entry.text}</p>
-          </div>
-        </article>
+          )}
+          <article className="support-message" data-runout={entry.fromRunout || undefined}>
+            {entry.mark.kind === 'runout' ? (
+              <span className="support-message__brand" aria-hidden="true">
+                <BrandMark size={16} />
+              </span>
+            ) : (
+              <Avatar name={entry.name} seed={entry.mark.seed} size={28} />
+            )}
+            <div className="support-message__body">
+              <div className="support-message__head">
+                <h3 className="support-message__writer">{entry.name}</h3>
+                {entry.tag && <span className="support-message__tag">{entry.tag}</span>}
+                <span className="support-message__spacer" />
+                <time className="support-message__time ro-mono" dateTime={entry.writtenAt}>
+                  {formatDate(new Date(entry.writtenAt), { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </time>
+              </div>
+              <p className="support-message__text">{entry.text}</p>
+            </div>
+          </article>
+        </Fragment>
       ))}
     </div>
   )

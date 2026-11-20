@@ -1037,6 +1037,13 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - A Suspended Account gets none. There is no opting out. A failed send is logged, and the message stays written.
 - The composers say so: "Runout te responderá aquí y por correo." on my side, and "… lo verá firmado como Runout y le llegará un correo." in the panel.
 
+**H14.6 — Unread answers and the waiting count.** As an Account, I want to notice Runout's answers without opening Support; as an Administrator, I want to know when someone is waiting for us.
+
+- While any of my Tickets has a message from Runout I haven't read, my avatar carries a brass dot and **Soporte** in its menu says how many ("1 nueva"). In my list those Tickets have a dot, a bold subject and **Respuesta nueva**. My own messages are never unread.
+- Opening a Ticket's page reads it: the dot and the mark go, and the messages I hadn't read stay set apart under **Nuevo** while the page is open. A Ticket I have never opened counts all of Runout's messages as unread, so one an Administrator opens with me starts unread.
+- The Administrator's button in the header carries the number of Open Tickets whose last message is the Account's, hidden at zero. The count is the same for every Administrator, with no read state of their own: once one answers or closes a Ticket it drops for all.
+- The avatar's mark and the button's count are read when a page opens and every minute after (at once after reading an unread answer, or answering from the panel); my list is read again every 15 seconds. Nothing is read while I am Impersonated, and an Administrator has neither the mark nor Soporte.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.
