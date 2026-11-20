@@ -18,6 +18,7 @@ import type { Identity } from '../identity/identity.service.js';
 import {
   SupportService,
   type NewMessageBody,
+  type NewPanelTicketBody,
   type PanelTicket,
   type PanelTicketPage,
   type PanelWaitingCount,
@@ -49,6 +50,18 @@ export class SupportAdminController {
   @Header('Cache-Control', 'private, no-cache')
   async waiting(): Promise<PanelWaitingCount> {
     return this.support.waitingForPanel();
+  }
+
+  /**
+   * Opens a Support Ticket with an Account, its first Support Message
+   * signed Runout towards it; refused for a Suspended Account.
+   */
+  @Post()
+  async open(
+    @Administrator() administrator: Identity,
+    @Body() body: NewPanelTicketBody = {},
+  ): Promise<PanelTicket> {
+    return this.support.openForPanel(administrator, body);
   }
 
   /** Any Support Ticket and its thread, showing which Administrator wrote each message. */

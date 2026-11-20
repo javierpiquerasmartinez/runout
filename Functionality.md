@@ -1024,7 +1024,20 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - Writing in a Closed Ticket, from either side, opens it again with the same **Enviar**; nothing else does.
 - My list keeps the Open ones above the Closed ones, and the panel's Support tab puts the Closed ones last.
 
-**H14.4 — Unread answers and the waiting count.** As an Account, I want to notice Runout's answers without opening Support; as an Administrator, I want to know when someone is waiting for us.
+**H14.4 — Opening a Ticket from the panel.** As an Administrator, I want to reach an Account from Runout about something of its own.
+
+- Every row of the Accounts tab ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
+- A Suspended Account can't be given a new Ticket: the server refuses it, and on its row **Abrir incidencia** is locked with "Esta cuenta está suspendida". Its existing Tickets stay readable and answerable from the panel.
+
+**H14.5 — Support emails.** As either side, I want to hear about Support even when I'm not in Runout.
+
+- Every Administrator in the server's configuration gets an email, in their Account's language (the default one before they have an Account), when an Account opens a Ticket ("Nueva incidencia: …") or writes in one ("Nuevo mensaje en una incidencia: …"), naming the Account and linking to the Ticket's page in the panel.
+- The Account gets an email in the language of its Preferences when an Administrator opens a Ticket with it ("Runout ha abierto una incidencia contigo: …"), writes in one of its Tickets ("Runout te ha respondido: …") or closes it ("Runout ha cerrado tu incidencia: …"), linking to the Ticket's page on its side. Closing a Ticket already Closed sends nothing, and neither does the Account closing its own.
+- Every email carries the Ticket's subject and a short excerpt (about 140 characters, on one line, cut at a word with "…") of the message it is about (for a closing, the last one), never the whole message; an answer is written in Runout, not by replying to the email.
+- A Suspended Account gets none. There is no opting out. A failed send is logged, and the message stays written.
+- The composers say so: "Runout te responderá aquí y por correo." on my side, and "… lo verá firmado como Runout y le llegará un correo." in the panel.
+
+**H14.6 — Unread answers and the waiting count.** As an Account, I want to notice Runout's answers without opening Support; as an Administrator, I want to know when someone is waiting for us.
 
 - While any of my Tickets has a message from Runout I haven't read, my avatar carries a brass dot and **Soporte** in its menu says how many ("1 nueva"). In my list those Tickets have a dot, a bold subject and **Respuesta nueva**. My own messages are never unread.
 - Opening a Ticket's page reads it: the dot and the mark go, and the messages I hadn't read stay set apart under **Nuevo** while the page is open. A Ticket I have never opened counts all of Runout's messages as unread, so one an Administrator opens with me starts unread.

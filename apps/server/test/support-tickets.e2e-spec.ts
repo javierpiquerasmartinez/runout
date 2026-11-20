@@ -415,6 +415,29 @@ describe('Support Tickets (e2e)', () => {
       ]);
     });
 
+    it('starts a Ticket an Administrator opened unread for its Account', async () => {
+      const { body: opened } = await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: 'Tu importación',
+          message: 'Hola. Lo estamos revisando.',
+        })
+        .expect(201);
+
+      expect(await unreadCount(ana.token)).toEqual({ unread: 1 });
+      expect(await listed(ana.token, opened.id)).toMatchObject({
+        unread: true,
+      });
+      const { body } = await as(ana.token)
+        .get(`/support/tickets/${opened.id}`)
+        .expect(200);
+      expect(body.messages).toEqual([
+        expect.objectContaining({ from: 'runout', unread: true }),
+      ]);
+      expect(await unreadCount(ana.token)).toEqual({ unread: 0 });
+    });
+
     it('refuses the unread count while Impersonating', async () => {
       const {
         body: { token },
@@ -665,11 +688,118 @@ describe('Support Tickets (e2e)', () => {
         .expect(201);
     });
 
+    it('opens a Ticket with an Account, which it sees from Runout in its list', async () => {
+      const opened = await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: '  Tu importación  ',
+          message: 'Hola. Lo estamos revisando.',
+        })
+        .expect(201);
+
+      expect(opened.body).toMatchObject({
+        account: { id: ana.id, email: anaEmail },
+        subject: 'Tu importación',
+        status: 'open',
+        waitingFor: 'account',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        openedBy: { id: administrator.id, email: ADMINISTRATOR_EMAIL },
+        messages: [
+          {
+            from: 'administrator',
+            writer: { id: administrator.id, email: ADMINISTRATOR_EMAIL },
+            text: 'Hola. Lo estamos revisando.',
+          },
+        ],
+      });
+      const { body: panel } = await as(administrator.token)
+        .get('/admin/support/tickets')
+        .expect(200);
+      expect(
+        panel.tickets.find(
+          (ticket: { id: string }) => ticket.id === opened.body.id,
+        ),
+      ).toMatchObject({ openedBy: { id: administrator.id } });
+
+      const { body: list } = await as(ana.token)
+        .get('/support/tickets')
+        .expect(200);
+      expect(list.tickets).toEqual([
+        expect.objectContaining({
+          id: opened.body.id,
+          subject: 'Tu importación',
+          lastMessage: {
+            from: 'runout',
+            writtenAt: '2026-01-01T00:00:00.000Z',
+          },
+        }),
+      ]);
+      const { body: thread } = await as(ana.token)
+        .get(`/support/tickets/${opened.body.id}`)
+        .expect(200);
+      expect(thread).toMatchObject({
+        openedBy: 'runout',
+        messages: [{ from: 'runout', text: 'Hola. Lo estamos revisando.' }],
+      });
+      expect(JSON.stringify(thread)).not.toContain(ADMINISTRATOR_EMAIL);
+    });
+
+    it('refuses to open a Ticket without a subject or a message, or with no such Account', async () => {
+      const opening = (body: object) =>
+        as(administrator.token).post('/admin/support/tickets').send(body);
+
+      await opening({
+        accountId: ana.id,
+        subject: ' ',
+        message: 'Hola',
+      }).expect(400, { reason: 'invalid-support-subject' });
+      await opening({ accountId: ana.id, subject: 'Hola', message: '' }).expect(
+        400,
+        { reason: 'invalid-support-message' },
+      );
+      for (const accountId of [
+        undefined,
+        'not-an-account',
+        crypto.randomUUID(),
+      ]) {
+        await opening({ accountId, subject: 'Hola', message: 'Hola' }).expect(
+          404,
+          { reason: 'not-found' },
+        );
+      }
+      const { body } = await as(ana.token).get('/support/tickets').expect(200);
+      expect(body.tickets).toEqual([]);
+    });
+
+    it('refuses to open a new Ticket with a Suspended Account', async () => {
+      await as(administrator.token)
+        .post(`/admin/accounts/${ana.id}/suspension`)
+        .expect(204);
+
+      await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({ accountId: ana.id, subject: 'Hola', message: 'Hola' })
+        .expect(403, { reason: 'support-account-suspended' });
+
+      const { body } = await as(administrator.token)
+        .get('/admin/support/tickets')
+        .expect(200);
+      expect(
+        body.tickets.filter(
+          (ticket: { account: { id: string } }) => ticket.account.id === ana.id,
+        ),
+      ).toEqual([]);
+    });
+
     it('is not there for anyone but an Administrator', async () => {
       const ticket = await open(ana.token);
 
       for (const refused of [
         as(ana.token).get('/admin/support/tickets'),
+        as(ana.token)
+          .post('/admin/support/tickets')
+          .send({ accountId: ana.id, subject: 'Hola', message: 'Hola' }),
         as(ana.token).get(`/admin/support/tickets/${ticket.id}`),
         as(ana.token)
           .post(`/admin/support/tickets/${ticket.id}/messages`)

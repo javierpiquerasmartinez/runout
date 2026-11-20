@@ -16,7 +16,9 @@ import {
 } from '../identity/identity.service.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from '../admin/admin-query.js';
+import { isAccount } from '../admin/accounts.service.js';
 import { Rejected } from '../rejection/rejection.js';
+import { SupportEmail } from './support-email.js';
 
 /** How long a Support Ticket's subject may be, in characters, once trimmed. */
 export const MAX_SUPPORT_SUBJECT_LENGTH = 120;
@@ -146,6 +148,11 @@ export interface NewTicketBody {
   message?: unknown;
 }
 
+/** What an Administrator opening a Support Ticket sends: the Account it is with, too. */
+export interface NewPanelTicketBody extends NewTicketBody {
+  accountId?: unknown;
+}
+
 /** What writing in a Support Ticket sends. */
 export interface NewMessageBody {
   text?: unknown;
@@ -190,6 +197,7 @@ export class SupportService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly email: SupportEmail,
   ) {}
 
   /** The Account's Support Tickets, Open ones first, the latest written in on top. */
@@ -244,24 +252,7 @@ export class SupportService {
     body: NewTicketBody,
   ): Promise<AccountTicket> {
     refuseImpersonation(account);
-    const subject = subjectOf(body.subject);
-    const text = messageOf(body.message);
-    const now = this.clock.now();
-    const ticketId = await this.db.transaction(async (tx) => {
-      const [ticket] = await tx
-        .insert(supportTickets)
-        .values({
-          identityId: account.id,
-          subject,
-          status: 'open',
-          createdAt: now,
-        })
-        .returning({ id: supportTickets.id });
-      await tx
-        .insert(supportMessages)
-        .values({ ticketId: ticket.id, text, writtenAt: now });
-      return ticket.id;
-    });
+    const ticketId = await this.open(account.id, null, body);
     return this.readForAccount(account, ticketId);
   }
 
@@ -315,7 +306,13 @@ export class SupportService {
       ticketId,
       eq(supportTickets.identityId, account.id),
     );
-    await this.write(ticket.id, null, messageOf(body.text));
+    const text = messageOf(body.text);
+    await this.write(ticket.id, null, text);
+    await this.email.toAdministrators('written', account.id, {
+      id: ticket.id,
+      subject: ticket.subject,
+      message: text,
+    });
     return this.readForAccount(account, ticket.id);
   }
 
@@ -448,6 +445,31 @@ export class SupportService {
     };
   }
 
+  /**
+   * An Administrator opens a Support Ticket with an Account, writing its
+   * first Support Message; the Account sees it from Runout. Never with a
+   * Suspended Account (`support-account-suspended`), nor with no such
+   * Account (`not-found`).
+   */
+  async openForPanel(
+    administrator: Identity,
+    body: NewPanelTicketBody,
+  ): Promise<PanelTicket> {
+    const [account] = isUuid(body.accountId)
+      ? await this.db
+          .select({ id: identities.id, suspendedAt: identities.suspendedAt })
+          .from(identities)
+          .where(and(eq(identities.id, body.accountId), isAccount))
+      : [];
+    if (!account) throw new Rejected('not-found');
+    if (account.suspendedAt !== null) {
+      throw new Rejected('support-account-suspended');
+    }
+    return this.readForPanel(
+      await this.open(account.id, administrator.id, body),
+    );
+  }
+
   /** An Administrator writes in any Support Ticket, a Suspended Account's included. */
   async writeForPanel(
     administrator: Identity,
@@ -455,15 +477,66 @@ export class SupportService {
     body: NewMessageBody,
   ): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    await this.write(ticket.id, administrator.id, messageOf(body.text));
+    const text = messageOf(body.text);
+    await this.write(ticket.id, administrator.id, text);
+    await this.email.toAccount('written', ticket.identityId, {
+      id: ticket.id,
+      subject: ticket.subject,
+      message: text,
+    });
     return this.readForPanel(ticket.id);
   }
 
   /** An Administrator closes any Support Ticket, so it stops counting as pending. */
   async closeForPanel(ticketId: string): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    await this.close(ticket.id);
+    if (await this.close(ticket.id)) {
+      const last = (await this.messagesOf(ticket.id)).at(-1);
+      await this.email.toAccount('closed', ticket.identityId, {
+        id: ticket.id,
+        subject: ticket.subject,
+        message: last?.text ?? '',
+      });
+    }
     return this.readForPanel(ticket.id);
+  }
+
+  /**
+   * Opens an Open Support Ticket with the Account and its first Support
+   * Message, written by the Administrator who opens it, or by the Account
+   * when `administratorId` is null.
+   */
+  private async open(
+    accountId: string,
+    administratorId: string | null,
+    body: NewTicketBody,
+  ): Promise<string> {
+    const subject = subjectOf(body.subject);
+    const text = messageOf(body.message);
+    const now = this.clock.now();
+    const ticketId = await this.db.transaction(async (tx) => {
+      const [ticket] = await tx
+        .insert(supportTickets)
+        .values({
+          identityId: accountId,
+          subject,
+          status: 'open',
+          openedByAdministratorId: administratorId,
+          createdAt: now,
+        })
+        .returning({ id: supportTickets.id });
+      await tx
+        .insert(supportMessages)
+        .values({ ticketId: ticket.id, administratorId, text, writtenAt: now });
+      return ticket.id;
+    });
+    const mention = { id: ticketId, subject, message: text };
+    if (administratorId) {
+      await this.email.toAccount('opened', accountId, mention);
+    } else {
+      await this.email.toAdministrators('opened', accountId, mention);
+    }
+    return ticketId;
   }
 
   /** Writes a Support Message; in a Closed Ticket it opens it again, since something is pending once more. */
@@ -486,12 +559,16 @@ export class SupportService {
     });
   }
 
-  /** Closes a Support Ticket; a Closed one stays as it is. */
-  private async close(ticketId: string): Promise<void> {
-    await this.db
+  /** Closes a Support Ticket; a Closed one stays as it is. Whether it was Open. */
+  private async close(ticketId: string): Promise<boolean> {
+    const closed = await this.db
       .update(supportTickets)
       .set({ status: 'closed' })
-      .where(eq(supportTickets.id, ticketId));
+      .where(
+        and(eq(supportTickets.id, ticketId), eq(supportTickets.status, 'open')),
+      )
+      .returning({ id: supportTickets.id });
+    return closed.length > 0;
   }
 
   /** The Support Ticket, if it is there and meets `scope`; `support-ticket-not-found` otherwise. */
