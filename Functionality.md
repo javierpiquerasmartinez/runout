@@ -1017,6 +1017,11 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - Whose turn it is is never stored: it is read from who wrote the last message.
 - A Ticket's page in the panel (`/admin/support/<id>`) shows the thread with which Administrator wrote each message, tagged "como Runout" (and "tú" for my own), the Account, and whether it waits for an answer or for the Account. Any Administrator writes in any Ticket, a Suspended Account's included; the Account sees it signed Runout.
 
+**H14.3 — Opening a Ticket from the panel.** As an Administrator, I want to reach an Account from Runout about something of its own.
+
+- Every row of the Accounts tab ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
+- A Suspended Account can't be given a new Ticket: the server refuses it, and on its row **Abrir incidencia** is locked with "Esta cuenta está suspendida". Its existing Tickets stay readable and answerable from the panel.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.

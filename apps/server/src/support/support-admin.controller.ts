@@ -16,6 +16,7 @@ import type { Identity } from '../identity/identity.service.js';
 import {
   SupportService,
   type NewMessageBody,
+  type NewPanelTicketBody,
   type PanelTicket,
   type PanelTicketPage,
 } from './support.service.js';
@@ -36,6 +37,18 @@ export class SupportAdminController {
     @Query() query: { page?: unknown; pageSize?: unknown },
   ): Promise<PanelTicketPage> {
     return this.support.listForPanel(query);
+  }
+
+  /**
+   * Opens a Support Ticket with an Account, its first Support Message
+   * signed Runout towards it; refused for a Suspended Account.
+   */
+  @Post()
+  async open(
+    @Administrator() administrator: Identity,
+    @Body() body: NewPanelTicketBody = {},
+  ): Promise<PanelTicket> {
+    return this.support.openForPanel(administrator, body);
   }
 
   /** Any Support Ticket and its thread, showing which Administrator wrote each message. */
