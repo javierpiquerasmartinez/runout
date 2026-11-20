@@ -5,8 +5,8 @@ import { useIdentity } from '../identity/context'
 import { useImpersonationLock } from '../identity/impersonationLock'
 import { Breadcrumb } from '../ui/Breadcrumb'
 import { SUPPORT_POLL_MS, supportPath, type AccountTicket } from './support'
-import { readTicket, writeInTicket } from './supportApi'
-import { SupportAside, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from './SupportThread'
+import { closeTicket, readTicket, writeInTicket } from './supportApi'
+import { SupportAside, SupportCloseButton, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from './SupportThread'
 import { usePolled } from './usePolled'
 import './Support.css'
 
@@ -14,7 +14,8 @@ import './Support.css'
  * One of the Account's Support Tickets: its thread in order, every
  * Administrator signed "Runout", and where to write the next message. It is
  * read again every so often while on screen, so answers turn up without a
- * reload. Locked while impersonating, and then nothing is read.
+ * reload. The Account closes it once settled, and writing in a Closed one
+ * opens it again. Locked while impersonating, and then nothing is read.
  */
 export function SupportTicketPage({ id }: { id: string }) {
   const { t, formatDate } = useI18n()
@@ -70,6 +71,10 @@ export function SupportTicketPage({ id }: { id: string }) {
                         : t('support.openedByYou', { date: day(ticket.createdAt) })}
                     </span>
                   </div>
+                  <p className="support-aside__muted">{ticket.status === 'open' ? t('support.closeHint') : t('support.closedHint')}</p>
+                  {ticket.status === 'open' && (
+                    <SupportCloseButton lockedReason={locked} onClose={async () => replace(await closeTicket(token, ticket.id))} />
+                  )}
                 </SupportAside>
               </div>
             </div>

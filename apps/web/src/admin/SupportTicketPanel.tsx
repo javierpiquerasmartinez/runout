@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { SUPPORT_POLL_MS, type PanelTicket } from '../support/support'
-import { SupportAside, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from '../support/SupportThread'
+import { SupportAside, SupportCloseButton, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from '../support/SupportThread'
 import { usePolled } from '../support/usePolled'
 import { Avatar } from '../ui/Avatar'
 import { Breadcrumb } from '../ui/Breadcrumb'
@@ -13,7 +13,8 @@ import '../support/Support.css'
 /**
  * A Support Ticket in the panel: its thread, each Support Message showing
  * which Administrator wrote it ("como Runout", as its Account sees it), its
- * Account, and whose turn it is. It is read again every so often while on
+ * Account, and whose turn it is; it is closed from here, and writing in a
+ * Closed one opens it again. It is read again every so often while on
  * screen, so what the Account writes turns up without a reload.
  */
 export function SupportTicketPanel({ id }: { id: string }) {
@@ -85,8 +86,11 @@ export function SupportTicketPanel({ id }: { id: string }) {
                     ))}
                 </div>
                 <p className="support-aside__muted">
-                  {t('admin.support.openedBy', { name: nameOf(ticket.openedBy ?? ticket.account), date: day(ticket.createdAt) })}
+                  {t('admin.support.openedBy', { name: nameOf(ticket.openedBy ?? ticket.account), date: day(ticket.createdAt) })} {t('admin.support.reopens')}
                 </p>
+                {ticket.status === 'open' && (
+                  <SupportCloseButton onClose={async () => replace(await admin<PanelTicket>(`/support/tickets/${ticket.id}/close`, { method: 'POST' }))} />
+                )}
               </SupportAside>
             </div>
           </div>

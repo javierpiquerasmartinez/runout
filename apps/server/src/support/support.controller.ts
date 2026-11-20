@@ -4,6 +4,8 @@ import {
   Get,
   Header,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
 } from '@nestjs/common';
@@ -74,6 +76,19 @@ export class SupportController {
       await this.authenticate(authorization),
       id,
       body,
+    );
+  }
+
+  /** Closes one of the Account's Support Tickets, answering with the thread; writing in it again opens it. */
+  @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
+  async close(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+  ): Promise<AccountTicket> {
+    return this.support.closeForAccount(
+      await this.authenticate(authorization),
+      id,
     );
   }
 
