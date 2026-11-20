@@ -148,7 +148,7 @@ describe('The panel · Support tab', () => {
     expect(articles.map((article) => within(article).getByRole('heading').textContent)).toEqual(['Ana', 'Tester B', 'Ana'])
     expect(within(articles[1]).getByText('as Runout')).toBeTruthy()
     expect(screen.getByText('Waiting for an answer')).toBeTruthy()
-    expect(screen.getByText('Ana will see it signed Runout.')).toBeTruthy()
+    expect(screen.getByText('Ana will see it signed Runout and get an email.')).toBeTruthy()
 
     await userEvent.type(screen.getByLabelText('Reply'), 'What time?')
     await userEvent.click(screen.getByRole('button', { name: 'Send' }))

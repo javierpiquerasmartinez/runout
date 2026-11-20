@@ -324,7 +324,7 @@ describe('the Accounts tab', () => {
     await userEvent.click(within(ana).getByRole('button', { name: 'Open ticket' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('heading').textContent).toBe('Open a ticket with ana')
-    expect(dialog.textContent).toContain('ana@x.com. They will see it in their Support, signed Runout.')
+    expect(dialog.textContent).toContain('ana@x.com. They will see it in their Support, signed Runout, and get an email.')
     const send = within(dialog).getByRole('button', { name: /^Open ticket/ })
     expect(send.getAttribute('aria-label')).toBe('Open ticket. Write a subject')
     await userEvent.type(within(dialog).getByLabelText('Subject'), 'Your import')
