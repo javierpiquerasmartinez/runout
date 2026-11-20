@@ -1,12 +1,13 @@
+import type { ReactNode } from 'react'
 import type { FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
-import type { Translator } from '../i18n/translator'
 import { isImportableFile, MAX_BULK_IMPORT_BYTES, MAX_BULK_IMPORT_FILES, percentOf } from '../library/bulkUpload'
 import { Wrapped } from '../library/ImportParts'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import type { ImportItem } from './importBatch'
+import { sizeLabel } from './sizeLabel'
 
 /*
  * The import dialog's Bulk Import: its files, what will happen to them, and
@@ -25,17 +26,6 @@ export type Bulk =
   | { phase: 'uploaded' }
   /** `upload` when storage refused a part; the same files continue on trying again. */
   | { phase: 'failed'; reason: FailureReason | 'upload' }
-
-/** "840 KB", "21,4 MB", "1,2 GB", in the reader's language. */
-function sizeLabel(bytes: number, formatNumber: Translator['formatNumber']): string {
-  const units = [
-    ['gigabyte', 1024 ** 3],
-    ['megabyte', 1024 ** 2],
-    ['kilobyte', 1024],
-  ] as const
-  const [unit, scale] = units.find(([, scale]) => bytes >= scale) ?? units[2]
-  return formatNumber(bytes / scale, { style: 'unit', unit, unitDisplay: 'short', maximumFractionDigits: 1 })
-}
 
 /** A Bulk Import's files: their names and sizes, with nothing read from them. */
 export function BulkFiles({
@@ -104,6 +94,7 @@ export function BulkFooter({
   onCancel,
   onUpload,
   onDone,
+  report,
 }: {
   bulk: Bulk
   files: ImportItem[]
@@ -111,6 +102,8 @@ export function BulkFooter({
   onCancel: () => void
   onUpload: () => void
   onDone: () => void
+  /** What offers to report a failed upload, given the failure as shown. */
+  report?: (failure: string) => ReactNode
 }) {
   const { t, formatNumber } = useI18n()
   const bytes = files.reduce((sum, file) => sum + file.size, 0)
@@ -166,6 +159,7 @@ export function BulkFooter({
           {failure}
         </p>
       )}
+      {failure && report?.(failure)}
       <span className="import-dialog__spacer" />
       {bulk.phase === 'uploaded' ? (
         <Button variant="primary" onClick={onDone}>
