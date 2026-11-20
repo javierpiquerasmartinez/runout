@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module.js';
 import { SupportAdminController } from './support-admin.controller.js';
 import { SupportController } from './support.controller.js';
+import { SupportEmail } from './support-email.js';
 import { SupportService } from './support.service.js';
 
 /**
@@ -12,6 +13,6 @@ import { SupportService } from './support.service.js';
 @Module({
   imports: [IdentityModule],
   controllers: [SupportController, SupportAdminController],
-  providers: [SupportService],
+  providers: [SupportService, SupportEmail],
 })
 export class SupportModule {}

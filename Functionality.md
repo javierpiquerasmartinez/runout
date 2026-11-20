@@ -1024,6 +1024,14 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - Writing in a Closed Ticket, from either side, opens it again with the same **Enviar**; nothing else does.
 - My list keeps the Open ones above the Closed ones, and the panel's Support tab puts the Closed ones last.
 
+**H14.4 — Support emails.** As either side, I want to hear about Support even when I'm not in Runout.
+
+- Every Administrator in the server's configuration gets an email, in their Account's language (the default one before they have an Account), when an Account opens a Ticket ("Nueva incidencia: …") or writes in one ("Nuevo mensaje en una incidencia: …"), naming the Account and linking to the Ticket's page in the panel.
+- The Account gets an email in the language of its Preferences when an Administrator writes in one of its Tickets ("Runout te ha respondido: …") or closes it ("Runout ha cerrado tu incidencia: …"), linking to the Ticket's page on its side. Closing a Ticket already Closed sends nothing, and neither does the Account closing its own.
+- Every email carries the Ticket's subject and a short excerpt (about 140 characters, on one line, cut at a word with "…") of the message it is about (for a closing, the last one), never the whole message; an answer is written in Runout, not by replying to the email.
+- A Suspended Account gets none. There is no opting out. A failed send is logged, and the message stays written.
+- The composers say so: "Runout te responderá aquí y por correo." on my side, and "… lo verá firmado como Runout y le llegará un correo." in the panel.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.

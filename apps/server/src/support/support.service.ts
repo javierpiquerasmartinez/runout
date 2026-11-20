@@ -17,6 +17,7 @@ import {
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from '../admin/admin-query.js';
 import { Rejected } from '../rejection/rejection.js';
+import { SupportEmail } from './support-email.js';
 
 /** How long a Support Ticket's subject may be, in characters, once trimmed. */
 export const MAX_SUPPORT_SUBJECT_LENGTH = 120;
@@ -166,6 +167,7 @@ export class SupportService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly email: SupportEmail,
   ) {}
 
   /** The Account's Support Tickets, Open ones first, the latest written in on top. */
@@ -222,6 +224,11 @@ export class SupportService {
         .values({ ticketId: ticket.id, text, writtenAt: now });
       return ticket.id;
     });
+    await this.email.toAdministrators('opened', account.id, {
+      id: ticketId,
+      subject,
+      message: text,
+    });
     return this.readForAccount(account, ticketId);
   }
 
@@ -262,7 +269,13 @@ export class SupportService {
       ticketId,
       eq(supportTickets.identityId, account.id),
     );
-    await this.write(ticket.id, null, messageOf(body.text));
+    const text = messageOf(body.text);
+    await this.write(ticket.id, null, text);
+    await this.email.toAdministrators('written', account.id, {
+      id: ticket.id,
+      subject: ticket.subject,
+      message: text,
+    });
     return this.readForAccount(account, ticket.id);
   }
 
@@ -388,14 +401,27 @@ export class SupportService {
     body: NewMessageBody,
   ): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    await this.write(ticket.id, administrator.id, messageOf(body.text));
+    const text = messageOf(body.text);
+    await this.write(ticket.id, administrator.id, text);
+    await this.email.toAccount('written', ticket.identityId, {
+      id: ticket.id,
+      subject: ticket.subject,
+      message: text,
+    });
     return this.readForPanel(ticket.id);
   }
 
   /** An Administrator closes any Support Ticket, so it stops counting as pending. */
   async closeForPanel(ticketId: string): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    await this.close(ticket.id);
+    if (await this.close(ticket.id)) {
+      const last = (await this.messagesOf(ticket.id)).at(-1);
+      await this.email.toAccount('closed', ticket.identityId, {
+        id: ticket.id,
+        subject: ticket.subject,
+        message: last?.text ?? '',
+      });
+    }
     return this.readForPanel(ticket.id);
   }
 
@@ -419,12 +445,16 @@ export class SupportService {
     });
   }
 
-  /** Closes a Support Ticket; a Closed one stays as it is. */
-  private async close(ticketId: string): Promise<void> {
-    await this.db
+  /** Closes a Support Ticket; a Closed one stays as it is. Whether it was Open. */
+  private async close(ticketId: string): Promise<boolean> {
+    const closed = await this.db
       .update(supportTickets)
       .set({ status: 'closed' })
-      .where(eq(supportTickets.id, ticketId));
+      .where(
+        and(eq(supportTickets.id, ticketId), eq(supportTickets.status, 'open')),
+      )
+      .returning({ id: supportTickets.id });
+    return closed.length > 0;
   }
 
   /** The Support Ticket, if it is there and meets `scope`; `support-ticket-not-found` otherwise. */
