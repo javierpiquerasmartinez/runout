@@ -5,15 +5,19 @@ import { SUPPORT_POLL_MS, type PanelTicket } from '../support/support'
 import { SupportAside, SupportCloseButton, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from '../support/SupportThread'
 import { usePolled } from '../support/usePolled'
 import { Avatar } from '../ui/Avatar'
+import { followLink } from '../routing'
+import { TicketBulkImportCard } from '../support/TicketBulkImport'
 import { Breadcrumb } from '../ui/Breadcrumb'
-import { adminTabPath, nameOf } from './admin'
+import { adminTabPath, nameOf, type Person } from './admin'
 import { useAdminApi } from './useAdminApi'
 import '../support/Support.css'
 
 /**
  * A Support Ticket in the panel: its thread, each Support Message showing
  * which Administrator wrote it ("como Runout", as its Account sees it), its
- * Account, and whose turn it is; it is closed from here, and writing in a
+ * Account, linked to it in Accounts (where it can be Impersonated), the
+ * Bulk Import it points at, linked to Imports, and whose turn it is; it is
+ * closed from here, and writing in a
  * Closed one opens it again. It is read again every so often while on
  * screen, so what the Account writes turns up without a reload.
  */
@@ -72,7 +76,19 @@ export function SupportTicketPanel({ id }: { id: string }) {
                     {ticket.account.email && <span className="admin-table__sub">{ticket.account.email}</span>}
                   </span>
                 </div>
+                <p className="support-aside__muted">{t('admin.support.accountHint')}</p>
+                <a className="ro-btn ro-btn--secondary ro-btn--compact" href={accountsPathFor(ticket.account)} onClick={followLink}>
+                  {t('admin.support.seeInAccounts')}
+                </a>
               </SupportAside>
+              {ticket.bulkImport && (
+                <SupportAside title={t('admin.support.bulkImport')}>
+                  <TicketBulkImportCard bulkImport={ticket.bulkImport} failureCode={ticket.bulkImport.failureCode} />
+                  <a className="ro-btn ro-btn--secondary ro-btn--compact" href={adminTabPath('imports')} onClick={followLink}>
+                    {t('admin.support.seeInImports')}
+                  </a>
+                </SupportAside>
+              )}
               <SupportAside title={t('support.state')}>
                 <div className="support-aside__row">
                   <SupportStatusBadge status={ticket.status} />
@@ -98,4 +114,10 @@ export function SupportTicketPanel({ id }: { id: string }) {
       )}
     </section>
   )
+}
+
+/** The Accounts tab searching for this Account, so that its row is the one there. */
+function accountsPathFor(account: Person): string {
+  const search = account.email ?? account.displayName
+  return search ? `${adminTabPath('accounts')}?${new URLSearchParams({ search })}` : adminTabPath('accounts')
 }

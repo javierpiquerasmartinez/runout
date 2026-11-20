@@ -43,6 +43,7 @@ function ticket(extra: Partial<AccountTicket> = {}): AccountTicket {
     status: 'open',
     openedBy: 'account',
     createdAt: '2026-11-18T10:02:00.000Z',
+    bulkImport: null,
     messages: [{ id: 'm1', from: 'account', text: 'The hero is another player.', writtenAt: '2026-11-18T10:02:00.000Z' }],
     ...extra,
   }
@@ -172,6 +173,42 @@ describe('Support · a Ticket’s thread', () => {
     await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
 
     expect(await screen.findByText('Looking into it.')).toBeTruthy()
+  })
+
+  it('shows the Bulk Import it points at, with the way to the Library’s imports', async () => {
+    fakeApi({
+      'GET /support/tickets/t1': () =>
+        Response.json(
+          ticket({
+            bulkImport: {
+              id: 'b1',
+              status: 'failed',
+              files: [{ name: 'sesiones-2023.zip', size: 1000 }],
+              total: 210_000,
+              processed: 58_000,
+              imported: 58_000,
+              reason: null,
+              createdAt: '2026-10-28T10:00:00.000Z',
+              finishedAt: '2026-10-28T11:00:00.000Z',
+            },
+          }),
+        ),
+    })
+    renderAt('/support/t1')
+
+    const about = await screen.findByRole('region', { name: 'About the import' })
+    const attached = within(about).getByRole('group', { name: 'sesiones-2023.zip' })
+    expect(attached.textContent).toContain('Failed')
+    expect(attached.textContent).toContain('Oct 28, 2026 · 58,000 of 210,000 hands')
+    expect(within(about).getByRole('link', { name: 'See imports' }).getAttribute('href')).toBe('/library/imports')
+  })
+
+  it('shows no Bulk Import for a generic Ticket', async () => {
+    fakeApi({ 'GET /support/tickets/t1': () => Response.json(ticket()) })
+    renderAt('/support/t1')
+
+    await screen.findAllByRole('article')
+    expect(screen.queryByRole('region', { name: 'About the import' })).toBeNull()
   })
 
   it('says so when the Ticket isn’t there', async () => {

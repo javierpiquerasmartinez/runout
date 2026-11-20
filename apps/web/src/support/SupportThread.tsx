@@ -166,9 +166,12 @@ export function SupportStatusBadge({ status }: { status: SupportTicketStatus }) 
 
 /** A box of the Ticket page's right-hand column. */
 export function SupportAside({ title, children }: { title: string; children: ReactNode }) {
+  const titleId = useId()
   return (
-    <section className="support-aside">
-      <h2 className="support-aside__title ro-mono">{title}</h2>
+    <section className="support-aside" aria-labelledby={titleId}>
+      <h2 id={titleId} className="support-aside__title ro-mono">
+        {title}
+      </h2>
       {children}
     </section>
   )

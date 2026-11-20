@@ -46,7 +46,8 @@ export class SupportAdminController {
 
   /**
    * Opens a Support Ticket with an Account, its first Support Message
-   * signed Runout towards it; refused for a Suspended Account.
+   * signed Runout towards it, pointing at one of its Bulk Imports when
+   * `bulkImportId` is given; refused for a Suspended Account.
    */
   @Post()
   async open(

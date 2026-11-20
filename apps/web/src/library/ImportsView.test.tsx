@@ -1,8 +1,11 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
 import type { Locale } from '../i18n/catalogue'
+import { SessionContext, type SessionContextValue } from '../identity/context'
+import { fakeApi } from '../test/fakeApi'
+import { fakeSession } from '../test/fakeSession'
 import type { BulkImport } from './bulkImports'
 import { ImportsView } from './ImportsView'
 
@@ -23,10 +26,22 @@ function bulkImport(overrides: Partial<BulkImport>): BulkImport {
   }
 }
 
-function renderImports(imports: BulkImport[], locale: Locale = 'es', onCancel: (id: string) => void = () => {}) {
+afterEach(() => {
+  vi.unstubAllGlobals()
+  window.history.replaceState(null, '', '/')
+})
+
+function renderImports(
+  imports: BulkImport[],
+  locale: Locale = 'es',
+  onCancel: (id: string) => void = () => {},
+  session: SessionContextValue = fakeSession(),
+) {
   render(
     <I18nProvider initialLocale={locale}>
-      <ImportsView imports={imports} onCancel={onCancel} />
+      <SessionContext.Provider value={session}>
+        <ImportsView imports={imports} onCancel={onCancel} />
+      </SessionContext.Provider>
     </I18nProvider>,
   )
   return screen.getByRole('table', { name: locale === 'es' ? 'Importaciones' : 'Imports' })
@@ -265,5 +280,78 @@ describe('ImportsView', () => {
     )
 
     expect(screen.getByText('Aún no has hecho ninguna importación grande.')).toBeTruthy()
+  })
+})
+
+describe('ImportsView · Reportar un problema', () => {
+  const failed = bulkImport({
+    id: 'b-failed',
+    status: 'failed',
+    files: [{ name: 'sesiones-2023.zip', size: 1000 }],
+    total: 210_000,
+    processed: 58_000,
+    imported: 58_000,
+    createdAt: '2026-10-28T10:00:00.000Z',
+  })
+
+  it('is offered where an import failed or ended early, and nowhere else', () => {
+    const table = renderImports(
+      [
+        failed,
+        bulkImport({ files: [{ name: 'lleno.zip', size: 1 }], reason: 'library-full', notImported: { 'library-full': 3 } }),
+        bulkImport({ files: [{ name: 'bien.zip', size: 1 }] }),
+        bulkImport({ files: [{ name: 'cancelada.zip', size: 1 }], status: 'cancelled' }),
+        bulkImport({ files: [{ name: 'en-curso.zip', size: 1 }], status: 'running', finishedAt: null }),
+      ],
+      'en',
+    )
+
+    const reports = (file: string) =>
+      within(within(table).getByRole('row', { name: new RegExp(file) })).queryAllByRole('button', { name: 'Report a problem' })
+    expect(reports('sesiones-2023.zip')).toHaveLength(1)
+    expect(reports('lleno.zip')).toHaveLength(1)
+    expect(reports('bien.zip')).toHaveLength(0)
+    expect(reports('cancelada.zip')).toHaveLength(0)
+    expect(reports('en-curso.zip')).toHaveLength(0)
+  })
+
+  it('opens a Ticket pointing at the import, with its subject prefilled, and goes to it', async () => {
+    const calls = fakeApi({ 'POST /support/tickets': () => Response.json({ id: 'ticket-1' }, { status: 201 }) })
+    const table = renderImports([failed], 'en')
+
+    await userEvent.click(within(table).getByRole('button', { name: 'Report a problem' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Report a problem' })
+    expect(dialog.textContent).toContain('The ticket will be attached to this import, so you don’t have to describe it.')
+    const attached = within(dialog).getByRole('group', { name: 'sesiones-2023.zip' })
+    expect(attached.textContent).toContain('Failed')
+    expect(attached.textContent).toContain('Oct 28, 2026 · 58,000 of 210,000 hands')
+    expect((within(dialog).getByLabelText('Subject') as HTMLInputElement).value).toBe('Problem with the import sesiones-2023.zip')
+    expect((within(dialog).getByLabelText('Message') as HTMLTextAreaElement).value).toBe('')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'It stopped halfway.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'POST')).toMatchObject({
+        path: '/support/tickets',
+        body: { subject: 'Problem with the import sesiones-2023.zip', message: 'It stopped halfway.', bulkImportId: 'b-failed' },
+      }),
+    )
+    await waitFor(() => expect(window.location.pathname).toBe('/support/ticket-1'))
+  })
+
+  it('is locked while impersonating', () => {
+    const impersonating = fakeSession({
+      impersonation: { administrator: { displayName: 'Admin', email: 'admin@x.com' }, endsAt: '2099-01-01T00:00:00Z' },
+    })
+    renderImports([failed], 'en', () => {}, impersonating)
+    expect(screen.getByRole('button', { name: /^Report a problem/ }).getAttribute('aria-label')).toBe(
+      "Report a problem. Support isn't available while impersonating someone",
+    )
+  })
+
+  it('is not offered to an Administrator', () => {
+    renderImports([failed], 'en', () => {}, fakeSession({ administrator: true }))
+    expect(screen.queryByRole('button', { name: /Report a problem/ })).toBeNull()
   })
 })

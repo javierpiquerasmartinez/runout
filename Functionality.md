@@ -1029,6 +1029,13 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - Every row of the Accounts tab ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
 - A Suspended Account can't be given a new Ticket: the server refuses it, and on its row **Abrir incidencia** is locked with "Esta cuenta está suspendida". Its existing Tickets stay readable and answerable from the panel.
 
+**H14.5 — Tickets about a Bulk Import.** As either side, I want a Ticket to point at the Bulk Import it is about, so nobody has to describe which one it was.
+
+- In the Library's Importaciones, a Bulk Import that failed or ended early (its Library or Plan full, files it could not read or recognise) offers **Reportar un problema**: the new-Ticket dialog with the import attached (its files, status, when it started and its Hands), the subject "Problema con la importación <archivo>" and an empty message, both editable. The Ticket points at that Bulk Import. Like the rest of Support, it is locked while I am Impersonated and not offered to an Administrator.
+- Every row of the panel's Importaciones tab ends with **Abrir incidencia**: a Ticket with that import's Account, pointing at it, shown attached with why it failed, and the subject prefilled ("Tu importación <archivo> se ha detenido" for one that ended badly, "Sobre tu importación <archivo>" otherwise). For a Suspended Account it is locked with "Esta cuenta está suspendida", and the server refuses it.
+- A Ticket can only point at a Bulk Import of its own Account: the server refuses any other, from either side.
+- A Ticket's page shows the Bulk Import it points at: on my side under **Sobre la importación**, with **Ver importaciones** to the Library's Importaciones; in the panel under **Importación**, with why it failed and **Ver en Importaciones**. In the panel, the Account also has **Ver en Cuentas**, which opens the Accounts tab searching for it, where it can be Impersonated.
+
 ## MVP scope and out of scope
 
 The MVP is one complete Tuesday-night session, start to finish, and nothing more. The proof it is ready is being able to cancel the screen-sharing call and not miss it.

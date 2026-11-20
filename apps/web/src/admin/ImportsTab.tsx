@@ -5,11 +5,13 @@ import { isFinished, stageOf } from '../library/bulkImports'
 import { ImportProgress, Wrapped } from '../library/ImportParts'
 import { useMoment, useNotAdded } from '../library/importWords'
 import { RoomDialog } from '../room/RoomDialog'
+import { endedBadly } from '../support/support'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { BULK_IMPORT_FILTERS, nameOf, type AdminBulkImport, type BulkImportFilter, type BulkImportsPage } from './admin'
 import { Badge } from './AdminPage'
 import { AdminPagination } from './AdminPagination'
+import { OpenTicketDialog } from './OpenTicketDialog'
 import { useAdminApi } from './useAdminApi'
 
 type Tone = 'brass' | 'sync' | 'muted' | 'alert'
@@ -18,7 +20,8 @@ type Tone = 'brass' | 'sync' | 'muted' | 'alert'
  * The Importaciones tab: every Account's Bulk Imports, newest first, with
  * the failed and stalled ones a filter away. One not yet ended can be
  * cancelled, as its Importer would; one failed retried while its files are
- * kept. The text of Hands is never here.
+ * kept. Each opens a Support Ticket with its Account, pointing at it, unless
+ * that Account is Suspended. The text of Hands is never here.
  */
 export function ImportsTab() {
   const { t } = useI18n()
@@ -28,6 +31,7 @@ export function ImportsTab() {
   const [page, setPage] = useState<BulkImportsPage | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)
   const [cancelling, setCancelling] = useState<AdminBulkImport | null>(null)
+  const [openingTicket, setOpeningTicket] = useState<AdminBulkImport | null>(null)
 
   const reload = useCallback(() => {
     const query = new URLSearchParams({ status: filter, page: String(pageNumber) })
@@ -103,6 +107,7 @@ export function ImportsTab() {
                     bulkImport={bulkImport}
                     onCancel={() => setCancelling(bulkImport)}
                     onRetry={() => void retry(bulkImport)}
+                    onOpenTicket={() => setOpeningTicket(bulkImport)}
                   />
                 ))}
               </tbody>
@@ -116,6 +121,16 @@ export function ImportsTab() {
             onGoTo={setPageNumber}
           />
         </>
+      )}
+      {openingTicket && (
+        <OpenTicketDialog
+          account={openingTicket.account}
+          bulkImport={openingTicket}
+          subject={t(endedBadly(openingTicket) ? 'admin.imports.openTicket.subject.failed' : 'admin.imports.openTicket.subject', {
+            file: openingTicket.files.map((file) => file.name).join(', '),
+          })}
+          onClose={() => setOpeningTicket(null)}
+        />
       )}
       {cancelling && (
         <RoomDialog
@@ -137,10 +152,12 @@ function ImportRow({
   bulkImport,
   onCancel,
   onRetry,
+  onOpenTicket,
 }: {
   bulkImport: AdminBulkImport
   onCancel: () => void
   onRetry: () => void
+  onOpenTicket: () => void
 }) {
   const { t, formatNumber, formatRelative } = useI18n()
   const moment = useMoment()
@@ -202,6 +219,14 @@ function ImportRow({
             {t('admin.imports.retry')}
           </Button>
         )}
+        <Button
+          size="compact"
+          variant="ghost"
+          disabledReason={bulkImport.accountSuspended ? t('admin.support.open.suspended') : undefined}
+          onClick={onOpenTicket}
+        >
+          {t('admin.support.open')}
+        </Button>
       </td>
     </tr>
   )
