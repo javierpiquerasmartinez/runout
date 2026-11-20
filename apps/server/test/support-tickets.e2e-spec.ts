@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { startApp, type RunningApp } from './support/app.js';
+import { newAccount } from './support/google.js';
 import {
   ADMINISTRATOR_EMAIL,
   invitedAccount,
@@ -107,6 +108,7 @@ describe('Support Tickets (e2e)', () => {
             from: 'account',
             writtenAt: '2026-01-01T00:02:00.000Z',
           },
+          unread: false,
         },
         expect.objectContaining({ id: second.id, subject: 'Segunda' }),
       ]);
@@ -311,6 +313,190 @@ describe('Support Tickets (e2e)', () => {
     });
   });
 
+  describe('unread answers and the waiting count', () => {
+    const unreadCount = async (token: string) =>
+      (await as(token).get('/support/tickets/unread').expect(200)).body as {
+        unread: number;
+      };
+    const waitingCount = async (token: string) =>
+      (
+        (await as(token).get('/admin/support/tickets/waiting').expect(200))
+          .body as { waiting: number }
+      ).waiting;
+    const listed = async (token: string, id: string) =>
+      (
+        (await as(token).get('/support/tickets').expect(200)).body as {
+          tickets: { id: string; unread: boolean }[];
+        }
+      ).tickets.find((ticket) => ticket.id === id);
+
+    it('never counts what the Account wrote itself as unread', async () => {
+      const ticket = await open(ana.token);
+      await as(ana.token)
+        .post(`/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Otra cosa más.' })
+        .expect(201);
+
+      expect(await unreadCount(ana.token)).toEqual({ unread: 0 });
+      expect(await listed(ana.token, ticket.id)).toMatchObject({
+        unread: false,
+      });
+    });
+
+    it('marks a Ticket with an answer from Runout unread until the Account reads its thread', async () => {
+      const ticket = await open(ana.token);
+      const other = await open(ana.token, 'Otra');
+      await running.clock.advance(MINUTE);
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Lo miramos.' })
+        .expect(201);
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Ya está.' })
+        .expect(201);
+
+      expect(await unreadCount(ana.token)).toEqual({ unread: 1 });
+      expect(await listed(ana.token, ticket.id)).toMatchObject({
+        unread: true,
+      });
+      expect(await listed(ana.token, other.id)).toMatchObject({
+        unread: false,
+      });
+
+      const first = await as(ana.token)
+        .get(`/support/tickets/${ticket.id}`)
+        .expect(200);
+      expect(
+        first.body.messages.map((m: { text: string; unread: boolean }) => [
+          m.text,
+          m.unread,
+        ]),
+      ).toEqual([
+        ['El héroe es otro jugador.', false],
+        ['Lo miramos.', true],
+        ['Ya está.', true],
+      ]);
+
+      expect(await unreadCount(ana.token)).toEqual({ unread: 0 });
+      expect(await listed(ana.token, ticket.id)).toMatchObject({
+        unread: false,
+      });
+      const again = await as(ana.token)
+        .get(`/support/tickets/${ticket.id}`)
+        .expect(200);
+      expect(
+        again.body.messages.some((m: { unread: boolean }) => m.unread),
+      ).toBe(false);
+    });
+
+    it('marks a Ticket unread again when Runout answers after it was read', async () => {
+      const ticket = await open(ana.token);
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Primera respuesta.' })
+        .expect(201);
+      await as(ana.token).get(`/support/tickets/${ticket.id}`).expect(200);
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/close`)
+        .expect(200);
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Segunda respuesta.' })
+        .expect(201);
+
+      expect(await unreadCount(ana.token)).toEqual({ unread: 1 });
+      const { body } = await as(ana.token)
+        .get(`/support/tickets/${ticket.id}`)
+        .expect(200);
+      expect(body.messages.map((m: { unread: boolean }) => m.unread)).toEqual([
+        false,
+        false,
+        true,
+      ]);
+    });
+
+    it('starts a Ticket an Administrator opened unread for its Account', async () => {
+      const { body: opened } = await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: 'Tu importación',
+          message: 'Hola. Lo estamos revisando.',
+        })
+        .expect(201);
+
+      expect(await unreadCount(ana.token)).toEqual({ unread: 1 });
+      expect(await listed(ana.token, opened.id)).toMatchObject({
+        unread: true,
+      });
+      const { body } = await as(ana.token)
+        .get(`/support/tickets/${opened.id}`)
+        .expect(200);
+      expect(body.messages).toEqual([
+        expect.objectContaining({ from: 'runout', unread: true }),
+      ]);
+      expect(await unreadCount(ana.token)).toEqual({ unread: 0 });
+    });
+
+    it('refuses the unread count while Impersonating', async () => {
+      const {
+        body: { token },
+      } = await as(administrator.token)
+        .post(`/admin/accounts/${ana.id}/impersonations`)
+        .expect(201);
+
+      await as(token)
+        .get('/support/tickets/unread')
+        .expect(403, { reason: 'impersonation-not-allowed' });
+    });
+
+    it('counts the Open Tickets the Account wrote in last, the same for every Administrator', async () => {
+      await running.close();
+      const secondEmail = uniqueEmail('second-admin');
+      running = await startApp({
+        administratorEmails: [ADMINISTRATOR_EMAIL, secondEmail],
+      });
+      administrator = await signInAdministrator(running);
+      const second = await newAccount(
+        running.httpServer,
+        secondEmail,
+        secondEmail,
+      );
+      ana = await invitedAccount(
+        running,
+        administrator.token,
+        uniqueEmail('ana'),
+      );
+      const before = await waitingCount(administrator.token);
+
+      const ticket = await open(ana.token);
+      const closed = await open(ana.token, 'Cerrada');
+      await as(ana.token)
+        .post(`/support/tickets/${closed.id}/close`)
+        .expect(200);
+      expect(await waitingCount(administrator.token)).toBe(before + 1);
+      expect(await waitingCount(second.token)).toBe(before + 1);
+
+      await as(second.token)
+        .post(`/admin/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Respondo yo.' })
+        .expect(201);
+      expect(await waitingCount(administrator.token)).toBe(before);
+      expect(await waitingCount(second.token)).toBe(before);
+
+      await as(ana.token)
+        .post(`/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Gracias, pero sigue.' })
+        .expect(201);
+      expect(await waitingCount(administrator.token)).toBe(before + 1);
+    });
+
+    it('keeps the waiting count for Administrators only', async () => {
+      await as(ana.token).get('/admin/support/tickets/waiting').expect(404);
+    });
+  });
+
   describe("the Administrators' side", () => {
     it('orders waiting, then the other Open, then Closed, and filters by Open and by Closed', async () => {
       const closed = await open(ana.token, 'Cerrada');
@@ -469,6 +655,7 @@ describe('Support Tickets (e2e)', () => {
         from: 'runout',
         text: '¿A qué hora fue?',
         writtenAt: '2026-01-01T00:01:00.000Z',
+        unread: true,
       });
       expect(JSON.stringify(thread)).not.toContain(ADMINISTRATOR_EMAIL);
       const { body: list } = await as(ana.token)

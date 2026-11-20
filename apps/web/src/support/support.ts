@@ -9,8 +9,11 @@ export const MAX_SUPPORT_SUBJECT_LENGTH = 120
 /** How long a Support Message may be, in characters. */
 export const MAX_SUPPORT_MESSAGE_LENGTH = 4000
 
-/** How often a thread on screen is read again: there is no live push. */
+/** How often a thread or the list of Tickets on screen is read again: there is no live push. */
 export const SUPPORT_POLL_MS = 15_000
+
+/** How often the header reads again the avatar's unread mark and the Administrators' waiting count. */
+export const SUPPORT_MARK_POLL_MS = 60_000
 
 /** Open while something is pending, Closed once settled. */
 export type SupportTicketStatus = 'open' | 'closed'
@@ -28,6 +31,8 @@ export interface AccountMessage {
   from: AccountSide
   text: string
   writtenAt: string
+  /** From Runout, and not yet read when the thread was read this time. */
+  unread: boolean
 }
 
 /** A Support Ticket in the Account's list. */
@@ -37,6 +42,8 @@ export interface AccountTicketSummary {
   status: SupportTicketStatus
   createdAt: string
   lastMessage: { from: AccountSide; writtenAt: string }
+  /** It has a Support Message from Runout the Account hasn't read. */
+  unread: boolean
 }
 
 /** The Bulk Import a Support Ticket points at, as its Account sees it in the Library. */

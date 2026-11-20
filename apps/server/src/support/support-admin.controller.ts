@@ -21,6 +21,7 @@ import {
   type NewPanelTicketBody,
   type PanelTicket,
   type PanelTicketPage,
+  type PanelWaitingCount,
 } from './support.service.js';
 
 /**
@@ -42,6 +43,13 @@ export class SupportAdminController {
     @Query() query: { status?: unknown; page?: unknown; pageSize?: unknown },
   ): Promise<PanelTicketPage> {
     return this.support.listForPanel(query);
+  }
+
+  /** How many Open Support Tickets wait for an answer, the same for every Administrator. */
+  @Get('waiting')
+  @Header('Cache-Control', 'private, no-cache')
+  async waiting(): Promise<PanelWaitingCount> {
+    return this.support.waitingForPanel();
   }
 
   /**

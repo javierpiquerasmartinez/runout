@@ -1029,7 +1029,22 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - Every row of the Accounts tab ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
 - A Suspended Account can't be given a new Ticket: the server refuses it, and on its row **Abrir incidencia** is locked with "Esta cuenta está suspendida". Its existing Tickets stay readable and answerable from the panel.
 
-**H14.5 — Tickets about a Bulk Import.** As either side, I want a Ticket to point at the Bulk Import it is about, so nobody has to describe which one it was.
+**H14.5 — Support emails.** As either side, I want to hear about Support even when I'm not in Runout.
+
+- Every Administrator in the server's configuration gets an email, in their Account's language (the default one before they have an Account), when an Account opens a Ticket ("Nueva incidencia: …") or writes in one ("Nuevo mensaje en una incidencia: …"), naming the Account and linking to the Ticket's page in the panel.
+- The Account gets an email in the language of its Preferences when an Administrator opens a Ticket with it ("Runout ha abierto una incidencia contigo: …"), writes in one of its Tickets ("Runout te ha respondido: …") or closes it ("Runout ha cerrado tu incidencia: …"), linking to the Ticket's page on its side. Closing a Ticket already Closed sends nothing, and neither does the Account closing its own.
+- Every email carries the Ticket's subject and a short excerpt (about 140 characters, on one line, cut at a word with "…") of the message it is about (for a closing, the last one), never the whole message; an answer is written in Runout, not by replying to the email.
+- A Suspended Account gets none. There is no opting out. A failed send is logged, and the message stays written.
+- The composers say so: "Runout te responderá aquí y por correo." on my side, and "… lo verá firmado como Runout y le llegará un correo." in the panel.
+
+**H14.6 — Unread answers and the waiting count.** As an Account, I want to notice Runout's answers without opening Support; as an Administrator, I want to know when someone is waiting for us.
+
+- While any of my Tickets has a message from Runout I haven't read, my avatar carries a brass dot and **Soporte** in its menu says how many ("1 nueva"). In my list those Tickets have a dot, a bold subject and **Respuesta nueva**. My own messages are never unread.
+- Opening a Ticket's page reads it: the dot and the mark go, and the messages I hadn't read stay set apart under **Nuevo** while the page is open. A Ticket I have never opened counts all of Runout's messages as unread, so one an Administrator opens with me starts unread.
+- The Administrator's button in the header carries the number of Open Tickets whose last message is the Account's, hidden at zero. The count is the same for every Administrator, with no read state of their own: once one answers or closes a Ticket it drops for all.
+- The avatar's mark and the button's count are read when a page opens and every minute after (at once after reading an unread answer, or answering from the panel); my list is read again every 15 seconds. Nothing is read while I am Impersonated, and an Administrator has neither the mark nor Soporte.
+
+**H14.7 — Tickets about a Bulk Import.** As either side, I want a Ticket to point at the Bulk Import it is about, so nobody has to describe which one it was.
 
 - In the Library's Importaciones, a Bulk Import that failed or ended early (its Library or Plan full, files it could not read or recognise) offers **Reportar un problema**: the new-Ticket dialog with the import attached (its files, status, when it started and its Hands), the subject "Problema con la importación <archivo>" and an empty message, both editable. The Ticket points at that Bulk Import. Like the rest of Support, it is locked while I am Impersonated and not offered to an Administrator.
 - Every row of the panel's Importaciones tab ends with **Abrir incidencia**: a Ticket with that import's Account, pointing at it, shown attached with why it failed, and the subject prefilled ("Tu importación <archivo> se ha detenido" for one that ended badly, "Sobre tu importación <archivo>" otherwise). For a Suspended Account it is locked with "Esta cuenta está suspendida", and the server refuses it.

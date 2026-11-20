@@ -80,7 +80,7 @@ const dialog = () => screen.queryByRole('dialog', { name: 'New milestone' })
 const titleField = () => within(dialog()!).getByRole<HTMLInputElement>('textbox', { name: 'Title' })
 const descriptionField = () => within(dialog()!).getByRole<HTMLTextAreaElement>('textbox', { name: /^Description/ })
 const dateField = () => within(dialog()!).getByLabelText<HTMLInputElement>('Date')
-const fetchedSpans = () => calls.filter(({ method }) => method === 'GET').map(({ search }) => search)
+const fetchedSpans = () => calls.filter(({ method, path }) => method === 'GET' && path.startsWith('/calendar')).map(({ search }) => search)
 
 describe('CalendarPage · entering the Calendar', () => {
   it('opens on the current month, in place of /calendar', async () => {

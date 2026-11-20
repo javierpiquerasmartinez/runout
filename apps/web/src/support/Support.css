@@ -86,10 +86,35 @@
 .support-table tr:last-child td {
   border-bottom: none;
 }
+.support-table__subject-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* A Ticket with an answer unread: a brass dot, the subject bold and "Respuesta nueva". */
+.support-table__unread {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brass);
+  flex-shrink: 0;
+}
+.support-table__unread[data-none] {
+  background: none;
+}
+.support-table__new {
+  color: var(--brass-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .support-table__subject {
   color: var(--text-primary);
   font-size: 13.5px;
   text-decoration: none;
+}
+.support-table__subject[data-unread] {
+  font-weight: 600;
 }
 .support-table__subject:hover {
   text-decoration: underline;
@@ -183,6 +208,21 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+/* "Nuevo": where the messages the Account hadn't read begin. */
+.support-thread__new {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--brass-ink);
+  font-size: 11px;
+  letter-spacing: 1.54px;
+  text-transform: uppercase;
+}
+.support-thread__new-rule {
+  flex-grow: 1;
+  height: 1px;
+  background: var(--brass-soft-border);
 }
 .support-message {
   display: flex;

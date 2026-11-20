@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { reasonOf, type FailureReason } from '../backend/api'
+import { useCallback, useState } from 'react'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
@@ -8,34 +7,28 @@ import { followLink } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { NewTicketDialog } from './NewTicketDialog'
-import { supportTicketPath, type AccountTicketSummary } from './support'
+import { SUPPORT_POLL_MS, supportTicketPath } from './support'
 import { listTickets } from './supportApi'
 import { SupportStatusBadge } from './SupportThread'
+import { usePolled } from './usePolled'
 import './Support.css'
 
 /**
  * Support ("Soporte"): the Account's Support Tickets, Open ones first, the
- * latest written in on top, and "Nueva incidencia" to open one. While an
- * Administrator impersonates the Account it is locked, and nothing is read.
+ * latest written in on top, those with an answer unread marked, and "Nueva
+ * incidencia" to open one. It is read again every so often while on screen.
+ * While an Administrator impersonates the Account it is locked, and nothing
+ * is read.
  */
 export function SupportPage() {
   const { t, formatDate } = useI18n()
   const { token } = useIdentity()
   const locked = useImpersonationLock('support')
-  const [tickets, setTickets] = useState<AccountTicketSummary[] | null>(null)
-  const [failure, setFailure] = useState<FailureReason | null>(null)
+  const load = useCallback(() => listTickets(token), [token])
+  const listed = usePolled(load, SUPPORT_POLL_MS, !locked)
+  const tickets = listed.value?.tickets ?? null
+  const failure = tickets ? null : listed.failure
   const [opening, setOpening] = useState(false)
-
-  useEffect(() => {
-    if (locked) return
-    let cancelled = false
-    listTickets(token)
-      .then((listed) => !cancelled && setTickets(listed.tickets))
-      .catch((error: unknown) => !cancelled && setFailure(reasonOf(error)))
-    return () => {
-      cancelled = true
-    }
-  }, [token, locked])
 
   const when = (iso: string) => formatDate(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 
@@ -78,9 +71,17 @@ export function SupportPage() {
                   {tickets.map((ticket) => (
                     <tr key={ticket.id}>
                       <td>
-                        <a href={supportTicketPath(ticket.id)} className="support-table__subject" onClick={followLink}>
-                          {ticket.subject}
-                        </a>
+                        <div className="support-table__subject-cell">
+                          {ticket.unread ? (
+                            <span className="support-table__unread" role="img" aria-label={t('support.unread')} />
+                          ) : (
+                            <span className="support-table__unread" data-none aria-hidden="true" />
+                          )}
+                          <a href={supportTicketPath(ticket.id)} className="support-table__subject" data-unread={ticket.unread || undefined} onClick={followLink}>
+                            {ticket.subject}
+                          </a>
+                          {ticket.unread && <span className="support-table__new">{t('support.unread.new')}</span>}
+                        </div>
                       </td>
                       <td>
                         <SupportStatusBadge status={ticket.status} />

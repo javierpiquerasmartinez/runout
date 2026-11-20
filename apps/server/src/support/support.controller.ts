@@ -15,6 +15,7 @@ import {
   SupportService,
   type AccountTicket,
   type AccountTicketList,
+  type AccountUnreadCount,
   type NewMessageBody,
   type NewTicketBody,
 } from './support.service.js';
@@ -40,6 +41,17 @@ export class SupportController {
     return this.support.listForAccount(await this.authenticate(authorization));
   }
 
+  /** How many of the Account's Support Tickets have an answer from Runout it hasn't read. */
+  @Get('unread')
+  @Header('Cache-Control', 'private, no-cache')
+  async unread(
+    @Headers('authorization') authorization: string | undefined,
+  ): Promise<AccountUnreadCount> {
+    return this.support.unreadForAccount(
+      await this.authenticate(authorization),
+    );
+  }
+
   /**
    * Opens a Support Ticket from a subject and a first message, pointing at
    * one of the Account's own Bulk Imports when `bulkImportId` is given.
@@ -55,7 +67,10 @@ export class SupportController {
     );
   }
 
-  /** One of the Account's Support Tickets and its thread; anyone else's is `support-ticket-not-found`. */
+  /**
+   * One of the Account's Support Tickets and its thread, which the Account
+   * thereby reads; anyone else's is `support-ticket-not-found`.
+   */
   @Get(':id')
   @Header('Cache-Control', 'private, no-cache')
   async read(

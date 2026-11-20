@@ -113,7 +113,7 @@ describe('The panel · Support tab', () => {
     expect(screen.queryByRole('link', { name: 'Winamax hands miss the final pot' })).toBeNull()
     await userEvent.click(within(filter).getByRole('radio', { name: 'Open' }))
     await waitFor(() => expect(new URLSearchParams(calls.at(-1)?.search).get('status')).toBe('open'))
-    expect(new URLSearchParams(calls[0].search).get('status')).toBe('all')
+    expect(new URLSearchParams(calls.find((call) => call.path === '/admin/support/tickets')?.search).get('status')).toBe('all')
   })
 
   it('closes a Ticket from its page, saying that writing in it opens it again', async () => {
@@ -190,7 +190,7 @@ describe('The panel · Support tab', () => {
     expect(articles.map((article) => within(article).getByRole('heading').textContent)).toEqual(['Ana', 'Tester B', 'Ana'])
     expect(within(articles[1]).getByText('as Runout')).toBeTruthy()
     expect(screen.getByText('Waiting for an answer')).toBeTruthy()
-    expect(screen.getByText('Ana will see it signed Runout.')).toBeTruthy()
+    expect(screen.getByText('Ana will see it signed Runout and get an email.')).toBeTruthy()
 
     await userEvent.type(screen.getByLabelText('Reply'), 'What time?')
     await userEvent.click(screen.getByRole('button', { name: 'Send' }))

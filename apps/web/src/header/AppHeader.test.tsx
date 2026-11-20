@@ -1,13 +1,19 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../backend/api'
 import { I18nProvider } from '../i18n'
 import { SessionContext, type SessionContextValue } from '../identity/context'
+import { SUPPORT_MARK_POLL_MS } from '../support/support'
+import { fakeApi } from '../test/fakeApi'
 import { fakeSession } from '../test/fakeSession'
 import { AppHeader } from './AppHeader'
 
-afterEach(() => window.history.replaceState(null, '', '/'))
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+  window.history.replaceState(null, '', '/')
+})
 
 /**
  * Gives elements the layout jsdom lacks, each measure worked out per element,
@@ -339,5 +345,90 @@ describe('AppHeader · Support', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
 
     expect(screen.queryByRole('link', { name: 'Support' })).toBeNull()
+  })
+})
+
+describe('AppHeader · unread answers in Support', () => {
+  it('marks the avatar while some Ticket has an answer unread, and says how many in the menu', async () => {
+    fakeApi({ 'GET /support/tickets/unread': () => Response.json({ unread: 1 }) })
+    renderHeader(fakeSession({ administrator: false }))
+
+    const avatar = await screen.findByRole('button', { name: 'Account menu: you have unread answers in Support' })
+    await userEvent.click(avatar)
+
+    expect(within(screen.getByRole('link', { name: /Support/ })).getByText('1 new')).toBeTruthy()
+  })
+
+  it('leaves the avatar unmarked when every answer has been read', async () => {
+    const calls = fakeApi({ 'GET /support/tickets/unread': () => Response.json({ unread: 0 }) })
+    renderHeader(fakeSession({ administrator: false }))
+
+    await vi.waitFor(() => expect(calls.some((call) => call.path === '/support/tickets/unread')).toBe(true))
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    expect(screen.getByRole('link', { name: 'Support' })).toBeTruthy()
+  })
+
+  it('marks the avatar once an answer turns up, with no reload', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let unread = 0
+    fakeApi({ 'GET /support/tickets/unread': () => Response.json({ unread }) })
+    renderHeader(fakeSession({ administrator: false }))
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeTruthy()
+
+    unread = 2
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_MARK_POLL_MS))
+
+    expect(await screen.findByRole('button', { name: 'Account menu: you have unread answers in Support' })).toBeTruthy()
+  })
+
+  it('asks nothing of an Administrator, nor while impersonating', async () => {
+    for (const session of [
+      fakeSession({ administrator: true }),
+      fakeSession({ impersonation: { administrator: { displayName: 'Admin', email: 'admin@x.com' }, endsAt: '2099-01-01T00:00:00Z' } }),
+    ]) {
+      const calls = fakeApi({ 'GET /support/tickets/unread': () => Response.json({ unread: 3 }) })
+      const { unmount } = render(
+        <I18nProvider initialLocale="en">
+          <SessionContext.Provider value={session}>
+            <AppHeader current="library" />
+          </SessionContext.Provider>
+        </I18nProvider>,
+      )
+      await act(() => Promise.resolve())
+      expect(calls.filter((call) => call.path === '/support/tickets/unread')).toEqual([])
+      expect(screen.getByRole('button', { name: 'Account menu' })).toBeTruthy()
+      unmount()
+    }
+  })
+})
+
+describe('AppHeader · Tickets waiting for the Administrators', () => {
+  it('shows on the panel button how many Open Tickets wait for an answer', async () => {
+    fakeApi({ 'GET /admin/support/tickets/waiting': () => Response.json({ waiting: 3 }) })
+    renderHeader(fakeSession({ administrator: true }))
+
+    const panel = await screen.findByRole('link', { name: 'Administration: 3 tickets waiting for an answer' })
+    expect(panel.textContent).toBe('3')
+  })
+
+  it('shows no number when none is waiting', async () => {
+    const calls = fakeApi({ 'GET /admin/support/tickets/waiting': () => Response.json({ waiting: 0 }) })
+    renderHeader(fakeSession({ administrator: true }))
+
+    await vi.waitFor(() => expect(calls.some((call) => call.path === '/admin/support/tickets/waiting')).toBe(true))
+    expect(screen.getByRole('link', { name: 'Administration' }).textContent).toBe('')
+  })
+
+  it('lowers the number once another Administrator answers, with no reload', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let waiting = 1
+    fakeApi({ 'GET /admin/support/tickets/waiting': () => Response.json({ waiting }) })
+    renderHeader(fakeSession({ administrator: true }))
+    expect(await screen.findByRole('link', { name: 'Administration: 1 ticket waiting for an answer' })).toBeTruthy()
+
+    waiting = 0
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_MARK_POLL_MS))
+
+    expect(await screen.findByRole('link', { name: 'Administration' })).toBeTruthy()
   })
 })

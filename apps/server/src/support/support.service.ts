@@ -21,6 +21,7 @@ import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from '../admin/admin-query.js';
 import { isAccount } from '../admin/accounts.service.js';
 import { Rejected } from '../rejection/rejection.js';
+import { SupportEmail } from './support-email.js';
 
 /** How long a Support Ticket's subject may be, in characters, once trimmed. */
 export const MAX_SUPPORT_SUBJECT_LENGTH = 120;
@@ -40,6 +41,8 @@ export interface AccountMessage {
   from: AccountSide;
   text: string;
   writtenAt: Date;
+  /** Whether it is from Runout and the Account had not read it before this read of the thread. */
+  unread: boolean;
 }
 
 /** A Support Ticket as its Account lists it. */
@@ -50,6 +53,8 @@ export interface AccountTicketSummary {
   createdAt: Date;
   /** Who wrote last and when. */
   lastMessage: { from: AccountSide; writtenAt: Date };
+  /** Whether it has a Support Message from Runout the Account hasn't read. */
+  unread: boolean;
 }
 
 /**
@@ -91,6 +96,16 @@ export interface AccountTicket {
 /** The Account's Support Tickets, Open ones first, the latest written in on top. */
 export interface AccountTicketList {
   tickets: AccountTicketSummary[];
+}
+
+/** How many of the Account's Support Tickets have a Support Message from Runout it hasn't read. */
+export interface AccountUnreadCount {
+  unread: number;
+}
+
+/** How many Open Support Tickets wait for an answer, the same for every Administrator. */
+export interface PanelWaitingCount {
+  waiting: number;
 }
 
 /** Who wrote a Support Message, as the panel shows it: the Account, or which Administrator. */
@@ -194,6 +209,16 @@ const lastWrittenAt = sql<Date>`(select max(m.written_at) from support_messages 
 const accountWroteLast = sql<boolean>`(select m.administrator_id is null from support_messages m where m.ticket_id = support_tickets.id order by m.seq desc limit 1)`;
 
 /**
+ * Whether the Ticket has a Support Message from Runout after the last one its
+ * Account read. One it never read counts from the start, so a Ticket an
+ * Administrator opened is unread until the Account opens it.
+ */
+const unreadByAccount = sql<boolean>`exists (select 1 from support_messages m where m.ticket_id = support_tickets.id and m.administrator_id is not null and m.seq > coalesce(support_tickets.account_read_seq, 0))`;
+
+/** Open, with the Account's Support Message last: waiting for the Administrators' answer. */
+const waitingForAdministrators = sql<boolean>`(support_tickets.status = 'open' and ${accountWroteLast})`;
+
+/**
  * Support: Support Tickets between an Account and the Administrators, and
  * their Support Messages. It has two sides: the Account's, over its own
  * Tickets and never while Impersonated, where every Administrator signs
@@ -205,6 +230,7 @@ export class SupportService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly email: SupportEmail,
   ) {}
 
   /** The Account's Support Tickets, Open ones first, the latest written in on top. */
@@ -215,6 +241,7 @@ export class SupportService {
         ticket: supportTickets,
         lastWrittenAt: lastWrittenAt.mapWith(supportMessages.writtenAt),
         accountWroteLast,
+        unread: unreadByAccount,
       })
       .from(supportTickets)
       .where(eq(supportTickets.identityId, account.id))
@@ -224,17 +251,32 @@ export class SupportService {
         asc(supportTickets.id),
       );
     return {
-      tickets: rows.map(({ ticket, lastWrittenAt, accountWroteLast }) => ({
-        id: ticket.id,
-        subject: ticket.subject,
-        status: ticket.status,
-        createdAt: ticket.createdAt,
-        lastMessage: {
-          from: accountWroteLast ? 'account' : 'runout',
-          writtenAt: lastWrittenAt,
-        },
-      })),
+      tickets: rows.map(
+        ({ ticket, lastWrittenAt, accountWroteLast, unread }) => ({
+          id: ticket.id,
+          subject: ticket.subject,
+          status: ticket.status,
+          createdAt: ticket.createdAt,
+          lastMessage: {
+            from: accountWroteLast ? 'account' : 'runout',
+            writtenAt: lastWrittenAt,
+          },
+          unread,
+        }),
+      ),
     };
+  }
+
+  /** How many of the Account's Support Tickets have a Support Message from Runout it hasn't read. */
+  async unreadForAccount(account: Identity): Promise<AccountUnreadCount> {
+    refuseImpersonation(account);
+    const [{ unread }] = await this.db
+      .select({
+        unread: sql<number>`(count(*) filter (where ${unreadByAccount}))::int`,
+      })
+      .from(supportTickets)
+      .where(eq(supportTickets.identityId, account.id));
+    return { unread };
   }
 
   /** Opens a Support Ticket with a subject and its first Support Message; it is Open. */
@@ -247,7 +289,11 @@ export class SupportService {
     return this.readForAccount(account, ticketId);
   }
 
-  /** One of the Account's Support Tickets with its thread; anyone else's is `support-ticket-not-found`. */
+  /**
+   * One of the Account's Support Tickets with its thread; anyone else's is
+   * `support-ticket-not-found`. The Account reads it, so it is no longer
+   * unread; each Support Message says whether it was unread before.
+   */
   async readForAccount(
     account: Identity,
     ticketId: string,
@@ -257,10 +303,16 @@ export class SupportService {
       ticketId,
       eq(supportTickets.identityId, account.id),
     );
-    const [messages, bulkImport] = await Promise.all([
-      this.messagesOf(ticket.id),
-      this.bulkImportOf(ticket),
-    ]);
+    const messages = await this.messagesOf(ticket.id);
+    const readSeq = ticket.accountReadSeq ?? 0;
+    const lastSeq = messages.at(-1)?.seq;
+    if (lastSeq !== undefined && lastSeq > readSeq) {
+      await this.db
+        .update(supportTickets)
+        .set({ accountReadSeq: lastSeq })
+        .where(eq(supportTickets.id, ticket.id));
+    }
+    const bulkImport = await this.bulkImportOf(ticket);
     return {
       id: ticket.id,
       subject: ticket.subject,
@@ -273,6 +325,7 @@ export class SupportService {
         from: message.administratorId ? 'runout' : 'account',
         text: message.text,
         writtenAt: message.writtenAt,
+        unread: message.administratorId !== null && message.seq > readSeq,
       })),
     };
   }
@@ -288,7 +341,13 @@ export class SupportService {
       ticketId,
       eq(supportTickets.identityId, account.id),
     );
-    await this.write(ticket.id, null, messageOf(body.text));
+    const text = messageOf(body.text);
+    await this.write(ticket.id, null, text);
+    await this.email.toAdministrators('written', account.id, {
+      id: ticket.id,
+      subject: ticket.subject,
+      message: text,
+    });
     return this.readForAccount(account, ticket.id);
   }
 
@@ -326,7 +385,7 @@ export class SupportService {
       this.db
         .select({
           total: sql<number>`(count(*) filter (where ${kept ?? sql`true`}))::int`,
-          waiting: sql<number>`(count(*) filter (where ${open} and ${accountWroteLast}))::int`,
+          waiting: sql<number>`(count(*) filter (where ${waitingForAdministrators}))::int`,
         })
         .from(supportTickets),
       this.db
@@ -376,6 +435,20 @@ export class SupportService {
         },
       })),
     };
+  }
+
+  /**
+   * How many Open Support Tickets wait for an answer: those whose last
+   * Support Message is the Account's. Every Administrator sees the same
+   * count, and one answering lowers it for all.
+   */
+  async waitingForPanel(): Promise<PanelWaitingCount> {
+    const [{ waiting }] = await this.db
+      .select({
+        waiting: sql<number>`(count(*) filter (where ${waitingForAdministrators}))::int`,
+      })
+      .from(supportTickets);
+    return { waiting };
   }
 
   /** Any Support Ticket with its thread, each Support Message showing who wrote it. */
@@ -446,14 +519,27 @@ export class SupportService {
     body: NewMessageBody,
   ): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    await this.write(ticket.id, administrator.id, messageOf(body.text));
+    const text = messageOf(body.text);
+    await this.write(ticket.id, administrator.id, text);
+    await this.email.toAccount('written', ticket.identityId, {
+      id: ticket.id,
+      subject: ticket.subject,
+      message: text,
+    });
     return this.readForPanel(ticket.id);
   }
 
   /** An Administrator closes any Support Ticket, so it stops counting as pending. */
   async closeForPanel(ticketId: string): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    await this.close(ticket.id);
+    if (await this.close(ticket.id)) {
+      const last = (await this.messagesOf(ticket.id)).at(-1);
+      await this.email.toAccount('closed', ticket.identityId, {
+        id: ticket.id,
+        subject: ticket.subject,
+        message: last?.text ?? '',
+      });
+    }
     return this.readForPanel(ticket.id);
   }
 
@@ -476,7 +562,7 @@ export class SupportService {
       body.bulkImportId,
     );
     const now = this.clock.now();
-    return this.db.transaction(async (tx) => {
+    const ticketId = await this.db.transaction(async (tx) => {
       const [ticket] = await tx
         .insert(supportTickets)
         .values({
@@ -493,6 +579,13 @@ export class SupportService {
         .values({ ticketId: ticket.id, administratorId, text, writtenAt: now });
       return ticket.id;
     });
+    const mention = { id: ticketId, subject, message: text };
+    if (administratorId) {
+      await this.email.toAccount('opened', accountId, mention);
+    } else {
+      await this.email.toAdministrators('opened', accountId, mention);
+    }
+    return ticketId;
   }
 
   /** Writes a Support Message; in a Closed Ticket it opens it again, since something is pending once more. */
@@ -515,12 +608,16 @@ export class SupportService {
     });
   }
 
-  /** Closes a Support Ticket; a Closed one stays as it is. */
-  private async close(ticketId: string): Promise<void> {
-    await this.db
+  /** Closes a Support Ticket; a Closed one stays as it is. Whether it was Open. */
+  private async close(ticketId: string): Promise<boolean> {
+    const closed = await this.db
       .update(supportTickets)
       .set({ status: 'closed' })
-      .where(eq(supportTickets.id, ticketId));
+      .where(
+        and(eq(supportTickets.id, ticketId), eq(supportTickets.status, 'open')),
+      )
+      .returning({ id: supportTickets.id });
+    return closed.length > 0;
   }
 
   /** The Support Ticket, if it is there and meets `scope`; `support-ticket-not-found` otherwise. */

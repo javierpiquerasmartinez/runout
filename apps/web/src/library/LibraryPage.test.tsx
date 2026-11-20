@@ -216,6 +216,8 @@ beforeEach(() => {
         }
         return Response.json({ handId, marked })
       }
+      // The header's unread mark in Support, read beside every page.
+      if (url.startsWith('/api/support/')) return Response.json({ unread: 0 })
       if (url.startsWith('/api/library/hand-ids')) {
         handIdsRequests.push(url)
         return Response.json({ ids: ['h1', 'h2', 'h3'] })

@@ -3,6 +3,7 @@ import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { SUPPORT_POLL_MS, type PanelTicket } from '../support/support'
 import { SupportAside, SupportCloseButton, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from '../support/SupportThread'
+import { supportChanged } from '../support/supportChanges'
 import { usePolled } from '../support/usePolled'
 import { Avatar } from '../ui/Avatar'
 import { followLink } from '../routing'
@@ -64,7 +65,10 @@ export function SupportTicketPanel({ id }: { id: string }) {
               <SupportThread entries={entries} />
               <SupportComposer
                 hint={t('admin.support.replyHint', { name: nameOf(ticket.account) })}
-                onSend={async (text) => replace(await admin<PanelTicket>(`/support/tickets/${ticket.id}/messages`, { method: 'POST', body: { text } }))}
+                onSend={async (text) => {
+                  replace(await admin<PanelTicket>(`/support/tickets/${ticket.id}/messages`, { method: 'POST', body: { text } }))
+                  supportChanged()
+                }}
               />
             </div>
             <div className="support-ticket__aside">
@@ -105,7 +109,12 @@ export function SupportTicketPanel({ id }: { id: string }) {
                   {t('admin.support.openedBy', { name: nameOf(ticket.openedBy ?? ticket.account), date: day(ticket.createdAt) })} {t('admin.support.reopens')}
                 </p>
                 {ticket.status === 'open' && (
-                  <SupportCloseButton onClose={async () => replace(await admin<PanelTicket>(`/support/tickets/${ticket.id}/close`, { method: 'POST' }))} />
+                  <SupportCloseButton
+                    onClose={async () => {
+                      replace(await admin<PanelTicket>(`/support/tickets/${ticket.id}/close`, { method: 'POST' }))
+                      supportChanged()
+                    }}
+                  />
                 )}
               </SupportAside>
             </div>
