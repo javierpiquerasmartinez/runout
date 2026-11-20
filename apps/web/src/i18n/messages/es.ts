@@ -1984,6 +1984,7 @@ export const es = {
   'reason.invalid-support-subject': 'Escribe un asunto de hasta 120 caracteres.',
   'reason.invalid-support-message': 'Escribe un mensaje de hasta 4.000 caracteres.',
   'reason.support-ticket-not-found': 'Esa incidencia no existe o no puedes verla.',
+  'reason.support-account-suspended': 'Esta cuenta está suspendida.',
   'support.title': 'Soporte',
   'support.lead': 'Tus incidencias con Runout. Te respondemos aquí.',
   'support.new': 'Nueva incidencia',
@@ -2043,4 +2044,8 @@ export const es = {
   'admin.support.filter.all': 'Todas',
   'admin.support.filter.open': 'Abiertas',
   'admin.support.filter.closed': 'Cerradas',
+  'admin.support.open': 'Abrir incidencia',
+  'admin.support.open.suspended': 'Esta cuenta está suspendida',
+  'admin.support.open.title': 'Abrir incidencia con {name}',
+  'admin.support.open.body': '{email}. La verá en su Soporte, firmada como Runout.',
 }

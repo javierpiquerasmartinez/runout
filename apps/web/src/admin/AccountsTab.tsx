@@ -12,6 +12,7 @@ import { PLAN_TONE, PLANS, type Plan } from '../plans/plans'
 import { nameOf, type AccountCounts, type AccountsPage, type AdminAccount, type Totals } from './admin'
 import { Badge } from './AdminPage'
 import { AdminPagination } from './AdminPagination'
+import { OpenTicketDialog } from './OpenTicketDialog'
 import { useAdminApi } from './useAdminApi'
 
 type Sort = 'lastActiveAt' | 'email' | 'displayName' | keyof AccountCounts
@@ -45,7 +46,7 @@ type Confirming = { action: 'suspend' | 'lift' | 'impersonate'; account: AdminAc
  * The Accounts tab: Runout at a glance, then every Account with what it has
  * and has done and its Plan, sortable, searchable and filtered by Plan.
  * Change its Plan, suspend, lift and Impersonate from each row, each after a
- * confirmation.
+ * confirmation, and open a Support Ticket with it, unless it is Suspended.
  */
 export function AccountsTab() {
   const { t, formatDate, formatNumber } = useI18n()
@@ -60,6 +61,7 @@ export function AccountsTab() {
   const [confirming, setConfirming] = useState<Confirming | null>(null)
   const [planFilter, setPlanFilter] = useState<Plan | 'all'>('all')
   const [changingPlan, setChangingPlan] = useState<AdminAccount | null>(null)
+  const [openingTicket, setOpeningTicket] = useState<AdminAccount | null>(null)
 
   const reload = useCallback(() => {
     const query = new URLSearchParams({ sort: sort.by, direction: sort.dir, page: String(pageNumber) })
@@ -262,6 +264,13 @@ export function AccountsTab() {
                               </Button>
                             </>
                           ))}
+                        <Button
+                          size="compact"
+                          disabledReason={account.suspension ? t('admin.support.open.suspended') : undefined}
+                          onClick={() => setOpeningTicket(account)}
+                        >
+                          {t('admin.support.open')}
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -301,6 +310,7 @@ export function AccountsTab() {
           onChange={(plan) => void changePlan(changingPlan, plan)}
         />
       )}
+      {openingTicket && <OpenTicketDialog account={openingTicket} onClose={() => setOpeningTicket(null)} />}
     </section>
   )
 }
