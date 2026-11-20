@@ -46,6 +46,8 @@ export const LabRangesPage = lazyPage(() => import('../lab/LabRangesPage').then(
 export const CalendarPage = lazyPage(() => import('../calendar/CalendarPage').then((module) => module.CalendarPage))
 export const MilestonePage = lazyPage(() => import('../calendar/MilestonePage').then((module) => module.MilestonePage))
 export const GoalsPage = lazyPage(() => import('../goals/GoalsPage').then((module) => module.GoalsPage))
+export const SupportPage = lazyPage(() => import('../support/SupportPage').then((module) => module.SupportPage))
+export const SupportTicketPage = lazyPage(() => import('../support/SupportTicketPage').then((module) => module.SupportTicketPage))
 export const AdminPage = lazyPage(() => import('../admin/AdminPage').then((module) => module.AdminPage))
 
 /** Where the Landing's two ways on lead, asked for while a Visitor reads it. */

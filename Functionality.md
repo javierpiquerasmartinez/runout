@@ -77,7 +77,7 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Thirteen epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, Goals after the Calendar, as a place to say what all of it is aiming for, and Home after Goals, as the first screen that says how all of them are going. Administration runs alongside them for the trial.
+Fourteen epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, Goals after the Calendar, as a place to say what all of it is aiming for, and Home after Goals, as the first screen that says how all of them are going. Administration runs alongside them for the trial, and Support with it, so that an Account and the Administrators can talk from inside Runout.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |
@@ -94,6 +94,7 @@ Thirteen epics cover the product. Five are essential for a session to work end t
 | E12 · Goals | Say what you are aiming for and by when, and see how far you have got | After the Calendar |
 | E13 · Home | See how every section is going as soon as I come in, and do the quickest things without leaving | After Goals |
 | E10 · Administration | Decide who gets an Account, see how Runout is used, and help someone from inside their Account | Trial |
+| E14 · Support | Raise a problem or a question with Runout, and answer it from the panel, in one conversation per matter | Trial |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
 
@@ -997,6 +998,23 @@ Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administ
 - A banner on every screen reads "Viendo como X" with **Salir**, which ends it and brings me back to the panel as myself. It ends on its own after one hour.
 - Rooms are refused while impersonating, and their entry points are locked with the reason; so are passwords and sign-in methods, and the panel itself.
 - Nobody can impersonate an Administrator or a suspended Account. Every Impersonation is recorded with who, whom, start and end, and shown on the Account's row. The Account's own Sign-ins and last activity are untouched.
+
+## E14 · Support
+
+An Account and the Administrators talk through **Support Tickets** ("Incidencias"): one conversation about one matter, with a subject and a thread of **Support Messages**. Messages are text only, up to 4,000 characters, and never edited or deleted by either side. There is no live push: a thread on screen is read again every 15 seconds, so new messages turn up without a reload.
+
+**H14.1 — Opening a Ticket and writing in it.** As an Account, I want to tell Runout about a problem or ask a question, and follow the answer.
+
+- **Soporte**, in the avatar's menu above Ajustes, leads to `/support`: my Tickets, Open ones first and the latest written in on top, each with its subject, its status (Abierta, Cerrada) and who wrote last ("Tú" or "Runout") and when. An Administrator has no Soporte in the menu.
+- **Nueva incidencia** asks for a subject (up to 120 characters) and a first message, both required: **Enviar** stays locked until both are written. Sending opens the Ticket, Open, and goes to its page.
+- A Ticket's page (`/support/<id>`) shows its thread in order, each message with its writer and when; every Administrator's message is signed **Runout**, never with who wrote it. Below it I write the next message, with a counter of the 4,000 characters.
+- I only ever see my own Tickets. While an Administrator Impersonates me, Support is refused by the server and locked on screen with the reason, and nothing is read.
+
+**H14.2 — Answering from the panel.** As an Administrator, I want every Ticket in one place, and to answer it.
+
+- The panel has a fifth tab, **Soporte** (`/admin/support`): every Ticket, those waiting for an answer first, then the other Open ones, then the Closed, the latest written in on top of each. Each row shows its Account, subject, status, who wrote last and when, and when it was opened; a filled **Espera respuesta** marks those whose Account wrote last, and the tab says how many there are.
+- Whose turn it is is never stored: it is read from who wrote the last message.
+- A Ticket's page in the panel (`/admin/support/<id>`) shows the thread with which Administrator wrote each message, tagged "como Runout" (and "tú" for my own), the Account, and whether it waits for an answer or for the Account. Any Administrator writes in any Ticket, a Suspended Account's included; the Account sees it signed Runout.
 
 ## MVP scope and out of scope
 

@@ -105,7 +105,10 @@ export type RejectionReason =
   | 'cannot-suspend-administrator'
   | 'cannot-impersonate-administrator'
   | 'impersonation-not-allowed'
-  | 'invalid-admin-query';
+  | 'invalid-admin-query'
+  | 'invalid-support-subject'
+  | 'invalid-support-message'
+  | 'support-ticket-not-found';
 
 /** Thrown by the domain; each transport turns it into its own reply. */
 export class Rejected extends Error {

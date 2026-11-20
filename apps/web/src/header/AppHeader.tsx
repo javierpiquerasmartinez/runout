@@ -13,6 +13,7 @@ import { roomPath } from '../room/roomCode'
 import { requestNewRoom, roomsPath } from '../rooms/rooms'
 import { followLink } from '../routing'
 import { settingsPath } from '../settings/paths'
+import { supportPath } from '../support/paths'
 import { Avatar } from '../ui/Avatar'
 import { Brand } from '../ui/Brand'
 import { Button } from '../ui/Button'
@@ -128,7 +129,7 @@ export function BackToRoom({ code, name }: { code: string; name: string }) {
   )
 }
 
-/** The avatar, opening onto the Display Name, Settings and signing out. */
+/** The avatar, opening onto the Display Name, Support (for Accounts that aren't Administrators), Settings and signing out. */
 function AccountMenu() {
   const { t } = useI18n()
   const { identity } = useIdentity()
@@ -181,6 +182,19 @@ function AccountMenu() {
             >
               <Icon name="administration" size={16} />
               {t('header.administration')}
+            </a>
+          )}
+          {!identity.administrator && (
+            <a
+              href={supportPath}
+              className="app-header__menu-item"
+              onClick={(event) => {
+                setOpen(false)
+                followLink(event)
+              }}
+            >
+              <Icon name="help" size={16} />
+              {t('header.support')}
             </a>
           )}
           <a

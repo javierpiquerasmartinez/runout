@@ -14,6 +14,7 @@ import { LibraryModule } from './library/library.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PingGateway } from './realtime/ping.gateway.js';
 import { RoomsModule } from './rooms/rooms.module.js';
+import { SupportModule } from './support/support.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { RoomsModule } from './rooms/rooms.module.js';
     BulkImportsModule,
     HandsModule,
     AdminModule,
+    SupportModule,
   ],
   controllers: [HealthController],
   providers: [PingGateway],

@@ -344,6 +344,13 @@
       "when": 1795078935931,
       "tag": "0048_shown_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1795185458865,
+      "tag": "0049_support_tickets",
+      "breakpoints": true
     }
   ]
 }
