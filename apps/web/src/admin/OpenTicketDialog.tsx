@@ -3,8 +3,9 @@ import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { RoomDialog } from '../room/RoomDialog'
 import { navigate } from '../routing'
-import { MAX_SUPPORT_MESSAGE_LENGTH, MAX_SUPPORT_SUBJECT_LENGTH, type PanelTicket } from '../support/support'
+import { MAX_SUPPORT_MESSAGE_LENGTH, MAX_SUPPORT_SUBJECT_LENGTH, type PanelTicket, type PanelTicketBulkImport } from '../support/support'
 import { SupportCount } from '../support/SupportThread'
+import { TicketBulkImportCard } from '../support/TicketBulkImport'
 import { Button } from '../ui/Button'
 import { TextField } from '../ui/TextField'
 import { adminSupportTicketPath, nameOf, type Person } from './admin'
@@ -16,13 +17,24 @@ import '../support/Support.css'
  * Account from a subject and a first message, both required, so "Abrir
  * incidencia" stays locked until both are written. The Account sees it
  * signed Runout. Opening lands on the Ticket's page in the panel; a refusal
- * says why, keeping what was typed.
+ * says why, keeping what was typed. Given one of the Account's Bulk
+ * Imports, the Ticket points at it, shown attached, its subject prefilled.
  */
-export function OpenTicketDialog({ account, onClose }: { account: Person; onClose: () => void }) {
+export function OpenTicketDialog({
+  account,
+  bulkImport,
+  subject: initialSubject = '',
+  onClose,
+}: {
+  account: Person
+  bulkImport?: PanelTicketBulkImport
+  subject?: string
+  onClose: () => void
+}) {
   const { t } = useI18n()
   const admin = useAdminApi()
   const messageId = useId()
-  const [subject, setSubject] = useState('')
+  const [subject, setSubject] = useState(initialSubject)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<FailureReason | null>(null)
@@ -32,7 +44,7 @@ export function OpenTicketDialog({ account, onClose }: { account: Person; onClos
     try {
       const opened = await admin<PanelTicket>('/support/tickets', {
         method: 'POST',
-        body: { accountId: account.id, subject, message },
+        body: { accountId: account.id, subject, message, ...(bulkImport && { bulkImportId: bulkImport.id }) },
       })
       navigate(adminSupportTicketPath(opened.id))
     } catch (caught) {
@@ -61,6 +73,7 @@ export function OpenTicketDialog({ account, onClose }: { account: Person; onClos
       }
     >
       <div className="support-new">
+        {bulkImport && <TicketBulkImportCard bulkImport={bulkImport} failureCode={bulkImport.failureCode} />}
         <TextField
           label={t('support.new.subject')}
           maxLength={MAX_SUPPORT_SUBJECT_LENGTH}

@@ -7,6 +7,7 @@ import {
   signInAdministrator,
   uniqueEmail,
 } from './support/admin.js';
+import { endedBulkImport } from './support/bulk-imports.js';
 
 const MINUTE = 60_000;
 
@@ -810,6 +811,178 @@ describe('Support Tickets (e2e)', () => {
       await as(administrator.token)
         .get('/admin/support/tickets/not-a-ticket')
         .expect(404, { reason: 'support-ticket-not-found' });
+    });
+  });
+
+  describe('Tickets about a Bulk Import', () => {
+    const pointedAt = (id: string) => ({
+      id,
+      status: 'failed',
+      files: [{ name: 'sesiones-2023.zip', size: 1024 }],
+      total: 210_000,
+      processed: 58_000,
+      imported: 58_000,
+      reason: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: '2026-01-01T00:01:00.000Z',
+    });
+
+    it('lets the Account open a Ticket pointing at one of its Bulk Imports, shown on both sides', async () => {
+      const bulkImportId = await endedBulkImport(running.databaseUrl, ana.id, {
+        failureCode: 'BATCH_INSERT_FAILED',
+      });
+
+      const { body: opened } = await as(ana.token)
+        .post('/support/tickets')
+        .send({
+          subject: 'Problema con la importación sesiones-2023.zip',
+          message: 'Se quedó a medias.',
+          bulkImportId,
+        })
+        .expect(201);
+
+      expect(opened.bulkImport).toEqual(pointedAt(bulkImportId));
+      const { body: read } = await as(ana.token)
+        .get(`/support/tickets/${opened.id}`)
+        .expect(200);
+      expect(read.bulkImport).toEqual(pointedAt(bulkImportId));
+      const { body: panel } = await as(administrator.token)
+        .get(`/admin/support/tickets/${opened.id}`)
+        .expect(200);
+      expect(panel.bulkImport).toEqual({
+        ...pointedAt(bulkImportId),
+        failureCode: 'BATCH_INSERT_FAILED',
+      });
+    });
+
+    it('points a generic Ticket at nothing', async () => {
+      const ticket = await open(ana.token);
+
+      const { body: read } = await as(ana.token)
+        .get(`/support/tickets/${ticket.id}`)
+        .expect(200);
+      expect(read.bulkImport).toBeNull();
+      const { body: panel } = await as(administrator.token)
+        .get(`/admin/support/tickets/${ticket.id}`)
+        .expect(200);
+      expect(panel.bulkImport).toBeNull();
+    });
+
+    it("refuses to point the Account's Ticket at someone else's Bulk Import, or at none there is", async () => {
+      const bea = await invitedAccount(
+        running,
+        administrator.token,
+        uniqueEmail('bea'),
+      );
+      const beas = await endedBulkImport(running.databaseUrl, bea.id);
+
+      for (const bulkImportId of [beas, crypto.randomUUID(), 'not-an-id']) {
+        await as(ana.token)
+          .post('/support/tickets')
+          .send({ subject: 'Hola', message: 'Hola', bulkImportId })
+          .expect(404, { reason: 'bulk-import-not-found' });
+      }
+      const { body } = await as(ana.token).get('/support/tickets').expect(200);
+      expect(body.tickets).toEqual([]);
+    });
+
+    it('lets an Administrator open a Ticket with an Account pointing at its Bulk Import, which the Account sees', async () => {
+      const bulkImportId = await endedBulkImport(running.databaseUrl, ana.id);
+
+      const { body: opened } = await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: 'Tu importación sesiones-2023.zip se ha detenido',
+          message: 'Lo estamos revisando.',
+          bulkImportId,
+        })
+        .expect(201);
+
+      expect(opened).toMatchObject({
+        account: { id: ana.id },
+        bulkImport: { id: bulkImportId, status: 'failed' },
+      });
+      const { body: thread } = await as(ana.token)
+        .get(`/support/tickets/${opened.id}`)
+        .expect(200);
+      expect(thread.bulkImport).toEqual(pointedAt(bulkImportId));
+    });
+
+    it("refuses to point an Administrator's Ticket at a Bulk Import of another Account", async () => {
+      const bea = await invitedAccount(
+        running,
+        administrator.token,
+        uniqueEmail('bea'),
+      );
+      const beas = await endedBulkImport(running.databaseUrl, bea.id);
+
+      await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: 'Hola',
+          message: 'Hola',
+          bulkImportId: beas,
+        })
+        .expect(404, { reason: 'bulk-import-not-found' });
+    });
+
+    it('refuses a Ticket about a Bulk Import with a Suspended Account', async () => {
+      const bulkImportId = await endedBulkImport(running.databaseUrl, ana.id);
+      await as(administrator.token)
+        .post(`/admin/accounts/${ana.id}/suspension`)
+        .expect(204);
+
+      await as(administrator.token)
+        .post('/admin/support/tickets')
+        .send({
+          accountId: ana.id,
+          subject: 'Hola',
+          message: 'Hola',
+          bulkImportId,
+        })
+        .expect(403, { reason: 'support-account-suspended' });
+    });
+  });
+
+  describe("the Importaciones tab's Accounts", () => {
+    let own: RunningApp;
+
+    beforeEach(async () => {
+      own = await startApp({
+        ownDatabase: true,
+        administratorEmails: [ADMINISTRATOR_EMAIL],
+      });
+    });
+
+    afterEach(async () => {
+      await own.close();
+    });
+
+    it('says which Bulk Imports are of a Suspended Account, for "Abrir incidencia" to be unavailable', async () => {
+      const admin = await signInAdministrator(own);
+      const cara = await invitedAccount(own, admin.token, uniqueEmail('cara'));
+      const dani = await invitedAccount(own, admin.token, uniqueEmail('dani'));
+      const caras = await endedBulkImport(own.databaseUrl, cara.id);
+      const danis = await endedBulkImport(own.databaseUrl, dani.id);
+      await request(own.httpServer)
+        .post(`/api/admin/accounts/${dani.id}/suspension`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(204);
+
+      const { body } = await request(own.httpServer)
+        .get('/api/admin/bulk-imports')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(200);
+
+      const suspended = Object.fromEntries(
+        body.imports.map((each: { id: string; accountSuspended: boolean }) => [
+          each.id,
+          each.accountSuspended,
+        ]),
+      );
+      expect(suspended).toEqual({ [caras]: false, [danis]: true });
     });
   });
 });

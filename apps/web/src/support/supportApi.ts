@@ -15,8 +15,11 @@ export function unreadTickets(token: Token): Promise<{ unread: number }> {
   return api('/support/tickets/unread', { token: token ?? undefined })
 }
 
-/** Opens a Support Ticket with a subject and a first message. */
-export function openTicket(token: Token, ticket: { subject: string; message: string }): Promise<AccountTicket> {
+/** Opens a Support Ticket with a subject and a first message, pointing at one of the Account's Bulk Imports when given. */
+export function openTicket(
+  token: Token,
+  ticket: { subject: string; message: string; bulkImportId?: string },
+): Promise<AccountTicket> {
   return api('/support/tickets', { token: token ?? undefined, method: 'POST', body: ticket })
 }
 

@@ -19,6 +19,8 @@ import { person } from './accounts.service.js';
 export interface AdminBulkImportView {
   id: string;
   account: PersonView;
+  /** Its Account is Suspended: no new Support Ticket can be opened with it. */
+  accountSuspended: boolean;
   status: BulkImportStatus;
   /** No advance for a long while: Atascada. */
   stalled: boolean;
@@ -101,6 +103,7 @@ export class BulkImportsAdminService {
       imports: rows.map(({ record, account }) => ({
         id: record.id,
         account: person(account),
+        accountSuspended: account.suspendedAt !== null,
         status: record.status,
         stalled: record.stalled,
         files: record.files.map(({ name, size }) => ({ name, size })),

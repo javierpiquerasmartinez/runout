@@ -149,6 +149,14 @@
   border-color: var(--brass-soft-border);
   color: var(--brass-ink);
 }
+.support-badge[data-tone='alert'] {
+  border-color: var(--alert-border);
+  color: var(--alert-ink);
+}
+.support-badge[data-tone='sync'] {
+  border-color: var(--sync-soft-border);
+  color: var(--sync-ink);
+}
 .support-badge[data-tone='waiting'] {
   border-color: var(--brass);
   background: var(--brass);
@@ -361,6 +369,41 @@
 .support-new__message {
   height: 140px;
   padding: 10px 12px;
+}
+
+/* The Bulk Import a Support Ticket points at. */
+.support-import {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+.support-import__icon {
+  display: flex;
+  color: var(--text-secondary);
+}
+.support-import__body {
+  flex-grow: 1;
+  min-width: 0;
+}
+.support-import__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.support-import__name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.support-import__detail {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* The panel's Support tab. */

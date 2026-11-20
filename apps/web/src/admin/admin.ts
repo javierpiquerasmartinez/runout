@@ -136,6 +136,8 @@ export interface RoomsPage {
 export interface AdminBulkImport {
   id: string
   account: Person
+  /** Its Account is Suspended: no new Support Ticket can be opened with it. */
+  accountSuspended: boolean
   status: BulkImportStatus
   /** No advance for a long while: Atascada, to Administrators only. */
   stalled: boolean

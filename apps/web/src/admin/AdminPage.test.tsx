@@ -405,6 +405,16 @@ describe('the Accounts tab', () => {
     expect(screen.getAllByRole('row')[1].textContent).toMatch(/bea@x\.com/)
   })
 
+  it('opens searching for the Account a link names, as a Ticket’s "See in Accounts" does', async () => {
+    window.history.replaceState(null, '', '/admin/accounts?search=bea%40x.com')
+    renderTab('accounts')
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
+    expect(screen.getAllByRole('row')[1].textContent).toMatch(/bea@x\.com/)
+    expect((screen.getByLabelText('Search by email or name') as HTMLInputElement).value).toBe('bea@x.com')
+    window.history.replaceState(null, '', '/')
+  })
+
   it('suspends and lifts, each after a confirmation', async () => {
     renderTab('accounts')
     const [, ana, bea] = await screen.findAllByRole('row')
@@ -534,6 +544,7 @@ describe('the Imports tab', () => {
     reason: null,
     failureCode: null,
     retryable: false,
+    accountSuspended: false,
     createdAt: '2026-11-02T09:12:00Z',
     lastActivityAt: '2026-11-02T10:00:00Z',
     finishedAt: null,
@@ -553,7 +564,7 @@ describe('the Imports tab', () => {
             ...(thirdStatus === 'failed' && { failureCode: '53100', retryable: true }),
             finishedAt: thirdStatus === 'failed' ? '2026-11-02T11:00:00Z' : null,
           }),
-          bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused'),
+          bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused', { accountSuspended: true }),
           bulkImport('6', 'jugador4@example.com', 'antiguo.zip', 'failed', {
             failureCode: 'ECONNRESET',
             finishedAt: '2026-10-20T11:00:00Z',
@@ -669,5 +680,64 @@ describe('the Imports tab', () => {
     await waitFor(() => expect(within(screen.getAllByRole('row')[3]).getByText('In progress')).toBeTruthy())
     expect(calls.some((call) => call.path === '/admin/bulk-imports/3/retry' && call.method === 'POST')).toBe(true)
     expect(within(screen.getAllByRole('row')[3]).queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
+
+  it('offers opening a Ticket last on every import, locked for a Suspended Account', async () => {
+    renderTab('imports')
+    const rows = (await screen.findAllByRole('row')).slice(1)
+
+    for (const row of rows) expect(within(row).getAllByRole('button').at(-1)?.textContent).toBe('Open ticket')
+    const locked = within(rows[3]).getAllByRole('button').at(-1)
+    expect(locked?.getAttribute('aria-label')).toBe('Open ticket. This account is suspended')
+    await userEvent.click(locked!)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens a Ticket with the import’s Account, pointing at it, and lands on it in Support', async () => {
+    window.history.replaceState(null, '', '/admin/imports')
+    calls = fakeApi({
+      'GET /admin/bulk-imports': () =>
+        Response.json({
+          total: 1,
+          page: 1,
+          pageSize: 50,
+          imports: [
+            bulkImport('3', 'jugador2@example.com', 'sesiones-2023.zip', 'failed', {
+              total: 210_000,
+              processed: 58_000,
+              failureCode: 'BATCH_INSERT_FAILED',
+              finishedAt: '2026-11-02T11:00:00Z',
+            }),
+          ],
+          storage: { used: 412 * MB, threshold: 800 * MB },
+        }),
+      'POST /admin/support/tickets': () => Response.json({ id: 'ticket-1' }, { status: 201 }),
+    })
+    renderTab('imports')
+    const [, row] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Open ticket' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading').textContent).toBe('Open a ticket with jugador2@example.com')
+    const attached = within(dialog).getByRole('group', { name: 'sesiones-2023.zip' })
+    expect(attached.textContent).toContain('58,000 of 210,000 hands · BATCH_INSERT_FAILED after 3 attempts')
+    expect((within(dialog).getByLabelText('Subject') as HTMLInputElement).value).toBe('Your import sesiones-2023.zip has stopped')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'We are looking into it.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open ticket' }))
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'POST')).toMatchObject({
+        path: '/admin/support/tickets',
+        body: {
+          accountId: 'account-3',
+          subject: 'Your import sesiones-2023.zip has stopped',
+          message: 'We are looking into it.',
+          bulkImportId: '3',
+        },
+      }),
+    )
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/support/ticket-1'))
+    window.history.replaceState(null, '', '/')
   })
 })

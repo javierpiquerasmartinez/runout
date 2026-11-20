@@ -1,6 +1,9 @@
+import { useState, type MouseEvent } from 'react'
 import { useI18n } from '../i18n'
-import type { MouseEvent } from 'react'
+import { ReportImportFailureButton } from '../room/ReportImportFailure'
 import { isPlainClick, navigate } from '../routing'
+import { NewTicketDialog } from '../support/NewTicketDialog'
+import { endedBadly } from '../support/support'
 import { Button } from '../ui/Button'
 import { isFinished, stageOf, type BulkImport } from './bulkImports'
 import { ImportProgress, Wrapped } from './ImportParts'
@@ -10,10 +13,12 @@ import './ImportsView.css'
 /**
  * The Library's Importaciones view: the Account's Bulk Imports, newest
  * first, each with its files, where it is, its Hands and how it ended. One
- * not yet ended can be cancelled.
+ * not yet ended can be cancelled. One that failed or ended early offers
+ * "Reportar un problema": a Support Ticket pointing at it.
  */
 export function ImportsView({ imports, onCancel }: { imports: BulkImport[]; onCancel: (id: string) => void }) {
   const { t } = useI18n()
+  const [reporting, setReporting] = useState<BulkImport | null>(null)
   if (imports.length === 0) return <p className="imports__empty">{t('library.imports.empty')}</p>
   return (
     <>
@@ -31,17 +36,34 @@ export function ImportsView({ imports, onCancel }: { imports: BulkImport[]; onCa
         </thead>
         <tbody>
           {imports.map((bulkImport) => (
-            <ImportRow key={bulkImport.id} bulkImport={bulkImport} onCancel={onCancel} />
+            <ImportRow key={bulkImport.id} bulkImport={bulkImport} onCancel={onCancel} onReport={() => setReporting(bulkImport)} />
           ))}
         </tbody>
       </table>
     </div>
     <p className="imports__kept">{t('library.imports.kept')}</p>
+    {reporting && (
+      <NewTicketDialog
+        title={t('import.report')}
+        body={t('library.imports.report.body')}
+        subject={t('library.imports.report.subject', { file: reporting.files.map((file) => file.name).join(', ') })}
+        bulkImport={reporting}
+        onClose={() => setReporting(null)}
+      />
+    )}
     </>
   )
 }
 
-function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel: (id: string) => void }) {
+function ImportRow({
+  bulkImport,
+  onCancel,
+  onReport,
+}: {
+  bulkImport: BulkImport
+  onCancel: (id: string) => void
+  onReport: () => void
+}) {
   const { t, formatNumber } = useI18n()
   const moment = useMoment()
   const stage = stageOf(bulkImport.status)
@@ -75,6 +97,7 @@ function ImportRow({ bulkImport, onCancel }: { bulkImport: BulkImport; onCancel:
             {t('library.imports.cancel')}
           </Button>
         )}
+        {endedBadly(bulkImport) && <ReportImportFailureButton onReport={onReport} />}
       </td>
     </tr>
   )

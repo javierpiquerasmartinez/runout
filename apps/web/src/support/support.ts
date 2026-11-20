@@ -1,4 +1,5 @@
 import type { Person } from '../admin/admin'
+import type { BulkImport } from '../library/bulkImports'
 
 export { supportPath, supportTicketIdFromPath, supportTicketPath } from './paths'
 
@@ -45,6 +46,17 @@ export interface AccountTicketSummary {
   unread: boolean
 }
 
+/** The Bulk Import a Support Ticket points at, as its Account sees it in the Library. */
+export type TicketBulkImport = Pick<
+  BulkImport,
+  'id' | 'status' | 'files' | 'total' | 'processed' | 'imported' | 'reason' | 'createdAt' | 'finishedAt'
+>
+
+/** The Bulk Import a Support Ticket points at, as the panel sees it: why it failed, too. */
+export interface PanelTicketBulkImport extends TicketBulkImport {
+  failureCode: string | null
+}
+
 /** A Support Ticket and its thread, as its Account reads it. */
 export interface AccountTicket {
   id: string
@@ -52,6 +64,8 @@ export interface AccountTicket {
   status: SupportTicketStatus
   openedBy: AccountSide
   createdAt: string
+  /** The Bulk Import it is about; null for a generic one. */
+  bulkImport: TicketBulkImport | null
   messages: AccountMessage[]
 }
 
@@ -93,6 +107,8 @@ export interface PanelTicket {
   waitingFor: WaitingFor
   createdAt: string
   openedBy: Person | null
+  /** The Bulk Import it is about; null for a generic one. */
+  bulkImport: PanelTicketBulkImport | null
   messages: PanelMessage[]
 }
 
@@ -104,4 +120,9 @@ export interface PanelTicketPage {
   /** How many Open Tickets wait for an answer, across every page. */
   waiting: number
   tickets: PanelTicketSummary[]
+}
+
+/** Whether a Bulk Import ended badly: it failed, or ended early for a reason. Where "Reportar un problema" is offered. */
+export function endedBadly(bulkImport: Pick<BulkImport, 'status' | 'reason'>): boolean {
+  return bulkImport.status === 'failed' || (bulkImport.status === 'completed' && bulkImport.reason !== null)
 }

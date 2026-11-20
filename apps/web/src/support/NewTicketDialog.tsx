@@ -6,9 +6,10 @@ import { RoomDialog } from '../room/RoomDialog'
 import { navigate } from '../routing'
 import { Button } from '../ui/Button'
 import { TextField } from '../ui/TextField'
-import { MAX_SUPPORT_MESSAGE_LENGTH, MAX_SUPPORT_SUBJECT_LENGTH, supportTicketPath } from './support'
+import { MAX_SUPPORT_MESSAGE_LENGTH, MAX_SUPPORT_SUBJECT_LENGTH, supportTicketPath, type TicketBulkImport } from './support'
 import { openTicket } from './supportApi'
 import { SupportCount } from './SupportThread'
+import { TicketBulkImportCard } from './TicketBulkImport'
 import './Support.css'
 
 /**
@@ -17,19 +18,22 @@ import './Support.css'
  * as from a failed import, and stays editable; nothing is sent until the
  * Account sends it. Sending opens the Ticket and goes to its page; a refusal
  * says why, keeping what was typed. Without a title and a body it is
- * "Nueva incidencia".
+ * "Nueva incidencia". Given one of the Account's Bulk Imports, the Ticket
+ * points at it, and the dialog shows it attached.
  */
 export function NewTicketDialog({
   title,
   body,
   subject: initialSubject = '',
   message: initialMessage = '',
+  bulkImport,
   onClose,
 }: {
   title?: string
   body?: string
   subject?: string
   message?: string
+  bulkImport?: TicketBulkImport
   onClose: () => void
 }) {
   const { t } = useI18n()
@@ -43,7 +47,7 @@ export function NewTicketDialog({
   async function send() {
     setBusy(true)
     try {
-      const opened = await openTicket(token, { subject, message })
+      const opened = await openTicket(token, { subject, message, ...(bulkImport && { bulkImportId: bulkImport.id }) })
       navigate(supportTicketPath(opened.id))
     } catch (caught) {
       setFailure(reasonOf(caught))
@@ -71,6 +75,7 @@ export function NewTicketDialog({
       }
     >
       <div className="support-new">
+        {bulkImport && <TicketBulkImportCard bulkImport={bulkImport} />}
         <TextField
           label={t('support.new.subject')}
           placeholder={t('support.new.subjectPlaceholder')}

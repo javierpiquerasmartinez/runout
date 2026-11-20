@@ -52,6 +52,7 @@ function ticket(extra: Partial<PanelTicket> = {}): PanelTicket {
     waitingFor: 'administrators',
     createdAt: '2026-11-18T10:02:00.000Z',
     openedBy: null,
+    bulkImport: null,
     messages: [
       { id: 'm1', from: 'account', writer: ana, text: 'It stopped halfway.', writtenAt: '2026-11-18T10:02:00.000Z' },
       { id: 'm2', from: 'administrator', writer: tester, text: 'Press Retry.', writtenAt: '2026-11-18T12:15:00.000Z' },
@@ -129,6 +130,47 @@ describe('The panel · Support tab', () => {
     expect(screen.queryByText('Waiting for an answer')).toBeNull()
     expect(screen.getAllByText('Closed').length).toBeGreaterThan(0)
     expect(calls.some((call) => call.method === 'POST' && call.path === '/admin/support/tickets/t1/close')).toBe(true)
+  })
+
+  it('links a Ticket to its Account in Accounts', async () => {
+    fakeApi({ 'GET /admin/support/tickets/t1': () => Response.json(ticket()) })
+    renderAt('/admin/support/t1')
+
+    const account = await screen.findByRole('region', { name: 'Account' })
+    expect(account.textContent).toContain('ana@example.com')
+    expect(within(account).getByRole('link', { name: 'See in Accounts' }).getAttribute('href')).toBe(
+      '/admin/accounts?search=ana%40example.com',
+    )
+    expect(screen.queryByRole('region', { name: 'Import' })).toBeNull()
+  })
+
+  it('shows the Bulk Import a Ticket points at, why it failed, and links to it in Imports', async () => {
+    fakeApi({
+      'GET /admin/support/tickets/t1': () =>
+        Response.json(
+          ticket({
+            bulkImport: {
+              id: 'b1',
+              status: 'failed',
+              files: [{ name: 'sesiones-2023.zip', size: 1000 }],
+              total: 210_000,
+              processed: 58_000,
+              imported: 58_000,
+              reason: null,
+              failureCode: 'BATCH_INSERT_FAILED',
+              createdAt: '2026-10-28T10:00:00.000Z',
+              finishedAt: '2026-10-28T11:00:00.000Z',
+            },
+          }),
+        ),
+    })
+    renderAt('/admin/support/t1')
+
+    const pointed = await screen.findByRole('region', { name: 'Import' })
+    const attached = within(pointed).getByRole('group', { name: 'sesiones-2023.zip' })
+    expect(attached.textContent).toContain('Failed')
+    expect(attached.textContent).toContain('58,000 of 210,000 hands · BATCH_INSERT_FAILED after 3 attempts')
+    expect(within(pointed).getByRole('link', { name: 'See in Imports' }).getAttribute('href')).toBe('/admin/imports')
   })
 
   it('opens a thread showing which Administrator wrote each message, and writes in it', async () => {

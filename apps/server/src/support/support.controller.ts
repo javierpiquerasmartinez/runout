@@ -52,7 +52,10 @@ export class SupportController {
     );
   }
 
-  /** Opens a Support Ticket from a subject and a first message. */
+  /**
+   * Opens a Support Ticket from a subject and a first message, pointing at
+   * one of the Account's own Bulk Imports when `bulkImportId` is given.
+   */
   @Post()
   async open(
     @Headers('authorization') authorization: string | undefined,

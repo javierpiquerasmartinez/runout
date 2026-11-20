@@ -3,10 +3,13 @@ import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useImpersonationLock } from '../identity/impersonationLock'
+import { libraryImportsPath } from '../library/library'
+import { followLink } from '../routing'
 import { Breadcrumb } from '../ui/Breadcrumb'
 import { SUPPORT_POLL_MS, supportPath, type AccountTicket } from './support'
 import { closeTicket, readTicket, writeInTicket } from './supportApi'
 import { SupportAside, SupportCloseButton, SupportComposer, SupportStatusBadge, SupportThread, type ThreadEntry } from './SupportThread'
+import { TicketBulkImportCard } from './TicketBulkImport'
 import { usePolled } from './usePolled'
 import './Support.css'
 
@@ -16,7 +19,9 @@ import './Support.css'
  * under "Nuevo", and where to write the next message. It is
  * read again every so often while on screen, so answers turn up without a
  * reload. The Account closes it once settled, and writing in a Closed one
- * opens it again. Locked while impersonating, and then nothing is read.
+ * opens it again. The Bulk Import it points at, if any, is shown beside
+ * it, with the way to the Library's imports. Locked while impersonating,
+ * and then nothing is read.
  */
 export function SupportTicketPage({ id }: { id: string }) {
   const { t, formatDate } = useI18n()
@@ -69,6 +74,14 @@ export function SupportTicketPage({ id }: { id: string }) {
                 />
               </div>
               <div className="support-ticket__aside">
+                {ticket.bulkImport && (
+                  <SupportAside title={t('support.bulkImport')}>
+                    <TicketBulkImportCard bulkImport={ticket.bulkImport} />
+                    <a className="ro-btn ro-btn--secondary ro-btn--compact" href={libraryImportsPath} onClick={followLink}>
+                      {t('support.bulkImport.see')}
+                    </a>
+                  </SupportAside>
+                )}
                 <SupportAside title={t('support.state')}>
                   <div className="support-aside__row">
                     <SupportStatusBadge status={ticket.status} />

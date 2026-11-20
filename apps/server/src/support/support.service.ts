@@ -3,10 +3,13 @@ import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import {
+  bulkImports,
   identities,
   SUPPORT_TICKET_STATUSES,
   supportMessages,
   supportTickets,
+  type BulkImportReason,
+  type BulkImportStatus,
   type SupportTicketStatus,
 } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
@@ -54,6 +57,29 @@ export interface AccountTicketSummary {
   unread: boolean;
 }
 
+/**
+ * The Bulk Import a Support Ticket points at, as its Account sees it in the
+ * Library: its files, where it ended and its Hands. Never a Hand's text.
+ */
+export interface TicketBulkImport {
+  id: string;
+  status: BulkImportStatus;
+  files: { name: string; size: number }[];
+  total: number | null;
+  processed: number;
+  imported: number;
+  /** Why it ended short of adding its Hands, when it did. */
+  reason: BulkImportReason | null;
+  createdAt: Date;
+  finishedAt: Date | null;
+}
+
+/** The Bulk Import a Support Ticket points at, as the panel sees it: why it failed, too. */
+export interface PanelTicketBulkImport extends TicketBulkImport {
+  /** Why it failed, when it did: a technical code, never a Hand's text. */
+  failureCode: string | null;
+}
+
 /** A Support Ticket and its whole thread, as its Account reads it. */
 export interface AccountTicket {
   id: string;
@@ -62,6 +88,8 @@ export interface AccountTicket {
   /** Who opened it: the Account, or Runout. */
   openedBy: AccountSide;
   createdAt: Date;
+  /** The Bulk Import it is about; null for a generic one. */
+  bulkImport: TicketBulkImport | null;
   messages: AccountMessage[];
 }
 
@@ -122,6 +150,8 @@ export interface PanelTicket {
   createdAt: Date;
   /** The Administrator who opened it; null when the Account did. */
   openedBy: PersonView | null;
+  /** The Bulk Import it is about; null for a generic one. */
+  bulkImport: PanelTicketBulkImport | null;
   messages: PanelMessage[];
 }
 
@@ -146,6 +176,8 @@ export interface PanelTicketPage {
 export interface NewTicketBody {
   subject?: unknown;
   message?: unknown;
+  /** The Bulk Import of the Ticket's Account it points at; none for a generic one. */
+  bulkImportId?: unknown;
 }
 
 /** What an Administrator opening a Support Ticket sends: the Account it is with, too. */
@@ -159,6 +191,7 @@ export interface NewMessageBody {
 }
 
 type TicketRow = typeof supportTickets.$inferSelect;
+type BulkImportRow = typeof bulkImports.$inferSelect;
 type MessageRow = typeof supportMessages.$inferSelect;
 type PersonRow = Pick<
   typeof identities.$inferSelect,
@@ -279,12 +312,14 @@ export class SupportService {
         .set({ accountReadSeq: lastSeq })
         .where(eq(supportTickets.id, ticket.id));
     }
+    const bulkImport = await this.bulkImportOf(ticket);
     return {
       id: ticket.id,
       subject: ticket.subject,
       status: ticket.status,
       openedBy: ticket.openedByAdministratorId ? 'runout' : 'account',
       createdAt: ticket.createdAt,
+      bulkImport: bulkImport && accountBulkImport(bulkImport),
       messages: messages.map((message) => ({
         id: message.id,
         from: message.administratorId ? 'runout' : 'account',
@@ -419,7 +454,10 @@ export class SupportService {
   /** Any Support Ticket with its thread, each Support Message showing who wrote it. */
   async readForPanel(ticketId: string): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    const messages = await this.messagesOf(ticket.id);
+    const [messages, bulkImport] = await Promise.all([
+      this.messagesOf(ticket.id),
+      this.bulkImportOf(ticket),
+    ]);
     const people = await this.people([
       ticket.identityId,
       ticket.openedByAdministratorId,
@@ -436,6 +474,10 @@ export class SupportService {
       openedBy: ticket.openedByAdministratorId
         ? people(ticket.openedByAdministratorId)
         : null,
+      bulkImport: bulkImport && {
+        ...accountBulkImport(bulkImport),
+        failureCode: bulkImport.failureCode,
+      },
       messages: messages.map((message) => ({
         id: message.id,
         ...writerOf(ticket, message.administratorId, people),
@@ -504,7 +546,9 @@ export class SupportService {
   /**
    * Opens an Open Support Ticket with the Account and its first Support
    * Message, written by the Administrator who opens it, or by the Account
-   * when `administratorId` is null.
+   * when `administratorId` is null. It points at `bulkImportId` when one is
+   * given, which must be a Bulk Import of that Account
+   * (`bulk-import-not-found` otherwise).
    */
   private async open(
     accountId: string,
@@ -513,6 +557,10 @@ export class SupportService {
   ): Promise<string> {
     const subject = subjectOf(body.subject);
     const text = messageOf(body.message);
+    const bulkImportId = await this.bulkImportOfAccount(
+      accountId,
+      body.bulkImportId,
+    );
     const now = this.clock.now();
     const ticketId = await this.db.transaction(async (tx) => {
       const [ticket] = await tx
@@ -522,6 +570,7 @@ export class SupportService {
           subject,
           status: 'open',
           openedByAdministratorId: administratorId,
+          bulkImportId,
           createdAt: now,
         })
         .returning({ id: supportTickets.id });
@@ -582,6 +631,36 @@ export class SupportService {
     return ticket;
   }
 
+  /**
+   * The Bulk Import a new Ticket points at: null when none is given, its id
+   * when it is one of the Account's, `bulk-import-not-found` otherwise.
+   */
+  private async bulkImportOfAccount(
+    accountId: string,
+    raw: unknown,
+  ): Promise<string | null> {
+    if (raw === undefined || raw === null) return null;
+    if (!isUuid(raw)) throw new Rejected('bulk-import-not-found');
+    const [found] = await this.db
+      .select({ id: bulkImports.id })
+      .from(bulkImports)
+      .where(
+        and(eq(bulkImports.id, raw), eq(bulkImports.identityId, accountId)),
+      );
+    if (!found) throw new Rejected('bulk-import-not-found');
+    return found.id;
+  }
+
+  /** The Bulk Import the Ticket points at, or null for a generic one. */
+  private async bulkImportOf(ticket: TicketRow): Promise<BulkImportRow | null> {
+    if (!ticket.bulkImportId) return null;
+    const [found] = await this.db
+      .select()
+      .from(bulkImports)
+      .where(eq(bulkImports.id, ticket.bulkImportId));
+    return found ?? null;
+  }
+
   /** A Ticket's thread, in the order it was written. */
   private messagesOf(ticketId: string): Promise<MessageRow[]> {
     return this.db
@@ -617,6 +696,21 @@ export class SupportService {
       };
     };
   }
+}
+
+/** The Bulk Import a Ticket points at, as its Account sees it. */
+function accountBulkImport(row: BulkImportRow): TicketBulkImport {
+  return {
+    id: row.id,
+    status: row.status,
+    files: row.files.map(({ name, size }) => ({ name, size })),
+    total: row.total,
+    processed: row.processed,
+    imported: row.imported,
+    reason: row.reason,
+    createdAt: row.createdAt,
+    finishedAt: row.finishedAt,
+  };
 }
 
 /** Who wrote a Support Message, for the panel. */

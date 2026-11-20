@@ -4,7 +4,7 @@ import { useI18n, type MessageKey } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { homePath } from '../home/home'
 import { RoomDialog } from '../room/RoomDialog'
-import { navigate } from '../routing'
+import { navigate, useSearch } from '../routing'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
@@ -47,6 +47,8 @@ type Confirming = { action: 'suspend' | 'lift' | 'impersonate'; account: AdminAc
  * and has done and its Plan, sortable, searchable and filtered by Plan.
  * Change its Plan, suspend, lift and Impersonate from each row, each after a
  * confirmation, and open a Support Ticket with it, unless it is Suspended.
+ * A `?search=` in its address starts it searching, as a Ticket's link to
+ * its Account does.
  */
 export function AccountsTab() {
   const { t, formatDate, formatNumber } = useI18n()
@@ -55,7 +57,8 @@ export function AccountsTab() {
   const [totals, setTotals] = useState<Totals | null>(null)
   const [page, setPage] = useState<AccountsPage | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)
-  const [search, setSearch] = useState('')
+  const linked = useSearch()
+  const [search, setSearch] = useState(() => new URLSearchParams(linked).get('search') ?? '')
   const [sort, setSort] = useState<{ by: Sort; dir: 'asc' | 'desc' }>({ by: 'lastActiveAt', dir: 'desc' })
   const [pageNumber, setPageNumber] = useState(1)
   const [confirming, setConfirming] = useState<Confirming | null>(null)
