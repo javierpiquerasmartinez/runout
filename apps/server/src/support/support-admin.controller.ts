@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -29,11 +31,14 @@ import {
 export class SupportAdminController {
   constructor(private readonly support: SupportService) {}
 
-  /** A page of every Support Ticket, those waiting for an answer first. */
+  /**
+   * A page of every Support Ticket, those waiting for an answer first;
+   * `status` (`all`, `open`, `closed`) keeps only some.
+   */
   @Get()
   @Header('Cache-Control', 'private, no-cache')
   async list(
-    @Query() query: { page?: unknown; pageSize?: unknown },
+    @Query() query: { status?: unknown; page?: unknown; pageSize?: unknown },
   ): Promise<PanelTicketPage> {
     return this.support.listForPanel(query);
   }
@@ -53,5 +58,12 @@ export class SupportAdminController {
     @Body() body: NewMessageBody = {},
   ): Promise<PanelTicket> {
     return this.support.writeForPanel(administrator, id, body);
+  }
+
+  /** Closes any Support Ticket, answering with the thread; whoever writes in it again opens it. */
+  @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
+  async close(@Param('id') id: string): Promise<PanelTicket> {
+    return this.support.closeForPanel(id);
   }
 }

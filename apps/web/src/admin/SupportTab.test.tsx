@@ -92,6 +92,45 @@ describe('The panel · Support tab', () => {
     expect(within(rows[1]).getByText('Tester B')).toBeTruthy()
   })
 
+  it('shows every Ticket at first, and filters by Open and by Closed', async () => {
+    const calls = fakeApi({
+      'GET /admin/support/tickets': (call) => {
+        const status = new URLSearchParams(call.search).get('status')
+        const tickets = status === 'closed' ? [summary('t2', 'Can I change my email?', { status: 'closed' })] : [summary('t1', 'Winamax hands miss the final pot')]
+        return Response.json({ total: tickets.length, page: 1, pageSize: 50, waiting: 1, tickets })
+      },
+    })
+    renderAt('/admin/support')
+
+    const filter = await screen.findByRole('radiogroup', { name: 'Show' })
+    expect(within(filter).getByRole('radio', { name: 'All' }).getAttribute('aria-checked')).toBe('true')
+    expect(await screen.findByRole('link', { name: 'Winamax hands miss the final pot' })).toBeTruthy()
+
+    await userEvent.click(within(filter).getByRole('radio', { name: 'Closed' }))
+
+    expect(await screen.findByRole('link', { name: 'Can I change my email?' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Winamax hands miss the final pot' })).toBeNull()
+    await userEvent.click(within(filter).getByRole('radio', { name: 'Open' }))
+    await waitFor(() => expect(new URLSearchParams(calls.at(-1)?.search).get('status')).toBe('open'))
+    expect(new URLSearchParams(calls[0].search).get('status')).toBe('all')
+  })
+
+  it('closes a Ticket from its page, saying that writing in it opens it again', async () => {
+    const calls = fakeApi({
+      'GET /admin/support/tickets/t1': () => Response.json(ticket()),
+      'POST /admin/support/tickets/t1/close': () => Response.json(ticket({ status: 'closed' })),
+    })
+    renderAt('/admin/support/t1')
+
+    expect(await screen.findByText('If anyone writes in it while closed, it opens again.', { exact: false })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Close ticket' }))
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close ticket' })).toBeNull())
+    expect(screen.queryByText('Waiting for an answer')).toBeNull()
+    expect(screen.getAllByText('Closed').length).toBeGreaterThan(0)
+    expect(calls.some((call) => call.method === 'POST' && call.path === '/admin/support/tickets/t1/close')).toBe(true)
+  })
+
   it('opens a thread showing which Administrator wrote each message, and writes in it', async () => {
     const answered = ticket({
       waitingFor: 'account',

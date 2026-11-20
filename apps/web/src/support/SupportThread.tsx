@@ -112,6 +112,42 @@ export function SupportComposer({ hint, lockedReason, onSend }: { hint: string; 
   )
 }
 
+/**
+ * "Cerrar incidencia": says the matter is settled. Locked while it is being
+ * closed; a refusal says why.
+ */
+export function SupportCloseButton({ lockedReason, onClose }: { lockedReason?: string; onClose: () => Promise<void> }) {
+  const { t } = useI18n()
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+
+  async function close() {
+    if (busy || lockedReason) return
+    setBusy(true)
+    try {
+      await onClose()
+      setFailure(null)
+    } catch (caught) {
+      setFailure(reasonOf(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      {failure && (
+        <p className="support-composer__failure" role="alert">
+          {t('support.closeFailed', { reason: t(`reason.${failure}`) })}
+        </p>
+      )}
+      <Button size="compact" disabledReason={lockedReason ?? (busy ? t('support.closing') : undefined)} aria-busy={busy || undefined} onClick={() => void close()}>
+        {t('support.close')}
+      </Button>
+    </>
+  )
+}
+
 /** "57 / 4.000": how much of a Support Message's room is taken. */
 export function SupportCount({ length }: { length: number }) {
   const { t, formatNumber } = useI18n()

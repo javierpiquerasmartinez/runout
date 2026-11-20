@@ -209,7 +209,167 @@ describe('Support Tickets (e2e)', () => {
     });
   });
 
+  describe('closing and reopening', () => {
+    it('lets the Account close one of its Tickets, and not anyone else’s', async () => {
+      const ticket = await open(ana.token);
+      const bea = await invitedAccount(
+        running,
+        administrator.token,
+        uniqueEmail('bea'),
+      );
+
+      await as(bea.token)
+        .post(`/support/tickets/${ticket.id}/close`)
+        .expect(404, { reason: 'support-ticket-not-found' });
+      const { body } = await as(ana.token)
+        .post(`/support/tickets/${ticket.id}/close`)
+        .expect(200);
+
+      expect(body).toMatchObject({ id: ticket.id, status: 'closed' });
+      const { body: list } = await as(ana.token)
+        .get('/support/tickets')
+        .expect(200);
+      expect(list.tickets[0].status).toBe('closed');
+      // Closing a Closed one again changes nothing.
+      await as(ana.token)
+        .post(`/support/tickets/${ticket.id}/close`)
+        .expect(200);
+    });
+
+    it('lets an Administrator close any Ticket', async () => {
+      const ticket = await open(ana.token);
+
+      const { body } = await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/close`)
+        .expect(200);
+
+      expect(body).toMatchObject({ id: ticket.id, status: 'closed' });
+      const { body: thread } = await as(ana.token)
+        .get(`/support/tickets/${ticket.id}`)
+        .expect(200);
+      expect(thread.status).toBe('closed');
+      await as(ana.token)
+        .post(`/admin/support/tickets/${ticket.id}/close`)
+        .expect(404);
+    });
+
+    it('opens a Closed Ticket again when either side writes in it', async () => {
+      const ticket = await open(ana.token);
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/close`)
+        .expect(200);
+
+      const { body: byAccount } = await as(ana.token)
+        .post(`/support/tickets/${ticket.id}/messages`)
+        .send({ text: 'Vuelve a pasar.' })
+        .expect(201);
+      expect(byAccount.status).toBe('open');
+
+      await as(ana.token)
+        .post(`/support/tickets/${ticket.id}/close`)
+        .expect(200);
+      const { body: byAdministrator } = await as(administrator.token)
+        .post(`/admin/support/tickets/${ticket.id}/messages`)
+        .send({ text: '¿Sigue pasando?' })
+        .expect(201);
+      expect(byAdministrator.status).toBe('open');
+    });
+
+    it('is refused while Impersonating', async () => {
+      const ticket = await open(ana.token);
+      const {
+        body: { token },
+      } = await as(administrator.token)
+        .post(`/admin/accounts/${ana.id}/impersonations`)
+        .expect(201);
+
+      await as(token)
+        .post(`/support/tickets/${ticket.id}/close`)
+        .expect(403, { reason: 'impersonation-not-allowed' });
+    });
+
+    it('orders the Account’s Open Tickets before its Closed ones', async () => {
+      const closed = await open(ana.token, 'Cerrada');
+      await running.clock.advance(MINUTE);
+      const opened = await open(ana.token, 'Abierta');
+      await running.clock.advance(MINUTE);
+      await as(ana.token)
+        .post(`/support/tickets/${closed.id}/messages`)
+        .send({ text: 'Lo último.' })
+        .expect(201);
+      await as(ana.token)
+        .post(`/support/tickets/${closed.id}/close`)
+        .expect(200);
+
+      const { body } = await as(ana.token).get('/support/tickets').expect(200);
+
+      expect(body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual([
+        opened.id,
+        closed.id,
+      ]);
+    });
+  });
+
   describe("the Administrators' side", () => {
+    it('orders waiting, then the other Open, then Closed, and filters by Open and by Closed', async () => {
+      const closed = await open(ana.token, 'Cerrada');
+      await running.clock.advance(MINUTE);
+      const answered = await open(ana.token, 'Respondida');
+      await as(administrator.token)
+        .post(`/admin/support/tickets/${answered.id}/messages`)
+        .send({ text: 'Mirado.' })
+        .expect(201);
+      await running.clock.advance(MINUTE);
+      const waiting = await open(ana.token, 'Sin respuesta');
+      await running.clock.advance(MINUTE);
+      // Written in last, but Closed: it goes after every Open one.
+      await as(ana.token)
+        .post(`/support/tickets/${closed.id}/messages`)
+        .send({ text: 'Ya está.' })
+        .expect(201);
+      await as(ana.token)
+        .post(`/support/tickets/${closed.id}/close`)
+        .expect(200);
+      const ours = (tickets: { id: string }[]) =>
+        tickets
+          .map((ticket) => ticket.id)
+          .filter((id) => [closed.id, answered.id, waiting.id].includes(id));
+      const statuses = (tickets: { status: string }[]) =>
+        tickets.map((ticket) => ticket.status);
+
+      const all = await as(administrator.token)
+        .get('/admin/support/tickets')
+        .expect(200);
+      expect(ours(all.body.tickets)).toEqual([
+        waiting.id,
+        answered.id,
+        closed.id,
+      ]);
+      const firstClosed = statuses(all.body.tickets).indexOf('closed');
+      expect(statuses(all.body.tickets).slice(firstClosed)).not.toContain(
+        'open',
+      );
+
+      const openOnes = await as(administrator.token)
+        .get('/admin/support/tickets?status=open')
+        .expect(200);
+      expect(ours(openOnes.body.tickets)).toEqual([waiting.id, answered.id]);
+      expect(statuses(openOnes.body.tickets)).not.toContain('closed');
+      expect(openOnes.body.total).toBe(openOnes.body.tickets.length);
+
+      const closedOnes = await as(administrator.token)
+        .get('/admin/support/tickets?status=closed')
+        .expect(200);
+      expect(ours(closedOnes.body.tickets)).toEqual([closed.id]);
+      expect(statuses(closedOnes.body.tickets)).not.toContain('open');
+      // The waiting count is the same whatever the filter.
+      expect(closedOnes.body.waiting).toBe(all.body.waiting);
+
+      await as(administrator.token)
+        .get('/admin/support/tickets?status=pending')
+        .expect(400, { reason: 'invalid-admin-query' });
+    });
+
     it('lists every Ticket, those waiting for an answer first, with its Account', async () => {
       const answered = await open(ana.token, 'Ya respondida');
       await running.clock.advance(MINUTE);
@@ -258,12 +418,11 @@ describe('Support Tickets (e2e)', () => {
       // Every waiting Ticket on the shared database counts, ours among them.
       expect(body.waiting).toBeGreaterThanOrEqual(1);
       const waitingFirst = body.tickets.map(
-        (ticket: { waitingFor: string }) => ticket.waitingFor,
+        (ticket: { status: string; waitingFor: string }) =>
+          ticket.status === 'open' && ticket.waitingFor === 'administrators',
       );
       expect(waitingFirst).toEqual(
-        [...waitingFirst].sort((a, b) =>
-          a === b ? 0 : a === 'administrators' ? -1 : 1,
-        ),
+        [...waitingFirst].sort((a, b) => Number(b) - Number(a)),
       );
     });
 

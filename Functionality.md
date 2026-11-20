@@ -1014,9 +1014,15 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 
 **H14.2 — Answering from the panel.** As an Administrator, I want every Ticket in one place, and to answer it.
 
-- The panel has a fifth tab, **Soporte** (`/admin/support`): every Ticket, those waiting for an answer first, then the other Open ones, then the Closed, the latest written in on top of each. Each row shows its Account, subject, status, who wrote last and when, and when it was opened; a filled **Espera respuesta** marks those whose Account wrote last, and the tab says how many there are.
+- The panel has a fifth tab, **Soporte** (`/admin/support`): every Ticket, those waiting for an answer first, then the other Open ones, then the Closed, the latest written in on top of each. **Todas** (the default), **Abiertas** and **Cerradas** keep every Ticket, only the Open or only the Closed; the count of those waiting is over every Ticket whatever is shown. Each row shows its Account, subject, status, who wrote last and when, and when it was opened; a filled **Espera respuesta** marks those whose Account wrote last, and the tab says how many there are.
 - Whose turn it is is never stored: it is read from who wrote the last message.
 - A Ticket's page in the panel (`/admin/support/<id>`) shows the thread with which Administrator wrote each message, tagged "como Runout" (and "tú" for my own), the Account, and whether it waits for an answer or for the Account. Any Administrator writes in any Ticket, a Suspended Account's included; the Account sees it signed Runout.
+
+**H14.3 — Closing and reopening.** As either side, I want to say a Ticket is settled, and to take it up again if the problem comes back, so Closed always means nothing is pending.
+
+- On a Ticket's page, under **Estado**, **Cerrar incidencia** closes it, on my side for my own Tickets and in the panel for any. A Closed one has no button, and says that writing in it again opens it.
+- Writing in a Closed Ticket, from either side, opens it again with the same **Enviar**; nothing else does.
+- My list keeps the Open ones above the Closed ones, and the panel's Support tab puts the Closed ones last.
 
 ## MVP scope and out of scope
 

@@ -4,6 +4,7 @@ import { CLOCK, type Clock } from '../clock/clock.js';
 import { DATABASE, type Database } from '../database/database.js';
 import {
   identities,
+  SUPPORT_TICKET_STATUSES,
   supportMessages,
   supportTickets,
   type SupportTicketStatus,
@@ -14,7 +15,7 @@ import {
   type Identity,
 } from '../identity/identity.service.js';
 import type { PersonView } from '../identity/invitations.service.js';
-import { adminPage } from '../admin/admin-query.js';
+import { adminPage, oneOf } from '../admin/admin-query.js';
 import { Rejected } from '../rejection/rejection.js';
 
 /** How long a Support Ticket's subject may be, in characters, once trimmed. */
@@ -107,6 +108,13 @@ export interface PanelTicket {
   openedBy: PersonView | null;
   messages: PanelMessage[];
 }
+
+/** The panel's Support filters: Todas, Abiertas and Cerradas. */
+export const PANEL_TICKET_FILTERS = [
+  'all',
+  ...SUPPORT_TICKET_STATUSES,
+] as const;
+export type PanelTicketFilter = (typeof PANEL_TICKET_FILTERS)[number];
 
 /** A page of every Support Ticket, those waiting for an answer first. */
 export interface PanelTicketPage {
@@ -258,21 +266,40 @@ export class SupportService {
     return this.readForAccount(account, ticket.id);
   }
 
+  /** The Account closes one of its Support Tickets: it says the matter is settled. */
+  async closeForAccount(
+    account: Identity,
+    ticketId: string,
+  ): Promise<AccountTicket> {
+    refuseImpersonation(account);
+    const ticket = await this.ticket(
+      ticketId,
+      eq(supportTickets.identityId, account.id),
+    );
+    await this.close(ticket.id);
+    return this.readForAccount(account, ticket.id);
+  }
+
   /**
    * A page of every Support Ticket: those waiting for an answer first, then
    * the other Open ones, then the Closed; the latest written in on top of
-   * each.
+   * each. `status` keeps only the Open or only the Closed; the waiting count
+   * is over every Ticket whatever it keeps.
    */
   async listForPanel(query: {
+    status?: unknown;
     page?: unknown;
     pageSize?: unknown;
   }): Promise<PanelTicketPage> {
+    const filter = oneOf(query.status, PANEL_TICKET_FILTERS);
     const { page, pageSize } = adminPage(query);
     const open = sql`${supportTickets.status} = 'open'`;
+    const kept =
+      filter === 'all' ? undefined : eq(supportTickets.status, filter);
     const [[{ total, waiting }], rows] = await Promise.all([
       this.db
         .select({
-          total: sql<number>`count(*)::int`,
+          total: sql<number>`(count(*) filter (where ${kept ?? sql`true`}))::int`,
           waiting: sql<number>`(count(*) filter (where ${open} and ${accountWroteLast}))::int`,
         })
         .from(supportTickets),
@@ -286,6 +313,7 @@ export class SupportService {
           >`(select m.administrator_id from support_messages m where m.ticket_id = support_tickets.id order by m.seq desc limit 1)`,
         })
         .from(supportTickets)
+        .where(kept)
         .orderBy(
           sql`case when ${open} and ${accountWroteLast} then 0 when ${open} then 1 else 2 end`,
           sql`${lastWrittenAt} desc`,
@@ -364,17 +392,39 @@ export class SupportService {
     return this.readForPanel(ticket.id);
   }
 
+  /** An Administrator closes any Support Ticket, so it stops counting as pending. */
+  async closeForPanel(ticketId: string): Promise<PanelTicket> {
+    const ticket = await this.ticket(ticketId);
+    await this.close(ticket.id);
+    return this.readForPanel(ticket.id);
+  }
+
+  /** Writes a Support Message; in a Closed Ticket it opens it again, since something is pending once more. */
   private async write(
     ticketId: string,
     administratorId: string | null,
     text: string,
   ): Promise<void> {
-    await this.db.insert(supportMessages).values({
-      ticketId,
-      administratorId,
-      text,
-      writtenAt: this.clock.now(),
+    await this.db.transaction(async (tx) => {
+      await tx.insert(supportMessages).values({
+        ticketId,
+        administratorId,
+        text,
+        writtenAt: this.clock.now(),
+      });
+      await tx
+        .update(supportTickets)
+        .set({ status: 'open' })
+        .where(eq(supportTickets.id, ticketId));
     });
+  }
+
+  /** Closes a Support Ticket; a Closed one stays as it is. */
+  private async close(ticketId: string): Promise<void> {
+    await this.db
+      .update(supportTickets)
+      .set({ status: 'closed' })
+      .where(eq(supportTickets.id, ticketId));
   }
 
   /** The Support Ticket, if it is there and meets `scope`; `support-ticket-not-found` otherwise. */

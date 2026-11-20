@@ -14,6 +14,10 @@ export const SUPPORT_POLL_MS = 15_000
 /** Open while something is pending, Closed once settled. */
 export type SupportTicketStatus = 'open' | 'closed'
 
+/** The panel's Support filters: Todas, Abiertas and Cerradas, Todas first. */
+export const PANEL_TICKET_FILTERS = ['all', 'open', 'closed'] as const
+export type PanelTicketFilter = (typeof PANEL_TICKET_FILTERS)[number]
+
 /** Who wrote a Support Message, as the Account sees it: itself, or Runout for every Administrator. */
 export type AccountSide = 'account' | 'runout'
 

@@ -19,6 +19,11 @@ export function readTicket(token: Token, id: string): Promise<AccountTicket> {
   return api(`/support/tickets/${id}`, { token: token ?? undefined })
 }
 
+/** Closes one of the Account's Support Tickets, answering with the thread. */
+export function closeTicket(token: Token, id: string): Promise<AccountTicket> {
+  return api(`/support/tickets/${id}/close`, { token: token ?? undefined, method: 'POST' })
+}
+
 /** Writes in one of the Account's Support Tickets, answering with the thread. */
 export function writeInTicket(token: Token, id: string, text: string): Promise<AccountTicket> {
   return api(`/support/tickets/${id}/messages`, { token: token ?? undefined, method: 'POST', body: { text } })

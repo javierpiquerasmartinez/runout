@@ -183,6 +183,45 @@ describe('Support · a Ticket’s thread', () => {
   })
 })
 
+describe('Support · closing and reopening', () => {
+  it('closes an Open Ticket, and then says writing in it opens it again', async () => {
+    const calls = fakeApi({
+      'GET /support/tickets/t1': () => Response.json(ticket()),
+      'POST /support/tickets/t1/close': () => Response.json(ticket({ status: 'closed' })),
+    })
+    renderAt('/support/t1')
+    expect(await screen.findByText('Close it once it’s settled. If you write in it again, it opens again.')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close ticket' }))
+
+    expect(await screen.findByText('It’s closed. If you write in it again, it opens again.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Close ticket' })).toBeNull()
+    expect(screen.getAllByText('Closed').length).toBeGreaterThan(0)
+    expect(calls.some((call) => call.method === 'POST' && call.path === '/support/tickets/t1/close')).toBe(true)
+  })
+
+  it('opens a Closed Ticket again by writing in it', async () => {
+    fakeApi({
+      'GET /support/tickets/t1': () => Response.json(ticket({ status: 'closed' })),
+      'POST /support/tickets/t1/messages': () =>
+        Response.json(
+          ticket({
+            messages: [...ticket().messages, { id: 'm2', from: 'account', text: 'It happens again.', writtenAt: '2026-11-19T09:30:00.000Z' }],
+          }),
+          { status: 201 },
+        ),
+    })
+    renderAt('/support/t1')
+    await screen.findByText('It’s closed. If you write in it again, it opens again.')
+
+    await userEvent.type(screen.getByLabelText('Reply'), 'It happens again.')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(await screen.findByRole('button', { name: 'Close ticket' })).toBeTruthy()
+    expect(screen.queryByText('Closed')).toBeNull()
+  })
+})
+
 describe('Support · while impersonating', () => {
   it('is locked, and asks nothing of the server', async () => {
     const calls = fakeApi({})

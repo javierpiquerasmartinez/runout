@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { followLink } from '../routing'
-import type { PanelTicketPage } from '../support/support'
+import { PANEL_TICKET_FILTERS, type PanelTicketFilter, type PanelTicketPage } from '../support/support'
 import { SupportStatusBadge } from '../support/SupportThread'
 import { Icon } from '../ui/Icon'
+import { SegmentedControl } from '../ui/SegmentedControl'
 import { adminSupportTicketPath, nameOf } from './admin'
 import { AdminPagination } from './AdminPagination'
 import { useAdminApi } from './useAdminApi'
@@ -13,37 +14,48 @@ import '../support/Support.css'
 /**
  * The Support tab: every Support Ticket, those waiting for an answer first
  * (their Account wrote last), then the other Open ones, then the Closed;
- * the latest written in on top of each. Each opens its thread.
+ * the latest written in on top of each. Todas, Abiertas and Cerradas keep
+ * every one, the Open ones or the Closed. Each opens its thread.
  */
 export function SupportTab() {
   const { t, formatDate, formatRelative } = useI18n()
   const admin = useAdminApi()
+  const [filter, setFilter] = useState<PanelTicketFilter>('all')
   const [pageNumber, setPageNumber] = useState(1)
   const [page, setPage] = useState<PanelTicketPage | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)
 
   const reload = useCallback(() => {
-    admin<PanelTicketPage>(`/support/tickets?${new URLSearchParams({ page: String(pageNumber) })}`)
+    admin<PanelTicketPage>(`/support/tickets?${new URLSearchParams({ status: filter, page: String(pageNumber) })}`)
       .then((found) => {
         setPage(found)
         setFailure(null)
       })
       .catch((error: unknown) => setFailure(reasonOf(error)))
-  }, [admin, pageNumber])
+  }, [admin, filter, pageNumber])
   useEffect(reload, [reload])
 
   const date = (iso: string) => formatDate(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric' })
 
   return (
     <section className="admin-section" aria-label={t('admin.tab.support')}>
-      {page && (
-        <div className="admin-toolbar">
+      <div className="admin-toolbar">
+        <SegmentedControl
+          label={t('admin.support.filter')}
+          options={PANEL_TICKET_FILTERS.map((value) => ({ value, label: t(`admin.support.filter.${value}`) }))}
+          value={filter}
+          onChange={(value) => {
+            setFilter(value)
+            setPageNumber(1)
+          }}
+        />
+        {page && (
           <span className="support-waiting">
             <span className="support-waiting__dot" aria-hidden="true" data-none={page.waiting === 0 || undefined} />
             {t('admin.support.waiting', { count: page.waiting })}
           </span>
-        </div>
-      )}
+        )}
+      </div>
       {failure && (
         <p className="admin-notice" data-tone="alert" role="alert">
           {t(`reason.${failure}`)}
