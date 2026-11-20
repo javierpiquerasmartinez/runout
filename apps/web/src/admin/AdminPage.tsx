@@ -17,7 +17,7 @@ export function AdminPage({ tab }: { tab: AdminTab }) {
   const { t } = useI18n()
   return (
     <div className="admin">
-      <AppHeader where={t('admin.title')} />
+      <AppHeader current="admin" where={t('admin.title')} />
       <main className="admin__main">
         <h1 className="admin__title ro-serif">{t('admin.title')}</h1>
         <nav className="admin__tabs" aria-label={t('admin.tabs')}>
