@@ -1,17 +1,16 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { useImpersonationLock } from '../identity/impersonationLock'
-import { RoomDialog } from '../room/RoomDialog'
-import { followLink, navigate } from '../routing'
+import { followLink } from '../routing'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { TextField } from '../ui/TextField'
-import { MAX_SUPPORT_MESSAGE_LENGTH, MAX_SUPPORT_SUBJECT_LENGTH, supportTicketPath, type AccountTicketSummary } from './support'
-import { listTickets, openTicket } from './supportApi'
-import { SupportCount, SupportStatusBadge } from './SupportThread'
+import { NewTicketDialog } from './NewTicketDialog'
+import { supportTicketPath, type AccountTicketSummary } from './support'
+import { listTickets } from './supportApi'
+import { SupportStatusBadge } from './SupportThread'
 import './Support.css'
 
 /**
@@ -104,83 +103,5 @@ export function SupportPage() {
       </main>
       {opening && <NewTicketDialog onClose={() => setOpening(false)} />}
     </div>
-  )
-}
-
-/**
- * "Nueva incidencia": a subject and a first message, both required, so
- * "Enviar" stays locked until both are written. Sending opens the Ticket
- * and goes to its page; a refusal says why, keeping what was typed.
- */
-function NewTicketDialog({ onClose }: { onClose: () => void }) {
-  const { t } = useI18n()
-  const { token } = useIdentity()
-  const messageId = useId()
-  const [subject, setSubject] = useState('')
-  const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<FailureReason | null>(null)
-
-  async function send() {
-    setBusy(true)
-    try {
-      const opened = await openTicket(token, { subject, message })
-      navigate(supportTicketPath(opened.id))
-    } catch (caught) {
-      setFailure(reasonOf(caught))
-      setBusy(false)
-    }
-  }
-
-  const sendLocked = busy
-    ? t('support.sending')
-    : subject.trim() === ''
-      ? t('support.new.needsSubject')
-      : message.trim() === ''
-        ? t('support.new.needsMessage')
-        : undefined
-  return (
-    <RoomDialog
-      title={t('support.new.title')}
-      body={t('support.new.body')}
-      onClose={onClose}
-      lockedReason={busy ? t('support.sending') : undefined}
-      actions={
-        <Button variant="primary" disabledReason={sendLocked} aria-busy={busy || undefined} onClick={() => void send()}>
-          {t('support.send')}
-        </Button>
-      }
-    >
-      <div className="support-new">
-        <TextField
-          label={t('support.new.subject')}
-          placeholder={t('support.new.subjectPlaceholder')}
-          maxLength={MAX_SUPPORT_SUBJECT_LENGTH}
-          value={subject}
-          onChange={(event) => setSubject(event.target.value)}
-        />
-        <div className="ro-field">
-          <div className="support-new__label">
-            <label htmlFor={messageId} className="ro-field__label">
-              {t('support.new.message')}
-            </label>
-            <SupportCount length={message.length} />
-          </div>
-          <textarea
-            id={messageId}
-            className="ro-field__input ro-field__description support-new__message"
-            placeholder={t('support.new.messagePlaceholder')}
-            maxLength={MAX_SUPPORT_MESSAGE_LENGTH}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-          />
-        </div>
-        {failure && (
-          <p className="support-new__failure" role="alert">
-            {t(`reason.${failure}`)}
-          </p>
-        )}
-      </div>
-    </RoomDialog>
   )
 }
