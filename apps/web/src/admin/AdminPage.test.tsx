@@ -418,8 +418,8 @@ describe('the Rooms tab', () => {
     const rows = await screen.findAllByRole('row')
     expect(rows).toHaveLength(3)
     expect(rows[1].textContent).toMatch(/Martes NL50.*RNT4-K9PX.*Javier.*Open.*3.*12/)
-    expect(calls[0].search).toContain('status=open')
-    expect(calls[0].search).toContain('sort=lastActivityAt&direction=asc')
+    expect(calls.find((call) => call.path === '/admin/rooms')?.search).toContain('status=open')
+    expect(calls.find((call) => call.path === '/admin/rooms')?.search).toContain('sort=lastActivityAt&direction=asc')
 
     await userEvent.click(screen.getByRole('radio', { name: 'All' }))
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(4))
@@ -550,7 +550,7 @@ describe('the Imports tab', () => {
     expect(rows[3].textContent).toMatch(/Failed.*53100 after 3 attempts/)
     expect(rows[4].textContent).toMatch(/Paused.*Storage at its limit/)
     expect(rows[6].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 not recognised · More than nine seats: 2/)
-    expect(calls[0].search).toContain('status=all')
+    expect(calls.find((call) => call.path === '/admin/bulk-imports')?.search).toContain('status=all')
   })
 
   it('shows the database size against the threshold at which imports pause', async () => {

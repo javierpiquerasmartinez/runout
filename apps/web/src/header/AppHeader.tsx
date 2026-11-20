@@ -1,5 +1,6 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { adminPath } from '../admin/admin'
+import { useAdminApi } from '../admin/useAdminApi'
 import { calendarPath } from '../calendar/calendar'
 import { goalsPath } from '../goals/goals'
 import { homePath } from '../home/home'
@@ -13,6 +14,10 @@ import { roomsPath } from '../rooms/rooms'
 import { followLink } from '../routing'
 import { settingsPath } from '../settings/paths'
 import { supportPath } from '../support/paths'
+import { SUPPORT_MARK_POLL_MS } from '../support/support'
+import { unreadTickets } from '../support/supportApi'
+import { useSupportChanges } from '../support/supportChanges'
+import { usePolled } from '../support/usePolled'
 import { Avatar } from '../ui/Avatar'
 import { Brand } from '../ui/Brand'
 import { Icon } from '../ui/Icon'
@@ -119,10 +124,22 @@ export function BackToRoom({ code, name }: { code: string; name: string }) {
   )
 }
 
-/** The Administrator's way to the panel: the shield, marked while in it. */
+/**
+ * The Administrator's way to the panel: the shield, marked while in it, with
+ * how many Open Support Tickets wait for an answer (none shown at zero). The
+ * count is the same for every Administrator, and is read again every so often.
+ */
 function AdministratorButton({ current }: { current: boolean }) {
   const { t } = useI18n()
-  const label = t('header.administration')
+  const admin = useAdminApi()
+  const changes = useSupportChanges()
+  const load = useCallback(() => admin<{ waiting: number }>('/support/tickets/waiting'), [admin])
+  // An answer from this browser reads the count again at once.
+  const waiting = usePolled(load, SUPPORT_MARK_POLL_MS, true, changes).value?.waiting ?? 0
+  const label =
+    waiting === 0
+      ? t('header.administration')
+      : t(waiting === 1 ? 'header.administration.waiting.one' : 'header.administration.waiting.other', { count: waiting })
   return (
     <a
       href={adminPath}
@@ -133,14 +150,25 @@ function AdministratorButton({ current }: { current: boolean }) {
       onClick={followLink}
     >
       <Icon name="administration" size={16} />
+      {waiting > 0 && (
+        <span className="app-header__count" aria-hidden="true">
+          {waiting}
+        </span>
+      )}
     </a>
   )
 }
 
-/** The avatar, opening onto the Display Name, Support (for Accounts that aren't Administrators), Settings and signing out. */
+/**
+ * The avatar, opening onto the Display Name, Support (for Accounts that
+ * aren't Administrators), Settings and signing out. For those Accounts it is
+ * marked while some Support Ticket has an answer unread, read again every so
+ * often, and Support says how many.
+ */
 function AccountMenu() {
   const { t } = useI18n()
   const { identity } = useIdentity()
+  const unread = useUnreadTickets(!identity.administrator && !identity.impersonation)
   const { signOut, busy, failure } = useSignOut()
   const [open, setOpen] = useState(false)
   const menuId = useId()
@@ -168,12 +196,13 @@ function AccountMenu() {
       <button
         type="button"
         className="app-header__avatar ro-touch-target"
-        aria-label={t('header.accountMenu')}
+        aria-label={unread > 0 ? t('header.accountMenu.unread') : t('header.accountMenu')}
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen(!open)}
       >
         <Avatar name={name || '?'} seed={identity.id} size={28} />
+        {unread > 0 && <span className="app-header__unread" aria-hidden="true" />}
       </button>
       {open && (
         <div id={menuId} className="app-header__menu" role="group" aria-label={t('header.accountMenu')}>
@@ -189,7 +218,13 @@ function AccountMenu() {
               }}
             >
               <Icon name="help" size={16} />
-              {t('header.support')}
+              <span className="app-header__menu-label">{t('header.support')}</span>
+              {unread > 0 && (
+                <span className="app-header__menu-new">
+                  <span className="app-header__menu-new-dot" aria-hidden="true" />
+                  {t(unread === 1 ? 'header.support.unread.one' : 'header.support.unread.other', { count: unread })}
+                </span>
+              )}
             </a>
           )}
           <a
@@ -215,4 +250,13 @@ function AccountMenu() {
       )}
     </div>
   )
+}
+
+/** How many of the Account's Support Tickets have an answer unread; nothing is asked while `enabled` is false. */
+function useUnreadTickets(enabled: boolean): number {
+  const { token } = useIdentity()
+  const changes = useSupportChanges()
+  const load = useCallback(() => unreadTickets(token), [token])
+  // Reading an unread answer reads the mark again at once.
+  return usePolled(load, SUPPORT_MARK_POLL_MS, enabled, changes).value?.unread ?? 0
 }

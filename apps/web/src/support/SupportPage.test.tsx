@@ -32,6 +32,7 @@ function summary(id: string, subject: string, extra: Partial<AccountTicketSummar
     status: 'open',
     createdAt: '2026-11-18T10:02:00.000Z',
     lastMessage: { from: 'account', writtenAt: '2026-11-18T10:02:00.000Z' },
+    unread: false,
     ...extra,
   }
 }
@@ -43,7 +44,7 @@ function ticket(extra: Partial<AccountTicket> = {}): AccountTicket {
     status: 'open',
     openedBy: 'account',
     createdAt: '2026-11-18T10:02:00.000Z',
-    messages: [{ id: 'm1', from: 'account', text: 'The hero is another player.', writtenAt: '2026-11-18T10:02:00.000Z' }],
+    messages: [{ id: 'm1', from: 'account', text: 'The hero is another player.', writtenAt: '2026-11-18T10:02:00.000Z', unread: false }],
     ...extra,
   }
 }
@@ -81,6 +82,80 @@ describe('Support · the list of Tickets', () => {
     renderAt('/support')
 
     expect(await screen.findByText('You haven’t opened any tickets yet.')).toBeTruthy()
+  })
+})
+
+describe('Support · unread answers', () => {
+  it('marks the Tickets with an answer unread', async () => {
+    fakeApi({
+      'GET /support/tickets': () =>
+        Response.json({
+          tickets: [
+            summary('t1', 'My 2023 import stopped halfway', { unread: true, lastMessage: { from: 'runout', writtenAt: '2026-11-19T09:30:00.000Z' } }),
+            summary('t2', 'Can I export my ranges?'),
+          ],
+        }),
+    })
+
+    renderAt('/support')
+
+    const [unread, read] = within(await screen.findByRole('table')).getAllByRole('row').slice(1)
+    expect(within(unread).getByRole('img', { name: 'Unread answer' })).toBeTruthy()
+    expect(within(unread).getByText('New answer')).toBeTruthy()
+    expect(within(read).queryByRole('img', { name: 'Unread answer' })).toBeNull()
+    expect(within(read).queryByText('New answer')).toBeNull()
+  })
+
+  it('reads the list again every so often, so new answers turn up', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let unread = false
+    fakeApi({ 'GET /support/tickets': () => Response.json({ tickets: [summary('t1', 'My 2023 import stopped halfway', { unread })] }) })
+    renderAt('/support')
+    expect(await screen.findByRole('table')).toBeTruthy()
+    expect(screen.queryByText('New answer')).toBeNull()
+
+    unread = true
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+
+    expect(await screen.findByText('New answer')).toBeTruthy()
+  })
+
+  it('sets the unread messages apart in the thread, and keeps them so while it is open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const thread = (unread: boolean) =>
+      ticket({
+        messages: [
+          ...ticket().messages,
+          { id: 'm2', from: 'runout', text: 'What time was it?', writtenAt: '2026-11-18T12:15:00.000Z', unread },
+        ],
+      })
+    // The first read is the Account's reading it: the next says it was read.
+    let read = thread(true)
+    fakeApi({
+      'GET /support/tickets/t1': () => {
+        const answer = Response.json(read)
+        read = thread(false)
+        return answer
+      },
+    })
+    renderAt('/support/t1')
+
+    const divider = await screen.findByRole('separator', { name: 'New messages' })
+    const articles = screen.getAllByRole('article')
+    expect(articles[0].compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(divider.compareDocumentPosition(articles[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    expect(screen.getByRole('separator', { name: 'New messages' })).toBeTruthy()
+  })
+
+  it('draws no divider when nothing was unread', async () => {
+    fakeApi({ 'GET /support/tickets/t1': () => Response.json(ticket()) })
+
+    renderAt('/support/t1')
+
+    expect(await screen.findAllByRole('article')).toHaveLength(1)
+    expect(screen.queryByRole('separator', { name: 'New messages' })).toBeNull()
   })
 })
 
@@ -134,11 +209,11 @@ describe('Support · a Ticket’s thread', () => {
     const answered = ticket({
       messages: [
         ...ticket().messages,
-        { id: 'm2', from: 'runout', text: 'What time was it?', writtenAt: '2026-11-18T12:15:00.000Z' },
+        { id: 'm2', from: 'runout', text: 'What time was it?', writtenAt: '2026-11-18T12:15:00.000Z', unread: false },
       ],
     })
     const written = ticket({
-      messages: [...answered.messages, { id: 'm3', from: 'account', text: 'At 22:41.', writtenAt: '2026-11-18T12:40:00.000Z' }],
+      messages: [...answered.messages, { id: 'm3', from: 'account', text: 'At 22:41.', writtenAt: '2026-11-18T12:40:00.000Z', unread: false }],
     })
     const calls = fakeApi({
       'GET /support/tickets/t1': () => Response.json(answered),
@@ -167,7 +242,7 @@ describe('Support · a Ticket’s thread', () => {
     expect(await screen.findAllByRole('article')).toHaveLength(1)
 
     current = ticket({
-      messages: [...current.messages, { id: 'm2', from: 'runout', text: 'Looking into it.', writtenAt: '2026-11-18T12:15:00.000Z' }],
+      messages: [...current.messages, { id: 'm2', from: 'runout', text: 'Looking into it.', writtenAt: '2026-11-18T12:15:00.000Z', unread: false }],
     })
     await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
 
@@ -206,7 +281,7 @@ describe('Support · closing and reopening', () => {
       'POST /support/tickets/t1/messages': () =>
         Response.json(
           ticket({
-            messages: [...ticket().messages, { id: 'm2', from: 'account', text: 'It happens again.', writtenAt: '2026-11-19T09:30:00.000Z' }],
+            messages: [...ticket().messages, { id: 'm2', from: 'account', text: 'It happens again.', writtenAt: '2026-11-19T09:30:00.000Z', unread: false }],
           }),
           { status: 201 },
         ),

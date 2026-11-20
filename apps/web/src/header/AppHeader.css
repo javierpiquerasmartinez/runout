@@ -116,11 +116,31 @@
   outline-offset: var(--focus-offset);
 }
 
+/* How many Open Support Tickets wait for an answer: a brass pill on the button's corner. */
+.app-header__count {
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--brass);
+  color: var(--color-canvas);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--color-panel);
+}
+
 .app-header__account {
   position: relative;
   display: flex;
 }
 .app-header__avatar {
+  position: relative;
   display: flex;
   padding: 0;
   border: 0;
@@ -161,6 +181,38 @@
   border: 0;
   border-top: 1px solid var(--color-border);
 }
+/* Some Support Ticket has an answer unread: a brass dot on the avatar's corner. */
+.app-header__unread {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--brass);
+  box-shadow: 0 0 0 2px var(--color-panel);
+}
+
+.app-header__menu-label {
+  flex-grow: 1;
+}
+/* "1 nueva" beside Support. */
+.app-header__menu-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brass-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.app-header__menu-new-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brass);
+}
+
 .app-header__menu-item {
   height: 34px;
   box-sizing: border-box;

@@ -2,6 +2,7 @@
 // `pnpm db:generate` after changing this file to write a migration.
 import {
   type AnyPgColumn,
+  bigint,
   bigserial,
   boolean,
   check,
@@ -1147,6 +1148,13 @@ export const supportTickets = pgTable(
     /** The Bulk Import of that Account it points at; null for a generic one. */
     bulkImportId: uuid('bulk_import_id').references(() => bulkImports.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    /**
+     * The `seq` of the last Support Message the Account has read in it; null
+     * while it has read none. Every Support Message from Runout after it is
+     * unread, so a Ticket an Administrator opened starts unread. The
+     * Administrators have no read state of their own.
+     */
+    accountReadSeq: bigint('account_read_seq', { mode: 'number' }),
   },
   (table) => [index('support_tickets_identity_id_idx').on(table.identityId)],
 );

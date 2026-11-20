@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { AppHeader } from '../header/AppHeader'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
@@ -12,7 +12,8 @@ import './Support.css'
 
 /**
  * One of the Account's Support Tickets: its thread in order, every
- * Administrator signed "Runout", and where to write the next message. It is
+ * Administrator signed "Runout", those messages it hadn't read set apart
+ * under "Nuevo", and where to write the next message. It is
  * read again every so often while on screen, so answers turn up without a
  * reload. The Account closes it once settled, and writing in a Closed one
  * opens it again. Locked while impersonating, and then nothing is read.
@@ -23,6 +24,12 @@ export function SupportTicketPage({ id }: { id: string }) {
   const locked = useImpersonationLock('support')
   const load = useCallback(() => readTicket(token, id), [token, id])
   const { value: ticket, failure, replace } = usePolled<AccountTicket>(load, SUPPORT_POLL_MS, !locked)
+  // Where the unread messages began when the Account opened it: reading the
+  // thread marks them read, so later reads no longer say so, but they stay
+  // set apart while the page is open.
+  const [newFrom, setNewFrom] = useState<string>()
+  const firstUnread = ticket?.messages.find((message) => message.unread)?.id
+  if (firstUnread && !newFrom) setNewFrom(firstUnread)
 
   const entries: ThreadEntry[] =
     ticket?.messages.map((message) => ({
@@ -54,7 +61,7 @@ export function SupportTicketPage({ id }: { id: string }) {
             </div>
             <div className="support-ticket">
               <div className="support-ticket__thread">
-                <SupportThread entries={entries} />
+                <SupportThread entries={entries} newFrom={newFrom} />
                 <SupportComposer
                   hint={t('support.reply.hint')}
                   lockedReason={locked}

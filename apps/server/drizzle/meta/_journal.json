@@ -351,6 +351,13 @@
       "when": 1795185458865,
       "tag": "0049_support_tickets",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795187548362,
+      "tag": "0050_support_account_read",
+      "breakpoints": true
     }
   ]
 }
