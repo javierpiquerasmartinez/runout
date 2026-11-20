@@ -533,6 +533,7 @@ describe('the Imports tab', () => {
       ['Accounts', '/admin/accounts'],
       ['Rooms', '/admin/rooms'],
       ['Imports', '/admin/imports'],
+      ['Support', '/admin/support'],
     ])
     expect(within(nav).getByRole('link', { name: 'Imports' }).getAttribute('aria-current')).toBe('page')
     await screen.findAllByRole('row')

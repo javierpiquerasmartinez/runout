@@ -12,6 +12,7 @@ import { roomPath } from '../room/roomCode'
 import { roomsPath } from '../rooms/rooms'
 import { followLink } from '../routing'
 import { settingsPath } from '../settings/paths'
+import { supportPath } from '../support/paths'
 import { Avatar } from '../ui/Avatar'
 import { Brand } from '../ui/Brand'
 import { Icon } from '../ui/Icon'
@@ -136,7 +137,7 @@ function AdministratorButton({ current }: { current: boolean }) {
   )
 }
 
-/** The avatar, opening onto the Display Name, Settings and signing out. */
+/** The avatar, opening onto the Display Name, Support (for Accounts that aren't Administrators), Settings and signing out. */
 function AccountMenu() {
   const { t } = useI18n()
   const { identity } = useIdentity()
@@ -178,6 +179,19 @@ function AccountMenu() {
         <div id={menuId} className="app-header__menu" role="group" aria-label={t('header.accountMenu')}>
           <span className="app-header__menu-name">{name}</span>
           <hr className="app-header__menu-rule" />
+          {!identity.administrator && (
+            <a
+              href={supportPath}
+              className="app-header__menu-item"
+              onClick={(event) => {
+                setOpen(false)
+                followLink(event)
+              }}
+            >
+              <Icon name="help" size={16} />
+              {t('header.support')}
+            </a>
+          )}
           <a
             href={settingsPath}
             className="app-header__menu-item"

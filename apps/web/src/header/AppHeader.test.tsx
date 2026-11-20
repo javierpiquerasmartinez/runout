@@ -322,3 +322,22 @@ describe('AppHeader · the Administrator panel', () => {
     expect(screen.queryByRole('link', { name: 'Administration' })).toBeNull()
   })
 })
+
+describe('AppHeader · Support', () => {
+  it('offers "Support" in the menu to an Account that is not an Administrator, leading to its Tickets', async () => {
+    renderHeader(fakeSession({ administrator: false }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Support' }))
+
+    expect(window.location.pathname).toBe('/support')
+  })
+
+  it('offers it to no Administrator', async () => {
+    renderHeader(fakeSession({ administrator: true }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+
+    expect(screen.queryByRole('link', { name: 'Support' })).toBeNull()
+  })
+})

@@ -10,6 +10,7 @@ import { libraryHandIdFromPath, libraryViewFromPath, roomCodeFromLibraryPath } f
 import { useHeldRoom } from '../room/heldRoomContext'
 import { formatRoomCode } from '../room/roomCode'
 import { roomsPath } from '../rooms/rooms'
+import { supportPath, supportTicketIdFromPath } from '../support/paths'
 import { usePath } from '../routing'
 import {
   AdminPage,
@@ -23,6 +24,8 @@ import {
   MilestonePage,
   preloadAccountPages,
   RoomsPage,
+  SupportPage,
+  SupportTicketPage,
 } from './pages'
 import { Redirect } from './Redirect'
 
@@ -61,6 +64,9 @@ export function AccountRoutes() {
     return <CalendarPage period={period} />
   }
   if (path === goalsPath) return <GoalsPage />
+  if (path === supportPath) return <SupportPage />
+  const ticketId = supportTicketIdFromPath(path)
+  if (ticketId) return <SupportTicketPage key={ticketId} id={ticketId} />
   // One screen for both views, so switching keeps its state; it reads which from the path.
   if (libraryViewFromPath(path)) return <LibraryPage />
   const pickingFor = roomCodeFromLibraryPath(path)

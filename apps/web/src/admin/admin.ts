@@ -4,16 +4,29 @@ import type { Plan } from '../plans/plans'
 /** The Administrator panel (ADR 0008): only routed for Administrators, a path like any other for everyone else. */
 export const adminPath = '/admin'
 
-export const ADMIN_TABS = ['invitations', 'accounts', 'rooms', 'imports'] as const
+export const ADMIN_TABS = ['invitations', 'accounts', 'rooms', 'imports', 'support'] as const
 export type AdminTab = (typeof ADMIN_TABS)[number]
 
 export function adminTabPath(tab: AdminTab): string {
   return `${adminPath}/${tab}`
 }
 
-/** The tab a panel path opens, or null when it isn't one; `/admin` opens on Invitations. */
+/** A Support Ticket's page in the panel. */
+export function adminSupportTicketPath(id: string): string {
+  return `${adminTabPath('support')}/${id}`
+}
+
+/** The Support Ticket a panel path opens, or null when it isn't one. */
+export function adminSupportTicketIdFromPath(path: string): string | null {
+  const prefix = `${adminTabPath('support')}/`
+  const id = path.startsWith(prefix) ? path.slice(prefix.length) : ''
+  return /^[^/]+$/.test(id) ? id : null
+}
+
+/** The tab a panel path opens, or null when it isn't one; `/admin` opens on Invitations, and a Support Ticket's page is in Support. */
 export function adminTabFromPath(path: string): AdminTab | null {
   if (path === adminPath) return 'invitations'
+  if (adminSupportTicketIdFromPath(path)) return 'support'
   const tab = path.startsWith(`${adminPath}/`) ? path.slice(adminPath.length + 1) : null
   return ADMIN_TABS.find((each) => each === tab) ?? null
 }
