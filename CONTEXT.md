@@ -408,7 +408,7 @@ _Avoid_: Closed, done, failed, archived
 ### Support
 
 **Support Ticket**:
-A conversation between one Account and Runout's Administrators about a single matter, with a subject and a thread of Support Messages. An Account can have many, each Open or Closed: either side can close one, and whoever writes in a Closed one opens it again. Whose turn it is to answer is never set by anyone, only read from who wrote last. The Account opens one with the Administrators, or an Administrator opens one with an Account; never by Impersonating it. It may be about anything, or point at the Bulk Import it is about. The UI calls it "Incidencia".
+A conversation between one Account and Runout's Administrators about a single matter, with a subject and a thread of Support Messages. An Account can have many, each Open or Closed: either side can close one, and whoever writes in a Closed one opens it again. Whose turn it is to answer is never set by anyone, only read from who wrote last. The Account opens one with the Administrators, or an Administrator opens one with an Account; never by Impersonating it, and never with an Administrator, who has no Support of their own. It may be about anything, or point at the Bulk Import it is about. The UI calls it "Incidencia".
 _Avoid_: Chat, message, issue, request, case, incidencia (UI only)
 
 **Support Message**:

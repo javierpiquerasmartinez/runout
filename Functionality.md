@@ -1011,11 +1011,13 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 - Where an ordinary import fails in the import dialog (a file it could not read, an import refused on confirming, a Bulk Import's upload that stopped), **Reportar un problema** opens the same dialog with the subject "No se han podido importar mis manos" and the failure already written into the message, in my language: where I was importing (my Library, or which Room), the files with their sizes, and the reason shown. I can edit both before sending, nothing is sent until I do, and cancelling leaves the import dialog as it was. An ordinary import has no record, so the Ticket points at nothing. Like the rest of Support, it is locked while I am Impersonated, and neither an anonymous Participant nor an Administrator is offered it.
 - A Ticket's page (`/support/<id>`) shows its thread in order, each message with its writer and when; every Administrator's message is signed **Runout**, never with who wrote it. Below it I write the next message, with a counter of the 4,000 characters.
 - I only ever see my own Tickets. While an Administrator Impersonates me, Support is refused by the server and locked on screen with the reason, and nothing is read.
+- An Administrator has no Support of their own: acting as themselves, the server refuses them every part of the Account's side of Support.
 
 **H14.2 — Answering from the panel.** As an Administrator, I want every Ticket in one place, and to answer it.
 
 - The panel has a fifth tab, **Soporte** (`/admin/support`): every Ticket, those waiting for an answer first, then the other Open ones, then the Closed, the latest written in on top of each. **Todas** (the default), **Abiertas** and **Cerradas** keep every Ticket, only the Open or only the Closed; the count of those waiting is over every Ticket whatever is shown. Each row shows its Account, subject, status, who wrote last and when, and when it was opened; a filled **Espera respuesta** marks those whose Account wrote last, and the tab says how many there are.
 - Whose turn it is is never stored: it is read from who wrote the last message.
+- The tab, like a Ticket's page, is read again every 15 seconds while on screen, so a new Ticket or answer turns up without a reload.
 - A Ticket's page in the panel (`/admin/support/<id>`) shows the thread with which Administrator wrote each message, tagged "como Runout" (and "tú" for my own), the Account, and whether it waits for an answer or for the Account. Any Administrator writes in any Ticket, a Suspended Account's included; the Account sees it signed Runout.
 
 **H14.3 — Closing and reopening.** As either side, I want to say a Ticket is settled, and to take it up again if the problem comes back, so Closed always means nothing is pending.
@@ -1026,8 +1028,9 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 
 **H14.4 — Opening a Ticket from the panel.** As an Administrator, I want to reach an Account from Runout about something of its own.
 
-- Every row of the Accounts tab ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
+- Every row of the Accounts tab but an Administrator's (mine included) ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
 - A Suspended Account can't be given a new Ticket: the server refuses it, and on its row **Abrir incidencia** is locked with "Esta cuenta está suspendida". Its existing Tickets stay readable and answerable from the panel.
+- No Ticket can be opened with an Administrator, from the Accounts tab or the Importaciones tab: the server refuses it ("Los administradores no tienen Soporte propio"), and their rows don't offer it.
 
 **H14.5 — Support emails.** As either side, I want to hear about Support even when I'm not in Runout.
 
@@ -1047,9 +1050,9 @@ An Account and the Administrators talk through **Support Tickets** ("Incidencias
 **H14.7 — Tickets about a Bulk Import.** As either side, I want a Ticket to point at the Bulk Import it is about, so nobody has to describe which one it was.
 
 - In the Library's Importaciones, a Bulk Import that failed or ended early (its Library or Plan full, files it could not read or recognise) offers **Reportar un problema**: the new-Ticket dialog with the import attached (its files, status, when it started and its Hands), the subject "Problema con la importación <archivo>" and an empty message, both editable. The Ticket points at that Bulk Import. Like the rest of Support, it is locked while I am Impersonated and not offered to an Administrator.
-- Every row of the panel's Importaciones tab ends with **Abrir incidencia**: a Ticket with that import's Account, pointing at it, shown attached with why it failed, and the subject prefilled ("Tu importación <archivo> se ha detenido" for one that ended badly, "Sobre tu importación <archivo>" otherwise). For a Suspended Account it is locked with "Esta cuenta está suspendida", and the server refuses it.
+- Every row of the panel's Importaciones tab but an Administrator's own imports ends with **Abrir incidencia**: a Ticket with that import's Account, pointing at it, shown attached with why it failed, and the subject prefilled ("Tu importación <archivo> se ha detenido" for one that ended badly, "Sobre tu importación <archivo>" otherwise). For a Suspended Account it is locked with "Esta cuenta está suspendida", and the server refuses it.
 - A Ticket can only point at a Bulk Import of its own Account: the server refuses any other, from either side.
-- A Ticket's page shows the Bulk Import it points at: on my side under **Sobre la importación**, with **Ver importaciones** to the Library's Importaciones; in the panel under **Importación**, with why it failed and **Ver en Importaciones**. In the panel, the Account also has **Ver en Cuentas**, which opens the Accounts tab searching for it, where it can be Impersonated.
+- A Ticket's page shows the Bulk Import it points at: on my side under **Sobre la importación**, with **Ver importaciones** to the Library's Importaciones; in the panel under **Importación**, with why it failed and **Ver en Importaciones**, which opens the Importaciones tab showing only that import (`?import=<id>`), with **Ver todas** to show every one again. In the panel, the Account also has **Ver en Cuentas**, which opens the Accounts tab searching for it, where it can be Impersonated.
 
 ## MVP scope and out of scope
 

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
-import { isFinished, stageOf } from '../library/bulkImports'
+import { endedBadly, isFinished, stageOf } from '../library/bulkImports'
 import { ImportProgress, Wrapped } from '../library/ImportParts'
 import { useMoment, useNotAdded } from '../library/importWords'
 import { RoomDialog } from '../room/RoomDialog'
-import { endedBadly } from '../support/support'
 import { Button } from '../ui/Button'
+import { useSearch } from '../routing'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { BULK_IMPORT_FILTERS, nameOf, type AdminBulkImport, type BulkImportFilter, type BulkImportsPage } from './admin'
 import { Badge } from './AdminPage'
@@ -21,11 +21,16 @@ type Tone = 'brass' | 'sync' | 'muted' | 'alert'
  * the failed and stalled ones a filter away. One not yet ended can be
  * cancelled, as its Importer would; one failed retried while its files are
  * kept. Each opens a Support Ticket with its Account, pointing at it, unless
- * that Account is Suspended. The text of Hands is never here.
+ * that Account is Suspended; never an Administrator's, who has no Support.
+ * An `?import=` in its address shows only that one, as a Ticket's link to
+ * the Bulk Import it points at does, until all are asked for again. The
+ * text of Hands is never here.
  */
 export function ImportsTab() {
   const { t } = useI18n()
   const admin = useAdminApi()
+  const linked = useSearch()
+  const [only, setOnly] = useState(() => new URLSearchParams(linked).get('import'))
   const [filter, setFilter] = useState<BulkImportFilter>('all')
   const [pageNumber, setPageNumber] = useState(1)
   const [page, setPage] = useState<BulkImportsPage | null>(null)
@@ -35,13 +40,14 @@ export function ImportsTab() {
 
   const reload = useCallback(() => {
     const query = new URLSearchParams({ status: filter, page: String(pageNumber) })
+    if (only) query.set('id', only)
     admin<BulkImportsPage>(`/bulk-imports?${query}`)
       .then((found) => {
         setPage(found)
         setFailure(null)
       })
       .catch((error: unknown) => setFailure(reasonOf(error)))
-  }, [admin, filter, pageNumber])
+  }, [admin, only, filter, pageNumber])
   useEffect(reload, [reload])
 
   async function retry(bulkImport: AdminBulkImport) {
@@ -72,11 +78,20 @@ export function ImportsTab() {
           value={filter}
           onChange={(value) => {
             setFilter(value)
+            setOnly(null)
             setPageNumber(1)
           }}
         />
         {page && <StorageGauge used={page.storage.used} threshold={page.storage.threshold} />}
       </div>
+      {only && (
+        <p className="admin-notice">
+          {t('admin.imports.only')}{' '}
+          <Button size="compact" variant="ghost" onClick={() => setOnly(null)}>
+            {t('admin.imports.showAll')}
+          </Button>
+        </p>
+      )}
       {failure && (
         <p className="admin-notice" data-tone="alert" role="alert">
           {t(`reason.${failure}`)}
@@ -219,14 +234,16 @@ function ImportRow({
             {t('admin.imports.retry')}
           </Button>
         )}
-        <Button
-          size="compact"
-          variant="ghost"
-          disabledReason={bulkImport.accountSuspended ? t('admin.support.open.suspended') : undefined}
-          onClick={onOpenTicket}
-        >
-          {t('admin.support.open')}
-        </Button>
+        {!bulkImport.accountAdministrator && (
+          <Button
+            size="compact"
+            variant="ghost"
+            disabledReason={bulkImport.accountSuspended ? t('admin.support.open.suspended') : undefined}
+            onClick={onOpenTicket}
+          >
+            {t('admin.support.open')}
+          </Button>
+        )}
       </td>
     </tr>
   )

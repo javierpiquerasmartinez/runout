@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { reasonOf, type FailureReason } from '../backend/api'
+import { useCallback, useState } from 'react'
 import { useI18n } from '../i18n'
 import { followLink } from '../routing'
-import { PANEL_TICKET_FILTERS, type PanelTicketFilter, type PanelTicketPage } from '../support/support'
+import { PANEL_TICKET_FILTERS, SUPPORT_POLL_MS, type PanelTicketFilter, type PanelTicketPage } from '../support/support'
 import { SupportStatusBadge } from '../support/SupportThread'
+import { usePolled } from '../support/usePolled'
 import { Icon } from '../ui/Icon'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { adminSupportTicketPath, nameOf } from './admin'
@@ -15,25 +15,20 @@ import '../support/Support.css'
  * The Support tab: every Support Ticket, those waiting for an answer first
  * (their Account wrote last), then the other Open ones, then the Closed;
  * the latest written in on top of each. Todas, Abiertas and Cerradas keep
- * every one, the Open ones or the Closed. Each opens its thread.
+ * every one, the Open ones or the Closed. Each opens its thread. It is
+ * read again every so often while on screen, so a new Ticket or answer
+ * turns up without a reload.
  */
 export function SupportTab() {
   const { t, formatDate, formatRelative } = useI18n()
   const admin = useAdminApi()
   const [filter, setFilter] = useState<PanelTicketFilter>('all')
   const [pageNumber, setPageNumber] = useState(1)
-  const [page, setPage] = useState<PanelTicketPage | null>(null)
-  const [failure, setFailure] = useState<FailureReason | null>(null)
-
-  const reload = useCallback(() => {
-    admin<PanelTicketPage>(`/support/tickets?${new URLSearchParams({ status: filter, page: String(pageNumber) })}`)
-      .then((found) => {
-        setPage(found)
-        setFailure(null)
-      })
-      .catch((error: unknown) => setFailure(reasonOf(error)))
-  }, [admin, filter, pageNumber])
-  useEffect(reload, [reload])
+  const load = useCallback(
+    () => admin<PanelTicketPage>(`/support/tickets?${new URLSearchParams({ status: filter, page: String(pageNumber) })}`),
+    [admin, filter, pageNumber],
+  )
+  const { value: page, failure } = usePolled(load, SUPPORT_POLL_MS)
 
   const date = (iso: string) => formatDate(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric' })
 

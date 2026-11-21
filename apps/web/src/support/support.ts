@@ -121,8 +121,3 @@ export interface PanelTicketPage {
   waiting: number
   tickets: PanelTicketSummary[]
 }
-
-/** Whether a Bulk Import ended badly: it failed, or ended early for a reason. Where "Reportar un problema" is offered. */
-export function endedBadly(bulkImport: Pick<BulkImport, 'status' | 'reason'>): boolean {
-  return bulkImport.status === 'failed' || (bulkImport.status === 'completed' && bulkImport.reason !== null)
-}

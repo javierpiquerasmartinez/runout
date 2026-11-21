@@ -28,7 +28,7 @@ export function SupportTicketPage({ id }: { id: string }) {
   const { token, identity } = useIdentity()
   const locked = useImpersonationLock('support')
   const load = useCallback(() => readTicket(token, id), [token, id])
-  const { value: ticket, failure, replace } = usePolled<AccountTicket>(load, SUPPORT_POLL_MS, !locked)
+  const { value: ticket, failure, replace } = usePolled<AccountTicket>(load, SUPPORT_POLL_MS, { enabled: !locked })
   // Where the unread messages began when the Account opened it: reading the
   // thread marks them read, so later reads no longer say so, but they stay
   // set apart while the page is open.
@@ -68,7 +68,7 @@ export function SupportTicketPage({ id }: { id: string }) {
               <div className="support-ticket__thread">
                 <SupportThread entries={entries} newFrom={newFrom} />
                 <SupportComposer
-                  hint={t('support.reply.hint')}
+                  hint={t('support.compose.hint')}
                   lockedReason={locked}
                   onSend={async (text) => replace(await writeInTicket(token, ticket.id, text))}
                 />
