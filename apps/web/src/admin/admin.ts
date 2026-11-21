@@ -11,6 +11,11 @@ export function adminTabPath(tab: AdminTab): string {
   return `${adminPath}/${tab}`
 }
 
+/** The Importaciones tab showing only this Bulk Import, as a Support Ticket links to the one it points at. */
+export function adminBulkImportPath(id: string): string {
+  return `${adminTabPath('imports')}?${new URLSearchParams({ import: id })}`
+}
+
 /** A Support Ticket's page in the panel. */
 export function adminSupportTicketPath(id: string): string {
   return `${adminTabPath('support')}/${id}`
@@ -138,6 +143,8 @@ export interface AdminBulkImport {
   account: Person
   /** Its Account is Suspended: no new Support Ticket can be opened with it. */
   accountSuspended: boolean
+  /** Its Account is an Administrator's, who has no Support of their own: no Support Ticket can be opened with it. */
+  accountAdministrator: boolean
   status: BulkImportStatus
   /** No advance for a long while: Atascada, to Administrators only. */
   stalled: boolean

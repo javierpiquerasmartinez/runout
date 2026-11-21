@@ -25,7 +25,7 @@ export function SupportPage() {
   const { token } = useIdentity()
   const locked = useImpersonationLock('support')
   const load = useCallback(() => listTickets(token), [token])
-  const listed = usePolled(load, SUPPORT_POLL_MS, !locked)
+  const listed = usePolled(load, SUPPORT_POLL_MS, { enabled: !locked })
   const tickets = listed.value?.tickets ?? null
   const failure = tickets ? null : listed.failure
   const [opening, setOpening] = useState(false)

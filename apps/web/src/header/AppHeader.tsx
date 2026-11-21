@@ -135,7 +135,7 @@ function AdministratorButton({ current }: { current: boolean }) {
   const changes = useSupportChanges()
   const load = useCallback(() => admin<{ waiting: number }>('/support/tickets/waiting'), [admin])
   // An answer from this browser reads the count again at once.
-  const waiting = usePolled(load, SUPPORT_MARK_POLL_MS, true, changes).value?.waiting ?? 0
+  const waiting = usePolled(load, SUPPORT_MARK_POLL_MS, { refresh: changes }).value?.waiting ?? 0
   const label =
     waiting === 0
       ? t('header.administration')
@@ -258,5 +258,5 @@ function useUnreadTickets(enabled: boolean): number {
   const changes = useSupportChanges()
   const load = useCallback(() => unreadTickets(token), [token])
   // Reading an unread answer reads the mark again at once.
-  return usePolled(load, SUPPORT_MARK_POLL_MS, enabled, changes).value?.unread ?? 0
+  return usePolled(load, SUPPORT_MARK_POLL_MS, { enabled, refresh: changes }).value?.unread ?? 0
 }

@@ -66,6 +66,11 @@ export function isFinished(status: BulkImportStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled'
 }
 
+/** Whether a Bulk Import ended badly: it failed, or ended early for a reason. Where "Reportar un problema" is offered. */
+export function endedBadly(bulkImport: Pick<BulkImport, 'status' | 'reason'>): boolean {
+  return bulkImport.status === 'failed' || (bulkImport.status === 'completed' && bulkImport.reason !== null)
+}
+
 /**
  * Whether it is the import service's to add, now or once resumed: neither
  * still uploading, which the import dialog follows, nor ended.

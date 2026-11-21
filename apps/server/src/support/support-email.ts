@@ -8,7 +8,12 @@ import {
   type AdministratorEmails,
 } from '../identity/administrators.js';
 import { DEFAULT_PREFERENCES } from '../identity/identity.service.js';
-import { EmailWriter, type SupportTicketMention } from '../mail/emails.js';
+import {
+  EmailWriter,
+  type SupportEventForAccount,
+  type SupportEventForAdministrators,
+  type SupportTicketMention,
+} from '../mail/emails.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
 import { messageOf } from '../import-service/message-of.js';
 
@@ -33,7 +38,7 @@ export class SupportEmail {
 
   /** Tells every Administrator that `accountId` opened a Ticket or wrote in one. */
   async toAdministrators(
-    event: 'opened' | 'written',
+    event: SupportEventForAdministrators,
     accountId: string,
     ticket: SupportTicketMention,
   ): Promise<void> {
@@ -74,7 +79,7 @@ export class SupportEmail {
 
   /** Tells the Account `accountId` that an Administrator opened, wrote in or closed its Ticket, unless it is Suspended. */
   async toAccount(
-    event: 'opened' | 'written' | 'closed',
+    event: SupportEventForAccount,
     accountId: string,
     ticket: SupportTicketMention,
   ): Promise<void> {

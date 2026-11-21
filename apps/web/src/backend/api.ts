@@ -106,6 +106,7 @@ export type RejectionReason =
   | 'invalid-support-message'
   | 'support-ticket-not-found'
   | 'support-account-suspended'
+  | 'support-not-for-administrators'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

@@ -298,10 +298,10 @@ describe('the Accounts tab', () => {
       const actions = within(row).getAllByRole('button')
       expect(actions[0].textContent).toBe('Change plan')
     }
-    expect(within(admin).getAllByRole('button').map((each) => each.textContent)).toEqual(['Change plan', 'Open ticket'])
+    expect(within(admin).getAllByRole('button').map((each) => each.textContent)).toEqual(['Change plan'])
   })
 
-  it('offers opening a Ticket last on every Account, locked on a Suspended one', async () => {
+  it('offers opening a Ticket last on every Account but an Administrator, who has no Support, locked on a Suspended one', async () => {
     renderTab('accounts')
     const [, ana, bea] = await screen.findAllByRole('row')
 
@@ -545,6 +545,7 @@ describe('the Imports tab', () => {
     failureCode: null,
     retryable: false,
     accountSuspended: false,
+    accountAdministrator: false,
     createdAt: '2026-11-02T09:12:00Z',
     lastActivityAt: '2026-11-02T10:00:00Z',
     finishedAt: null,
@@ -557,6 +558,7 @@ describe('the Imports tab', () => {
     calls = fakeApi({
       'GET /admin/bulk-imports': (call) => {
         const status = new URLSearchParams(call.search).get('status')
+        const only = new URLSearchParams(call.search).get('id')
         const imports = [
           bulkImport('1', 'jugador3@example.com', 'pt4-2019-2026.zip', firstStatus),
           bulkImport('2', 'jugador7@example.com', 'hm3-2024.zip', 'running', { stalled: true }),
@@ -566,6 +568,7 @@ describe('the Imports tab', () => {
           }),
           bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused', { accountSuspended: true }),
           bulkImport('6', 'jugador4@example.com', 'antiguo.zip', 'failed', {
+            accountAdministrator: true,
             failureCode: 'ECONNRESET',
             finishedAt: '2026-10-20T11:00:00Z',
           }),
@@ -577,7 +580,9 @@ describe('the Imports tab', () => {
             notImported: { 'unrecognised-format': 42, 'too-many-seats': 2 },
             finishedAt: '2026-11-02T12:00:00Z',
           }),
-        ].filter((each) => status !== 'failed' || each.status === 'failed')
+        ]
+          .filter((each) => status !== 'failed' || each.status === 'failed')
+          .filter((each) => !only || each.id === only)
         return Response.json({
           total: imports.length,
           page: 1,
@@ -682,11 +687,29 @@ describe('the Imports tab', () => {
     expect(within(screen.getAllByRole('row')[3]).queryByRole('button', { name: 'Retry' })).toBeNull()
   })
 
-  it('offers opening a Ticket last on every import, locked for a Suspended Account', async () => {
+  it('opens on the one import a link names, as a Ticket’s "See in Imports" does, until asked for all', async () => {
+    window.history.replaceState(null, '', '/admin/imports?import=3')
+    renderTab('imports')
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
+    expect(screen.getAllByRole('row')[1].textContent).toMatch(/sesiones-2023\.zip/)
+    expect(calls.at(-1)?.search).toContain('id=3')
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }))
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(7))
+    expect(calls.at(-1)?.search).not.toContain('id=')
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('offers opening a Ticket last on every import but an Administrator’s, locked for a Suspended Account', async () => {
     renderTab('imports')
     const rows = (await screen.findAllByRole('row')).slice(1)
 
-    for (const row of rows) expect(within(row).getAllByRole('button').at(-1)?.textContent).toBe('Open ticket')
+    for (const row of rows.filter((_, index) => index !== 4)) {
+      expect(within(row).getAllByRole('button').at(-1)?.textContent).toBe('Open ticket')
+    }
+    expect(within(rows[4]).queryByRole('button', { name: 'Open ticket' })).toBeNull()
     const locked = within(rows[3]).getAllByRole('button').at(-1)
     expect(locked?.getAttribute('aria-label')).toBe('Open ticket. This account is suspended')
     await userEvent.click(locked!)

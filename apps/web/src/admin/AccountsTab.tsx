@@ -46,7 +46,8 @@ type Confirming = { action: 'suspend' | 'lift' | 'impersonate'; account: AdminAc
  * The Accounts tab: Runout at a glance, then every Account with what it has
  * and has done and its Plan, sortable, searchable and filtered by Plan.
  * Change its Plan, suspend, lift and Impersonate from each row, each after a
- * confirmation, and open a Support Ticket with it, unless it is Suspended.
+ * confirmation, and open a Support Ticket with it, unless it is Suspended;
+ * never with an Administrator, oneself included, who has no Support.
  * A `?search=` in its address starts it searching, as a Ticket's link to
  * its Account does.
  */
@@ -267,13 +268,15 @@ export function AccountsTab() {
                               </Button>
                             </>
                           ))}
-                        <Button
-                          size="compact"
-                          disabledReason={account.suspension ? t('admin.support.open.suspended') : undefined}
-                          onClick={() => setOpeningTicket(account)}
-                        >
-                          {t('admin.support.open')}
-                        </Button>
+                        {!account.administrator && (
+                          <Button
+                            size="compact"
+                            disabledReason={account.suspension ? t('admin.support.open.suspended') : undefined}
+                            onClick={() => setOpeningTicket(account)}
+                          >
+                            {t('admin.support.open')}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

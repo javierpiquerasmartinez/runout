@@ -159,7 +159,7 @@ export class EmailWriter {
   supportToAdministrator(input: {
     to: string;
     language: Language;
-    event: 'opened' | 'written';
+    event: SupportEventForAdministrators;
     /** The Account, as Runout names it: its email, else its Display Name. */
     account: string;
     ticket: SupportTicketMention;
@@ -200,7 +200,7 @@ export class EmailWriter {
   supportToAccount(input: {
     to: string;
     language: Language;
-    event: 'opened' | 'written' | 'closed';
+    event: SupportEventForAccount;
     ticket: SupportTicketMention;
   }): Email {
     const { language, event, ticket } = input;
@@ -290,6 +290,12 @@ export class EmailWriter {
     );
   }
 }
+
+/** What the Administrators are emailed about: an Account opened a Support Ticket, or wrote in one. */
+export type SupportEventForAdministrators = 'opened' | 'written';
+
+/** What an Account is emailed about: an Administrator opened a Support Ticket with it, wrote in one of its Tickets, or closed it. */
+export type SupportEventForAccount = 'opened' | 'written' | 'closed';
 
 /** A Support Ticket as an email names it: its subject and the Support Message it is about. */
 export interface SupportTicketMention {

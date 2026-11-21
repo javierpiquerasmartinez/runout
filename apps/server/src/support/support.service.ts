@@ -14,6 +14,7 @@ import {
 } from '../database/schema.js';
 import { isUuid } from '../database/uuid.js';
 import {
+  IdentityService,
   refuseImpersonation,
   type Identity,
 } from '../identity/identity.service.js';
@@ -21,6 +22,7 @@ import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from '../admin/admin-query.js';
 import { isAccount } from '../admin/accounts.service.js';
 import { Rejected } from '../rejection/rejection.js';
+import type { SupportTicketMention } from '../mail/emails.js';
 import { SupportEmail } from './support-email.js';
 
 /** How long a Support Ticket's subject may be, in characters, once trimmed. */
@@ -205,8 +207,13 @@ type PersonRow = Pick<
 /** When the Ticket was last written in. */
 const lastWrittenAt = sql<Date>`(select max(m.written_at) from support_messages m where m.ticket_id = support_tickets.id)`;
 
-/** Whether its Account wrote its last Support Message. */
-const accountWroteLast = sql<boolean>`(select m.administrator_id is null from support_messages m where m.ticket_id = support_tickets.id order by m.seq desc limit 1)`;
+/** The Administrator who wrote its last Support Message; null when its Account did. */
+const lastAdministratorId = sql<
+  string | null
+>`(select m.administrator_id from support_messages m where m.ticket_id = support_tickets.id order by m.seq desc limit 1)`;
+
+/** Whether its Account wrote its last Support Message: every Ticket has one, its first. */
+const accountWroteLast = sql<boolean>`(${lastAdministratorId} is null)`;
 
 /**
  * Whether the Ticket has a Support Message from Runout after the last one its
@@ -221,9 +228,10 @@ const waitingForAdministrators = sql<boolean>`(support_tickets.status = 'open' a
 /**
  * Support: Support Tickets between an Account and the Administrators, and
  * their Support Messages. It has two sides: the Account's, over its own
- * Tickets and never while Impersonated, where every Administrator signs
- * "Runout"; and the Administrators', over every Ticket, where each
- * Support Message shows which of them wrote it.
+ * Tickets, never while Impersonated nor for an Administrator, who has no
+ * Support of their own, and where every Administrator signs "Runout"; and
+ * the Administrators', over every Ticket, where each Support Message shows
+ * which of them wrote it.
  */
 @Injectable()
 export class SupportService {
@@ -231,11 +239,12 @@ export class SupportService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly email: SupportEmail,
+    private readonly identities: IdentityService,
   ) {}
 
   /** The Account's Support Tickets, Open ones first, the latest written in on top. */
   async listForAccount(account: Identity): Promise<AccountTicketList> {
-    refuseImpersonation(account);
+    await this.refuseOutsideAccountSide(account);
     const rows = await this.db
       .select({
         ticket: supportTickets,
@@ -269,7 +278,7 @@ export class SupportService {
 
   /** How many of the Account's Support Tickets have a Support Message from Runout it hasn't read. */
   async unreadForAccount(account: Identity): Promise<AccountUnreadCount> {
-    refuseImpersonation(account);
+    await this.refuseOutsideAccountSide(account);
     const [{ unread }] = await this.db
       .select({
         unread: sql<number>`(count(*) filter (where ${unreadByAccount}))::int`,
@@ -284,7 +293,7 @@ export class SupportService {
     account: Identity,
     body: NewTicketBody,
   ): Promise<AccountTicket> {
-    refuseImpersonation(account);
+    await this.refuseOutsideAccountSide(account);
     const ticketId = await this.open(account.id, null, body);
     return this.readForAccount(account, ticketId);
   }
@@ -298,11 +307,7 @@ export class SupportService {
     account: Identity,
     ticketId: string,
   ): Promise<AccountTicket> {
-    refuseImpersonation(account);
-    const ticket = await this.ticket(
-      ticketId,
-      eq(supportTickets.identityId, account.id),
-    );
+    const ticket = await this.ownTicket(account, ticketId);
     const messages = await this.messagesOf(ticket.id);
     const readSeq = ticket.accountReadSeq ?? 0;
     const lastSeq = messages.at(-1)?.seq;
@@ -336,18 +341,14 @@ export class SupportService {
     ticketId: string,
     body: NewMessageBody,
   ): Promise<AccountTicket> {
-    refuseImpersonation(account);
-    const ticket = await this.ticket(
-      ticketId,
-      eq(supportTickets.identityId, account.id),
-    );
-    const text = messageOf(body.text);
+    const ticket = await this.ownTicket(account, ticketId);
+    const text = supportMessageTextOf(body.text);
     await this.write(ticket.id, null, text);
-    await this.email.toAdministrators('written', account.id, {
-      id: ticket.id,
-      subject: ticket.subject,
-      message: text,
-    });
+    await this.email.toAdministrators(
+      'written',
+      account.id,
+      mentionOf(ticket, text),
+    );
     return this.readForAccount(account, ticket.id);
   }
 
@@ -356,11 +357,7 @@ export class SupportService {
     account: Identity,
     ticketId: string,
   ): Promise<AccountTicket> {
-    refuseImpersonation(account);
-    const ticket = await this.ticket(
-      ticketId,
-      eq(supportTickets.identityId, account.id),
-    );
+    const ticket = await this.ownTicket(account, ticketId);
     await this.close(ticket.id);
     return this.readForAccount(account, ticket.id);
   }
@@ -392,10 +389,7 @@ export class SupportService {
         .select({
           ticket: supportTickets,
           lastWrittenAt: lastWrittenAt.mapWith(supportMessages.writtenAt),
-          accountWroteLast,
-          lastAdministratorId: sql<
-            string | null
-          >`(select m.administrator_id from support_messages m where m.ticket_id = support_tickets.id order by m.seq desc limit 1)`,
+          lastAdministratorId,
         })
         .from(supportTickets)
         .where(kept)
@@ -426,9 +420,7 @@ export class SupportService {
         status: ticket.status,
         waitingFor: lastAdministratorId ? 'account' : 'administrators',
         createdAt: ticket.createdAt,
-        openedBy: ticket.openedByAdministratorId
-          ? people(ticket.openedByAdministratorId)
-          : null,
+        openedBy: openedByOf(ticket, people),
         lastMessage: {
           ...writerOf(ticket, lastAdministratorId, people),
           writtenAt: lastWrittenAt,
@@ -471,9 +463,7 @@ export class SupportService {
       status: ticket.status,
       waitingFor: last?.administratorId ? 'account' : 'administrators',
       createdAt: ticket.createdAt,
-      openedBy: ticket.openedByAdministratorId
-        ? people(ticket.openedByAdministratorId)
-        : null,
+      openedBy: openedByOf(ticket, people),
       bulkImport: bulkImport && {
         ...accountBulkImport(bulkImport),
         failureCode: bulkImport.failureCode,
@@ -490,8 +480,10 @@ export class SupportService {
   /**
    * An Administrator opens a Support Ticket with an Account, writing its
    * first Support Message; the Account sees it from Runout. Never with a
-   * Suspended Account (`support-account-suspended`), nor with no such
-   * Account (`not-found`).
+   * Suspended Account (`support-account-suspended`), nor with an
+   * Administrator, oneself included, who has no Support of their own
+   * (`support-not-for-administrators`), nor with no such Account
+   * (`not-found`).
    */
   async openForPanel(
     administrator: Identity,
@@ -499,11 +491,18 @@ export class SupportService {
   ): Promise<PanelTicket> {
     const [account] = isUuid(body.accountId)
       ? await this.db
-          .select({ id: identities.id, suspendedAt: identities.suspendedAt })
+          .select({
+            id: identities.id,
+            email: identities.email,
+            suspendedAt: identities.suspendedAt,
+          })
           .from(identities)
           .where(and(eq(identities.id, body.accountId), isAccount))
       : [];
     if (!account) throw new Rejected('not-found');
+    if (this.identities.isAdministrator(account.email)) {
+      throw new Rejected('support-not-for-administrators');
+    }
     if (account.suspendedAt !== null) {
       throw new Rejected('support-account-suspended');
     }
@@ -519,13 +518,13 @@ export class SupportService {
     body: NewMessageBody,
   ): Promise<PanelTicket> {
     const ticket = await this.ticket(ticketId);
-    const text = messageOf(body.text);
+    const text = supportMessageTextOf(body.text);
     await this.write(ticket.id, administrator.id, text);
-    await this.email.toAccount('written', ticket.identityId, {
-      id: ticket.id,
-      subject: ticket.subject,
-      message: text,
-    });
+    await this.email.toAccount(
+      'written',
+      ticket.identityId,
+      mentionOf(ticket, text),
+    );
     return this.readForPanel(ticket.id);
   }
 
@@ -534,11 +533,11 @@ export class SupportService {
     const ticket = await this.ticket(ticketId);
     if (await this.close(ticket.id)) {
       const last = (await this.messagesOf(ticket.id)).at(-1);
-      await this.email.toAccount('closed', ticket.identityId, {
-        id: ticket.id,
-        subject: ticket.subject,
-        message: last?.text ?? '',
-      });
+      await this.email.toAccount(
+        'closed',
+        ticket.identityId,
+        mentionOf(ticket, last?.text ?? ''),
+      );
     }
     return this.readForPanel(ticket.id);
   }
@@ -556,7 +555,7 @@ export class SupportService {
     body: NewTicketBody,
   ): Promise<string> {
     const subject = subjectOf(body.subject);
-    const text = messageOf(body.message);
+    const text = supportMessageTextOf(body.message);
     const bulkImportId = await this.bulkImportOfAccount(
       accountId,
       body.bulkImportId,
@@ -579,7 +578,7 @@ export class SupportService {
         .values({ ticketId: ticket.id, administratorId, text, writtenAt: now });
       return ticket.id;
     });
-    const mention = { id: ticketId, subject, message: text };
+    const mention = mentionOf({ id: ticketId, subject }, text);
     if (administratorId) {
       await this.email.toAccount('opened', accountId, mention);
     } else {
@@ -618,6 +617,34 @@ export class SupportService {
       )
       .returning({ id: supportTickets.id });
     return closed.length > 0;
+  }
+
+  /**
+   * Lets an Account through to its own Support: never while Impersonated
+   * (`impersonation-not-allowed`), nor to an Administrator, who has no
+   * Support of their own (`support-not-for-administrators`).
+   */
+  private async refuseOutsideAccountSide(account: Identity): Promise<void> {
+    refuseImpersonation(account);
+    const [row] = await this.db
+      .select({ email: identities.email })
+      .from(identities)
+      .where(eq(identities.id, account.id));
+    if (this.identities.isAdministrator(row?.email ?? null)) {
+      throw new Rejected('support-not-for-administrators');
+    }
+  }
+
+  /**
+   * One of the Account's own Support Tickets, on the Account's side
+   * (`refuseOutsideAccountSide`); anyone else's is `support-ticket-not-found`.
+   */
+  private async ownTicket(
+    account: Identity,
+    ticketId: string,
+  ): Promise<TicketRow> {
+    await this.refuseOutsideAccountSide(account);
+    return this.ticket(ticketId, eq(supportTickets.identityId, account.id));
   }
 
   /** The Support Ticket, if it is there and meets `scope`; `support-ticket-not-found` otherwise. */
@@ -724,6 +751,24 @@ function writerOf(
     : { from: 'account', writer: people(ticket.identityId) };
 }
 
+/** The Administrator who opened the Ticket, for the panel; null when its Account did. */
+function openedByOf(
+  ticket: TicketRow,
+  people: (id: string) => PersonView,
+): PersonView | null {
+  return ticket.openedByAdministratorId
+    ? people(ticket.openedByAdministratorId)
+    : null;
+}
+
+/** What an email says about a Support Ticket: which, its subject and this Support Message's text. */
+function mentionOf(
+  ticket: Pick<TicketRow, 'id' | 'subject'>,
+  text: string,
+): SupportTicketMention {
+  return { id: ticket.id, subject: ticket.subject, message: text };
+}
+
 /** A subject, trimmed, with at least a character and at most the cap. */
 function subjectOf(raw: unknown): string {
   const subject = typeof raw === 'string' ? raw.trim() : '';
@@ -734,7 +779,7 @@ function subjectOf(raw: unknown): string {
 }
 
 /** A Support Message's text, trimmed, with at least a character and at most the cap. */
-function messageOf(raw: unknown): string {
+function supportMessageTextOf(raw: unknown): string {
   const text = typeof raw === 'string' ? raw.trim() : '';
   if (text.length === 0 || text.length > MAX_SUPPORT_MESSAGE_LENGTH) {
     throw new Rejected('invalid-support-message');

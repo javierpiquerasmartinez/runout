@@ -9,7 +9,7 @@ import { Avatar } from '../ui/Avatar'
 import { followLink } from '../routing'
 import { TicketBulkImportCard } from '../support/TicketBulkImport'
 import { Breadcrumb } from '../ui/Breadcrumb'
-import { adminTabPath, nameOf, type Person } from './admin'
+import { adminBulkImportPath, adminTabPath, nameOf, type Person } from './admin'
 import { useAdminApi } from './useAdminApi'
 import '../support/Support.css'
 
@@ -64,7 +64,7 @@ export function SupportTicketPanel({ id }: { id: string }) {
             <div className="support-ticket__thread">
               <SupportThread entries={entries} />
               <SupportComposer
-                hint={t('admin.support.replyHint', { name: nameOf(ticket.account) })}
+                hint={t('admin.support.composeHint', { name: nameOf(ticket.account) })}
                 onSend={async (text) => {
                   replace(await admin<PanelTicket>(`/support/tickets/${ticket.id}/messages`, { method: 'POST', body: { text } }))
                   supportChanged()
@@ -88,7 +88,7 @@ export function SupportTicketPanel({ id }: { id: string }) {
               {ticket.bulkImport && (
                 <SupportAside title={t('admin.support.bulkImport')}>
                   <TicketBulkImportCard bulkImport={ticket.bulkImport} failureCode={ticket.bulkImport.failureCode} />
-                  <a className="ro-btn ro-btn--secondary ro-btn--compact" href={adminTabPath('imports')} onClick={followLink}>
+                  <a className="ro-btn ro-btn--secondary ro-btn--compact" href={adminBulkImportPath(ticket.bulkImport.id)} onClick={followLink}>
                     {t('admin.support.seeInImports')}
                   </a>
                 </SupportAside>

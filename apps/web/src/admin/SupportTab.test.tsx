@@ -170,7 +170,7 @@ describe('The panel · Support tab', () => {
     const attached = within(pointed).getByRole('group', { name: 'sesiones-2023.zip' })
     expect(attached.textContent).toContain('Failed')
     expect(attached.textContent).toContain('58,000 of 210,000 hands · BATCH_INSERT_FAILED after 3 attempts')
-    expect(within(pointed).getByRole('link', { name: 'See in Imports' }).getAttribute('href')).toBe('/admin/imports')
+    expect(within(pointed).getByRole('link', { name: 'See in Imports' }).getAttribute('href')).toBe('/admin/imports?import=b1')
   })
 
   it('opens a thread showing which Administrator wrote each message, and writes in it', async () => {
@@ -214,5 +214,20 @@ describe('The panel · Support tab', () => {
     await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
 
     expect(await screen.findByText('Any news?')).toBeTruthy()
+  })
+
+  it('shows a new Ticket in the list within a short while', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let tickets = [summary('t1', 'Winamax hands miss the final pot')]
+    fakeApi({
+      'GET /admin/support/tickets': () => Response.json({ total: tickets.length, page: 1, pageSize: 50, waiting: tickets.length, tickets }),
+    })
+    renderAt('/admin/support')
+    expect(await screen.findByText('Winamax hands miss the final pot')).toBeTruthy()
+
+    tickets = [summary('t2', 'Can I change my email?'), ...tickets]
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+
+    expect(await screen.findByText('Can I change my email?')).toBeTruthy()
   })
 })

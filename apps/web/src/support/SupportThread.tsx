@@ -67,7 +67,7 @@ export function SupportThread({ entries, newFrom }: { entries: ThreadEntry[]; ne
 }
 
 /**
- * Where a reply is written, with how much of the 4,000 characters it takes.
+ * Where a Support Message is written, with how much of the 4,000 characters it takes.
  * "Enviar" is locked while it is empty and while it is being sent; once
  * sent it clears, and a refusal says why, keeping what was typed.
  */
@@ -75,34 +75,27 @@ export function SupportComposer({ hint, lockedReason, onSend }: { hint: string; 
   const { t } = useI18n()
   const id = useId()
   const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<FailureReason | null>(null)
+  const { busy, failure, run } = useSupportAction()
 
-  async function send(event?: FormEvent) {
+  function send(event?: FormEvent) {
     event?.preventDefault()
-    if (busy || lockedReason || text.trim() === '') return
-    setBusy(true)
-    try {
+    if (lockedReason || text.trim() === '') return
+    void run(async () => {
       await onSend(text)
       setText('')
-      setFailure(null)
-    } catch (caught) {
-      setFailure(reasonOf(caught))
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
   const sendLocked = lockedReason ?? (busy ? t('support.sending') : text.trim() === '' ? t('support.new.needsMessage') : undefined)
   return (
-    <form className="support-composer" onSubmit={(event) => void send(event)}>
+    <form className="support-composer" onSubmit={send}>
       <label htmlFor={id} className="ro-field__label">
-        {t('support.reply')}
+        {t('support.compose')}
       </label>
       <textarea
         id={id}
         className="ro-field__input ro-field__description support-composer__text"
-        placeholder={t('support.reply.placeholder')}
+        placeholder={t('support.compose.placeholder')}
         maxLength={MAX_SUPPORT_MESSAGE_LENGTH}
         readOnly={lockedReason !== undefined}
         value={text}
@@ -110,7 +103,7 @@ export function SupportComposer({ hint, lockedReason, onSend }: { hint: string; 
       />
       {failure && (
         <p className="support-composer__failure" role="alert">
-          {t('support.reply.failed', { reason: t(`reason.${failure}`) })}
+          {t('support.compose.failed', { reason: t(`reason.${failure}`) })}
         </p>
       )}
       <div className="support-composer__foot">
@@ -131,20 +124,10 @@ export function SupportComposer({ hint, lockedReason, onSend }: { hint: string; 
  */
 export function SupportCloseButton({ lockedReason, onClose }: { lockedReason?: string; onClose: () => Promise<void> }) {
   const { t } = useI18n()
-  const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<FailureReason | null>(null)
+  const { busy, failure, run } = useSupportAction()
 
-  async function close() {
-    if (busy || lockedReason) return
-    setBusy(true)
-    try {
-      await onClose()
-      setFailure(null)
-    } catch (caught) {
-      setFailure(reasonOf(caught))
-    } finally {
-      setBusy(false)
-    }
+  function close() {
+    if (!lockedReason) void run(onClose)
   }
 
   return (
@@ -154,11 +137,36 @@ export function SupportCloseButton({ lockedReason, onClose }: { lockedReason?: s
           {t('support.closeFailed', { reason: t(`reason.${failure}`) })}
         </p>
       )}
-      <Button size="compact" disabledReason={lockedReason ?? (busy ? t('support.closing') : undefined)} aria-busy={busy || undefined} onClick={() => void close()}>
+      <Button size="compact" disabledReason={lockedReason ?? (busy ? t('support.closing') : undefined)} aria-busy={busy || undefined} onClick={close}>
         {t('support.close')}
       </Button>
     </>
   )
+}
+
+/**
+ * A Support action that is sent to the server, such as writing or closing:
+ * whether it is on its way, and why it was last refused. `run` does nothing
+ * while one is on its way; it clears the refusal once one goes through.
+ */
+function useSupportAction() {
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<FailureReason | null>(null)
+
+  async function run(action: () => Promise<void>) {
+    if (busy) return
+    setBusy(true)
+    try {
+      await action()
+      setFailure(null)
+    } catch (caught) {
+      setFailure(reasonOf(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return { busy, failure, run }
 }
 
 /** "57 / 4.000": how much of a Support Message's room is taken. */

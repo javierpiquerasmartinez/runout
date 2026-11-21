@@ -10,6 +10,7 @@ import {
 import { endedBulkImport } from './support/bulk-imports.js';
 
 const MINUTE = 60_000;
+const OTHER_ADMINISTRATOR_EMAIL = 'other-admin@runout.test';
 
 describe('Support Tickets (e2e)', () => {
   let running: RunningApp;
@@ -18,7 +19,9 @@ describe('Support Tickets (e2e)', () => {
   let ana: { token: string; id: string };
 
   beforeEach(async () => {
-    running = await startApp({ administratorEmails: [ADMINISTRATOR_EMAIL] });
+    running = await startApp({
+      administratorEmails: [ADMINISTRATOR_EMAIL, OTHER_ADMINISTRATOR_EMAIL],
+    });
     administrator = await signInAdministrator(running);
     anaEmail = uniqueEmail('ana');
     ana = await invitedAccount(running, administrator.token, anaEmail);
@@ -208,6 +211,26 @@ describe('Support Tickets (e2e)', () => {
           .send({ text: 'Hola' }),
       ]) {
         await refused.expect(403, { reason: 'impersonation-not-allowed' });
+      }
+    });
+    it('is not there for an Administrator, who has no Support of their own', async () => {
+      const ticket = await open(ana.token);
+
+      for (const refused of [
+        as(administrator.token).get('/support/tickets'),
+        as(administrator.token).get('/support/tickets/unread'),
+        as(administrator.token)
+          .post('/support/tickets')
+          .send({ subject: 'Hola', message: 'Hola' }),
+        as(administrator.token).get(`/support/tickets/${ticket.id}`),
+        as(administrator.token)
+          .post(`/support/tickets/${ticket.id}/messages`)
+          .send({ text: 'Hola' }),
+        as(administrator.token).post(`/support/tickets/${ticket.id}/close`),
+      ]) {
+        await refused.expect(403, {
+          reason: 'support-not-for-administrators',
+        });
       }
     });
   });
@@ -793,6 +816,29 @@ describe('Support Tickets (e2e)', () => {
       ).toEqual([]);
     });
 
+    it('refuses to open a Ticket with an Administrator, oneself included', async () => {
+      const other = await newAccount(
+        running.httpServer,
+        'other-administrator',
+        OTHER_ADMINISTRATOR_EMAIL,
+      );
+
+      for (const accountId of [administrator.id, other.id]) {
+        await as(administrator.token)
+          .post('/admin/support/tickets')
+          .send({ accountId, subject: 'Hola', message: 'Hola' })
+          .expect(403, { reason: 'support-not-for-administrators' });
+      }
+      const { body } = await as(administrator.token)
+        .get('/admin/support/tickets')
+        .expect(200);
+      expect(
+        body.tickets.filter((ticket: { account: { id: string } }) =>
+          [administrator.id, other.id].includes(ticket.account.id),
+        ),
+      ).toEqual([]);
+    });
+
     it('is not there for anyone but an Administrator', async () => {
       const ticket = await open(ana.token);
 
@@ -983,6 +1029,28 @@ describe('Support Tickets (e2e)', () => {
         ]),
       );
       expect(suspended).toEqual({ [caras]: false, [danis]: true });
+    });
+
+    it('says which Bulk Imports are of an Administrator, who has no Support of their own', async () => {
+      const admin = await signInAdministrator(own);
+      const cara = await invitedAccount(own, admin.token, uniqueEmail('cara'));
+      const caras = await endedBulkImport(own.databaseUrl, cara.id);
+      const admins = await endedBulkImport(own.databaseUrl, admin.id);
+
+      const { body } = await request(own.httpServer)
+        .get('/api/admin/bulk-imports')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(200);
+
+      const administrator = Object.fromEntries(
+        body.imports.map(
+          (each: { id: string; accountAdministrator: boolean }) => [
+            each.id,
+            each.accountAdministrator,
+          ],
+        ),
+      );
+      expect(administrator).toEqual({ [caras]: false, [admins]: true });
     });
   });
 });
