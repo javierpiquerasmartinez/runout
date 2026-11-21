@@ -152,6 +152,109 @@ export class EmailWriter {
     );
   }
 
+  /**
+   * To an Administrator, when an Account opens a Support Ticket or writes in
+   * one: a short excerpt and a link to the Ticket in the panel.
+   */
+  supportToAdministrator(input: {
+    to: string;
+    language: Language;
+    event: SupportEventForAdministrators;
+    /** The Account, as Runout names it: its email, else its Display Name. */
+    account: string;
+    ticket: SupportTicketMention;
+  }): Email {
+    const { language, event, account, ticket } = input;
+    const es = language === 'es';
+    const opened = event === 'opened';
+    const subject = es
+      ? `${opened ? 'Nueva incidencia' : 'Nuevo mensaje en una incidencia'}: ${ticket.subject}`
+      : `${opened ? 'New ticket' : 'New message in a ticket'}: ${ticket.subject}`;
+    const lead = es
+      ? opened
+        ? `${account} ha abierto una incidencia en Soporte:`
+        : `${account} ha escrito en su incidencia:`
+      : opened
+        ? `${account} has opened a ticket in Support:`
+        : `${account} has written in their ticket:`;
+    return write(
+      input.to,
+      language,
+      subject,
+      [lead, `«${excerpt(ticket.message)}»`],
+      es ? 'Ver la incidencia' : 'See the ticket',
+      `${this.frontendUrl}/admin/support/${ticket.id}`,
+      [
+        es
+          ? 'Te escribimos porque eres administrador de Runout.'
+          : 'You are receiving this because you are a Runout Administrator.',
+      ],
+    );
+  }
+
+  /**
+   * To an Account, when an Administrator opens a Support Ticket with it,
+   * writes in one of its Tickets or closes it: a short excerpt and a link to
+   * the Ticket's page.
+   */
+  supportToAccount(input: {
+    to: string;
+    language: Language;
+    event: SupportEventForAccount;
+    ticket: SupportTicketMention;
+  }): Email {
+    const { language, event, ticket } = input;
+    const es = language === 'es';
+    const answer = es
+      ? 'Para responder, hazlo en Runout: este email no recibe respuestas.'
+      : 'To answer, do it on Runout: this email does not take replies.';
+    const copy = {
+      opened: es
+        ? {
+            subject: 'Runout ha abierto una incidencia contigo',
+            lead: 'Runout ha abierto una incidencia contigo en Soporte:',
+            after: answer,
+          }
+        : {
+            subject: 'Runout has opened a ticket with you',
+            lead: 'Runout has opened a ticket with you in Support:',
+            after: answer,
+          },
+      written: es
+        ? {
+            subject: 'Runout te ha respondido',
+            lead: 'Runout ha respondido en tu incidencia:',
+            after: answer,
+          }
+        : {
+            subject: 'Runout has answered you',
+            lead: 'Runout has answered in your ticket:',
+            after: answer,
+          },
+      closed: es
+        ? {
+            subject: 'Runout ha cerrado tu incidencia',
+            lead: 'Runout ha cerrado tu incidencia. Su último mensaje:',
+            after:
+              'Si aún necesitas ayuda, escribe en ella y se abrirá de nuevo.',
+          }
+        : {
+            subject: 'Runout has closed your ticket',
+            lead: 'Runout has closed your ticket. Its last message:',
+            after: 'If you still need help, write in it and it opens again.',
+          },
+    }[event];
+    return write(
+      input.to,
+      language,
+      `${copy.subject}: ${ticket.subject}`,
+      [copy.lead, `«${excerpt(ticket.message)}»`],
+      es ? 'Ver la incidencia' : 'See the ticket',
+      `${this.frontendUrl}/support/${ticket.id}`,
+      [copy.after],
+    );
+  }
+
   passwordReset(input: {
     to: string;
     language: Language;
@@ -186,6 +289,32 @@ export class EmailWriter {
       [copy.expiry, copy.ignore],
     );
   }
+}
+
+/** What the Administrators are emailed about: an Account opened a Support Ticket, or wrote in one. */
+export type SupportEventForAdministrators = 'opened' | 'written';
+
+/** What an Account is emailed about: an Administrator opened a Support Ticket with it, wrote in one of its Tickets, or closed it. */
+export type SupportEventForAccount = 'opened' | 'written' | 'closed';
+
+/** A Support Ticket as an email names it: its subject and the Support Message it is about. */
+export interface SupportTicketMention {
+  id: string;
+  subject: string;
+  /** The whole Support Message; the email carries only an excerpt of it. */
+  message: string;
+}
+
+/** How many characters of a Support Message an email carries. */
+const EXCERPT_LENGTH = 140;
+
+/** The start of a Support Message, on one line, cut at a word with "…" when longer. */
+function excerpt(text: string): string {
+  const line = text.replace(/\s+/g, ' ').trim();
+  if (line.length <= EXCERPT_LENGTH) return line;
+  const cut = line.slice(0, EXCERPT_LENGTH);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > EXCERPT_LENGTH / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 /** A Bulk Import as it ended, as its Importer is told it. */

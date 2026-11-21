@@ -102,6 +102,11 @@ export type RejectionReason =
   | 'cannot-impersonate-administrator'
   | 'impersonation-not-allowed'
   | 'invalid-admin-query'
+  | 'invalid-support-subject'
+  | 'invalid-support-message'
+  | 'support-ticket-not-found'
+  | 'support-account-suspended'
+  | 'support-not-for-administrators'
 
 /** A refusal, or `network` when the server could not be reached at all. */
 export type FailureReason = RejectionReason | 'network'

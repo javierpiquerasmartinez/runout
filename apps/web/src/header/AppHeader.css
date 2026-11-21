@@ -1,6 +1,7 @@
 /*
  * The header of the "Biblioteca" board, shared by the Account side: 56 px, the
- * brand, the navigation, where the person is, "Nueva sala" and the avatar's menu.
+ * brand, the navigation, where the person is, an Administrator's button to the
+ * panel and the avatar's menu.
  * On a phone, as the Calendar's narrow boards draw it, it keeps everything but
  * loses what can go without words, and its sections scroll sideways.
  */
@@ -92,11 +93,54 @@
   background: var(--sync);
 }
 
+.app-header__administrator {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  color: var(--text-secondary);
+}
+.app-header__administrator:hover,
+.app-header__administrator[aria-current='page'] {
+  background: var(--color-hover);
+  color: var(--text-primary);
+}
+.app-header__administrator:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* How many Open Support Tickets wait for an answer: a brass pill on the button's corner. */
+.app-header__count {
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--brass);
+  color: var(--color-canvas);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--color-panel);
+}
+
 .app-header__account {
   position: relative;
   display: flex;
 }
 .app-header__avatar {
+  position: relative;
   display: flex;
   padding: 0;
   border: 0;
@@ -137,6 +181,38 @@
   border: 0;
   border-top: 1px solid var(--color-border);
 }
+/* Some Support Ticket has an answer unread: a brass dot on the avatar's corner. */
+.app-header__unread {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--brass);
+  box-shadow: 0 0 0 2px var(--color-panel);
+}
+
+.app-header__menu-label {
+  flex-grow: 1;
+}
+/* "1 nueva" beside Support. */
+.app-header__menu-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brass-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.app-header__menu-new-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brass);
+}
+
 .app-header__menu-item {
   height: 34px;
   box-sizing: border-box;
@@ -184,11 +260,10 @@
   .app-header__where {
     display: none;
   }
-  .app-header__new-room,
   .app-header__account {
     flex-shrink: 0;
   }
-  /* "Nueva sala" and the avatar, each 44 px to the finger, without sharing any. */
+  /* The panel's button and the avatar, each 44 px to the finger, without sharing any. */
   .app-header__account {
     margin-left: 6px;
   }
@@ -235,20 +310,6 @@
   }
   .app-header__nav-item:focus-visible {
     outline-offset: -2px;
-  }
-  /* "Nueva sala" keeps its name for screen readers, and shows only its plus. */
-  .app-header__new-room-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-  .app-header__new-room {
-    width: var(--control-compact);
-    justify-content: center;
-    padding: 0;
   }
   /* A long Room name gives way before anything else does. */
   .app-header__back-label {

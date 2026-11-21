@@ -4,7 +4,7 @@ import { useI18n, type MessageKey } from '../i18n'
 import { useIdentity } from '../identity/context'
 import { homePath } from '../home/home'
 import { RoomDialog } from '../room/RoomDialog'
-import { navigate } from '../routing'
+import { navigate, useSearch } from '../routing'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
@@ -12,6 +12,7 @@ import { PLAN_TONE, PLANS, type Plan } from '../plans/plans'
 import { nameOf, type AccountCounts, type AccountsPage, type AdminAccount, type Totals } from './admin'
 import { Badge } from './AdminPage'
 import { AdminPagination } from './AdminPagination'
+import { OpenTicketDialog } from './OpenTicketDialog'
 import { useAdminApi } from './useAdminApi'
 
 type Sort = 'lastActiveAt' | 'email' | 'displayName' | keyof AccountCounts
@@ -45,7 +46,10 @@ type Confirming = { action: 'suspend' | 'lift' | 'impersonate'; account: AdminAc
  * The Accounts tab: Runout at a glance, then every Account with what it has
  * and has done and its Plan, sortable, searchable and filtered by Plan.
  * Change its Plan, suspend, lift and Impersonate from each row, each after a
- * confirmation.
+ * confirmation, and open a Support Ticket with it, unless it is Suspended;
+ * never with an Administrator, oneself included, who has no Support.
+ * A `?search=` in its address starts it searching, as a Ticket's link to
+ * its Account does.
  */
 export function AccountsTab() {
   const { t, formatDate, formatNumber } = useI18n()
@@ -54,12 +58,14 @@ export function AccountsTab() {
   const [totals, setTotals] = useState<Totals | null>(null)
   const [page, setPage] = useState<AccountsPage | null>(null)
   const [failure, setFailure] = useState<FailureReason | null>(null)
-  const [search, setSearch] = useState('')
+  const linked = useSearch()
+  const [search, setSearch] = useState(() => new URLSearchParams(linked).get('search') ?? '')
   const [sort, setSort] = useState<{ by: Sort; dir: 'asc' | 'desc' }>({ by: 'lastActiveAt', dir: 'desc' })
   const [pageNumber, setPageNumber] = useState(1)
   const [confirming, setConfirming] = useState<Confirming | null>(null)
   const [planFilter, setPlanFilter] = useState<Plan | 'all'>('all')
   const [changingPlan, setChangingPlan] = useState<AdminAccount | null>(null)
+  const [openingTicket, setOpeningTicket] = useState<AdminAccount | null>(null)
 
   const reload = useCallback(() => {
     const query = new URLSearchParams({ sort: sort.by, direction: sort.dir, page: String(pageNumber) })
@@ -262,6 +268,15 @@ export function AccountsTab() {
                               </Button>
                             </>
                           ))}
+                        {!account.administrator && (
+                          <Button
+                            size="compact"
+                            disabledReason={account.suspension ? t('admin.support.open.suspended') : undefined}
+                            onClick={() => setOpeningTicket(account)}
+                          >
+                            {t('admin.support.open')}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -301,6 +316,7 @@ export function AccountsTab() {
           onChange={(plan) => void changePlan(changingPlan, plan)}
         />
       )}
+      {openingTicket && <OpenTicketDialog account={openingTicket} onClose={() => setOpeningTicket(null)} />}
     </section>
   )
 }

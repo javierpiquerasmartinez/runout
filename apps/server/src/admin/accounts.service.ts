@@ -133,7 +133,7 @@ export type AccountSort = (typeof ACCOUNT_SORTS)[number];
 const DAY = 24 * 3_600_000;
 
 /** An Account, as opposed to an anonymous identity. */
-const isAccount = or(
+export const isAccount = or(
   isNotNull(identities.googleSubject),
   isNotNull(identities.passwordHash),
 );

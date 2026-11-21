@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n'
@@ -6,6 +6,7 @@ import { SessionContext } from '../identity/context'
 import { readJoinIntent } from '../room/joinIntent'
 import { fakeSession } from '../test/fakeSession'
 import { RoomsPage } from './RoomsPage'
+import { requestNewRoom } from './rooms'
 
 interface OpenRoom {
   code: string
@@ -76,8 +77,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
 })
 
-function renderRooms() {
-  const session = fakeSession()
+function renderRooms(session = fakeSession()) {
   render(
     <I18nProvider initialLocale="en">
       <SessionContext.Provider value={session}>
@@ -107,25 +107,22 @@ describe('RoomsPage · creating a Room', () => {
     expect(session.rememberDisplayName).toHaveBeenCalledWith('Javier')
   })
 
-  it('focuses the new Room’s name when "New room" is pressed, even on the Rooms screen', async () => {
+  it('focuses the new Room’s name when Home’s "New room" leads here', async () => {
     await renderEmptyRooms()
     const name = screen.getByLabelText('Room name')
     expect(document.activeElement).not.toBe(name)
 
-    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
+    act(() => requestNewRoom())
+
     expect(document.activeElement).toBe(name)
     expect(window.location.pathname).toBe('/rooms')
-
-    await userEvent.click(screen.getByLabelText('Room code'))
-    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
-    expect(document.activeElement).toBe(name)
   })
 })
 
 describe('RoomsPage · coming back to a "New room"', () => {
   it('does not focus the new Room’s name again on a reload', async () => {
     await renderEmptyRooms()
-    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
+    act(() => requestNewRoom())
     cleanup()
 
     await renderEmptyRooms()
@@ -191,8 +188,28 @@ describe('RoomsPage · your Rooms', () => {
     await screen.findByRole('region', { name: 'My rooms' })
 
     await userEvent.click(screen.getByRole('button', { name: 'New room' }))
+    const name = screen.getByLabelText('Room name')
+    expect(document.activeElement).toBe(name)
 
-    expect(document.activeElement).toBe(screen.getByLabelText('Room name'))
+    await userEvent.click(screen.getByLabelText('Room code'))
+    await userEvent.click(screen.getByRole('button', { name: 'New room' }))
+    expect(document.activeElement).toBe(name)
+  })
+
+  it('locks "New room" while impersonating, saying why', async () => {
+    openRooms = [mine]
+    renderRooms(
+      fakeSession({
+        impersonation: { administrator: { displayName: 'Admin', email: 'admin@x.com' }, endsAt: '2099-01-01T00:00:00Z' },
+      }),
+    )
+    await screen.findByRole('region', { name: 'My rooms' })
+
+    const newRoom = screen.getByRole('button', { name: /New room/ })
+    expect(newRoom.getAttribute('aria-disabled')).toBe('true')
+    expect(newRoom.getAttribute('title')).toBe("Rooms aren't available while impersonating someone")
+    await userEvent.click(newRoom)
+    expect(screen.queryByLabelText('Room name')).toBeNull()
   })
 
   it('copies a Room’s link', async () => {

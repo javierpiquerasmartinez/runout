@@ -179,6 +179,8 @@ describe('The Importaciones tab (e2e)', () => {
         {
           id: uploading,
           account: { id: bea.id, displayName: null, email: 'bea@example.com' },
+          accountSuspended: false,
+          accountAdministrator: false,
           status: 'uploading',
           stalled: false,
           files: [{ name: 'hm3-2024.zip', size: 1000 }],
@@ -197,6 +199,8 @@ describe('The Importaciones tab (e2e)', () => {
         {
           id: done,
           account: { id: ana.id, displayName: null, email: 'ana@example.com' },
+          accountSuspended: false,
+          accountAdministrator: false,
           status: 'completed',
           stalled: false,
           files: [{ name: 'pt4-export.txt', size: expect.any(Number) }],
@@ -250,6 +254,27 @@ describe('The Importaciones tab (e2e)', () => {
       failureCode: '53100',
     });
     await tab('?status=nonsense').expect(400);
+  });
+
+  it('narrows the list to one import, as a Support Ticket links to the one it points at', async () => {
+    const ana = await importer('ana@example.com');
+    const bea = await importer('bea@example.com');
+    const first = await ana.startUploading('first.zip');
+    await clock.advance(MINUTE);
+    await bea.startUploading('second.zip');
+
+    const { body } = await tab(`?id=${first}`).expect(200);
+
+    expect(body).toMatchObject({ total: 1, page: 1 });
+    expect(body.imports.map(({ id }: { id: string }) => id)).toEqual([first]);
+    expect(
+      (await tab(`?id=${first}&status=active`).expect(200)).body.imports,
+    ).toHaveLength(1);
+    expect(
+      (await tab('?id=00000000-0000-4000-8000-000000000000').expect(200)).body
+        .imports,
+    ).toEqual([]);
+    await tab('?id=not-an-import').expect(400);
   });
 
   it('pages the list', async () => {

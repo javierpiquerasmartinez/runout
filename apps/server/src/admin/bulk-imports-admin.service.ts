@@ -11,6 +11,9 @@ import { CLOCK, type Clock } from '../clock/clock.js';
 import { retryable } from '../bulk-imports/bulk-imports.service.js';
 import { unfinished } from '../database/bulk-import-status.js';
 import { Storage } from '../storage/storage.js';
+import { isUuid } from '../database/uuid.js';
+import { Rejected } from '../rejection/rejection.js';
+import { IdentityService } from '../identity/identity.service.js';
 import type { PersonView } from '../identity/invitations.service.js';
 import { adminPage, oneOf } from './admin-query.js';
 import { person } from './accounts.service.js';
@@ -19,6 +22,10 @@ import { person } from './accounts.service.js';
 export interface AdminBulkImportView {
   id: string;
   account: PersonView;
+  /** Its Account is Suspended: no new Support Ticket can be opened with it. */
+  accountSuspended: boolean;
+  /** Its Account is an Administrator's, who has no Support of their own: no Support Ticket can be opened with it. */
+  accountAdministrator: boolean;
   status: BulkImportStatus;
   /** No advance for a long while: Atascada. */
   stalled: boolean;
@@ -55,9 +62,16 @@ export class BulkImportsAdminService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly storage: Storage,
+    private readonly identityService: IdentityService,
   ) {}
 
+  /**
+   * A page of every Account's Bulk Imports, newest first: `status` keeps
+   * only some, and `id` only that one, as a Support Ticket links to the one
+   * it points at (`invalid-admin-query` for an id that can't be one).
+   */
   async list(query: {
+    id?: unknown;
     status?: unknown;
     page?: unknown;
     pageSize?: unknown;
@@ -71,12 +85,18 @@ export class BulkImportsAdminService {
   }> {
     const filter = oneOf(query.status, BULK_IMPORT_FILTERS);
     const { page, pageSize } = adminPage(query);
-    const where = {
-      all: undefined,
-      active: unfinished,
-      failed: inArray(bulkImports.status, ['failed']),
-      stalled: and(eq(bulkImports.stalled, true), unfinished),
-    }[filter];
+    if (query.id !== undefined && !isUuid(query.id)) {
+      throw new Rejected('invalid-admin-query');
+    }
+    const where = and(
+      {
+        all: undefined,
+        active: unfinished,
+        failed: inArray(bulkImports.status, ['failed']),
+        stalled: and(eq(bulkImports.stalled, true), unfinished),
+      }[filter],
+      query.id === undefined ? undefined : eq(bulkImports.id, query.id),
+    );
     const [[{ total }], rows, used] = await Promise.all([
       this.db
         .select({ total: sql<number>`count(*)::int` })
@@ -101,6 +121,10 @@ export class BulkImportsAdminService {
       imports: rows.map(({ record, account }) => ({
         id: record.id,
         account: person(account),
+        accountSuspended: account.suspendedAt !== null,
+        accountAdministrator: this.identityService.isAdministrator(
+          account.email,
+        ),
         status: record.status,
         stalled: record.stalled,
         files: record.files.map(({ name, size }) => ({ name, size })),

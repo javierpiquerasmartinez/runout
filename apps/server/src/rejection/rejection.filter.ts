@@ -111,6 +111,11 @@ const statusFor: Record<RejectionReason, HttpStatus> = {
   'cannot-impersonate-administrator': HttpStatus.FORBIDDEN,
   'impersonation-not-allowed': HttpStatus.FORBIDDEN,
   'invalid-admin-query': HttpStatus.BAD_REQUEST,
+  'invalid-support-subject': HttpStatus.BAD_REQUEST,
+  'invalid-support-message': HttpStatus.BAD_REQUEST,
+  'support-ticket-not-found': HttpStatus.NOT_FOUND,
+  'support-account-suspended': HttpStatus.FORBIDDEN,
+  'support-not-for-administrators': HttpStatus.FORBIDDEN,
 };
 
 /** Replies to an HTTP request the domain rejected with `{ reason }` and its details. */

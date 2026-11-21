@@ -2,6 +2,7 @@
 // `pnpm db:generate` after changing this file to write a migration.
 import {
   type AnyPgColumn,
+  bigint,
   bigserial,
   boolean,
   check,
@@ -1118,4 +1119,63 @@ export const bulkImports = pgTable(
       .on(table.identityId)
       .where(sql`${table.status} not in ('completed', 'failed', 'cancelled')`),
   ],
+);
+
+/** Where a Support Ticket stands: Open while something is pending, Closed once settled. */
+export const SUPPORT_TICKET_STATUSES = ['open', 'closed'] as const;
+export type SupportTicketStatus = (typeof SUPPORT_TICKET_STATUSES)[number];
+
+/**
+ * A Support Ticket ("Incidencia"): a conversation between one Account and
+ * the Administrators about one matter. Whose turn it is to answer is never
+ * stored: it is read from the writer of its last Support Message.
+ */
+export const supportTickets = pgTable(
+  'support_tickets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** The Account it is with. */
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    /** What it is about, in one line. */
+    subject: text('subject').notNull(),
+    status: text('status', { enum: SUPPORT_TICKET_STATUSES }).notNull(),
+    /** The Administrator who opened it with the Account; null when the Account opened it. */
+    openedByAdministratorId: uuid('opened_by_administrator_id').references(
+      () => identities.id,
+    ),
+    /** The Bulk Import of that Account it points at; null for a generic one. */
+    bulkImportId: uuid('bulk_import_id').references(() => bulkImports.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    /**
+     * The `seq` of the last Support Message the Account has read in it; null
+     * while it has read none. Every Support Message from Runout after it is
+     * unread, so a Ticket an Administrator opened starts unread. The
+     * Administrators have no read state of their own.
+     */
+    accountReadSeq: bigint('account_read_seq', { mode: 'number' }),
+  },
+  (table) => [index('support_tickets_identity_id_idx').on(table.identityId)],
+);
+
+/**
+ * One Support Message in a Support Ticket's thread: text only, never edited
+ * or deleted by either side.
+ */
+export const supportMessages = pgTable(
+  'support_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** The order they were written in, which two messages of the same instant still have. */
+    seq: bigserial('seq', { mode: 'number' }).notNull(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => supportTickets.id),
+    /** The Administrator who wrote it; null when the Ticket's Account did. */
+    administratorId: uuid('administrator_id').references(() => identities.id),
+    text: text('text').notNull(),
+    writtenAt: timestamp('written_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('support_messages_ticket_id_idx').on(table.ticketId)],
 );

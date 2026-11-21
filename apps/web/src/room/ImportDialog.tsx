@@ -33,6 +33,7 @@ import { usePreferences } from '../preferences/context'
 import { Secondary } from '../ui/Secondary'
 import { guardLocked, lockedProps } from '../ui/locked'
 import { BulkExplanation, BulkFiles, BulkFooter, type Bulk } from './BulkImportParts'
+import { ReportImportFailureButton, ReportImportFailureDialog, type ImportFailure } from './ReportImportFailure'
 import './ImportDialog.css'
 
 type Tab = 'files' | 'paste' | 'library'
@@ -77,6 +78,8 @@ export function ImportDialog({
   // The refusal of the import confirmed, kept whole: a full Library's says by how much.
   const [confirmFailure, setConfirmFailure] = useState<{ refusal: unknown } | null>(null)
   const [bulk, setBulk] = useState<Bulk | null>(null)
+  // A failure being reported to Support, in a dialog of its own over this one.
+  const [reporting, setReporting] = useState<ImportFailure | null>(null)
   const uploading = bulk?.phase === 'uploading'
   const totals = batchTotals(batch)
   const hands = batchHands(batch)
@@ -257,209 +260,232 @@ export function ImportDialog({
   const choiceLocked = choosing ? undefined : (uploadingLabel ?? t('import.bulk.uploaded'))
 
   return (
-    <dialog
-      ref={dialog}
-      className="import-dialog"
-      aria-labelledby="import-title"
-      onCancel={(event) => {
-        // Escape closes through the Room, which unmounts the dialog.
-        event.preventDefault()
-        if (!holding) onClose()
-      }}
-      onClose={() => {
-        // A browser may close it on a repeated Escape whatever the page
-        // says; while Hands are being saved or uploaded it opens again.
-        if (holding) dialog.current?.showModal()
-      }}
-    >
-      <header className="import-dialog__header">
-        <div className="import-dialog__heading">
-          <h2 id="import-title" className="import-dialog__title">
-            {t(`import.${destinationKind}.title`)}
-          </h2>
-          <span className="import-dialog__subtitle">
-            {destination.kind === 'room' ? t('import.room.subtitle', { room: destination.name }) : t('import.library.subtitle')}
-          </span>
+    <>
+      <dialog
+        ref={dialog}
+        className="import-dialog"
+        aria-labelledby="import-title"
+        onCancel={(event) => {
+          // Escape closes through the Room, which unmounts the dialog.
+          event.preventDefault()
+          if (!holding) onClose()
+        }}
+        onClose={() => {
+          // A browser may close it on a repeated Escape whatever the page
+          // says; while Hands are being saved or uploaded it opens again.
+          if (holding) dialog.current?.showModal()
+        }}
+      >
+        <header className="import-dialog__header">
+          <div className="import-dialog__heading">
+            <h2 id="import-title" className="import-dialog__title">
+              {t(`import.${destinationKind}.title`)}
+            </h2>
+            <span className="import-dialog__subtitle">
+              {destination.kind === 'room' ? t('import.room.subtitle', { room: destination.name }) : t('import.library.subtitle')}
+            </span>
+          </div>
+          <IconButton icon="close" label={t('import.close')} size="compact" disabledReason={busy} onClick={onClose} />
+        </header>
+
+        <div className="import-dialog__tabs" role="tablist">
+            {tabs.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={`import-tab-${name}`}
+                aria-controls="import-tabpanel"
+                aria-selected={tab === name}
+                className="import-dialog__tab"
+                {...lockedProps(t(`import.tab.${name}`), choiceLocked)}
+                onClick={guardLocked(choiceLocked, () => setTab(name))}
+              >
+                {t(`import.tab.${name}`)}
+              </button>
+            ))}
         </div>
-        <IconButton icon="close" label={t('import.close')} size="compact" disabledReason={busy} onClick={onClose} />
-      </header>
 
-      <div className="import-dialog__tabs" role="tablist">
-          {tabs.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              id={`import-tab-${name}`}
-              aria-controls="import-tabpanel"
-              aria-selected={tab === name}
-              className="import-dialog__tab"
-              {...lockedProps(t(`import.tab.${name}`), choiceLocked)}
-              onClick={guardLocked(choiceLocked, () => setTab(name))}
-            >
-              {t(`import.tab.${name}`)}
-            </button>
-          ))}
-      </div>
-
-      <div className="import-dialog__body">
-        <div className="import-dialog__main">
-            <div id="import-tabpanel" role="tabpanel" aria-labelledby={`import-tab-${tab}`}>
-              {tab === 'library' && destination.kind === 'room' ? (
-                <div className="import-from-library">
-                  <Icon name="library" size={30} className="import-from-library__icon" />
-                  <p className="import-from-library__body">{t('import.fromLibrary.body')}</p>
-                  <Button variant="secondary" size="compact" onClick={() => navigate(roomLibraryPath(destination.code))}>
-                    {t('import.fromLibrary.open')}
-                  </Button>
-                </div>
-              ) : tab === 'files' ? (
-                <div
-                  className="import-drop"
-                  data-dragging={dragging || undefined}
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    setDragging(true)
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={onDrop}
-                >
-                  <Icon name="import" size={30} className="import-drop__icon" />
-                  <span className="import-drop__title">{t('import.drop.title')}</span>
-                  <span className="import-drop__hint">{t(`import.${destinationKind}.dropHint`)}</span>
-                  <Button variant="secondary" size="compact" disabledReason={choiceLocked} onClick={() => fileInput.current?.click()}>
-                    {t('import.drop.choose')}
-                  </Button>
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    multiple
-                    accept=".txt,.zip,text/plain,application/zip"
-                    className="ro-visually-hidden"
-                    tabIndex={-1}
-                    aria-label={t('import.drop.choose')}
-                    onChange={(event) => {
-                      addFiles(event.target.files)
-                      event.target.value = ''
+        <div className="import-dialog__body">
+          <div className="import-dialog__main">
+              <div id="import-tabpanel" role="tabpanel" aria-labelledby={`import-tab-${tab}`}>
+                {tab === 'library' && destination.kind === 'room' ? (
+                  <div className="import-from-library">
+                    <Icon name="library" size={30} className="import-from-library__icon" />
+                    <p className="import-from-library__body">{t('import.fromLibrary.body')}</p>
+                    <Button variant="secondary" size="compact" onClick={() => navigate(roomLibraryPath(destination.code))}>
+                      {t('import.fromLibrary.open')}
+                    </Button>
+                  </div>
+                ) : tab === 'files' ? (
+                  <div
+                    className="import-drop"
+                    data-dragging={dragging || undefined}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      setDragging(true)
                     }}
-                  />
-                </div>
-              ) : (
-                <label className="import-paste">
-                  <span className="ro-visually-hidden">{t('import.paste.label')}</span>
-                  <textarea
-                    className="import-paste__field"
-                    placeholder={t('import.paste.placeholder')}
-                    readOnly={choiceLocked !== undefined}
-                    title={choiceLocked}
-                    onPaste={onPaste}
-                  />
-                </label>
-              )}
-            </div>
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={onDrop}
+                  >
+                    <Icon name="import" size={30} className="import-drop__icon" />
+                    <span className="import-drop__title">{t('import.drop.title')}</span>
+                    <span className="import-drop__hint">{t(`import.${destinationKind}.dropHint`)}</span>
+                    <Button variant="secondary" size="compact" disabledReason={choiceLocked} onClick={() => fileInput.current?.click()}>
+                      {t('import.drop.choose')}
+                    </Button>
+                    <input
+                      ref={fileInput}
+                      type="file"
+                      multiple
+                      accept=".txt,.zip,text/plain,application/zip"
+                      className="ro-visually-hidden"
+                      tabIndex={-1}
+                      aria-label={t('import.drop.choose')}
+                      onChange={(event) => {
+                        addFiles(event.target.files)
+                        event.target.value = ''
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <label className="import-paste">
+                    <span className="ro-visually-hidden">{t('import.paste.label')}</span>
+                    <textarea
+                      className="import-paste__field"
+                      placeholder={t('import.paste.placeholder')}
+                      readOnly={choiceLocked !== undefined}
+                      title={choiceLocked}
+                      onPaste={onPaste}
+                    />
+                  </label>
+                )}
+              </div>
 
-          {tab !== 'library' && !bulk && (
-            <ul className="import-formats" aria-label={t('import.formats.label')}>
-              {SOURCE_FORMATS.map((format) => (
-                <li key={format} className="import-formats__chip ro-mono">
-                  {t(`import.format.${format}`)}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {bulk ? (
-            <BulkFiles files={batch.items} lockedReason={choiceLocked} onRemove={remove} />
-          ) : batch.items.length > 0 && (
-            <section className="import-files" aria-labelledby="import-files-title">
-              <h3 id="import-files-title" className="import-dialog__eyebrow">
-                {t('import.files.title')}
-              </h3>
-              <ul className="import-files__list">
-                {batch.items.map((item) => (
-                  <FileRow
-                    key={item.key}
-                    item={item}
-                    destinationKind={destinationKind}
-                    i18n={i18n}
-                    onRemove={() => remove(item.key)}
-                    onPickFormat={(format) => reread(item.key, format)}
-                    onShowDiscarded={() => setDiscardedOf(item.key)}
-                  />
+            {tab !== 'library' && !bulk && (
+              <ul className="import-formats" aria-label={t('import.formats.label')}>
+                {SOURCE_FORMATS.map((format) => (
+                  <li key={format} className="import-formats__chip ro-mono">
+                    {t(`import.format.${format}`)}
+                  </li>
                 ))}
               </ul>
-            </section>
-          )}
-        </div>
+            )}
 
-        <aside className="import-dialog__side">
-          {destinationKind === 'room' && (
-            <ClaimHeroes heroes={unmatchedHeroes(batch)} onClaimed={(screenName) => dispatch({ type: 'screenNameAdded', screenName })} />
-          )}
-          {bulk ? (
-            <BulkExplanation />
-          ) : showingDiscarded?.state === 'read' ? (
-            <DiscardedPanel
-              item={showingDiscarded}
-              preview={showingDiscarded.preview}
-              destinationKind={destinationKind}
-              onBack={() => setDiscardedOf(null)}
-            />
-          ) : (
-            <HandPreviewPanel hands={hands} index={previewIndex} onNext={() => setPreviewIndex((index) => (index + 1) % hands.length)} i18n={i18n} />
-          )}
-        </aside>
-      </div>
-
-      {bulk ? (
-        <BulkFooter bulk={bulk} files={batch.items} uploadingLabel={uploadingLabel} onCancel={onClose} onUpload={upload} onDone={onClose} />
-      ) : (
-        <footer className="import-dialog__footer">
-          <div className="import-dialog__totals" role="status">
-            <span className="import-dialog__ready">
-              {importing ??
-                (totals.ready > 0
-                ? t(totals.ready === 1 ? 'import.footer.ready.one' : 'import.footer.ready.other', { count: totals.ready })
-                : t('import.footer.none'))}
-            </span>
-            {totals.discarded > 0 && (
-              <span className="import-dialog__left-out">
-                {t(totals.discarded === 1 ? 'import.footer.discarded.one' : 'import.footer.discarded.other', { count: totals.discarded })}
-              </span>
+            {bulk ? (
+              <BulkFiles files={batch.items} lockedReason={choiceLocked} onRemove={remove} />
+            ) : batch.items.length > 0 && (
+              <section className="import-files" aria-labelledby="import-files-title">
+                <h3 id="import-files-title" className="import-dialog__eyebrow">
+                  {t('import.files.title')}
+                </h3>
+                <ul className="import-files__list">
+                  {batch.items.map((item) => (
+                    <FileRow
+                      key={item.key}
+                      item={item}
+                      destinationKind={destinationKind}
+                      i18n={i18n}
+                      onRemove={() => remove(item.key)}
+                      onPickFormat={(format) => reread(item.key, format)}
+                      onShowDiscarded={() => setDiscardedOf(item.key)}
+                      onReport={() => setReporting({ files: [item], reason: fileMeta(item, destinationKind, i18n) })}
+                    />
+                  ))}
+                </ul>
+              </section>
             )}
           </div>
-          {offersBulk && !confirmFailure && (
-            <p className="import-dialog__failure">
-              {fileOverLimit
-                ? t('import.bulk.offerOverLimit', { limit: formatNumber(limit) })
-                : t('import.bulk.offer', { count: formatNumber(totals.ready) })}
-            </p>
-          )}
-          {overLimit && !confirmFailure && <p className="import-dialog__failure">{overLimit}</p>}
-          {confirmFailure && (
-            <p className="import-dialog__failure" role="alert">
-              {refusalText(i18n, confirmFailure.refusal)}
-            </p>
-          )}
-          <span className="import-dialog__spacer" />
-          <Button variant="secondary" disabledReason={importing} onClick={onClose}>
-            {t('import.cancel')}
-          </Button>
-          {offersBulk ? (
-            <Button variant="primary" onClick={() => setBulk({ phase: 'ready' })}>
-              {t('import.bulk.continue')}
+
+          <aside className="import-dialog__side">
+            {destinationKind === 'room' && (
+              <ClaimHeroes heroes={unmatchedHeroes(batch)} onClaimed={(screenName) => dispatch({ type: 'screenNameAdded', screenName })} />
+            )}
+            {bulk ? (
+              <BulkExplanation />
+            ) : showingDiscarded?.state === 'read' ? (
+              <DiscardedPanel
+                item={showingDiscarded}
+                preview={showingDiscarded.preview}
+                destinationKind={destinationKind}
+                onBack={() => setDiscardedOf(null)}
+              />
+            ) : (
+              <HandPreviewPanel hands={hands} index={previewIndex} onNext={() => setPreviewIndex((index) => (index + 1) % hands.length)} i18n={i18n} />
+            )}
+          </aside>
+        </div>
+
+        {bulk ? (
+          <BulkFooter
+            bulk={bulk}
+            files={batch.items}
+            uploadingLabel={uploadingLabel}
+            onCancel={onClose}
+            onUpload={upload}
+            onDone={onClose}
+            report={(failure) => <ReportImportFailureButton onReport={() => setReporting({ files: batch.items, reason: failure })} />}
+          />
+        ) : (
+          <footer className="import-dialog__footer">
+            <div className="import-dialog__totals" role="status">
+              <span className="import-dialog__ready">
+                {importing ??
+                  (totals.ready > 0
+                  ? t(totals.ready === 1 ? 'import.footer.ready.one' : 'import.footer.ready.other', { count: totals.ready })
+                  : t('import.footer.none'))}
+              </span>
+              {totals.discarded > 0 && (
+                <span className="import-dialog__left-out">
+                  {t(totals.discarded === 1 ? 'import.footer.discarded.one' : 'import.footer.discarded.other', { count: totals.discarded })}
+                </span>
+              )}
+            </div>
+            {offersBulk && !confirmFailure && (
+              <p className="import-dialog__failure">
+                {fileOverLimit
+                  ? t('import.bulk.offerOverLimit', { limit: formatNumber(limit) })
+                  : t('import.bulk.offer', { count: formatNumber(totals.ready) })}
+              </p>
+            )}
+            {overLimit && !confirmFailure && <p className="import-dialog__failure">{overLimit}</p>}
+            {confirmFailure && (
+              <p className="import-dialog__failure" role="alert">
+                {refusalText(i18n, confirmFailure.refusal)}
+              </p>
+            )}
+            {confirmFailure && (
+              <ReportImportFailureButton
+                onReport={() =>
+                  setReporting({
+                    files: batch.items.filter((item) => item.state === 'read'),
+                    reason: refusalText(i18n, confirmFailure.refusal),
+                  })
+                }
+              />
+            )}
+            <span className="import-dialog__spacer" />
+            <Button variant="secondary" disabledReason={importing} onClick={onClose}>
+              {t('import.cancel')}
             </Button>
-          ) : (
-            <Button variant="primary" disabledReason={lockedReason} onClick={confirm}>
-              <Icon name="add" size={16} />
-              {totals.ready > 0
-                ? t(totals.ready === 1 ? `import.${destinationKind}.confirm.one` : `import.${destinationKind}.confirm.other`, { count: totals.ready })
-                : t(`import.${destinationKind}.confirm.empty`)}
-            </Button>
-          )}
-        </footer>
-      )}
-    </dialog>
+            {offersBulk ? (
+              <Button variant="primary" onClick={() => setBulk({ phase: 'ready' })}>
+                {t('import.bulk.continue')}
+              </Button>
+            ) : (
+              <Button variant="primary" disabledReason={lockedReason} onClick={confirm}>
+                <Icon name="add" size={16} />
+                {totals.ready > 0
+                  ? t(totals.ready === 1 ? `import.${destinationKind}.confirm.one` : `import.${destinationKind}.confirm.other`, { count: totals.ready })
+                  : t(`import.${destinationKind}.confirm.empty`)}
+              </Button>
+            )}
+          </footer>
+        )}
+      </dialog>
+      {/* Beside the import dialog, not in it: closing the report must not close the import. */}
+      {reporting && <ReportImportFailureDialog destination={destination} failure={reporting} onClose={() => setReporting(null)} />}
+    </>
   )
 }
 
@@ -470,6 +496,7 @@ function FileRow({
   onRemove,
   onPickFormat,
   onShowDiscarded,
+  onReport,
 }: {
   item: ImportItem
   destinationKind: ImportDestination['kind']
@@ -477,6 +504,8 @@ function FileRow({
   onRemove: () => void
   onPickFormat: (format: SourceFormat) => void
   onShowDiscarded: () => void
+  /** Reports a file that failed to Support. */
+  onReport: () => void
 }) {
   const { t } = i18n
   const status = rowStatus(item)
@@ -513,6 +542,7 @@ function FileRow({
             : t('import.file.showDiscarded.other', { count: item.preview.discarded.length })}
         </Button>
       )}
+      {item.state === 'failed' && <ReportImportFailureButton onReport={onReport} />}
       <IconButton icon="close" size="compact" label={t('import.file.remove', { name: item.name })} onClick={onRemove} />
     </li>
   )

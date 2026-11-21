@@ -1,0 +1,120 @@
+import { useCallback, useState } from 'react'
+import { useI18n } from '../i18n'
+import { followLink } from '../routing'
+import { PANEL_TICKET_FILTERS, SUPPORT_POLL_MS, type PanelTicketFilter, type PanelTicketPage } from '../support/support'
+import { SupportStatusBadge } from '../support/SupportThread'
+import { usePolled } from '../support/usePolled'
+import { Icon } from '../ui/Icon'
+import { SegmentedControl } from '../ui/SegmentedControl'
+import { adminSupportTicketPath, nameOf } from './admin'
+import { AdminPagination } from './AdminPagination'
+import { useAdminApi } from './useAdminApi'
+import '../support/Support.css'
+
+/**
+ * The Support tab: every Support Ticket, those waiting for an answer first
+ * (their Account wrote last), then the other Open ones, then the Closed;
+ * the latest written in on top of each. Todas, Abiertas and Cerradas keep
+ * every one, the Open ones or the Closed. Each opens its thread. It is
+ * read again every so often while on screen, so a new Ticket or answer
+ * turns up without a reload.
+ */
+export function SupportTab() {
+  const { t, formatDate, formatRelative } = useI18n()
+  const admin = useAdminApi()
+  const [filter, setFilter] = useState<PanelTicketFilter>('all')
+  const [pageNumber, setPageNumber] = useState(1)
+  const load = useCallback(
+    () => admin<PanelTicketPage>(`/support/tickets?${new URLSearchParams({ status: filter, page: String(pageNumber) })}`),
+    [admin, filter, pageNumber],
+  )
+  const { value: page, failure } = usePolled(load, SUPPORT_POLL_MS)
+
+  const date = (iso: string) => formatDate(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric' })
+
+  return (
+    <section className="admin-section" aria-label={t('admin.tab.support')}>
+      <div className="admin-toolbar">
+        <SegmentedControl
+          label={t('admin.support.filter')}
+          options={PANEL_TICKET_FILTERS.map((value) => ({ value, label: t(`admin.support.filter.${value}`) }))}
+          value={filter}
+          onChange={(value) => {
+            setFilter(value)
+            setPageNumber(1)
+          }}
+        />
+        {page && (
+          <span className="support-waiting">
+            <span className="support-waiting__dot" aria-hidden="true" data-none={page.waiting === 0 || undefined} />
+            {t('admin.support.waiting', { count: page.waiting })}
+          </span>
+        )}
+      </div>
+      {failure && (
+        <p className="admin-notice" data-tone="alert" role="alert">
+          {t(`reason.${failure}`)}
+        </p>
+      )}
+      {page && page.tickets.length === 0 && <p className="admin-notice">{t('admin.support.none')}</p>}
+      {page && page.tickets.length > 0 && (
+        <>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>{t('admin.support.account')}</th>
+                  <th>{t('admin.support.subject')}</th>
+                  <th>{t('admin.support.status')}</th>
+                  <th>{t('admin.support.lastMessage')}</th>
+                  <th>{t('admin.support.openedAt')}</th>
+                  <th>
+                    <span className="ro-visually-hidden">{t('support.column.open')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.tickets.map((ticket) => (
+                  <tr key={ticket.id}>
+                    <td>
+                      {ticket.account.email ?? nameOf(ticket.account)}
+                      {ticket.account.displayName && <span className="admin-table__sub">{ticket.account.displayName}</span>}
+                    </td>
+                    <td className="support-panel__subject">
+                      <a href={adminSupportTicketPath(ticket.id)} className="support-table__subject" onClick={followLink}>
+                        {ticket.subject}
+                      </a>
+                    </td>
+                    <td>
+                      <span className="support-panel__status">
+                        <SupportStatusBadge status={ticket.status} />
+                        {ticket.status === 'open' && ticket.waitingFor === 'administrators' && (
+                          <span className="support-badge" data-tone="waiting">
+                            {t('admin.support.waitingBadge')}
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td>
+                      <span>{nameOf(ticket.lastMessage.writer)}</span>
+                      <span className="support-table__muted"> · {formatRelative(new Date(ticket.lastMessage.writtenAt))}</span>
+                    </td>
+                    <td>
+                      {ticket.openedBy
+                        ? t('admin.support.openedAtBy', { date: date(ticket.createdAt), name: nameOf(ticket.openedBy) })
+                        : date(ticket.createdAt)}
+                    </td>
+                    <td className="support-table__chevron">
+                      <Icon name="chevron" size={16} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <AdminPagination page={page.page} pageSize={page.pageSize} shown={page.tickets.length} total={page.total} onGoTo={setPageNumber} />
+        </>
+      )}
+    </section>
+  )
+}

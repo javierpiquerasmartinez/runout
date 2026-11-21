@@ -77,7 +77,7 @@ Voice still goes through Discord or wherever the group already talks. Runout car
 
 ## Epic map
 
-Thirteen epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, Goals after the Calendar, as a place to say what all of it is aiming for, and Home after Goals, as the first screen that says how all of them are going. Administration runs alongside them for the trial.
+Fourteen epics cover the product. Five are essential for a session to work end to end. Notes and preferences could land partially and grow later. The Library and Results epic is the second release, which turns Runout into where each person keeps their Hands. The Lab comes after it, as a place to study preflop Ranges away from any Hand, the Calendar after the Lab, as a place to plan that study day by day, Goals after the Calendar, as a place to say what all of it is aiming for, and Home after Goals, as the first screen that says how all of them are going. Administration runs alongside them for the trial, and Support with it, so that an Account and the Administrators can talk from inside Runout.
 
 | Epic | Goal | Priority |
 | --- | --- | --- |
@@ -94,6 +94,7 @@ Thirteen epics cover the product. Five are essential for a session to work end t
 | E12 · Goals | Say what you are aiming for and by when, and see how far you have got | After the Calendar |
 | E13 · Home | See how every section is going as soon as I come in, and do the quickest things without leaving | After Goals |
 | E10 · Administration | Decide who gets an Account, see how Runout is used, and help someone from inside their Account | Trial |
+| E14 · Support | Raise a problem or a question with Runout, and answer it from the panel, in one conversation per matter | Trial |
 
 Build order is not the table order. E2 goes first because without parsed Hands there is nothing to show, and E4 can be built locally long before E5 exists.
 
@@ -103,7 +104,7 @@ A Room holds exactly one study session: its Participants, a Queue and the Playba
 
 **H1.1 — Create a Room.** As the player organising the session, I want to create a Room with a name, so I have somewhere to call the group to.
 
-- I create it on the **Salas** screen (`/rooms`). The **Nueva sala** button in the header takes me there from any screen with the shared header (H8.9), with the name field ready.
+- I create it on the **Salas** screen (`/rooms`): with no open Room the create panel is there; with some, **Nueva sala** above the list opens the form, the name field ready. Home's **Salas** card's **Nueva sala** takes me there the same way (H8.9 no longer has it in the header).
 - Creating a Room needs an Account, and **Salas** is only reached with one; without it I am sent to `/login`.
 - On creation I become the Master automatically.
 - The name allows up to 60 characters.
@@ -601,7 +602,8 @@ Screen Names, Display Name and Preferences belong to the Participant's identity.
 
 **H8.9 — Move around the app.** As a player with an Account, I want every screen to share one header, so the app feels like one place and I always know where I am.
 
-- Home, the Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, which leads to Home, **Inicio**, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, **Nueva sala** and the avatar menu.
+- Home, the Library, a Library Hand, **Salas**, the Lab, the Calendar, Goals and Settings share the same header: the brand, which leads to Home, **Inicio**, **Biblioteca**, **Salas**, **Laboratorio**, **Calendario** and **Objetivos** with the current one marked, and the avatar menu. **Nueva sala** is not in the header: Rooms are created from **Salas** and Home's **Salas** card.
+- An Administrator also has a shield button just left of the avatar, leading to the panel and marked while in it; **Administración** is not in the avatar's menu.
 - On a phone the six sections don't fit: they scroll sideways, opening with the current one in view, and fade out on the side where more are hidden.
 - The brand looks the same on every screen, Rooms included.
 - While I hold a Room, the header offers a way back to it.
@@ -962,7 +964,7 @@ Home is an Account's first screen, called **Inicio**: one card per section, so t
 
 ## E10 · Administration
 
-Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administrator is an Account named as one in the server's configuration (`ADMINISTRATOR_EMAILS`), never from Runout itself. They have **Administración** in the header's menu, leading to `/admin` with three tabs, each its own route. For anyone else neither the entry nor `/admin` exists: the path leads nowhere, as any unknown path does.
+Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administrator is an Account named as one in the server's configuration (`ADMINISTRATOR_EMAILS`), never from Runout itself. They have a shield button labelled **Administración** in the header, leading to `/admin` with three tabs, each its own route. For anyone else neither the entry nor `/admin` exists: the path leads nowhere, as any unknown path does.
 
 **H10.1 — Invitations.** As an Administrator, I want to choose who can create an Account.
 
@@ -997,6 +999,60 @@ Runout is offered as a free trial to a hand-picked group (ADR 0008). An Administ
 - A banner on every screen reads "Viendo como X" with **Salir**, which ends it and brings me back to the panel as myself. It ends on its own after one hour.
 - Rooms are refused while impersonating, and their entry points are locked with the reason; so are passwords and sign-in methods, and the panel itself.
 - Nobody can impersonate an Administrator or a suspended Account. Every Impersonation is recorded with who, whom, start and end, and shown on the Account's row. The Account's own Sign-ins and last activity are untouched.
+
+## E14 · Support
+
+An Account and the Administrators talk through **Support Tickets** ("Incidencias"): one conversation about one matter, with a subject and a thread of **Support Messages**. Messages are text only, up to 4,000 characters, and never edited or deleted by either side. There is no live push: a thread on screen is read again every 15 seconds, so new messages turn up without a reload.
+
+**H14.1 — Opening a Ticket and writing in it.** As an Account, I want to tell Runout about a problem or ask a question, and follow the answer.
+
+- **Soporte**, in the avatar's menu above Ajustes, leads to `/support`: my Tickets, Open ones first and the latest written in on top, each with its subject, its status (Abierta, Cerrada) and who wrote last ("Tú" or "Runout") and when. An Administrator has no Soporte in the menu.
+- **Nueva incidencia** asks for a subject (up to 120 characters) and a first message, both required: **Enviar** stays locked until both are written. Sending opens the Ticket, Open, and goes to its page.
+- Where an ordinary import fails in the import dialog (a file it could not read, an import refused on confirming, a Bulk Import's upload that stopped), **Reportar un problema** opens the same dialog with the subject "No se han podido importar mis manos" and the failure already written into the message, in my language: where I was importing (my Library, or which Room), the files with their sizes, and the reason shown. I can edit both before sending, nothing is sent until I do, and cancelling leaves the import dialog as it was. An ordinary import has no record, so the Ticket points at nothing. Like the rest of Support, it is locked while I am Impersonated, and neither an anonymous Participant nor an Administrator is offered it.
+- A Ticket's page (`/support/<id>`) shows its thread in order, each message with its writer and when; every Administrator's message is signed **Runout**, never with who wrote it. Below it I write the next message, with a counter of the 4,000 characters.
+- I only ever see my own Tickets. While an Administrator Impersonates me, Support is refused by the server and locked on screen with the reason, and nothing is read.
+- An Administrator has no Support of their own: acting as themselves, the server refuses them every part of the Account's side of Support.
+
+**H14.2 — Answering from the panel.** As an Administrator, I want every Ticket in one place, and to answer it.
+
+- The panel has a fifth tab, **Soporte** (`/admin/support`): every Ticket, those waiting for an answer first, then the other Open ones, then the Closed, the latest written in on top of each. **Todas** (the default), **Abiertas** and **Cerradas** keep every Ticket, only the Open or only the Closed; the count of those waiting is over every Ticket whatever is shown. Each row shows its Account, subject, status, who wrote last and when, and when it was opened; a filled **Espera respuesta** marks those whose Account wrote last, and the tab says how many there are.
+- Whose turn it is is never stored: it is read from who wrote the last message.
+- The tab, like a Ticket's page, is read again every 15 seconds while on screen, so a new Ticket or answer turns up without a reload.
+- A Ticket's page in the panel (`/admin/support/<id>`) shows the thread with which Administrator wrote each message, tagged "como Runout" (and "tú" for my own), the Account, and whether it waits for an answer or for the Account. Any Administrator writes in any Ticket, a Suspended Account's included; the Account sees it signed Runout.
+
+**H14.3 — Closing and reopening.** As either side, I want to say a Ticket is settled, and to take it up again if the problem comes back, so Closed always means nothing is pending.
+
+- On a Ticket's page, under **Estado**, **Cerrar incidencia** closes it, on my side for my own Tickets and in the panel for any. A Closed one has no button, and says that writing in it again opens it.
+- Writing in a Closed Ticket, from either side, opens it again with the same **Enviar**; nothing else does.
+- My list keeps the Open ones above the Closed ones, and the panel's Support tab puts the Closed ones last.
+
+**H14.4 — Opening a Ticket from the panel.** As an Administrator, I want to reach an Account from Runout about something of its own.
+
+- Every row of the Accounts tab but an Administrator's (mine included) ends with **Abrir incidencia**: a subject and a first message, both required, open a Ticket with that Account, which lands on its page in the panel. The Ticket records which Administrator opened it, and the Account finds it in its Soporte, written by Runout.
+- A Suspended Account can't be given a new Ticket: the server refuses it, and on its row **Abrir incidencia** is locked with "Esta cuenta está suspendida". Its existing Tickets stay readable and answerable from the panel.
+- No Ticket can be opened with an Administrator, from the Accounts tab or the Importaciones tab: the server refuses it ("Los administradores no tienen Soporte propio"), and their rows don't offer it.
+
+**H14.5 — Support emails.** As either side, I want to hear about Support even when I'm not in Runout.
+
+- Every Administrator in the server's configuration gets an email, in their Account's language (the default one before they have an Account), when an Account opens a Ticket ("Nueva incidencia: …") or writes in one ("Nuevo mensaje en una incidencia: …"), naming the Account and linking to the Ticket's page in the panel.
+- The Account gets an email in the language of its Preferences when an Administrator opens a Ticket with it ("Runout ha abierto una incidencia contigo: …"), writes in one of its Tickets ("Runout te ha respondido: …") or closes it ("Runout ha cerrado tu incidencia: …"), linking to the Ticket's page on its side. Closing a Ticket already Closed sends nothing, and neither does the Account closing its own.
+- Every email carries the Ticket's subject and a short excerpt (about 140 characters, on one line, cut at a word with "…") of the message it is about (for a closing, the last one), never the whole message; an answer is written in Runout, not by replying to the email.
+- A Suspended Account gets none. There is no opting out. A failed send is logged, and the message stays written.
+- The composers say so: "Runout te responderá aquí y por correo." on my side, and "… lo verá firmado como Runout y le llegará un correo." in the panel.
+
+**H14.6 — Unread answers and the waiting count.** As an Account, I want to notice Runout's answers without opening Support; as an Administrator, I want to know when someone is waiting for us.
+
+- While any of my Tickets has a message from Runout I haven't read, my avatar carries a brass dot and **Soporte** in its menu says how many ("1 nueva"). In my list those Tickets have a dot, a bold subject and **Respuesta nueva**. My own messages are never unread.
+- Opening a Ticket's page reads it: the dot and the mark go, and the messages I hadn't read stay set apart under **Nuevo** while the page is open. A Ticket I have never opened counts all of Runout's messages as unread, so one an Administrator opens with me starts unread.
+- The Administrator's button in the header carries the number of Open Tickets whose last message is the Account's, hidden at zero. The count is the same for every Administrator, with no read state of their own: once one answers or closes a Ticket it drops for all.
+- The avatar's mark and the button's count are read when a page opens and every minute after (at once after reading an unread answer, or answering from the panel); my list is read again every 15 seconds. Nothing is read while I am Impersonated, and an Administrator has neither the mark nor Soporte.
+
+**H14.7 — Tickets about a Bulk Import.** As either side, I want a Ticket to point at the Bulk Import it is about, so nobody has to describe which one it was.
+
+- In the Library's Importaciones, a Bulk Import that failed or ended early (its Library or Plan full, files it could not read or recognise) offers **Reportar un problema**: the new-Ticket dialog with the import attached (its files, status, when it started and its Hands), the subject "Problema con la importación <archivo>" and an empty message, both editable. The Ticket points at that Bulk Import. Like the rest of Support, it is locked while I am Impersonated and not offered to an Administrator.
+- Every row of the panel's Importaciones tab but an Administrator's own imports ends with **Abrir incidencia**: a Ticket with that import's Account, pointing at it, shown attached with why it failed, and the subject prefilled ("Tu importación <archivo> se ha detenido" for one that ended badly, "Sobre tu importación <archivo>" otherwise). For a Suspended Account it is locked with "Esta cuenta está suspendida", and the server refuses it.
+- A Ticket can only point at a Bulk Import of its own Account: the server refuses any other, from either side.
+- A Ticket's page shows the Bulk Import it points at: on my side under **Sobre la importación**, with **Ver importaciones** to the Library's Importaciones; in the panel under **Importación**, with why it failed and **Ver en Importaciones**, which opens the Importaciones tab showing only that import (`?import=<id>`), with **Ver todas** to show every one again. In the panel, the Account also has **Ver en Cuentas**, which opens the Accounts tab searching for it, where it can be Impersonated.
 
 ## MVP scope and out of scope
 

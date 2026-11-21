@@ -215,10 +215,9 @@ describe('the Invitations tab', () => {
 describe('the Accounts tab', () => {
   let calls: ApiCall[]
 
-  beforeEach(() => {
-    calls = fakeApi({
+  const accountsAnswers = () => ({
       'GET /admin/totals': () => Response.json(totals),
-      'GET /admin/accounts': (call) => {
+      'GET /admin/accounts': (call: ApiCall) => {
         const query = new URLSearchParams(call.search)
         const search = query.get('search')
         const plan = query.get('plan')
@@ -248,7 +247,10 @@ describe('the Accounts tab', () => {
       'PUT /admin/accounts/ana/plan': () => new Response(null, { status: 204 }),
       'POST /admin/accounts/ana/suspension': () => new Response(null, { status: 204 }),
       'DELETE /admin/accounts/bea/suspension': () => new Response(null, { status: 204 }),
-    })
+  })
+
+  beforeEach(() => {
+    calls = fakeApi(accountsAnswers())
   })
 
   it('shows the totals and each Account with its statistics', async () => {
@@ -296,7 +298,67 @@ describe('the Accounts tab', () => {
       const actions = within(row).getAllByRole('button')
       expect(actions[0].textContent).toBe('Change plan')
     }
-    expect(within(admin).getAllByRole('button')).toHaveLength(1)
+    expect(within(admin).getAllByRole('button').map((each) => each.textContent)).toEqual(['Change plan'])
+  })
+
+  it('offers opening a Ticket last on every Account but an Administrator, who has no Support, locked on a Suspended one', async () => {
+    renderTab('accounts')
+    const [, ana, bea] = await screen.findAllByRole('row')
+
+    expect(within(ana).getAllByRole('button').at(-1)?.textContent).toBe('Open ticket')
+    const locked = within(bea).getAllByRole('button').at(-1)
+    expect(locked?.getAttribute('aria-label')).toBe('Open ticket. This account is suspended')
+    await userEvent.click(locked!)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens a Ticket with an Account from a subject and a message, and lands on it in Support', async () => {
+    window.history.replaceState(null, '', '/admin/accounts')
+    calls = fakeApi({
+      ...accountsAnswers(),
+      'POST /admin/support/tickets': () => Response.json({ id: 'ticket-1' }, { status: 201 }),
+    })
+    renderTab('accounts')
+    const [, ana] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(ana).getByRole('button', { name: 'Open ticket' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading').textContent).toBe('Open a ticket with ana')
+    expect(dialog.textContent).toContain('ana@x.com. They will see it in their Support, signed Runout, and get an email.')
+    const send = within(dialog).getByRole('button', { name: /^Open ticket/ })
+    expect(send.getAttribute('aria-label')).toBe('Open ticket. Write a subject')
+    await userEvent.type(within(dialog).getByLabelText('Subject'), 'Your import')
+    expect(send.getAttribute('aria-label')).toBe('Open ticket. Write a message')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'We are looking into it.')
+    expect(dialog.textContent).toContain('23 / 4,000')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open ticket' }))
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'POST')).toMatchObject({
+        path: '/admin/support/tickets',
+        body: { accountId: 'ana', subject: 'Your import', message: 'We are looking into it.' },
+      }),
+    )
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/support/ticket-1'))
+  })
+
+  it('says why opening a Ticket was refused, keeping what was written', async () => {
+    fakeApi({
+      ...accountsAnswers(),
+      'POST /admin/support/tickets': () => refusal(403, 'support-account-suspended'),
+    })
+    renderTab('accounts')
+    const [, ana] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(ana).getByRole('button', { name: 'Open ticket' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText('Subject'), 'Your import')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'Hello')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open ticket' }))
+
+    expect((await within(dialog).findByRole('alert')).textContent).toBe('This account is suspended.')
+    expect((within(dialog).getByLabelText('Message') as HTMLTextAreaElement).value).toBe('Hello')
   })
 
   it('changes the Plan after a confirmation that says what changes', async () => {
@@ -341,6 +403,16 @@ describe('the Accounts tab', () => {
 
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
     expect(screen.getAllByRole('row')[1].textContent).toMatch(/bea@x\.com/)
+  })
+
+  it('opens searching for the Account a link names, as a Ticket’s "See in Accounts" does', async () => {
+    window.history.replaceState(null, '', '/admin/accounts?search=bea%40x.com')
+    renderTab('accounts')
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
+    expect(screen.getAllByRole('row')[1].textContent).toMatch(/bea@x\.com/)
+    expect((screen.getByLabelText('Search by email or name') as HTMLInputElement).value).toBe('bea@x.com')
+    window.history.replaceState(null, '', '/')
   })
 
   it('suspends and lifts, each after a confirmation', async () => {
@@ -418,8 +490,8 @@ describe('the Rooms tab', () => {
     const rows = await screen.findAllByRole('row')
     expect(rows).toHaveLength(3)
     expect(rows[1].textContent).toMatch(/Martes NL50.*RNT4-K9PX.*Javier.*Open.*3.*12/)
-    expect(calls[0].search).toContain('status=open')
-    expect(calls[0].search).toContain('sort=lastActivityAt&direction=asc')
+    expect(calls.find((call) => call.path === '/admin/rooms')?.search).toContain('status=open')
+    expect(calls.find((call) => call.path === '/admin/rooms')?.search).toContain('sort=lastActivityAt&direction=asc')
 
     await userEvent.click(screen.getByRole('radio', { name: 'All' }))
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(4))
@@ -472,6 +544,8 @@ describe('the Imports tab', () => {
     reason: null,
     failureCode: null,
     retryable: false,
+    accountSuspended: false,
+    accountAdministrator: false,
     createdAt: '2026-11-02T09:12:00Z',
     lastActivityAt: '2026-11-02T10:00:00Z',
     finishedAt: null,
@@ -484,6 +558,7 @@ describe('the Imports tab', () => {
     calls = fakeApi({
       'GET /admin/bulk-imports': (call) => {
         const status = new URLSearchParams(call.search).get('status')
+        const only = new URLSearchParams(call.search).get('id')
         const imports = [
           bulkImport('1', 'jugador3@example.com', 'pt4-2019-2026.zip', firstStatus),
           bulkImport('2', 'jugador7@example.com', 'hm3-2024.zip', 'running', { stalled: true }),
@@ -491,8 +566,9 @@ describe('the Imports tab', () => {
             ...(thirdStatus === 'failed' && { failureCode: '53100', retryable: true }),
             finishedAt: thirdStatus === 'failed' ? '2026-11-02T11:00:00Z' : null,
           }),
-          bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused'),
+          bulkImport('4', 'jugador5@example.com', 'tracker-completo.zip', 'paused', { accountSuspended: true }),
           bulkImport('6', 'jugador4@example.com', 'antiguo.zip', 'failed', {
+            accountAdministrator: true,
             failureCode: 'ECONNRESET',
             finishedAt: '2026-10-20T11:00:00Z',
           }),
@@ -504,7 +580,9 @@ describe('the Imports tab', () => {
             notImported: { 'unrecognised-format': 42, 'too-many-seats': 2 },
             finishedAt: '2026-11-02T12:00:00Z',
           }),
-        ].filter((each) => status !== 'failed' || each.status === 'failed')
+        ]
+          .filter((each) => status !== 'failed' || each.status === 'failed')
+          .filter((each) => !only || each.id === only)
         return Response.json({
           total: imports.length,
           page: 1,
@@ -533,6 +611,7 @@ describe('the Imports tab', () => {
       ['Accounts', '/admin/accounts'],
       ['Rooms', '/admin/rooms'],
       ['Imports', '/admin/imports'],
+      ['Support', '/admin/support'],
     ])
     expect(within(nav).getByRole('link', { name: 'Imports' }).getAttribute('aria-current')).toBe('page')
     await screen.findAllByRole('row')
@@ -549,7 +628,7 @@ describe('the Imports tab', () => {
     expect(rows[3].textContent).toMatch(/Failed.*53100 after 3 attempts/)
     expect(rows[4].textContent).toMatch(/Paused.*Storage at its limit/)
     expect(rows[6].textContent).toMatch(/Completed.*318,204 hands.*1,910 duplicates · 42 not recognised · More than nine seats: 2/)
-    expect(calls[0].search).toContain('status=all')
+    expect(calls.find((call) => call.path === '/admin/bulk-imports')?.search).toContain('status=all')
   })
 
   it('shows the database size against the threshold at which imports pause', async () => {
@@ -606,5 +685,82 @@ describe('the Imports tab', () => {
     await waitFor(() => expect(within(screen.getAllByRole('row')[3]).getByText('In progress')).toBeTruthy())
     expect(calls.some((call) => call.path === '/admin/bulk-imports/3/retry' && call.method === 'POST')).toBe(true)
     expect(within(screen.getAllByRole('row')[3]).queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
+
+  it('opens on the one import a link names, as a Ticket’s "See in Imports" does, until asked for all', async () => {
+    window.history.replaceState(null, '', '/admin/imports?import=3')
+    renderTab('imports')
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2))
+    expect(screen.getAllByRole('row')[1].textContent).toMatch(/sesiones-2023\.zip/)
+    expect(calls.at(-1)?.search).toContain('id=3')
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }))
+
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(7))
+    expect(calls.at(-1)?.search).not.toContain('id=')
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('offers opening a Ticket last on every import but an Administrator’s, locked for a Suspended Account', async () => {
+    renderTab('imports')
+    const rows = (await screen.findAllByRole('row')).slice(1)
+
+    for (const row of rows.filter((_, index) => index !== 4)) {
+      expect(within(row).getAllByRole('button').at(-1)?.textContent).toBe('Open ticket')
+    }
+    expect(within(rows[4]).queryByRole('button', { name: 'Open ticket' })).toBeNull()
+    const locked = within(rows[3]).getAllByRole('button').at(-1)
+    expect(locked?.getAttribute('aria-label')).toBe('Open ticket. This account is suspended')
+    await userEvent.click(locked!)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens a Ticket with the import’s Account, pointing at it, and lands on it in Support', async () => {
+    window.history.replaceState(null, '', '/admin/imports')
+    calls = fakeApi({
+      'GET /admin/bulk-imports': () =>
+        Response.json({
+          total: 1,
+          page: 1,
+          pageSize: 50,
+          imports: [
+            bulkImport('3', 'jugador2@example.com', 'sesiones-2023.zip', 'failed', {
+              total: 210_000,
+              processed: 58_000,
+              failureCode: 'BATCH_INSERT_FAILED',
+              finishedAt: '2026-11-02T11:00:00Z',
+            }),
+          ],
+          storage: { used: 412 * MB, threshold: 800 * MB },
+        }),
+      'POST /admin/support/tickets': () => Response.json({ id: 'ticket-1' }, { status: 201 }),
+    })
+    renderTab('imports')
+    const [, row] = await screen.findAllByRole('row')
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Open ticket' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading').textContent).toBe('Open a ticket with jugador2@example.com')
+    const attached = within(dialog).getByRole('group', { name: 'sesiones-2023.zip' })
+    expect(attached.textContent).toContain('58,000 of 210,000 hands · BATCH_INSERT_FAILED after 3 attempts')
+    expect((within(dialog).getByLabelText('Subject') as HTMLInputElement).value).toBe('Your import sesiones-2023.zip has stopped')
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'We are looking into it.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open ticket' }))
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'POST')).toMatchObject({
+        path: '/admin/support/tickets',
+        body: {
+          accountId: 'account-3',
+          subject: 'Your import sesiones-2023.zip has stopped',
+          message: 'We are looking into it.',
+          bulkImportId: '3',
+        },
+      }),
+    )
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/support/ticket-1'))
+    window.history.replaceState(null, '', '/')
   })
 })
