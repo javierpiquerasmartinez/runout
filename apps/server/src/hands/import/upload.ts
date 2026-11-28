@@ -77,12 +77,17 @@ function decode(bytes: Uint8Array): string {
  * way: UTF-8 unless a byte order mark says UTF-16, the mark itself dropped.
  * Older iPoker clients save their files in cp1252 (the € as the byte 0x80),
  * whatever their XML declaration says, so from the first byte that can't be
- * UTF-8 on, the rest is read as cp1252. Everything before it is ASCII in
- * such a file, which reads the same in both.
+ * UTF-8 on, the rest is read as cp1252, as long as everything before it is
+ * ASCII, which reads the same in both, as it is in such a file. After a
+ * character only UTF-8 writes, the file is UTF-8, and a stray byte that
+ * can't be is just unreadable (U+FFFD).
  */
 export class TextStreamDecoder {
   private encoding: 'utf-16le' | 'utf-16be' | 'utf-8' | 'cp1252' | null = null;
+  /** Set once the encoding is settled for the rest of the file. */
   private decoder: TextDecoder | null = null;
+  /** Whether a character only UTF-8 writes (or its byte order mark) has been read. */
+  private utf8Only = false;
   /** Bytes not decoded yet: the file's first one, or a character cut across pieces. */
   private held: Uint8Array = new Uint8Array(0);
 
@@ -96,11 +101,11 @@ export class TextStreamDecoder {
       if (this.held.length === 0) return '';
       return this.read(new Uint8Array(0), true) + this.end();
     }
+    if (this.decoder) return this.decoder.decode();
     const held = this.held;
     this.held = new Uint8Array(0);
-    if (this.encoding !== 'utf-8') return this.decoder!.decode();
     // A character the text ends before completing can't be UTF-8.
-    return held.length === 0 ? '' : this.toCp1252(held);
+    return held.length === 0 ? '' : this.settle(held) + this.decoder!.decode();
   }
 
   private read(chunk: Uint8Array, ending: boolean): string {
@@ -119,26 +124,32 @@ export class TextStreamDecoder {
         this.encoding = 'utf-8';
         if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
           bytes = bytes.subarray(3);
+          this.utf8Only = true;
         }
       }
       if (this.encoding !== 'utf-8') {
         this.decoder = new TextDecoder(this.encoding);
       }
     }
-    if (this.encoding !== 'utf-8') {
-      return this.decoder!.decode(bytes, { stream: true });
-    }
+    if (this.decoder) return this.decoder.decode(bytes, { stream: true });
     const { valid, invalid } = utf8Prefix(bytes);
-    const text = UTF8.decode(bytes.subarray(0, valid));
-    if (invalid) return text + this.toCp1252(bytes.subarray(valid));
+    const read = bytes.subarray(0, valid);
+    if (read.some((byte) => byte >= 0x80)) this.utf8Only = true;
+    const text = UTF8.decode(read);
+    if (invalid) return text + this.settle(bytes.subarray(valid));
     // What is left is the start of a character the next piece completes.
     this.held = bytes.slice(valid);
     return text;
   }
 
-  private toCp1252(bytes: Uint8Array): string {
-    this.encoding = 'cp1252';
-    this.decoder = new TextDecoder('windows-1252');
+  /** Settles the encoding at the first byte that can't be UTF-8, and reads on from it. */
+  private settle(bytes: Uint8Array): string {
+    if (this.utf8Only) {
+      this.decoder = new TextDecoder('utf-8', { ignoreBOM: true });
+    } else {
+      this.encoding = 'cp1252';
+      this.decoder = new TextDecoder('windows-1252');
+    }
     return this.decoder.decode(bytes, { stream: true });
   }
 }

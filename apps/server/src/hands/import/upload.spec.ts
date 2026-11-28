@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { strToU8, zipSync } from 'fflate';
-import { readUpload, UnreadableUpload } from './upload.js';
+import { readUpload, TextStreamDecoder, UnreadableUpload } from './upload.js';
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -54,6 +54,27 @@ describe('Reading an uploaded Hand History file', () => {
     expect(text).toContain('<?xml version="1.0" encoding="utf-8"?>');
     expect(text).toContain('<gametype>Holdem NL €0.05/€0.10</gametype>');
     expect(text).toContain('<tablename>Málaga, 913000301</tablename>');
+  });
+
+  it('keeps reading a UTF-8 file as UTF-8 past a stray byte that cannot be UTF-8, whole or in pieces', () => {
+    const bytes = Buffer.concat([
+      Buffer.from('€1 ', 'utf8'),
+      Buffer.from([0xff]),
+      Buffer.from(' €2 ', 'utf8'),
+      // A character the file ends before completing.
+      Buffer.from([0xe2, 0x82]),
+    ]);
+    const expected = '€1 � €2 �';
+
+    expect(readUpload('session.txt', bytes)).toBe(expected);
+    for (let size = 1; size <= bytes.length; size++) {
+      const decoder = new TextStreamDecoder();
+      let text = '';
+      for (let start = 0; start < bytes.length; start += size) {
+        text += decoder.decode(bytes.subarray(start, start + size));
+      }
+      expect(text + decoder.end()).toBe(expected);
+    }
   });
 
   it('reads each file in a zip in its own encoding', () => {
