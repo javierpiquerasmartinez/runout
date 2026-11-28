@@ -23,8 +23,16 @@ export interface Hand {
   hero: { screenName: string; cards: string[] };
   posts: Post[];
   actions: Action[];
-  /** The community cards, in the order they were dealt. */
+  /**
+   * The community cards, in the order they were dealt. In a Hand run more
+   * than once, Run 1's whole board (ADR 0014).
+   */
   board: string[];
+  /**
+   * Every Run's whole board, in the order the Runs were dealt, the first
+   * equal to `board`. Only in a Hand run more than once.
+   */
+  runs?: string[][];
   /** Bets nobody matched, handed back before the pot was awarded. */
   returned: { screenName: string; amount: number }[];
   /** Whether the Hand reached Showdown. */
@@ -34,8 +42,14 @@ export interface Hand {
   /**
    * What each winner took, and from which pot: 0 is the main pot, then side
    * pots from 1. Hands imported before pots were recorded have no `pot`.
+   * In a Hand run more than once, `run` says which Run paid it, 0 for Run 1.
    */
-  collected: { screenName: string; amount: number; pot?: number }[];
+  collected: {
+    screenName: string;
+    amount: number;
+    pot?: number;
+    run?: number;
+  }[];
   /** The Rake alone: what the Poker Site charged for the game. */
   rake: number;
   /**

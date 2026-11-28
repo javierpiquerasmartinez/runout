@@ -270,6 +270,28 @@ describe('Replay: a Hand Summary of an unusual Hand', () => {
     );
   });
 
+  it('writes a Hand run twice: the shared Streets once, then a line per Run', () => {
+    const twice = hand('coinpoker-session.txt', '159583401409');
+    const body = (language: 'es' | 'en') =>
+      handSummary(twice, { language, timeZone: madrid }).split('\n').slice(3);
+
+    expect(body('es')).toEqual([
+      'Preflop: UTG fold, HJ fold, CO raise 2,5bb, BTN 3bet 7,4bb, Hero fold, BB fold, CO 4bet 24bb, BTN call',
+      'Flop (49,5bb) 8♦ 8♥ 7♠: CO bet 10,9bb, BTN call',
+      'Turn (71,3bb) A♦: CO check, BTN bet 19bb, CO all-in 88,7bb, BTN call',
+      'Showdown: CO muestra T♦ J♦, BTN muestra A♠ K♠',
+      'Run 1 (248,7bb) 3♦: CO gana 119,2bb',
+      'Run 2 (248,7bb) Q♥: BTN gana 119,4bb (rake 10bb)',
+      'Resultado Hero: -0,5bb',
+    ]);
+    expect(body('en').slice(3)).toEqual([
+      'Showdown: CO shows T♦ J♦, BTN shows A♠ K♠',
+      'Run 1 (248.7bb) 3♦: CO wins 119.2bb',
+      'Run 2 (248.7bb) Q♥: BTN wins 119.4bb (rake 10bb)',
+      'Hero result: -0.5bb',
+    ]);
+  });
+
   it('writes a Winamax Hand where the Hero wins only a side pot', () => {
     expect(
       handSummary(hand('winamax-session.txt', '20954312-7733-1757700200'), {

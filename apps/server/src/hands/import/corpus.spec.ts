@@ -67,6 +67,14 @@ const CORPUS: CorpusEntry[] = [
     discarded: [],
   },
   {
+    // Written by hand: no real PokerStars Hand run twice has turned up, so
+    // its Runs aren't read yet (issue 26 of mvp-study-session).
+    file: 'pokerstars-run-it-twice.txt',
+    format: 'pokerstars',
+    hands: [],
+    discarded: ['run-it-twice'],
+  },
+  {
     file: 'pokerstars-pot-limit.txt',
     format: 'pokerstars',
     hands: [
@@ -320,8 +328,39 @@ const CORPUS: CorpusEntry[] = [
         returned: [{ screenName: '4e097d34', amount: 10 }],
         showdown: false,
       },
+      {
+        // Run twice after an all-in on the turn: one river per Run, each
+        // with its own Showdown paying half the pot.
+        siteHandId: '159583401409',
+        actions: expect.arrayContaining([
+          {
+            street: 'turn',
+            screenName: 'a9373981',
+            type: 'raise',
+            amount: 697,
+            to: 887,
+            allIn: true,
+          },
+        ]) as Hand['actions'],
+        board: ['8d', '8h', '7s', 'Ad', '3d'],
+        runs: [
+          ['8d', '8h', '7s', 'Ad', '3d'],
+          ['8d', '8h', '7s', 'Ad', 'Qh'],
+        ],
+        showdown: true,
+        shown: [
+          { screenName: 'a9373981', cards: ['10d', 'Jd'] },
+          { screenName: '7160fe9f', cards: ['As', 'Ks'] },
+        ],
+        collected: [
+          { screenName: 'a9373981', amount: 1192, pot: 0, run: 0 },
+          { screenName: '7160fe9f', amount: 1194, pot: 0, run: 1 },
+        ],
+        rake: 100,
+        fees: 1,
+      },
     ],
-    discarded: ['run-it-twice'],
+    discarded: [],
   },
   {
     // From NL25 up CoinPoker plays with an ante, written in the header as a
@@ -446,6 +485,20 @@ describe('Hand History import: the fixture corpus', () => {
         (hand.splash ?? 0);
 
       expect(paid).toBe(overview(hand).finalPot);
+    },
+  );
+
+  it.each(everyHand)(
+    '$file #$id has Run 1 as its board, if it was run more than once',
+    ({ hand }) => {
+      if (hand.runs) {
+        expect(hand.runs.length).toBeGreaterThanOrEqual(2);
+        expect(hand.runs[0]).toEqual(hand.board);
+      }
+      // Only a Hand run more than once says which Run paid each winner.
+      for (const { run } of hand.collected) {
+        expect(run === undefined).toBe(hand.runs === undefined);
+      }
     },
   );
 

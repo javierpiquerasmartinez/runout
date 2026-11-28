@@ -178,10 +178,49 @@ describe('Replay: the Hero’s All-in EV', () => {
     expect(results.map((r) => r.allInEv)).toEqual(results.map((r) => r.result));
   });
 
-  it('never meets a Hand run twice: those are discarded as they are read', () => {
-    // Such a Hand would count by its Result.
-    expect(importHandHistory(text('coinpoker-session.txt')).discarded).toEqual([
-      expect.objectContaining({ reason: 'run-it-twice' }),
-    ]);
+  describe('in a Hand run more than once', () => {
+    // The fixture's Hero folded preflop: seen from 7160fe9f's seat instead,
+    // who put in ₮12.36 and won Run 2's half (₮11.94) with As Ks.
+    function ranTwice() {
+      const hand = hands('coinpoker-session.txt').at(-1)!;
+      expect(hand.runs).toHaveLength(2);
+      return {
+        ...hand,
+        hero: { screenName: '7160fe9f', cards: ['As', 'Ks'] },
+      };
+    }
+
+    it('adds up what the Hero collected in every Run', () => {
+      expect(heroResult(ranTwice())).toMatchObject({
+        result: 1194 - 1236,
+        reachedShowdown: true,
+      });
+    });
+
+    it('counts both halves when the Hero wins both Runs', () => {
+      const hand = ranTwice();
+      const both = {
+        ...hand,
+        collected: hand.collected.map((paid) => ({
+          ...paid,
+          screenName: '7160fe9f',
+        })),
+      };
+
+      expect(heroResult(both).result).toBe(1192 + 1194 - 1236);
+    });
+
+    it('works out All-in EV as for the same all-in run once', () => {
+      const hand = ranTwice();
+      const once = {
+        ...hand,
+        runs: undefined,
+        collected: [{ screenName: '7160fe9f', amount: 2386, pot: 0 }],
+      };
+      const twice = heroResult(hand);
+
+      expect(twice.allInEv).toBe(heroResult(once).allInEv);
+      expect(twice.allInEv).not.toBe(twice.result);
+    });
   });
 });

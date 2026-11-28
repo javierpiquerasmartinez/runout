@@ -257,7 +257,11 @@ A betting round: preflop, flop, turn or river.
 _Avoid_: Calling showdown a street
 
 **Showdown**:
-The point after the last Street where remaining hands are revealed and pots awarded. Not a Street.
+The point after the last Street where remaining hands are revealed and pots awarded. Not a Street. A Hand run more than once has one Showdown per Run, and the Hero reaches Showdown in all of them or none.
+
+**Run**:
+One of the boards dealt after an all-in when the players agree to run it more than once. Runs share the cards dealt before the all-in; each one pays out its share of every pot and has its own Showdown. The Hand's Result adds up what the Hero collected in every Run, and its All-in EV is worked out as for any other all-in, since running it more than once changes the luck, not the equity.
+_Avoid_: Runout, second board, Board (that is the Lab's)
 
 **Final Street**:
 The last Street a Hand reached (preflop, flop, turn or river). Whether it went to Showdown is recorded separately, never as a Final Street value.

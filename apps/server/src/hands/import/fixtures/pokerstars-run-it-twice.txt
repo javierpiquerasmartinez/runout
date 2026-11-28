@@ -1,0 +1,32 @@
+PokerStars Hand #262160000101:  Hold'em No Limit ($0.25/$0.50 USD) - 2026/09/14 22:00:00 CET [2026/09/14 16:00:00 ET]
+Table 'Electra' 2-max Seat #1 is the button
+Seat 1: HeroAI ($50 in chips)
+Seat 2: Aces2 ($50 in chips)
+HeroAI: posts small blind $0.25
+Aces2: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to HeroAI [Kd Kc]
+HeroAI: raises $1 to $1.50
+Aces2: raises $48.50 to $50 and is all-in
+HeroAI: calls $48.50 and is all-in
+*** FIRST FLOP *** [Ks 7d 4h]
+*** FIRST TURN *** [Ks 7d 4h] [9c]
+*** FIRST RIVER *** [Ks 7d 4h 9c] [2s]
+*** SECOND FLOP *** [Ah 8c 3d]
+*** SECOND TURN *** [Ah 8c 3d] [5s]
+*** SECOND RIVER *** [Ah 8c 3d 5s] [Jh]
+*** FIRST SHOW DOWN ***
+Aces2: shows [Ad As] (a pair of Aces)
+HeroAI: shows [Kd Kc] (three of a kind, Kings)
+HeroAI collected $48.75 from pot
+*** SECOND SHOW DOWN ***
+Aces2: shows [Ad As] (three of a kind, Aces)
+HeroAI: shows [Kd Kc] (a pair of Kings)
+Aces2 collected $48.75 from pot
+*** SUMMARY ***
+Total pot $100 | Rake $2.50
+Hand was run twice
+FIRST Board [Ks 7d 4h 9c 2s]
+SECOND Board [Ah 8c 3d 5s Jh]
+Seat 1: HeroAI (button) (small blind) showed [Kd Kc] and won ($48.75) with three of a kind, Kings, and lost with a pair of Kings
+Seat 2: Aces2 (big blind) showed [Ad As] and lost with a pair of Aces, and won ($48.75) with three of a kind, Aces
