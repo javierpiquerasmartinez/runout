@@ -1015,3 +1015,17 @@
     max-width: calc(100vw - 32px);
   }
 }
+
+/* A Hand run more than once: "×2" beside its Final Street or its title. */
+.times-run {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: help;
+}

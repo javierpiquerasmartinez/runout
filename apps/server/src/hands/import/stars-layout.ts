@@ -25,6 +25,12 @@ export interface Layout {
   format: SourceFormat;
   /** What comes between a Screen Name and what they did: ": " or " ". */
   separator: string;
+  /**
+   * Whether a Hand run more than once is read, with its Runs, rather than
+   * discarded as `run-it-twice`. Only for a layout whose Runs have been
+   * checked against real Hand Histories.
+   */
+  readsRuns?: boolean;
 }
 
 /** What a Poker Site's module reads from the header and table lines. */
@@ -46,7 +52,7 @@ export function readHand(
   const seats = readSeats(lines);
   if (seats.length > MAX_SEATS) throw new Discard('too-many-seats');
   const hero = readHero(lines);
-  const play = readPlay(lines, seats, layout.separator);
+  const play = readPlay(lines, seats, layout);
   return {
     site: layout.site,
     sourceFormat: layout.format,
@@ -98,6 +104,7 @@ type Play = Pick<
   | 'posts'
   | 'actions'
   | 'board'
+  | 'runs'
   | 'returned'
   | 'showdown'
   | 'shown'
@@ -122,6 +129,18 @@ const POST = new RegExp(
   `^posts (small blind|big blind|small & big blinds|straddle|the ante|ante) ${AMOUNT}${ALL_IN}$`,
 );
 
+/**
+ * How a Hand run more than once names each Run: `*** FIRST FLOP ***`,
+ * `*** SECOND RIVER ***`, `*** FIRST SHOWDOWN ***` and, in the summary,
+ * `SECOND Board [ 8d 8h 7s Ad Qh ]`.
+ */
+const RUN_ORDINALS = ['FIRST', 'SECOND', 'THIRD', 'FOURTH'];
+const RUN_ORDINAL = `(${RUN_ORDINALS.join('|')})`;
+const RUN_MARKER = new RegExp(
+  `^${RUN_ORDINAL} (FLOP|TURN|RIVER|SHOWDOWN|SHOW DOWN)$`,
+);
+const RUN_BOARD = new RegExp(String.raw`^${RUN_ORDINAL} Board \[([^\]]+)\]$`);
+
 /** Markers that open preflop, or say nothing the Actions don't. */
 const PREFLOP_MARKERS = new Set(['HOLE CARDS', 'ANTE/BLINDS', 'PRE-FLOP']);
 
@@ -136,7 +155,8 @@ const RAKE_AND_FEES = /\| (Rake|Jackpot|Bingo|Fortune|Tax|Splash Fee) (\S+)/g;
  * the Showdown and who collected what. Lines that change nothing in the Hand
  * (chat, players joining or leaving, "doesn't show hand") are skipped.
  */
-function readPlay(lines: string[], seats: Seat[], separator: string): Play {
+function readPlay(lines: string[], seats: Seat[], layout: Layout): Play {
+  const { separator } = layout;
   const play: Play = {
     posts: [],
     actions: [],
@@ -155,11 +175,31 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
   let street: Street = 'preflop';
   let inSummary = false;
   let showdownMarker = false;
+  // In a Hand run more than once: the Run whose Showdown is being read, and
+  // each Run's whole board as the summary gives it.
+  let showdownRun: number | null = null;
+  let runMarkers = false;
+  const runs: string[][] = [];
 
   for (const line of lines.slice(2)) {
     const marker = line.match(/^\*\*\* (.+?) \*\*\*(.*)$/);
     if (marker) {
-      const [, name, rest] = marker;
+      const [, markerName, rest] = marker;
+      let name = markerName;
+      const runMarker = name.match(RUN_MARKER);
+      if (runMarker) {
+        if (!layout.readsRuns) throw new Discard('run-it-twice');
+        runMarkers = true;
+        const run = RUN_ORDINALS.indexOf(runMarker[1]);
+        name = runMarker[2];
+        if (name === 'SHOWDOWN' || name === 'SHOW DOWN') showdownRun = run;
+        else if (run > 0) {
+          // A later Run's cards come whole from the summary; there is no
+          // betting left to read after the all-in.
+          street = name.toLowerCase() as Street;
+          continue;
+        }
+      }
       if (name === 'SUMMARY') inSummary = true;
       else if (name === 'SHOW DOWN' || name === 'SHOWDOWN') {
         showdownMarker = true;
@@ -169,13 +209,17 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
         if (!dealt) throw new Discard('malformed');
         play.board.push(...cards(dealt[1]));
       } else if (!PREFLOP_MARKERS.has(name)) {
-        // Running it twice and anything else we can't replay.
+        // Anything else we can't replay.
         throw new Discard('malformed');
       }
       continue;
     }
 
     if (inSummary) {
+      const runBoard = line.match(RUN_BOARD);
+      if (runBoard && runMarkers) {
+        runs[RUN_ORDINALS.indexOf(runBoard[1])] = cards(runBoard[2]);
+      }
       if (line.startsWith('Total pot ')) {
         for (const [, kind, taken] of line.matchAll(RAKE_AND_FEES)) {
           if (kind === 'Rake') play.rake += amount(taken);
@@ -207,6 +251,7 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
         screenName: name,
         amount: amount(won),
         pot: kind === 'side ' ? Number(side ?? 1) : 0,
+        ...(showdownRun !== null && { run: showdownRun }),
       });
       continue;
     }
@@ -225,7 +270,10 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
 
     const shows = statement.match(/^shows \[([^\]]+)\]/);
     if (shows) {
-      play.shown.push({ screenName: name, cards: cards(shows[1]) });
+      // Each Run's Showdown shows the same cards again.
+      if (!play.shown.some((shown) => shown.screenName === name)) {
+        play.shown.push({ screenName: name, cards: cards(shows[1]) });
+      }
       continue;
     }
 
@@ -240,6 +288,19 @@ function readPlay(lines: string[], seats: Seat[], separator: string): Play {
   // GGPoker marks a Showdown in every Hand, and a winner may show by choice
   // after everyone folded: it only counts with two or more players left.
   play.showdown = showdownMarker && stillIn(play) >= 2;
+  if (runMarkers) {
+    // Every Run's board, none missing, the first the one dealt as `board`.
+    const everyRun =
+      runs.length >= 2 && Array.from(runs, Boolean).every(Boolean);
+    const sameFirstRun = runs[0]?.join(' ') === play.board.join(' ');
+    if (!everyRun || !sameFirstRun) {
+      throw new Discard('malformed');
+    }
+    if (play.collected.some((paid) => paid.run === undefined)) {
+      throw new Discard('malformed');
+    }
+    play.runs = runs;
+  }
   return play;
 }
 

@@ -765,6 +765,22 @@ describe('Replay: the Hero’s facts, their cards on each Street', () => {
 });
 
 describe('Replay: the Hero’s facts, Showdown and Result', () => {
+  it('are worked out on Run 1 in a Hand run more than once', () => {
+    // Seen from 7160fe9f's seat, who stayed to both Runs' Showdowns.
+    const twice = {
+      ...only(oneHand('coinpoker-session.txt', '159583401409')),
+      hero: { screenName: '7160fe9f', cards: ['As', 'Ks'] },
+    };
+    const runOnce = {
+      ...twice,
+      runs: undefined,
+      collected: twice.collected.map(({ run: _run, ...paid }) => paid),
+    };
+
+    expect(twice.runs).toHaveLength(2);
+    expect(heroFacts(twice)).toEqual(heroFacts(runOnce));
+  });
+
   // Hand #262130000104 with Hero4 folding the river to Aspen1's bet, which
   // Willow4 calls and loses.
   const foldedRiver = oneHand('pokerstars-edge-cases.txt', '262130000104')

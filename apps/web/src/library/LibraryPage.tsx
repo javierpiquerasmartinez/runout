@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { TimesRun } from '../room/TimesRun'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { AppHeader, BackToRoom } from '../header/AppHeader'
 import { useI18n } from '../i18n'
@@ -870,6 +871,7 @@ function HandTable({
                   <span className="library-row__street ro-mono" data-showdown={hand.overview.showdown || undefined}>
                     {streetLabel(hand, i18n)}
                   </span>
+                  <TimesRun count={hand.overview.timesRun ?? 1} />
                 </td>
                 <td className="library-row__date ro-mono">{playedAtLabel(hand, i18n)}</td>
                 <td className="library-table__tags">

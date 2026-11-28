@@ -1,4 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react'
+import { TimesRun } from '../room/TimesRun'
+import { timesRunOf } from '../room/hand'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n } from '../i18n'
 import { useIdentity } from '../identity/context'
@@ -66,6 +68,7 @@ export function LibraryHandPage({ handId }: { handId: string }) {
               {t('library.back')}
             </a>
             <ReplayNav handId={handId} />
+            {load.state === 'loaded' && <TimesRun count={timesRunOf(load.hand)} />}
             {load.state === 'loaded' && <CopyHand handId={handId} hasHistory={load.hand.hasHistory} />}
           </div>
           {table ? (

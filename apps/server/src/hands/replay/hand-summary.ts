@@ -105,18 +105,24 @@ export function handSummary(
     ...(hand.hero.cards.length > 0 ? [cardsOf(hand.hero.cards)] : []),
   ].join(' · ');
 
+  // A Hand run more than once writes the Streets its Runs share, then a
+  // line per Run with the cards it dealt.
+  const shared = hand.runs ? sharedCards(hand.runs) : hand.board.length;
+  const dealtOn = (street: Street) =>
+    replay.states.find(
+      (state, index) =>
+        index > 0 && state.street === street && state.action === null,
+    );
+
   const lines = [header, heroLine, ''];
   for (const street of STREETS.filter(
-    (street) => BOARD_SIZE[street] <= hand.board.length,
+    (street) => BOARD_SIZE[street] <= shared,
   )) {
     const items = streetActions(hand, street, actor, bb);
     let line = STREET_NAMES[street];
     if (street !== 'preflop') {
       // The deal of a Street: the pot as it begins, bets gathered.
-      const dealt = replay.states.find(
-        (state, index) =>
-          index > 0 && state.street === street && state.action === null,
-      );
+      const dealt = dealtOn(street);
       const cards = hand.board.slice(
         street === 'flop' ? 0 : BOARD_SIZE[street] - 1,
         BOARD_SIZE[street],
@@ -128,13 +134,16 @@ export function handSummary(
   }
 
   const result = replay.states.at(-1)!.result!;
-  const won = new Map<string, number>();
-  for (const { screenName, amount } of result.pots.flatMap((p) => p.winners)) {
-    won.set(screenName, (won.get(screenName) ?? 0) + amount);
-  }
-  const winners = [...won]
-    .map(([name, amount]) => `${actor(name)} ${words.wins} ${bb(amount)}`)
-    .join(', ');
+  const winnersOf = (paid: { screenName: string; amount: number }[]) => {
+    const won = new Map<string, number>();
+    for (const { screenName, amount } of paid) {
+      won.set(screenName, (won.get(screenName) ?? 0) + amount);
+    }
+    return [...won]
+      .map(([name, amount]) => `${actor(name)} ${words.wins} ${bb(amount)}`)
+      .join(', ');
+  };
+  const winners = winnersOf(result.pots.flatMap((p) => p.winners));
   const rake = hand.rake > 0 ? ` (rake ${bb(hand.rake)})` : '';
   const shown = result.revealed
     // The Hero's own cards are already on the Hero line.
@@ -143,11 +152,25 @@ export function handSummary(
       (revealed) =>
         `${actor(revealed.screenName)} ${words.shows} ${cardsOf(revealed.cards)}`,
     );
-  lines.push(
-    hand.showdown
-      ? `Showdown: ${[...(shown.length > 0 ? [shown.join(', ')] : []), winners + rake].join(' · ')}`
-      : winners + rake,
-  );
+  if (hand.runs) {
+    // Runs are only dealt after an all-in, so every one goes to Showdown.
+    if (shown.length > 0) lines.push(`Showdown: ${shown.join(', ')}`);
+    // No betting is left after the all-in: every Run is dealt into the final pot.
+    const pot = replay.states.at(-1)!.pot;
+    hand.runs.forEach((board, run) => {
+      const paid = hand.collected.filter((each) => each.run === run);
+      const last = run === hand.runs!.length - 1;
+      lines.push(
+        `Run ${run + 1} (${bb(pot)}) ${cardsOf(board.slice(shared))}: ${winnersOf(paid)}${last ? rake : ''}`,
+      );
+    });
+  } else {
+    lines.push(
+      hand.showdown
+        ? `Showdown: ${[...(shown.length > 0 ? [shown.join(', ')] : []), winners + rake].join(' · ')}`
+        : winners + rake,
+    );
+  }
   lines.push(`${words.result}: ${bb(heroOutcome(hand).result, true)}`);
   return lines.join('\n');
 }
@@ -233,6 +256,18 @@ function stakeName(stake: Stake, locale: string): string {
     return written.replace(/[\u00a0\u202f]/g, ' ');
   };
   return `${LIMIT_PREFIX[stake.limit]}${stake.bigBlind} (${money(stake.smallBlind)}/${money(stake.bigBlind)})`;
+}
+
+/** How many cards every Run shares: those dealt before the all-in. */
+function sharedCards(runs: string[][]): number {
+  let shared = 0;
+  while (
+    shared < runs[0].length &&
+    runs.every((board) => board[shared] === runs[0][shared])
+  ) {
+    shared++;
+  }
+  return shared;
 }
 
 /** Cards rank then suit symbol, tens as "T": "A♠ T♦". */

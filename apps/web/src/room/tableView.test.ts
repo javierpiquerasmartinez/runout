@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createTranslator } from '../i18n/translator'
 import type { HandWithTimeline, TableState } from './hand'
 import nineMaxSidePots from './fixtures/nine-max-side-pots.json'
+import runTwice from './fixtures/run-twice.json'
 import splitPot from './fixtures/split-pot.json'
 import straddleFullHouse from './fixtures/straddle-full-house.json'
 import { tableView } from './tableView'
@@ -571,3 +572,52 @@ describe('tableView: Hide Opponent Names', () => {
     expect(written).not.toMatch(/Oak_BB|Elm_UTG|Spruce9/)
   })
 })
+
+describe('tableView: a Hand run twice', () => {
+  // CoinPoker, all in on the turn: Run 1's river is 3d and pays a9373981,
+  // Run 2's is Qh and pays 7160fe9f. 16 is the call, then Run 1's river (17)
+  // and Showdown (18), Run 2 back on the turn (19), its river (20) and the end (21).
+  const ranTwice = runTwice as HandWithTimeline
+  const at = (index: number) => tableView(ranTwice, index, es)
+  const seat = (index: number, name: string) => at(index).seats.find((s) => s.screenName === name)!
+
+  it('draws a single board until the all-in has been called', () => {
+    expect(at(16).runBoards).toBeNull()
+  })
+
+  it('draws every Run’s board, the one being dealt marked, the next one still to deal', () => {
+    expect(at(17).runBoards).toEqual([
+      { label: 'Run 1', state: 'current', board: ['8d', '8h', '7s', 'Ad', '3d'], note: null },
+      { label: 'Run 2', state: 'pending', board: ['8d', '8h', '7s', 'Ad', null], note: 'por repartir' },
+    ])
+    expect(at(17).lastAction).toBe('Run 1 · River · se reparte')
+  })
+
+  it('pays each Run at its own Showdown, saying who won it', () => {
+    expect(at(18).lastAction).toBe('Run 1 · Showdown')
+    expect(at(18).runBoards![0].note).toBe('a9373981 gana 119,2 BB')
+    expect(seat(18, 'a9373981')).toMatchObject({ winner: true, netResult: null })
+    expect(seat(18, '7160fe9f').winner).toBe(false)
+    expect(at(18).log.label).toBe('Run 1')
+  })
+
+  it('deals the next Run again from the shared cards, the shown cards still face up', () => {
+    expect(at(19).lastAction).toBe('Run 2 · se reparte de nuevo desde el Turn')
+    expect(at(19).runBoards!.map((run) => [run.state, run.board.filter(Boolean).length])).toEqual([
+      ['done', 5],
+      ['current', 4],
+    ])
+    expect(at(19).runBoards![0].note).toBe('a9373981 gana 119,2 BB')
+    expect(seat(19, '7160fe9f')).toMatchObject({ cards: ['As', 'Ks'], revealed: true, winner: false })
+    // Paid by Run 1, so no longer just all in.
+    expect(seat(19, 'a9373981').allInLabel).toBeNull()
+  })
+
+  it('ends on the last Run’s Showdown', () => {
+    expect(at(21).lastAction).toBe('Run 2 · Showdown · fin de la mano')
+    expect(seat(21, '7160fe9f').winner).toBe(true)
+    expect(seat(21, 'a9373981').winner).toBe(false)
+    expect(at(21).streets.segments.map((s) => s.stop)).toEqual(['preflop', 'flop', 'turn', 'run-1', 'run-2'])
+  })
+})
+

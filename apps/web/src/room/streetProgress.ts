@@ -6,8 +6,12 @@ import type { Street } from './hand'
  * Hand reached Showdown.
  */
 
-/** A segment of the progress bar: a Street, or Showdown after the last one. */
-export type Stop = Street | 'showdown'
+/**
+ * A segment of the progress bar: a Street, or Showdown after the last one.
+ * A Hand run more than once has one segment per Run after the Streets dealt
+ * before the all-in, in place of the rest: `run-1`, `run-2`…
+ */
+export type Stop = Street | 'showdown' | `run-${number}`
 
 export interface StreetSegment {
   stop: Stop
@@ -30,26 +34,49 @@ export interface StreetProgress {
   nextStreet: number | null
 }
 
-const STOPS: Stop[] = ['preflop', 'flop', 'turn', 'river', 'showdown']
+const STREETS: Street[] = ['preflop', 'flop', 'turn', 'river']
+
+/** What the progress bar reads of each state: its Street and, run more than once, its Run. */
+interface ProgressState {
+  street: Street
+  run?: number | null
+  runs?: unknown[] | null
+}
 
 export function streetProgress(
-  timeline: { showdown: boolean; states: { street: Street }[] },
+  timeline: { showdown: boolean; states: ProgressState[] },
   actionIndex: number,
 ): StreetProgress {
   const { states, showdown } = timeline
   const last = states.length - 1
   const index = Math.min(Math.max(actionIndex, 0), last)
-  const order = (stop: Stop) => STOPS.indexOf(stop)
-  const finalStreet = order(states[last].street)
+  const order = (street: Street) => STREETS.indexOf(street)
+  const runCount = states[last].runs?.length ?? 0
+  const firstRun = states.findIndex((state) => state.run != null)
 
   // A Street starts at the first state on it, or past it when an all-in
   // runout deals it without anyone acting; Showdown is the last Action.
-  const targets = STOPS.map((stop) => {
-    if (stop === 'showdown') return showdown ? last : null
-    if (order(stop) > finalStreet) return null
-    return states.findIndex((state) => order(state.street) >= order(stop))
+  // A Run starts at its first card.
+  const finalStreet = order(runCount > 0 ? states[firstRun - 1].street : states[last].street)
+  const streets = runCount > 0 ? STREETS.slice(0, finalStreet + 1) : STREETS
+  const stops: Stop[] =
+    runCount > 0
+      ? [...streets, ...Array.from({ length: runCount }, (_, run) => `run-${run + 1}` as const)]
+      : [...STREETS, 'showdown']
+  const targets = stops.map((stop, i) => {
+    if (i >= streets.length) {
+      return runCount > 0 ? states.findIndex((state) => state.run === i - streets.length) : showdown ? last : null
+    }
+    if (order(stop as Street) > finalStreet) return null
+    return states.findIndex((state) => order(state.street) >= order(stop as Street))
   })
-  const current = order(showdown && index === last ? 'showdown' : states[index].street)
+  const run = states[index].run
+  const current =
+    run != null
+      ? streets.length + run
+      : runCount === 0 && showdown && index === last
+        ? stops.indexOf('showdown')
+        : order(states[index].street)
   const starts = [...new Set(targets.filter((target) => target !== null))].sort((a, b) => a - b)
   const previousStreet = starts.findLast((start) => start < index) ?? null
   const nextStreet = starts.find((start) => start > index) ?? null
@@ -59,7 +86,7 @@ export function streetProgress(
   const progress = end > start ? (index - start) / (end - start) : 1
 
   return {
-    segments: STOPS.map((stop, i) => ({
+    segments: stops.map((stop, i) => ({
       stop,
       state: i < current ? 'completed' : i === current ? 'current' : 'pending',
       progress: i < current ? 1 : i === current ? progress : 0,

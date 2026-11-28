@@ -17,7 +17,7 @@ import { readHand } from './stars-layout.js';
  * also carries the ante, posted as PokerStars does. A few lines are its own:
  * `ALLIN`, `RETURN`, a `STRADDLE` posted after the hole cards and a Splash
  * (`SPLASH dropped`). They are rewritten as PokerStars writes them before
- * the rest is read.
+ * the rest is read. A Hand run more than once is read with its Runs.
  */
 
 /** `CoinPoker Hand #160064400025: NLH (₮0.05/₮0.10) 2026/10/19 17:55:42 CEST` */
@@ -51,10 +51,6 @@ export function parseCoinPokerHand(block: string): Hand {
     /^Table '(.+)' (\d+)-max Seat #(\d+) is the button$/,
   );
   if (!table) throw new Discard('malformed');
-  if (lines.some((line) => /^Hand was run (?!once$)/.test(line))) {
-    throw new Discard('run-it-twice');
-  }
-
   const splash = lines
     .map((line) => line.match(/^SPLASH dropped (\S+)$/))
     .reduce((sum, dropped) => sum + (dropped ? amount(dropped[1]) : 0), 0);
@@ -68,7 +64,12 @@ export function parseCoinPokerHand(block: string): Hand {
       tableSize: Number(table[2]),
       buttonSeat: Number(table[3]),
     },
-    { site: 'coinpoker', format: 'coinpoker', separator: ': ' },
+    {
+      site: 'coinpoker',
+      format: 'coinpoker',
+      separator: ': ',
+      readsRuns: true,
+    },
   );
   return splash > 0 ? { ...hand, splash } : hand;
 }
@@ -90,7 +91,9 @@ function asPokerStars(lines: string[]): string[] {
   let bets = new Map<string, number>();
   const rewritten: string[] = [];
   for (const line of lines) {
-    if (/^\*\*\* (FLOP|TURN|RIVER) \*\*\*/.test(line)) bets = new Map();
+    // A Hand run more than once writes `*** FIRST FLOP ***` and the like.
+    if (/^\*\*\* (?:\w+ )?(FLOP|TURN|RIVER) \*\*\*/.test(line))
+      bets = new Map();
     if (line.startsWith('SPLASH dropped ')) continue;
 
     const statement = line.match(/^(.+?): (.+)$/);

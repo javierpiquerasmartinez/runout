@@ -91,6 +91,9 @@ describe('Replay: a Hand’s Timeline', () => {
       effectiveStack: 1136,
       spr: null,
       result: null,
+      // Run only once.
+      run: null,
+      runs: null,
     });
   });
 
@@ -811,5 +814,79 @@ describe('Replay: made hands at Showdown', () => {
       ranks: ['A'],
       cards: ['As', 'Ks', 'Qs', 'Js', '10s'],
     });
+  });
+});
+
+describe('Replay: a Hand run more than once', () => {
+  // All-in on the turn, the river run twice: Run 1 deals 3d and pays
+  // a9373981 ₮11.92, Run 2 deals Qh and pays 7160fe9f ₮11.94.
+  const twice = hands('coinpoker-session.txt').at(-1)!;
+  const replay = timeline(twice);
+  const lastAction = replay.states.findLastIndex((s) => s.action !== null);
+  const after = replay.states.slice(lastAction + 1);
+  const stack = (state: (typeof after)[number], name: string) =>
+    state.players.find((p) => p.screenName === name)!.stack;
+
+  it('deals each Run to its own Showdown, back to the shared cards in between', () => {
+    expect(
+      after.map((s) => [s.run, s.street, s.board.join(' '), s.action]),
+    ).toEqual([
+      [0, 'river', '8d 8h 7s Ad 3d', null],
+      [0, 'river', '8d 8h 7s Ad 3d', null],
+      [1, 'turn', '8d 8h 7s Ad', null],
+      [1, 'river', '8d 8h 7s Ad Qh', null],
+      [1, 'river', '8d 8h 7s Ad Qh', null],
+    ]);
+  });
+
+  it('pays each Run its own winners, and the Hand’s result only at the end', () => {
+    const [, run1Showdown, , , end] = after;
+
+    expect(run1Showdown.result).toBeNull();
+    expect(run1Showdown.runs![0].result!.pots[0].winners).toEqual([
+      { screenName: 'a9373981', amount: 1192 },
+    ]);
+    expect(run1Showdown.runs![1].result).toBeNull();
+    expect(stack(run1Showdown, 'a9373981')).toBe(1192);
+    expect(stack(run1Showdown, '7160fe9f')).toBe(1564 - 1236);
+
+    expect(end.runs![1].result!.pots[0].winners).toEqual([
+      { screenName: '7160fe9f', amount: 1194 },
+    ]);
+    expect(stack(end, '7160fe9f')).toBe(1564 - 1236 + 1194);
+    expect(end.result!.pots[0].winners).toEqual([
+      { screenName: 'a9373981', amount: 1192 },
+      { screenName: '7160fe9f', amount: 1194 },
+    ]);
+  });
+
+  it('labels each Run’s hands on that Run’s board', () => {
+    const end = after.at(-1)!;
+    const made = (run: number) =>
+      end.runs![run].result!.revealed.map((r) => r.madeHand.category);
+
+    expect(made(0)).toEqual(['flush', 'two-pair']);
+    expect(made(1)).toEqual(['pair', 'two-pair']);
+  });
+
+  it('keeps every Run’s board as far as it has been dealt', () => {
+    expect(after.map((s) => s.runs!.map((r) => r.board.length))).toEqual([
+      [5, 4],
+      [5, 4],
+      [5, 4],
+      [5, 5],
+      [5, 5],
+    ]);
+    // Before the all-in nothing is run yet.
+    expect(replay.states[lastAction].runs).toBeNull();
+    expect(replay.states[lastAction].run).toBeNull();
+  });
+
+  it('leaves a Hand run once without Runs', () => {
+    const [once] = hands('pokerstars-all-ins.txt');
+
+    expect(
+      timeline(once).states.every((s) => s.runs === null && s.run === null),
+    ).toBe(true);
   });
 });

@@ -50,6 +50,8 @@ export interface QueueEntry {
     finalPot: number
     finalStreet: 'preflop' | 'flop' | 'turn' | 'river'
     showdown: boolean
+    /** How many times the board was run: 1 unless run more than once. */
+    timesRun?: number
   }
 }
 

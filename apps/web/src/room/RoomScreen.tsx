@@ -57,6 +57,7 @@ import { guestsFollowing, presenceOf } from './syncView'
 import { tableView, type PayoutView, type TableView } from './tableView'
 import { useHand, type HandLoad } from './useHand'
 import type { RoomCommands } from './useRoom'
+import { TimesRun } from './TimesRun'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 
@@ -825,6 +826,7 @@ function LoadedHand({
             </span>
             <span className="room-stage__divider" />
             <span className="room-stage__title">{positionsLabel(entry, i18n)}</span>
+            <TimesRun count={entry.overview.timesRun ?? 1} />
             <span className="room-stage__by">
               {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
             </span>

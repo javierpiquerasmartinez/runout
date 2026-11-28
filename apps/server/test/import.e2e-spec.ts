@@ -26,6 +26,7 @@ interface Preview {
       positions: string[];
       finalPot: number;
       finalStreet: string;
+      timesRun: number;
       showdown: boolean;
     };
   }[];
@@ -158,6 +159,7 @@ describe('Importing Hand History files through a preview (e2e)', () => {
           finalPot: 105,
           finalStreet: 'river',
           showdown: true,
+          timesRun: 1,
         },
       },
     ]);

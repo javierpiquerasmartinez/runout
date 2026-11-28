@@ -8,6 +8,8 @@ export interface HandOverview {
   finalPot: number;
   finalStreet: Street;
   showdown: boolean;
+  /** How many times the board was run: 1 unless run more than once. */
+  timesRun: number;
 }
 
 const STREET_BY_BOARD_SIZE: Record<number, Street> = {
@@ -23,6 +25,7 @@ export function overview(hand: Hand): HandOverview {
     finalPot: finalPot(hand),
     finalStreet: STREET_BY_BOARD_SIZE[hand.board.length] ?? 'preflop',
     showdown: hand.showdown,
+    timesRun: hand.runs?.length ?? 1,
   };
 }
 
