@@ -43,6 +43,7 @@ const SITE_NAMES: Record<PokerSite, string> = {
   ggpoker: 'GGPoker',
   winamax: 'Winamax',
   coinpoker: 'CoinPoker',
+  ipoker: 'iPoker',
 };
 
 const LIMIT_PREFIX: Record<Stake['limit'], string> = {

@@ -18,8 +18,8 @@ const MAX_TEXT_BYTES = 32 * 1024 * 1024;
 export const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];
 
 /**
- * The Hand History text in an uploaded file: a .txt file as is, or every
- * .txt file inside a zip, in order, separated by a blank line. This happens
+ * The Hand History text in an uploaded file: a .txt or .xml file as is, or
+ * every such file inside a zip, in order, separated by a blank line. This happens
  * before the import module, which only ever sees text.
  */
 export function readUpload(
@@ -55,10 +55,13 @@ export function readUpload(
   return texts.map(decode).join('\n\n');
 }
 
-/** .txt files, leaving out the copies macOS adds to the zips it makes. */
+/**
+ * .txt files, and the .xml files the iPoker client saves, leaving out the
+ * copies macOS adds to the zips it makes.
+ */
 export function isHandHistoryEntry(path: string): boolean {
   return (
-    /\.txt$/i.test(path) &&
+    /\.(txt|xml)$/i.test(path) &&
     !path.startsWith('__MACOSX/') &&
     !/(^|\/)\._/.test(path)
   );

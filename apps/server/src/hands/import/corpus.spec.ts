@@ -432,6 +432,169 @@ const CORPUS: CorpusEntry[] = [
     discarded: [],
   },
   {
+    // A session of the iPoker client: a walk, then a raise taken down on
+    // the flop. Its actions are written out of their order.
+    file: 'ipoker-session.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        site: 'ipoker',
+        siteHandId: '6100000101',
+        sourceFormat: 'ipoker',
+        // Spanish summer time, two hours ahead of UTC.
+        playedAt: '2026-07-20T19:00:05.000Z',
+        tableName: 'Alcalá, 912000101',
+        tableSize: 6,
+        buttonSeat: 2,
+        stake: EUR_05_10,
+        hero: { screenName: 'Maplewood', cards: ['7c', '2h'] },
+        posts: [
+          { screenName: 'Maplewood', kind: 'small-blind', amount: 5 },
+          { screenName: 'Cedar', kind: 'big-blind', amount: 10 },
+        ],
+        returned: [{ screenName: 'Cedar', amount: 5 }],
+        collected: [{ screenName: 'Cedar', amount: 10 }],
+        showdown: false,
+        board: [],
+        rake: 0,
+        fees: 0,
+      },
+      {
+        siteHandId: '6100000102',
+        playedAt: '2026-07-20T19:00:41.000Z',
+        buttonSeat: 3,
+        hero: { screenName: 'Maplewood', cards: ['9d', '8d'] },
+        actions: [
+          { street: 'preflop', screenName: 'Fir', type: 'fold', allIn: false },
+          {
+            street: 'preflop',
+            screenName: 'Alder',
+            type: 'raise',
+            amount: 20,
+            to: 30,
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Birch',
+            type: 'fold',
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Maplewood',
+            type: 'call',
+            amount: 30,
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Cedar',
+            type: 'fold',
+            allIn: false,
+          },
+          { street: 'preflop', screenName: 'Elm', type: 'fold', allIn: false },
+          {
+            street: 'flop',
+            screenName: 'Alder',
+            type: 'bet',
+            amount: 40,
+            allIn: false,
+          },
+          {
+            street: 'flop',
+            screenName: 'Maplewood',
+            type: 'fold',
+            allIn: false,
+          },
+        ],
+        board: ['2s', '7c', 'Qh'],
+        returned: [{ screenName: 'Alder', amount: 40 }],
+        collected: [{ screenName: 'Alder', amount: 72 }],
+        // No `rakeamount`: what was put in, less what was won.
+        rake: 3,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A Hand played to a Showdown, in winter, its Rake written per player.
+    file: 'ipoker-showdown.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        site: 'ipoker',
+        siteHandId: '6100000201',
+        // Spanish winter time, one hour ahead of UTC.
+        playedAt: '2026-01-15T21:14:03.000Z',
+        buttonSeat: 4,
+        stake: EUR_05_10,
+        seats: [
+          {
+            seat: 1,
+            screenName: 'Alder',
+            startingStack: 1000,
+            sittingOut: false,
+          },
+          {
+            seat: 2,
+            screenName: 'Birch',
+            startingStack: 1235,
+            sittingOut: false,
+          },
+          {
+            seat: 3,
+            screenName: 'Maplewood',
+            startingStack: 1000,
+            sittingOut: false,
+          },
+          {
+            seat: 4,
+            screenName: 'Cedar',
+            startingStack: 965,
+            sittingOut: false,
+          },
+          {
+            seat: 5,
+            screenName: 'Elm',
+            startingStack: 1105,
+            sittingOut: false,
+          },
+          { seat: 6, screenName: 'Fir', startingStack: 690, sittingOut: false },
+        ],
+        hero: { screenName: 'Maplewood', cards: ['Ah', 'Ks'] },
+        actions: expect.arrayContaining([
+          {
+            street: 'flop',
+            screenName: 'Birch',
+            type: 'raise',
+            amount: 100,
+            to: 150,
+            allIn: false,
+          },
+          {
+            street: 'river',
+            screenName: 'Maplewood',
+            type: 'call',
+            amount: 200,
+            allIn: false,
+          },
+        ]) as Hand['actions'],
+        board: ['10d', '7s', '2h', 'Kc', '4d'],
+        returned: [],
+        showdown: true,
+        shown: [
+          { screenName: 'Birch', cards: ['10c', '9c'] },
+          { screenName: 'Maplewood', cards: ['Ah', 'Ks'] },
+        ],
+        collected: [{ screenName: 'Maplewood', amount: 755 }],
+        rake: 40,
+        fees: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
     // PokerTracker 4's forum layout has no exact Amounts to replay.
     file: 'pokertracker-forum.txt',
     format: null,

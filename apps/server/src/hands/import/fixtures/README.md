@@ -4,7 +4,7 @@
 
 ## Layouts and Trackers
 
-PokerTracker 4, Hold'em Manager 3 and Hand2Note export each Hand in its Poker Site's own layout, so a format here is a Poker Site's layout:
+PokerTracker 4, Hold'em Manager 3 and Hand2Note export each Hand in its Poker Site's own layout, so a format here is mostly a Poker Site's layout. A Poker Site may have more than one, each with its own row:
 
 | Format       | Poker Site | Files              |
 | ------------ | ---------- | ------------------ |
@@ -12,12 +12,15 @@ PokerTracker 4, Hold'em Manager 3 and Hand2Note export each Hand in its Poker Si
 | `ggpoker`    | GGPoker    | `ggpoker-*.txt`    |
 | `winamax`    | Winamax    | `winamax-*.txt`    |
 | `coinpoker`  | CoinPoker  | `coinpoker-*.txt`  |
+| `ipoker`     | iPoker     | `ipoker-*.xml`     |
+
+`ipoker` is the XML session the iPoker client saves (Hold'em Manager's archive is the same XML): one file per table, a header, then a `<game>` per Hand.
 
 Other files are kept because they must be discarded: PokerTracker 4's forum layout (`pokertracker-forum.txt`) and layouts not read yet (`888poker-unsupported.txt`).
 
 ## Where the files come from
 
-Screen Names, hand IDs and table names are anonymised. The GGPoker, Winamax, 10-max, pot-limit, PokerStars run-it-twice and 888poker files were written by hand, following each Poker Site's layout as closely as we know it, to cover edge cases: straddles, side pots, uncalled bets, 10-max tables, pot-limit Stakes, tournaments and other games. They are not real exports yet. `coinpoker-session.txt` is: seven Hands picked from a session exported by CoinPoker's own client, one per case its layout has (a Splash, a straddle, a run it twice…), left exactly as exported since the site already hashes every opponent and writes the Hero as `Hero`. `coinpoker-ante.txt` is too: two Hands from an NL25 table, where CoinPoker plays with an ante. Add real exports from each Tracker next to them as they turn up: they are what proves the parser right.
+Screen Names, hand IDs and table names are anonymised. The GGPoker, Winamax, 10-max, pot-limit, PokerStars run-it-twice and 888poker files were written by hand, following each Poker Site's layout as closely as we know it, to cover edge cases: straddles, side pots, uncalled bets, 10-max tables, pot-limit Stakes, tournaments and other games. They are not real exports yet. `coinpoker-session.txt` is: seven Hands picked from a session exported by CoinPoker's own client, one per case its layout has (a Splash, a straddle, a run it twice…), left exactly as exported since the site already hashes every opponent and writes the Hero as `Hero`. `coinpoker-ante.txt` is too: two Hands from an NL25 table, where CoinPoker plays with an ante. The iPoker files (`ipoker-*.xml`) are written by hand too, modelled closely on the public iPoker samples of fpdb-3 and HHSmithy's PokerHandHistoryParser but never copied from them (fpdb-3 is AGPL-3 and HHSmithy's has no licence); their Screen Names, session codes and gamecodes are made up. `ipoker-showdown.xml` writes its Rake per player (`rakeamount`), `ipoker-session.xml` leaves it to be worked out. Add real exports from each Tracker next to them as they turn up: they are what proves the parser right.
 
 ## Adding a file
 

@@ -76,7 +76,8 @@ export function fromStored(stored: StoredHand): Hand {
   return { ...stored, fees: stored.fees ?? 0 };
 }
 
-export type PokerSite = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker';
+export type PokerSite =
+  'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker' | 'ipoker';
 
 /**
  * Poker Sites whose Hand Histories never name the Hero: CoinPoker writes
@@ -100,9 +101,11 @@ export function heroSeat(hand: Hand): number {
 
 /**
  * The layout the Hand History was written in. The Trackers export each Hand
- * in its Poker Site's own layout, so there is one per Poker Site.
+ * in its Poker Site's own layout, so most Poker Sites have one: iPoker's is
+ * the XML its client saves.
  */
-export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker';
+export type SourceFormat =
+  'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker' | 'ipoker';
 
 export interface Stake {
   limit: 'no-limit' | 'pot-limit' | 'fixed-limit';

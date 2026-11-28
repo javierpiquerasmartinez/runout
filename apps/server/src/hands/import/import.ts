@@ -2,6 +2,8 @@ import type { Hand, SourceFormat } from '../hand.js';
 import { Discard, type DiscardReason } from './discard.js';
 import { isCoinPokerHand, parseCoinPokerHand } from './coinpoker.js';
 import { isGGPokerHand, parseGGPokerHand } from './ggpoker.js';
+import { IPOKER_SESSION, isIPokerHand, parseIPokerHand } from './ipoker.js';
+import { PieceCutter, type SessionLayout } from './pieces.js';
 import { isPokerStarsHand, parsePokerStarsHand } from './pokerstars.js';
 import { isWinamaxHand, parseWinamaxHand } from './winamax.js';
 
@@ -12,6 +14,11 @@ interface Format {
   recognises(block: string): boolean;
   /** Reads a Hand it recognised; throws `Discard` when it can't. */
   parse(block: string): Hand;
+  /**
+   * For a layout that writes several Hands under one header, how they are
+   * cut apart, each into a text of its own that reads back as that Hand.
+   */
+  session?: SessionLayout;
 }
 
 /** Every format detection tries, in the order it tries them. */
@@ -20,9 +27,27 @@ const FORMATS: Record<SourceFormat, Format> = {
   ggpoker: { recognises: isGGPokerHand, parse: parseGGPokerHand },
   winamax: { recognises: isWinamaxHand, parse: parseWinamaxHand },
   coinpoker: { recognises: isCoinPokerHand, parse: parseCoinPokerHand },
+  ipoker: {
+    recognises: isIPokerHand,
+    parse: parseIPokerHand,
+    session: IPOKER_SESSION,
+  },
 };
 
 export const SOURCE_FORMATS = Object.keys(FORMATS) as SourceFormat[];
+
+const SESSIONS = Object.values(FORMATS).flatMap(({ session }) =>
+  session ? [session] : [],
+);
+
+/**
+ * What cuts Hand History text into pieces, each one Hand or text that is
+ * none, as every format would have it. A piece longer than `maxPieceChars`
+ * is dropped as too long to be a Hand.
+ */
+export function pieceCutter(maxPieceChars = Infinity): PieceCutter {
+  return new PieceCutter(SESSIONS, maxPieceChars);
+}
 
 /** The first format, of those tried, that recognises the block as a Hand; null for none. */
 export function recogniseBlock(
@@ -98,8 +123,14 @@ export function importHandHistory(
     unrecognised = { start: unrecognised?.start ?? start, end };
   };
 
-  for (const { start, end } of blocks(text)) {
-    const block = text.slice(start, end);
+  const cutter = pieceCutter();
+  for (const piece of [...cutter.push(text), ...cutter.end()]) {
+    const { start, end } = piece;
+    if (!('text' in piece)) {
+      extendUnrecognised(start, end);
+      continue;
+    }
+    const block = piece.text;
     // A format picked by hand reads every block, without detection's say.
     const format = options.format ?? recogniseBlock(block, tried);
     if (!format) {
@@ -130,17 +161,4 @@ export function importHandHistory(
     [...detected].sort(([, a], [, b]) => b - a).at(0)?.[0] ??
     null;
   return result;
-}
-
-/**
- * Where each run of non-blank lines starts and ends, found as they are read.
- * Hands are separated by blank lines and have none inside, so each run is one
- * Hand, or a piece of text that isn't one.
- */
-function* blocks(text: string): Generator<{ start: number; end: number }> {
-  const runs = /\S(?:[^\n]|\n(?![ \t\r]*\n))*/g;
-  for (const run of text.matchAll(runs)) {
-    const trimmed = run[0].trimEnd();
-    yield { start: run.index, end: run.index + trimmed.length };
-  }
 }

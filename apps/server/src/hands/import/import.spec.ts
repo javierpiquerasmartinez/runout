@@ -185,6 +185,61 @@ describe('Hand History import: several Hands at once', () => {
   });
 });
 
+describe('Hand History import: a piece of text holding several Hands', () => {
+  it('reads one Hand per game of an iPoker session', () => {
+    const { hands } = importHandHistory(fixture('ipoker-session.xml'));
+
+    expect(hands.map((hand) => hand.siteHandId)).toEqual([
+      '6100000101',
+      '6100000102',
+    ]);
+  });
+
+  it('keeps a text of each Hand’s own, its session header and its game, that reads back as that Hand alone', () => {
+    const { hands, texts } = importHandHistory(fixture('ipoker-session.xml'));
+
+    expect(texts).toHaveLength(2);
+    texts.forEach((text, index) => {
+      expect(text).toContain('<nickname>Maplewood</nickname>');
+      expect(text.match(/<game /g)).toHaveLength(1);
+      const alone = importHandHistory(text);
+      expect(alone.hands).toEqual([hands[index]]);
+      expect(alone.texts).toEqual([text]);
+    });
+  });
+
+  it('reads a session with blank lines inside it, and the Hands around it', () => {
+    const session = fixture('ipoker-session.xml').replace(
+      /<\/game>/g,
+      '</game>\n\n',
+    );
+    const text = [
+      fixture('pokerstars-showdown.txt'),
+      session,
+      'not a hand history',
+      fixture('ipoker-showdown.xml'),
+    ].join('\n\n');
+
+    const { hands, discarded } = importHandHistory(text);
+
+    expect(hands.map((hand) => hand.site)).toEqual([
+      'pokerstars',
+      'ipoker',
+      'ipoker',
+      'ipoker',
+    ]);
+    expect(discarded).toEqual([
+      { text: 'not a hand history', reason: 'unrecognised-format' },
+    ]);
+  });
+
+  it('reads a session written on a single line', () => {
+    const flat = fixture('ipoker-session.xml').replace(/\n\s*/g, '');
+
+    expect(importHandHistory(flat).hands).toHaveLength(2);
+  });
+});
+
 describe('Hand History import: what is discarded', () => {
   it("discards PokerTracker 4's converted forum layout as an unrecognised format", () => {
     const text = fixture('pokertracker-forum.txt');
@@ -267,7 +322,17 @@ describe('Hand History import: detecting the format', () => {
       'ggpoker',
       'winamax',
       'coinpoker',
+      'ipoker',
     ]);
+  });
+
+  it('reads an iPoker session in the format picked by hand', () => {
+    const result = importHandHistory(fixture('ipoker-session.xml'), {
+      format: 'ipoker',
+    });
+
+    expect(result.format).toBe('ipoker');
+    expect(result.hands).toHaveLength(2);
   });
 
   it('reads every piece of the text in a format picked by hand, discarding what it cannot read', () => {

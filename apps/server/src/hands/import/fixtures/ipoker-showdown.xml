@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400000201">
+ <general>
+  <client_version>26.1.1.31</client_version>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Alcalá, 912000201</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <smallblind>€0.05</smallblind>
+  <bigblind>€0.10</bigblind>
+  <duration>00:02:11</duration>
+  <gamecount>1</gamecount>
+  <startdate>2026-01-15 22:13:40</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+  <tablesize>6</tablesize>
+ </general>
+ <game gamecode="6100000201">
+  <general>
+   <startdate>2026-01-15 22:14:03</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="0" win="€0" bet="€0"/>
+    <player seat="2" name="Birch" chips="€12.35" dealer="0" win="€0" bet="€3.90" rakeamount="€0.20"/>
+    <player seat="3" name="Maplewood" chips="€10" dealer="0" win="€7.55" bet="€3.90" rakeamount="€0.20"/>
+    <player seat="4" name="Cedar" chips="€9.65" dealer="1" win="€0" bet="€0"/>
+    <player seat="5" name="Elm" chips="€11.05" dealer="0" win="€0" bet="€0.05"/>
+    <player seat="6" name="Fir" chips="€6.90" dealer="0" win="€0" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Elm" sum="€0.05" type="1"/>
+   <action no="2" player="Fir" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Alder">X X</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+   <cards type="Pocket" player="Birch">C10 C9</cards>
+   <action no="4" player="Birch" sum="€0.10" type="3"/>
+   <action no="9" player="Birch" sum="€0.30" type="3"/>
+   <cards type="Pocket" player="Maplewood">HA SK</cards>
+   <action no="5" player="Maplewood" sum="€0.40" type="23"/>
+   <cards type="Pocket" player="Cedar">X X</cards>
+   <action no="6" player="Cedar" sum="€0" type="0"/>
+   <cards type="Pocket" player="Elm">X X</cards>
+   <action no="7" player="Elm" sum="€0" type="0"/>
+   <cards type="Pocket" player="Fir">X X</cards>
+   <action no="8" player="Fir" sum="€0" type="0"/>
+  </round>
+  <round no="2">
+   <cards type="Flop" player="">D10 S7 H2</cards>
+   <action no="10" player="Birch" sum="€0" type="4"/>
+   <action no="11" player="Maplewood" sum="€0.50" type="5"/>
+   <action no="12" player="Birch" sum="€1.50" type="23"/>
+   <action no="13" player="Maplewood" sum="€1" type="3"/>
+  </round>
+  <round no="3">
+   <cards type="Turn" player="">CK</cards>
+   <action no="14" player="Birch" sum="€0" type="4"/>
+   <action no="15" player="Maplewood" sum="€0" type="4"/>
+  </round>
+  <round no="4">
+   <cards type="River" player="">D4</cards>
+   <action no="16" player="Birch" sum="€2" type="5"/>
+   <action no="17" player="Maplewood" sum="€2" type="3"/>
+  </round>
+ </game>
+</session>

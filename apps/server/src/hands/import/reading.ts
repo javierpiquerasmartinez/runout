@@ -79,6 +79,57 @@ export function utcTime(text: string): string {
   ).toISOString();
 }
 
+const WALL_CLOCKS = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A time read off a wall clock in `timeZone` (`Europe/Madrid`), in ISO 8601:
+ * the instant whose local time there it was.
+ */
+export function wallClockTime(
+  timeZone: string,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): string {
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute, second);
+  if (Number.isNaN(wallClock)) throw new Discard('malformed');
+  // How far ahead of UTC the clock is at an instant; looked up twice, so
+  // that a time just across a change of offset gets the right one.
+  const offsetAt = (instant: number) => {
+    let clock = WALL_CLOCKS.get(timeZone);
+    if (!clock) {
+      clock = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+      });
+      WALL_CLOCKS.set(timeZone, clock);
+    }
+    const parts = Object.fromEntries(
+      clock.formatToParts(instant).map(({ type, value }) => [type, value]),
+    );
+    const local = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+    );
+    return local - instant;
+  };
+  const guess = wallClock - offsetAt(wallClock);
+  return new Date(wallClock - offsetAt(guess)).toISOString();
+}
+
 /** The first line of a piece of text, where every format says what it is. */
 export function firstLine(block: string): string {
   return block.split(/\r?\n/, 1)[0];

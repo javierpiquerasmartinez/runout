@@ -38,6 +38,24 @@ describe('Reading an uploaded Hand History file', () => {
     expect(readUpload('march.zip', zip)).toBe('first\n\nsecond');
   });
 
+  it('reads an .xml file, as the iPoker client saves its sessions', () => {
+    const text = fixture('ipoker-session.xml');
+
+    expect(readUpload('alcala.xml', Buffer.from(text, 'utf8'))).toBe(text);
+  });
+
+  it('extracts the .xml files in a zip like its .txt files', () => {
+    const zip = zipSync({
+      'tables/alcala.xml': strToU8('first'),
+      'tables/notes.pdf': strToU8('not a hand history'),
+      '__MACOSX/tables/._alcala.xml': strToU8('resource fork'),
+      'tables/stars.txt': strToU8('second'),
+      'tables/vantaa.XML': strToU8('third'),
+    });
+
+    expect(readUpload('tables.zip', zip)).toBe('first\n\nsecond\n\nthird');
+  });
+
   it('recognises a zip by its content, whatever its name', () => {
     const zip = zipSync({ 'hh.txt': strToU8('inside') });
 

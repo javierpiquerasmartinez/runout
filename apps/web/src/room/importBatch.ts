@@ -8,8 +8,8 @@ import type { QueueEntry } from './roomClient'
  */
 
 /** The formats the server reads. Mirrors the server's (ADR 0001: no shared code). */
-export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker'
-export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax', 'coinpoker']
+export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker' | 'ipoker'
+export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax', 'coinpoker', 'ipoker']
 
 export type DiscardReason =
   | 'unrecognised-format'

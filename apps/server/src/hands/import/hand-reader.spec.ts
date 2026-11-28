@@ -196,6 +196,50 @@ describe('Reading the Hands of stored files as a stream', () => {
     expect(resumed[0]).toEqual(whole[after]);
   });
 
+  it('reads an iPoker session longer than any Hand could be whole, a Hand per game, as reading it at once does', async () => {
+    const content = longSession(300);
+    expect(content.length).toBeGreaterThan(300_000);
+    const whole = importHandHistory(content);
+    expect(whole.hands).toHaveLength(300);
+
+    const read = await all([text('session.xml', content, 4096)]);
+
+    expect(read.every((item) => item.kind === 'hand')).toBe(true);
+    expect(
+      read.flatMap((item) => (item.kind === 'hand' ? [item.text] : [])),
+    ).toEqual(whole.texts);
+  });
+
+  it('resumes inside an iPoker session after the Hands already gone through', async () => {
+    const content = longSession(300);
+    const whole = await all([text('session.xml', content)]);
+
+    const resumed: HandRead[] = [];
+    for await (const item of readHands([text('session.xml', content)], {
+      after: 250,
+    })) {
+      resumed.push(item);
+    }
+
+    expect(resumed).toEqual(whole.slice(250));
+  });
+
+  it('reads the .xml files in a zip', async () => {
+    const zip = zipSync({
+      'tables/alcala.xml': strToU8(fixture('ipoker-session.xml')),
+      'tables/readme.pdf': strToU8('not a hand history'),
+      'tables/showdown.XML': strToU8(fixture('ipoker-showdown.xml')),
+    });
+
+    const read = await all([file('tables.zip', zip, 100)]);
+
+    expect(siteHandIds(read)).toEqual([
+      '6100000101',
+      '6100000102',
+      '6100000201',
+    ]);
+  });
+
   it('refuses a file that is not a zip though named like one', async () => {
     await expect(
       all([text('broken.zip', 'PK\u0003\u0004 not really')]),
@@ -287,4 +331,28 @@ describe('Counting the Hands of stored files', () => {
     expect(over.over).toBe('text');
     expect(within).toMatchObject({ hands: 200, over: null });
   });
+
+  it('counts every game of an iPoker session longer than any Hand could be', async () => {
+    const counted = await countHands([text('session.xml', longSession(300))], {
+      hands: 1000,
+      characters: 10_000_000,
+    });
+
+    expect(counted).toEqual({ hands: 300, unrecognised: 0, over: null });
+  });
 });
+
+/** An iPoker session of `games` Hands: the fixture's games over and over, each its own gamecode. */
+function longSession(games: number): string {
+  const session = fixture('ipoker-session.xml');
+  const header = session.slice(0, session.indexOf(' <game '));
+  const played = session.match(/ <game [\s\S]*?<\/game>\n/g)!;
+  let body = '';
+  for (let index = 0; index < games; index++) {
+    body += played[index % played.length].replace(
+      /gamecode="\d+"/,
+      `gamecode="${6200000000 + index}"`,
+    );
+  }
+  return `${header}${body}</session>\n`;
+}

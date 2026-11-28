@@ -1,15 +1,17 @@
 import { Unzip, UnzipInflate, UnzipPassThrough } from 'fflate';
 import type { Hand } from '../hand.js';
 import { Discard, type DiscardReason } from './discard.js';
-import { parseBlock, recogniseBlock } from './import.js';
+import { parseBlock, pieceCutter, recogniseBlock } from './import.js';
+import type { Piece } from './pieces.js';
 import { isHandHistoryEntry, UnreadableUpload, ZIP_MAGIC } from './upload.js';
 
 /*
- * Stored files read as a stream of Hands, however large: a .txt file, or
- * every .txt file in a zip, decoded and split into Hands as the bytes come,
- * the same way, format by format, as reading the whole text at once. Nothing
- * proportional to a file's size is held: a line or a Hand longer than any
- * Hand could be is dropped as text that is no Hand.
+ * Stored files read as a stream of Hands, however large: a .txt or .xml
+ * file, or every such file in a zip, decoded and cut into Hands as the bytes
+ * come, the same way, format by format, as reading the whole text at once.
+ * Nothing proportional to a file's size is held: a session of many Hands is
+ * cut Hand by Hand as it comes, and a line or a Hand longer than any Hand
+ * could be is dropped as text that is no Hand.
  */
 
 /** A file as it streams in. */
@@ -113,80 +115,33 @@ export async function countHands(
 class TooMuchText extends Error {}
 
 /**
- * Each run of non-blank lines in the files' texts, trimmed: one Hand, or a
- * piece of text that is none. Hands are separated by blank lines and have
- * none inside. One too long to be a Hand comes as the empty string. Throws
- * `TooMuchText` once the texts pass `maxCharacters`, all files together.
+ * Each piece of the files' texts, as reading the whole text at once cuts
+ * it: one Hand, or a piece of text that is none. One too long to be a Hand
+ * comes as the empty string. Throws `TooMuchText` once the texts pass
+ * `maxCharacters`, all files together.
  */
 async function* blocksOf(
   files: Iterable<SourceFile>,
   maxCharacters = Infinity,
 ): AsyncGenerator<string> {
   let characters = 0;
-  let lines: string[] = [];
-  let size = 0;
-  let tooLong = false;
-  let partial = '';
-  /** Dropping a line already too long, until its end. */
-  let droppingLine = false;
-
-  function* endBlock(): Generator<string> {
-    if (tooLong) yield '';
-    else if (lines.length > 0) yield lines.join('\n').trim();
-    lines = [];
-    size = 0;
-    tooLong = false;
-  }
-  function* endLine(line: string): Generator<string> {
-    if (/^[ \t\r]*$/.test(line)) {
-      yield* endBlock();
-      return;
-    }
-    if (tooLong) return;
-    size += line.length + 1;
-    if (size > MAX_BLOCK_CHARS) {
-      tooLong = true;
-      lines = [];
-    } else {
-      lines.push(line);
-    }
-  }
-
+  const cutter = pieceCutter(MAX_BLOCK_CHARS);
   for (const file of files) {
     for await (const piece of textsOf(file)) {
+      let pieces: Piece[];
       if ('end' in piece) {
-        if (!droppingLine) yield* endLine(partial);
-        partial = '';
-        droppingLine = false;
-        yield* endBlock();
-        continue;
+        pieces = cutter.end();
+      } else {
+        characters += piece.text.length;
+        if (characters > maxCharacters) throw new TooMuchText();
+        pieces = cutter.push(piece.text);
       }
-      characters += piece.text.length;
-      if (characters > maxCharacters) throw new TooMuchText();
-      let from = 0;
-      for (;;) {
-        const newline = piece.text.indexOf('\n', from);
-        if (newline === -1) break;
-        const rest = piece.text.slice(from, newline);
-        if (!droppingLine) yield* endLine(partial + rest);
-        partial = '';
-        droppingLine = false;
-        from = newline + 1;
-      }
-      if (droppingLine) continue;
-      partial += piece.text.slice(from);
-      if (partial.length > MAX_BLOCK_CHARS) {
-        // A line this long belongs to no Hand: drop it, and its block.
-        partial = '';
-        droppingLine = true;
-        tooLong = true;
-        lines = [];
-      }
+      for (const cut of pieces) yield 'text' in cut ? cut.text : '';
     }
   }
 }
 
-/** The texts of one file: itself, or each .txt file in it when it is a zip. */
+/** The texts of one file: itself, or each Hand History file in it when it is a zip. */
 async function* textsOf(file: SourceFile): AsyncGenerator<TextPiece> {
   const iterator = file.bytes[Symbol.asyncIterator]();
   const first = await iterator.next();
@@ -219,7 +174,7 @@ async function* decoded(
   yield { end: true };
 }
 
-/** Each .txt file in a zip, decoded as it unpacks, entry after entry. */
+/** Each Hand History file in a zip, decoded as it unpacks, entry after entry. */
 async function* zipTexts(
   bytes: AsyncIterable<Uint8Array>,
 ): AsyncGenerator<TextPiece> {
