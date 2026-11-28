@@ -1,0 +1,25 @@
+GAME #6100000401 Version:26.1.1.31 Uncalled:Y Texas Hold'em NL $0.05/$0.10 2026-05-10 09:12:44/GMT
+Table Speed Poker - Guadiana
+Seat 1: Maplewood ($10.00 in chips)
+Seat 3: Alder ($0.10 in chips)
+Seat 5: Birch ($7.20 in chips)
+Seat 6: Cedar ($12.00 in chips)
+Seat 8: Elm ($9.10 in chips)
+Seat 10: Fir ($10.40 in chips) DEALER
+Maplewood: Post SB $0.05
+Alder: Post BB Allin $0.10
+*** HOLE CARDS ***
+Dealt to Maplewood [S7 D6]
+Birch: Fold
+Cedar: Fold
+Elm: Fold
+Fir: Fold
+Maplewood: Call $0.05
+*** FLOP *** [HA C9 D2]
+*** TURN *** [SJ]
+*** RIVER *** [H5]
+*** SUMMARY ***
+Total pot $0.19 Rake $0.01
+Alder: Shows [CK D9] One Pair, Nines
+Maplewood: Shows [S7 D6] High Card, Ace
+Alder: wins $0.19

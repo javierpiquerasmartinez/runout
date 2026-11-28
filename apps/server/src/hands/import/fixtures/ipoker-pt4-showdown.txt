@@ -1,0 +1,35 @@
+GAME #6100000201 Version:26.1.1.31 Uncalled:Y Texas Hold'em NL €0.05/€0.10 2026-01-15 21:14:03/GMT
+Table Alcalá, 912000201
+Seat 1: Alder (€10.00 in chips)
+Seat 2: Birch (€12.35 in chips)
+Seat 3: Maplewood (€10.00 in chips)
+Seat 4: Cedar (€9.65 in chips) DEALER
+Seat 5: Elm (€11.05 in chips)
+Seat 6: Fir (€6.90 in chips)
+Elm: Post SB €0.05
+Fir: Post BB €0.10
+*** HOLE CARDS ***
+Dealt to Maplewood [HA SK]
+Alder: Fold
+Birch: Call €0.10
+Maplewood: Raise (NF) €0.40
+Cedar: Fold
+Elm: Fold
+Fir: Fold
+Birch: Call €0.30
+*** FLOP *** [D10 S7 H2]
+Birch: Check
+Maplewood: Bet €0.50
+Birch: Raise (NF) €1.50
+Maplewood: Call €1.00
+*** TURN *** [CK]
+Birch: Check
+Maplewood: Check
+*** RIVER *** [D4]
+Birch: Bet €2.00
+Maplewood: Call €2.00
+*** SUMMARY ***
+Total pot €7.55 Rake €0.40
+Birch: Shows [C10 C9] One Pair, Tens
+Maplewood: Shows [HA SK] One Pair, Kings
+Maplewood: wins €7.55
