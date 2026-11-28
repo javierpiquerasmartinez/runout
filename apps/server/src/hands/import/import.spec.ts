@@ -340,6 +340,7 @@ describe('Hand History import: detecting the format', () => {
       'ipoker-pt4',
       'ipoker-pt4',
       'ipoker-pt4',
+      'ipoker-pt4',
     ]);
   });
 
@@ -350,6 +351,7 @@ describe('Hand History import: detecting the format', () => {
 
     expect(result.format).toBe('ipoker-pt4');
     expect(result.hands.map((hand) => hand.site)).toEqual([
+      'ipoker',
       'ipoker',
       'ipoker',
       'ipoker',

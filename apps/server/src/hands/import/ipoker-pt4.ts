@@ -96,9 +96,9 @@ function sum(amounts: number[]): number {
   return amounts.reduce((total, each) => total + each, 0);
 }
 
-/** `HA` → "Ah", `D10` → "Td", as PokerStars writes them; null for `X`, a card not shown. */
+/** `HA` → "Ah", `D10` → "Td", as PokerStars writes them; null for `X` (or `x`), a card not shown. */
 function card(written: string): string | null {
-  if (written === 'X') return null;
+  if (written.toUpperCase() === 'X') return null;
   const match = written.match(/^([SHDC])(10|[2-9JQKA])$/i);
   if (!match) throw new Discard('malformed');
   return `${match[2] === '10' ? 'T' : match[2].toUpperCase()}${match[1].toLowerCase()}`;

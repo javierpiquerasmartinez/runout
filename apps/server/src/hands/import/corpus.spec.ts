@@ -985,7 +985,8 @@ const CORPUS: CorpusEntry[] = [
   },
   {
     // A PT4 session on iPoker's ten-seat numbering: an uncalled bet, a
-    // walk, then all-ins on the flop, a muck and a single card shown.
+    // walk, then all-ins on the flop, a muck and a single card shown, and
+    // a muck of cards nobody saw.
     file: 'ipoker-pt4-session.txt',
     format: 'ipoker-pt4',
     hands: [
@@ -1059,6 +1060,16 @@ const CORPUS: CorpusEntry[] = [
         ],
         collected: [{ screenName: 'Birch', amount: 1645 }],
         rake: 50,
+      },
+      {
+        // Cards nobody saw written `x`, as `X` elsewhere: shown as nothing.
+        siteHandId: '6100000304',
+        buttonSeat: 8,
+        board: ['9c', '5h', '2s', 'Ad', '8h'],
+        showdown: true,
+        shown: [{ screenName: 'Maplewood', cards: ['As', 'Jd'] }],
+        collected: [{ screenName: 'Maplewood', amount: 119 }],
+        rake: 6,
       },
     ],
     discarded: [],
