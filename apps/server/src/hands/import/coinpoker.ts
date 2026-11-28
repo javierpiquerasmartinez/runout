@@ -16,8 +16,8 @@ import { readHand } from './stars-layout.js';
  * opponent under a name hashed for that Hand alone. From NL25 up the header
  * also carries the ante, posted as PokerStars does. A few lines are its own:
  * `ALLIN`, `RETURN`, a `STRADDLE` posted after the hole cards and a Splash
- * (`SPLASH dropped`). A Hand run more than once is read with its Runs. They are rewritten as PokerStars writes them before
- * the rest is read.
+ * (`SPLASH dropped`). They are rewritten as PokerStars writes them before
+ * the rest is read. A Hand run more than once is read with its Runs.
  */
 
 /** `CoinPoker Hand #160064400025: NLH (₮0.05/₮0.10) 2026/10/19 17:55:42 CEST` */

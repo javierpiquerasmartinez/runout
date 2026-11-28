@@ -506,6 +506,14 @@ describe('Hand History import: the fixture corpus', () => {
     expect(() => timeline(hand)).not.toThrow();
   });
 
+  it.each(everyHand.filter(({ hand }) => !hand.runs))(
+    '$file #$id, run once, replays without Runs',
+    ({ hand }) => {
+      const { states } = timeline(hand);
+      expect(states.every((s) => s.run === null && s.runs === null)).toBe(true);
+    },
+  );
+
   it.each(everyHand)('$file #$id writes tens as "10"', ({ hand }) => {
     const cards = [
       ...hand.hero.cards,

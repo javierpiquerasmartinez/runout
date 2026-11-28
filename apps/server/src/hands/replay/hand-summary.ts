@@ -155,12 +155,13 @@ export function handSummary(
   if (hand.runs) {
     // Runs are only dealt after an all-in, so every one goes to Showdown.
     if (shown.length > 0) lines.push(`Showdown: ${shown.join(', ')}`);
-    const pot = dealtOn(STREETS.find((s) => BOARD_SIZE[s] > shared)!)?.pot;
+    // No betting is left after the all-in: every Run is dealt into the final pot.
+    const pot = replay.states.at(-1)!.pot;
     hand.runs.forEach((board, run) => {
       const paid = hand.collected.filter((each) => each.run === run);
       const last = run === hand.runs!.length - 1;
       lines.push(
-        `Run ${run + 1} (${bb(pot ?? 0)}) ${cardsOf(board.slice(shared))}: ${winnersOf(paid)}${last ? rake : ''}`,
+        `Run ${run + 1} (${bb(pot)}) ${cardsOf(board.slice(shared))}: ${winnersOf(paid)}${last ? rake : ''}`,
       );
     });
   } else {

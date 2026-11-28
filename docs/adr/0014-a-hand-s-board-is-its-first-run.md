@@ -2,7 +2,7 @@
 
 Date: 2026-11-28 · Status: accepted
 
-Some Hands are run more than once after an all-in: CoinPoker deals a second board, with its own Showdown, and each Run pays out its share of the pots. Until now these Hands were discarded at import. A Hand held a single `board`, and the Result, All-in EV, the facts, board texture, the timeline and the Hand Summary all read it as the whole board.
+Some Hands are run more than once after an all-in: CoinPoker deals the board again, with its own Showdown, and each Run pays out its share of the pots. Until now these Hands were discarded at import. A Hand held a single `board`, and the Result, All-in EV, the facts, board texture, the timeline and the Hand Summary all read it as the whole board.
 
 We keep `board` as the full board of the first Run and add `runs` next to it, holding the full board of every Run. `runs` is there only when the Hand was run more than once, and its first entry repeats `board`. Each `collected` entry also records which Run paid it. Anything that reads `board` keeps working unchanged and sees Run 1. That is what we want for the facts and Filters too: they hold one value per Hand, and the cards dealt before the all-in are the same in every Run.
 

@@ -135,9 +135,11 @@ const POST = new RegExp(
  * `SECOND Board [ 8d 8h 7s Ad Qh ]`.
  */
 const RUN_ORDINALS = ['FIRST', 'SECOND', 'THIRD', 'FOURTH'];
-const RUN_MARKER =
-  /^(FIRST|SECOND|THIRD|FOURTH) (FLOP|TURN|RIVER|SHOWDOWN|SHOW DOWN)$/;
-const RUN_BOARD = /^(FIRST|SECOND|THIRD|FOURTH) Board \[([^\]]+)\]$/;
+const RUN_ORDINAL = `(${RUN_ORDINALS.join('|')})`;
+const RUN_MARKER = new RegExp(
+  `^${RUN_ORDINAL} (FLOP|TURN|RIVER|SHOWDOWN|SHOW DOWN)$`,
+);
+const RUN_BOARD = new RegExp(String.raw`^${RUN_ORDINAL} Board \[([^\]]+)\]$`);
 
 /** Markers that open preflop, or say nothing the Actions don't. */
 const PREFLOP_MARKERS = new Set(['HOLE CARDS', 'ANTE/BLINDS', 'PRE-FLOP']);

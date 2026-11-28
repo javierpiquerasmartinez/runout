@@ -10,7 +10,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent,
 } from 'react'
-import { TimesRun } from './TimesRun'
 import { flushSync } from 'react-dom'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
@@ -58,6 +57,7 @@ import { guestsFollowing, presenceOf } from './syncView'
 import { tableView, type PayoutView, type TableView } from './tableView'
 import { useHand, type HandLoad } from './useHand'
 import type { RoomCommands } from './useRoom'
+import { TimesRun } from './TimesRun'
 
 type InRoom = Extract<RoomView, { phase: 'in-room' }>
 

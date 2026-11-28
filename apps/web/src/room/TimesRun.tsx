@@ -14,4 +14,3 @@ export function TimesRun({ count }: { count: number }) {
     </abbr>
   )
 }
-

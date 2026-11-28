@@ -827,13 +827,6 @@
 .poker-table__run[data-state='pending'] {
   opacity: 0.45;
 }
-.poker-table__run .ro-card {
-  --card-w: 40px;
-  --card-h: 54px;
-  --card-rank: 20px;
-  --card-ten: 16px;
-  --card-suit: 15px;
-}
 .poker-table__run-label {
   justify-self: end;
   display: inline-flex;
@@ -1235,11 +1228,7 @@
 }
 /* Run more than once: the Runs centred on the board's middle, between the side seats, the pot above. */
 .poker-table[data-shape='portrait'] .poker-table__middle:has(.poker-table__runs) {
-  bottom: calc(var(--table-h) - var(--table-mid) - 77px);
-}
-.poker-table[data-shape='portrait'] .poker-table__run .ro-card {
-  --card-w: 38px;
-  --card-h: 52px;
+  bottom: calc(var(--table-h) - var(--table-mid) - 75px);
 }
 .poker-table[data-shape='portrait'] .poker-table__pot {
   gap: 2px;

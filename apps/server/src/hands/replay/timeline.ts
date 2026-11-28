@@ -258,7 +258,7 @@ export function timeline(hand: Hand): Timeline {
   // Street, then the Hand ends: the pots are paid out.
   unreturned = hand.returned;
   const reached = STREETS.indexOf(hand.actions.at(-1)?.street ?? 'preflop');
-  const runOut = (from: string[]) => {
+  const dealRun = (from: string[]) => {
     const finalStreet = streetOf(from.length);
     for (const street of STREETS.slice(reached + 1)) {
       if (STREETS.indexOf(street) > STREETS.indexOf(finalStreet)) break;
@@ -278,7 +278,7 @@ export function timeline(hand: Hand): Timeline {
   };
 
   if (!hand.runs) {
-    const finalStreet = runOut(hand.board);
+    const finalStreet = dealRun(hand.board);
     const result = resultOf(hand, players, board, splash);
     payOut(result);
     push({ street: finalStreet, toAct: null, action: null, result });
@@ -302,7 +302,7 @@ export function timeline(hand: Hand): Timeline {
           result: null,
         });
       }
-      const finalStreet = runOut(runBoard);
+      const finalStreet = dealRun(runBoard);
       const paid = resultOf(
         {
           ...hand,
