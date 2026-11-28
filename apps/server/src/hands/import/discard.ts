@@ -9,6 +9,8 @@ export type DiscardReason =
   | 'unbalanced'
   /** The board was run more than once: one board is all a Hand holds. */
   | 'run-it-twice'
+  /** An export too old to say when it was played: import the client's own files instead. */
+  | 'old-export'
   /** Already imported: same Poker Site, hand ID, Hero and seat (ADR 0002). */
   | 'duplicate';
 

@@ -3,6 +3,7 @@ import { Discard, type DiscardReason } from './discard.js';
 import { isCoinPokerHand, parseCoinPokerHand } from './coinpoker.js';
 import { isGGPokerHand, parseGGPokerHand } from './ggpoker.js';
 import { IPOKER_SESSION, isIPokerHand, parseIPokerHand } from './ipoker.js';
+import { isIPokerPt4Hand, parseIPokerPt4Hand } from './ipoker-pt4.js';
 import { PieceCutter, type SessionLayout } from './pieces.js';
 import { isPokerStarsHand, parsePokerStarsHand } from './pokerstars.js';
 import { isWinamaxHand, parseWinamaxHand } from './winamax.js';
@@ -32,6 +33,7 @@ const FORMATS: Record<SourceFormat, Format> = {
     parse: parseIPokerHand,
     session: IPOKER_SESSION,
   },
+  'ipoker-pt4': { recognises: isIPokerPt4Hand, parse: parseIPokerPt4Hand },
 };
 
 export const SOURCE_FORMATS = Object.keys(FORMATS) as SourceFormat[];

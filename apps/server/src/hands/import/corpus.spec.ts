@@ -936,6 +936,148 @@ const CORPUS: CorpusEntry[] = [
     discarded: ['run-it-twice'],
   },
   {
+    // PokerTracker 4's export of the Hand in ipoker-showdown.xml.
+    file: 'ipoker-pt4-showdown.txt',
+    format: 'ipoker-pt4',
+    hands: [
+      {
+        site: 'ipoker',
+        siteHandId: '6100000201',
+        sourceFormat: 'ipoker-pt4',
+        // PT4 writes GMT, as its header says.
+        playedAt: '2026-01-15T21:14:03.000Z',
+        tableName: 'Alcalá, 912000201',
+        tableSize: 6,
+        buttonSeat: 4,
+        stake: EUR_05_10,
+        hero: { screenName: 'Maplewood', cards: ['Ah', 'Ks'] },
+        board: ['10d', '7s', '2h', 'Kc', '4d'],
+        returned: [],
+        showdown: true,
+        shown: [
+          { screenName: 'Birch', cards: ['10c', '9c'] },
+          { screenName: 'Maplewood', cards: ['Ah', 'Ks'] },
+        ],
+        collected: [{ screenName: 'Maplewood', amount: 755 }],
+        rake: 40,
+        fees: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A PT4 session on iPoker's ten-seat numbering: an uncalled bet, a
+    // walk, then all-ins on the flop, a muck and a single card shown.
+    file: 'ipoker-pt4-session.txt',
+    format: 'ipoker-pt4',
+    hands: [
+      {
+        site: 'ipoker',
+        siteHandId: '6100000301',
+        playedAt: '2026-03-02T18:20:11.000Z',
+        tableName: 'Toledo, 912000301',
+        tableSize: 6,
+        buttonSeat: 3,
+        hero: { screenName: 'Maplewood', cards: ['8c', '8d'] },
+        actions: expect.arrayContaining([
+          {
+            street: 'preflop',
+            screenName: 'Alder',
+            type: 'raise',
+            amount: 20,
+            to: 30,
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Maplewood',
+            type: 'call',
+            amount: 20,
+            allIn: false,
+          },
+        ]) as Hand['actions'],
+        board: ['5s', 'Jh', '2c', 'Kd'],
+        // PT4 writes no line for it: the turn bet nobody called.
+        returned: [{ screenName: 'Alder', amount: 110 }],
+        showdown: false,
+        shown: [],
+        collected: [{ screenName: 'Alder', amount: 140 }],
+        rake: 5,
+      },
+      {
+        siteHandId: '6100000302',
+        buttonSeat: 5,
+        returned: [{ screenName: 'Elm', amount: 5 }],
+        collected: [{ screenName: 'Elm', amount: 10 }],
+        rake: 0,
+      },
+      {
+        siteHandId: '6100000303',
+        buttonSeat: 6,
+        actions: expect.arrayContaining([
+          {
+            street: 'flop',
+            screenName: 'Maplewood',
+            type: 'raise',
+            amount: 845,
+            to: 895,
+            allIn: true,
+          },
+          {
+            street: 'flop',
+            screenName: 'Birch',
+            type: 'call',
+            amount: 760,
+            allIn: true,
+          },
+        ]) as Hand['actions'],
+        board: ['10d', '7c', '3s', '2h', '8s'],
+        returned: [{ screenName: 'Maplewood', amount: 85 }],
+        showdown: true,
+        // The Hero's muck counts as shown; Elm folded and showed one card.
+        shown: [
+          { screenName: 'Birch', cards: ['Ac', 'Ad'] },
+          { screenName: 'Maplewood', cards: ['Qh', 'Qs'] },
+        ],
+        collected: [{ screenName: 'Birch', amount: 1645 }],
+        rake: 50,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A fast-fold (Speed) Hand reads as any cash Hand: a big blind posted
+    // all-in, called, and the board run out.
+    file: 'ipoker-pt4-fast-fold.txt',
+    format: 'ipoker-pt4',
+    hands: [
+      {
+        site: 'ipoker',
+        siteHandId: '6100000401',
+        tableName: 'Speed Poker - Guadiana',
+        stake: USD_05_10,
+        posts: [
+          { screenName: 'Maplewood', kind: 'small-blind', amount: 5 },
+          { screenName: 'Alder', kind: 'big-blind', amount: 10 },
+        ],
+        board: ['Ah', '9c', '2d', 'Js', '5h'],
+        showdown: true,
+        collected: [{ screenName: 'Alder', amount: 19 }],
+        rake: 1,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A Hand that doesn't balance, an export from before PT4 wrote the
+    // client version and GMT, a Hand run twice (how PT4 writes one is a
+    // guess until a real one turns up) and Omaha.
+    file: 'ipoker-pt4-discarded.txt',
+    format: 'ipoker-pt4',
+    hands: [],
+    discarded: ['unbalanced', 'old-export', 'run-it-twice', 'not-cash-holdem'],
+  },
+  {
     // PokerTracker 4's forum layout has no exact Amounts to replay.
     file: 'pokertracker-forum.txt',
     format: null,
@@ -1005,6 +1147,19 @@ describe('Hand History import: the fixture corpus', () => {
       }
     },
   );
+
+  it('reads one iPoker Hand alike from the client XML and from PT4, so it is one Hand', () => {
+    const [xml] = importHandHistory(fixture('ipoker-showdown.xml')).hands;
+    const [pt4] = importHandHistory(fixture('ipoker-pt4-showdown.txt')).hands;
+
+    // The uniqueness a Library keeps: Poker Site and hand ID.
+    expect(pt4.site).toBe(xml.site);
+    expect(pt4.siteHandId).toBe(xml.siteHandId);
+    // And the same Hand in every other respect but its layout.
+    const { sourceFormat, ...rest } = xml;
+    expect(sourceFormat).toBe('ipoker');
+    expect(pt4).toMatchObject(rest);
+  });
 
   it.each(everyHand)('$file #$id replays to the end', ({ hand }) => {
     expect(() => timeline(hand)).not.toThrow();

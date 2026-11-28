@@ -101,11 +101,12 @@ export function heroSeat(hand: Hand): number {
 
 /**
  * The layout the Hand History was written in. The Trackers export each Hand
- * in its Poker Site's own layout, so most Poker Sites have one: iPoker's is
- * the XML its client saves.
+ * in its Poker Site's own layout, so most Poker Sites have one. iPoker has
+ * two: the XML its client saves (`ipoker`) and PokerTracker 4's text export
+ * of it (`ipoker-pt4`).
  */
 export type SourceFormat =
-  'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker' | 'ipoker';
+  'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker' | 'ipoker' | 'ipoker-pt4';
 
 export interface Stake {
   limit: 'no-limit' | 'pot-limit' | 'fixed-limit';
