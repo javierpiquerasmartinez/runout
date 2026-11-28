@@ -14,7 +14,9 @@ const NOT_IMPORTED: Exclude<DiscardReason, 'duplicate'>[] = [
   'too-many-seats',
   'no-hero',
   'malformed',
+  'unbalanced',
   'run-it-twice',
+  'old-export',
 ]
 
 /**

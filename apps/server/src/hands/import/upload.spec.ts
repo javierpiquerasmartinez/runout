@@ -53,7 +53,7 @@ describe('Reading an uploaded Hand History file', () => {
 
     expect(text).toContain('<?xml version="1.0" encoding="utf-8"?>');
     expect(text).toContain('<gametype>Holdem NL €0.05/€0.10</gametype>');
-    expect(text).toContain('<tablename>Málaga, 912000301</tablename>');
+    expect(text).toContain('<tablename>Málaga, 913000301</tablename>');
   });
 
   it('reads each file in a zip in its own encoding', () => {

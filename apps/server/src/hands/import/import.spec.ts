@@ -323,6 +323,46 @@ describe('Hand History import: detecting the format', () => {
       'winamax',
       'coinpoker',
       'ipoker',
+      'ipoker-pt4',
+    ]);
+  });
+
+  it("tells PokerTracker 4's iPoker export apart from the PokerStars-like layouts", () => {
+    const text = [
+      fixture('pokerstars-showdown.txt'),
+      fixture('ipoker-pt4-session.txt'),
+    ].join('\n\n');
+
+    const { hands } = importHandHistory(text);
+
+    expect(hands.map((hand) => hand.sourceFormat)).toEqual([
+      'pokerstars',
+      'ipoker-pt4',
+      'ipoker-pt4',
+      'ipoker-pt4',
+    ]);
+  });
+
+  it("reads PokerTracker 4's iPoker export in the format picked by hand", () => {
+    const result = importHandHistory(fixture('ipoker-pt4-session.txt'), {
+      format: 'ipoker-pt4',
+    });
+
+    expect(result.format).toBe('ipoker-pt4');
+    expect(result.hands.map((hand) => hand.site)).toEqual([
+      'ipoker',
+      'ipoker',
+      'ipoker',
+    ]);
+  });
+
+  it("discards another layout picked by hand as PokerTracker 4's iPoker export", () => {
+    const text = fixture('pokerstars-showdown.txt');
+
+    const result = importHandHistory(text, { format: 'ipoker-pt4' });
+
+    expect(result.discarded).toEqual([
+      { text: text.trim(), reason: 'malformed' },
     ]);
   });
 

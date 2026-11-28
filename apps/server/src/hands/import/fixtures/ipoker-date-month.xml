@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-	<session sessioncode="7400000601">
+	<session sessioncode="7430000601">
 			<general>
 	    	<mode>real</mode>
 	      		<gametype>Holdem NL $0.10/$0.25</gametype>
-	          <tablename>Lorca, 912000601</tablename>
+	          <tablename>Lorca, 913000601</tablename>
 	          <duration>00:01</duration>
 	          <gamecount>1</gamecount>
 	          <startdate>20-Apr-2012 20:11:15</startdate>
@@ -18,7 +18,7 @@
 			  		<awardpoints>0.50</awardpoints>
 
 	    </general>
-	    <game gamecode="6100000601">
+	    <game gamecode="6300000601">
 		 <general>
 		  <startdate>20-Apr-2012 20:11:15</startdate>
 		  <players>

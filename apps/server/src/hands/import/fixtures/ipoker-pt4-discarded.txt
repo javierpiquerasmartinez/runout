@@ -1,0 +1,76 @@
+GAME #6100000501 Version:26.1.1.31 Uncalled:Y Texas Hold'em NL €0.05/€0.10 2026-03-03 20:05:10/GMT
+Table Segovia, 912000501
+Seat 1: Alder (€10.00 in chips)
+Seat 3: Maplewood (€10.00 in chips) DEALER
+Seat 5: Birch (€10.00 in chips)
+Seat 6: Cedar (€10.00 in chips)
+Birch: Post SB €0.05
+Cedar: Post BB €0.10
+*** HOLE CARDS ***
+Dealt to Maplewood [D5 C3]
+Alder: Fold
+Maplewood: Fold
+Birch: Fold
+*** SUMMARY ***
+Total pot €0.10 Rake €0.01
+Cedar: wins €0.10
+
+
+GAME #2900000101: Texas Hold'em  NL $0.05/$0.10 2012-06-04 21:40:12
+Table Ourense
+Seat 1: Alder ($10.00 in chips) DEALER
+Seat 2: Maplewood ($10.00 in chips)
+Seat 3: Birch ($10.00 in chips)
+Maplewood: Post SB $0.05
+Birch: Post BB $0.10
+*** HOLE CARDS ***
+Dealt to Maplewood [H6 S2]
+Alder: Fold
+Maplewood: Fold
+*** SUMMARY ***
+Total pot $0.10 Rake $0.00
+Birch: wins $0.10
+
+
+GAME #6100000502 Version:26.1.1.31 Uncalled:Y Texas Hold'em NL €0.05/€0.10 2026-03-03 20:06:31/GMT
+Table Segovia, 912000501
+Seat 1: Alder (€10.00 in chips)
+Seat 3: Maplewood (€4.00 in chips)
+Seat 5: Birch (€10.05 in chips) DEALER
+Seat 6: Cedar (€10.00 in chips)
+Cedar: Post SB €0.05
+Alder: Post BB €0.10
+*** HOLE CARDS ***
+Dealt to Maplewood [HA HK]
+Maplewood: Allin €4.00
+Birch: Call €4.00
+Cedar: Fold
+Alder: Fold
+*** FLOP *** [S9 D4 C2]
+*** TURN *** [H7]
+*** RIVER *** [DJ]
+*** FLOP *** [HQ SJ H3]
+*** TURN *** [C8]
+*** RIVER *** [H10]
+*** SUMMARY ***
+Total pot €7.80 Rake €0.35
+Birch: Shows [S10 C10] One Pair, Tens
+Maplewood: Shows [HA HK] Flush, Ace High
+Birch: wins €3.90
+Maplewood: wins €3.90
+
+
+GAME #6100000503 Version:26.1.1.31 Uncalled:Y Omaha PL €0.05/€0.10 2026-03-03 20:07:12/GMT
+Table Soria, 912000503
+Seat 1: Alder (€10.00 in chips) DEALER
+Seat 3: Maplewood (€10.00 in chips)
+Seat 5: Birch (€10.00 in chips)
+Maplewood: Post SB €0.05
+Birch: Post BB €0.10
+*** HOLE CARDS ***
+Dealt to Maplewood [HA HK D7 C2]
+Alder: Fold
+Maplewood: Fold
+*** SUMMARY ***
+Total pot €0.10 Rake €0.00
+Birch: wins €0.10

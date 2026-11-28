@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-	<session sessioncode="7400001001">
+	<session sessioncode="7430001001">
 			<general>
 	    	<mode>real</mode>
 	      		<gametype>Holdem БЛ €0.25/€0.50</gametype>
-	          <tablename>Mieres, 912001001</tablename>
+	          <tablename>Mieres, 913001001</tablename>
 	          <duration>00:01</duration>
 	          <gamecount>1</gamecount>
 	          <startdate>2012-02-23 17:54:57</startdate>
@@ -18,7 +18,7 @@
 			  		<awardpoints>1.05</awardpoints>
 
 	    </general>
-	    <game gamecode="6100001001">
+	    <game gamecode="6300001001">
 		 <general>
 		  <startdate>2012-02-23 17:54:57</startdate>
 		  <players>

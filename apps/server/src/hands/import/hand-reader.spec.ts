@@ -152,8 +152,8 @@ describe('Reading the Hands of stored files as a stream', () => {
     expect(hands).toHaveLength(2);
     for (const hand of hands) {
       expect(hand).toMatchObject({
-        siteHandId: '6100000301',
-        tableName: 'Málaga, 912000301',
+        siteHandId: '6300000301',
+        tableName: 'Málaga, 913000301',
         stake: { smallBlind: 5, bigBlind: 10, currency: 'EUR' },
       });
     }

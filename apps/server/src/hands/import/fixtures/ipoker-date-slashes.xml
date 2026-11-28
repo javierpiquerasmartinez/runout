@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<session sessioncode="7400000401">
+<session sessioncode="7430000401">
  <general>
   <mode>real</mode>
   <gametype>Holdem NL €0.01/€0.02</gametype>
-  <tablename>Ávila, 912000401</tablename>
+  <tablename>Ávila, 913000401</tablename>
   <tablecurrency>EUR</tablecurrency>
   <duration>00:00:51</duration>
   <gamecount>1</gamecount>
@@ -18,7 +18,7 @@
   <awardpoints>0.00</awardpoints>
   <ipoints>0.00</ipoints>
  </general>
- <game gamecode="6100000401">
+ <game gamecode="6300000401">
   <general>
    <startdate>2017/01/23 22:27:48</startdate>
    <players>

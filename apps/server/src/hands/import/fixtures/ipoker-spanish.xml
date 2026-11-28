@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-	<session sessioncode="7400000901">
+	<session sessioncode="7430000901">
 			<general>
 	    	<mode>real</mode>
 	      		<gametype>Holdem SL $0.01/$0.02</gametype>
-	          <tablename>Alfaro, 912000901</tablename>
+	          <tablename>Alfaro, 913000901</tablename>
 	          <duration>00:01</duration>
 	          <gamecount>1</gamecount>
 	          <startdate>2011-11-04 18:46:19</startdate>
@@ -18,7 +18,7 @@
 			  		<awardpoints>0.50</awardpoints>
 
 	    </general>
-	    <game gamecode="6100000901">
+	    <game gamecode="6300000901">
 		 <general>
 		  <startdate>2011-11-04 18:46:19</startdate>
 		  <players>
