@@ -1291,6 +1291,33 @@ const CORPUS: CorpusEntry[] = [
     ],
   },
   {
+    // The limit written out in full and an ante of nothing after the
+    // blinds, as Hold'em Manager's archive writes `<gametype>`, and the
+    // cards nobody saw written `x x`.
+    file: 'ipoker-archive-names.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6300001201',
+        stake: USD_05_10,
+        hero: { screenName: 'Maplewood', cards: ['5d', '5c'] },
+        posts: [
+          { screenName: 'Alder', kind: 'small-blind', amount: 5 },
+          { screenName: 'Maplewood', kind: 'big-blind', amount: 10 },
+        ],
+        collected: [{ screenName: 'Maplewood', amount: 10 }],
+        rake: 0,
+      },
+      {
+        siteHandId: '6300001202',
+        stake: { ...USD_05_10, limit: 'pot-limit' },
+        collected: [{ screenName: 'Alder', amount: 10 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
     // PokerTracker 4's forum layout has no exact Amounts to replay.
     file: 'pokertracker-forum.txt',
     format: null,

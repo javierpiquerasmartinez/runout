@@ -55,6 +55,10 @@ const LIMITS: Record<string, Stake['limit']> = {
   БЛ: 'no-limit',
   L: 'fixed-limit',
   FL: 'fixed-limit',
+  // Hold'em Manager's archive writes them out.
+  'No limit': 'no-limit',
+  'Pot limit': 'pot-limit',
+  Limit: 'fixed-limit',
 };
 
 const CURRENCY_SIGNS: Record<string, string> = {
@@ -249,7 +253,10 @@ export function parseIPokerHand(block: string): Hand {
  * `<currency>`, the player's account's, which can differ.
  */
 function stakeOf(gametype: string, tableCurrency: string | null): Stake {
-  const holdem = gametype.match(/^Holdem (\S+) (\S+)\/(\S+)$/);
+  // The ante, where one is written after the blinds, is read from its posts.
+  const holdem = gametype.match(
+    /^Holdem (No limit|Pot limit|\S+) (\S+)\/(\S+)(?: Ante (\S+))?$/,
+  );
   if (!holdem) {
     // Omaha (`PL €0.05/€0.10`, `Omaha PL …`) and the rest of iPoker's games.
     throw new Discard(
@@ -261,10 +268,10 @@ function stakeOf(gametype: string, tableCurrency: string | null): Stake {
   }
   const limit = LIMITS[holdem[1]];
   if (!limit) throw new Discard('malformed');
-  const signs = [holdem[2], holdem[3]].map((blind) =>
-    blind.replace(/[\d.,]/g, ''),
-  );
-  if (signs[0] !== signs[1]) throw new Discard('malformed');
+  const written = [holdem[2], holdem[3], holdem[4] ?? holdem[3]];
+  const signs = written.map((written) => written.replace(/[\d.,]/g, ''));
+  if (signs.some((sign) => sign !== signs[0])) throw new Discard('malformed');
+  written.forEach(amount);
   const signed =
     CURRENCY_SIGNS[signs[0]] ??
     (CURRENCY_CODES.has(signs[0]) ? signs[0] : undefined);
@@ -322,8 +329,8 @@ function readRounds(game: string): {
       const faces = decode(cards.body).trim().split(/\s+/);
       if (type === 'Pocket') {
         if (player) dealt.add(player);
-        // Cards nobody saw are written `X`.
-        if (faces.every((card) => card !== 'X') && player) {
+        // Cards nobody saw are written `X`, or `x` in older archives.
+        if (faces.every((card) => card.toUpperCase() !== 'X') && player) {
           pockets.set(player, faces.map(card));
         }
       } else if (BOARD_CARDS[type ?? ''] === street) {
