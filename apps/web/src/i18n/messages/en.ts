@@ -510,6 +510,7 @@ export const en: Messages = {
   'import.discarded.reason.too-many-seats': 'More than nine seats',
   'import.discarded.reason.no-hero': "Doesn't say who the hero is",
   'import.discarded.reason.malformed': "Couldn't be read",
+  'import.discarded.reason.unbalanced': "The amounts don't add up",
   'import.discarded.reason.run-it-twice': 'Board run more than once',
   'import.footer.ready.one': '{count} hand ready to add',
   'import.footer.ready.other': '{count} hands ready to add',

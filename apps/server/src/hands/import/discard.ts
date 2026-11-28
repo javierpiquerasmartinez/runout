@@ -5,6 +5,8 @@ export type DiscardReason =
   | 'too-many-seats'
   | 'no-hero'
   | 'malformed'
+  /** What was put in, won and kept as Rake don't add up. */
+  | 'unbalanced'
   /** The board was run more than once: one board is all a Hand holds. */
   | 'run-it-twice'
   /** Already imported: same Poker Site, hand ID, Hero and seat (ADR 0002). */

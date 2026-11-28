@@ -351,6 +351,7 @@ const NOT_IMPORTED: Record<Language, Record<string, string>> = {
     'too-many-seats': 'Más de nueve asientos',
     'no-hero': 'No indica el jugador héroe',
     malformed: 'No se ha podido leer',
+    unbalanced: 'Las cantidades no cuadran',
     'run-it-twice': 'Board repartido más de una vez',
   },
   en: {
@@ -359,6 +360,7 @@ const NOT_IMPORTED: Record<Language, Record<string, string>> = {
     'too-many-seats': 'More than nine seats',
     'no-hero': "Doesn't say who the hero is",
     malformed: "Couldn't be read",
+    unbalanced: "The amounts don't add up",
     'run-it-twice': 'Board run more than once',
   },
 };

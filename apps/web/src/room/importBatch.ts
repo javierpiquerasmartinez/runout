@@ -17,6 +17,7 @@ export type DiscardReason =
   | 'too-many-seats'
   | 'no-hero'
   | 'malformed'
+  | 'unbalanced'
   | 'run-it-twice'
   | 'duplicate'
 

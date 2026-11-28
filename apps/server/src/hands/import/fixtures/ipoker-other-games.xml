@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001101">
+  <general>
+    <mode>real</mode>
+    <gametype>Holdem PL $0.05/$0.10</gametype>
+    <tablename>Teba (Heads Up), 584001101</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100001101">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="3" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Maplewood" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Maplewood" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>
+
+<session sessioncode="7400001102">
+  <general>
+    <mode>real</mode>
+    <gametype>Holdem L $0.05/$0.10</gametype>
+    <tablename>Teba (Heads Up), 584001102</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100001102">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="3" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Maplewood" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Maplewood" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>
+
+<session sessioncode="7400001103">
+  <general>
+    <mode>real</mode>
+    <gametype>Omaha PL $0.05/$0.10</gametype>
+    <tablename>Teba (Heads Up), 584001103</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100001103">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="3" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Maplewood" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Maplewood" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>
+
+<session sessioncode="7400001104">
+  <general>
+    <mode>real</mode>
+    <gametype>PL $0.05/$0.10</gametype>
+    <tablename>Teba (Heads Up), 584001104</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100001104">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="3" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Maplewood" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Maplewood" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>
+
+<session sessioncode="7400001105">
+  <general>
+    <mode>real</mode>
+    <gametype>Six Plus Holdem NL</gametype>
+    <tablename>Teba (Heads Up), 584001105</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100001105">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="3" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Maplewood" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Maplewood" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>
+
+<session sessioncode="7400001106">
+  <general>
+    <mode>real</mode>
+    <gametype>Holdem NL $0.05/$0.10</gametype>
+    <tournamentcode>48800110</tournamentcode>
+    <tournamentname>Freeroll 48800110</tournamentname>
+    <tablename>Teba (Heads Up), 584001105</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100001106">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="3" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Maplewood" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Maplewood" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>

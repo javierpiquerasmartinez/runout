@@ -511,6 +511,7 @@ export const es = {
   'import.discarded.reason.too-many-seats': 'Más de nueve asientos',
   'import.discarded.reason.no-hero': 'No indica el jugador héroe',
   'import.discarded.reason.malformed': 'No se ha podido leer',
+  'import.discarded.reason.unbalanced': 'Las cantidades no cuadran',
   'import.discarded.reason.run-it-twice': 'Board repartido más de una vez',
   'import.footer.ready.one': '{count} mano lista para añadir',
   'import.footer.ready.other': '{count} manos listas para añadir',
