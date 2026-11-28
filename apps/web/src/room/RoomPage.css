@@ -798,6 +798,71 @@
   --card-suit: 17px;
 }
 
+/* Board "Sala · Una mano con dos runs": each Run's board, one above the other. */
+.poker-table__middle:has(.poker-table__runs) {
+  top: 25%;
+  gap: 6px;
+}
+.poker-table__runs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.poker-table__run {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 3px;
+}
+/* Who won goes beside the label, above each Run's board: beside it, the seats leave no room. */
+.poker-table__run .poker-table__board {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.poker-table__run[data-state='done'] {
+  opacity: 0.6;
+}
+.poker-table__run[data-state='pending'] {
+  opacity: 0.45;
+}
+.poker-table__run .ro-card {
+  --card-w: 40px;
+  --card-h: 54px;
+  --card-rank: 20px;
+  --card-ten: 16px;
+  --card-suit: 15px;
+}
+.poker-table__run-label {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.poker-table__run[data-state='current'] .poker-table__run-label {
+  background: var(--brass-soft-bg);
+  color: var(--brass-ink);
+}
+.poker-table__run-note {
+  justify-self: start;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 13px;
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+.poker-table__run[data-state='pending'] .poker-table__run-note {
+  color: var(--text-muted);
+}
+
 .poker-table__pot {
   display: flex;
   flex-direction: column;
@@ -1167,6 +1232,14 @@
   --card-rank: 20px;
   --card-ten: 16px;
   --card-suit: 15px;
+}
+/* Run more than once: the Runs centred on the board's middle, between the side seats, the pot above. */
+.poker-table[data-shape='portrait'] .poker-table__middle:has(.poker-table__runs) {
+  bottom: calc(var(--table-h) - var(--table-mid) - 77px);
+}
+.poker-table[data-shape='portrait'] .poker-table__run .ro-card {
+  --card-w: 38px;
+  --card-h: 52px;
 }
 .poker-table[data-shape='portrait'] .poker-table__pot {
   gap: 2px;

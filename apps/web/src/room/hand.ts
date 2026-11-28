@@ -64,6 +64,23 @@ export interface TableState {
   spr: number | null
   /** How the Hand ended, on its last state only. */
   result: HandResult | null
+  /**
+   * In a Hand run more than once, which Run is being dealt or paid, 0 for
+   * Run 1, from the first card dealt after the all-in; otherwise null.
+   */
+  run?: number | null
+  /**
+   * In a Hand run more than once, from the first card dealt after the
+   * all-in: every Run's board as far as it has been dealt, and how it was
+   * paid once its Showdown is reached. Otherwise null.
+   */
+  runs?: RunState[] | null
+}
+
+export interface RunState {
+  board: string[]
+  /** What this Run paid out, its hands labelled on its own board. Null until its Showdown. */
+  result: HandResult | null
 }
 
 export interface HandResult {
@@ -94,6 +111,11 @@ export interface HandWithTimeline {
     /** Whether the Hand reached Showdown after its last Action. */
     showdown: boolean
   }
+}
+
+/** How many times a Hand's board was run: 1 unless run more than once. */
+export function timesRunOf(hand: HandWithTimeline): number {
+  return hand.timeline.states.at(-1)?.runs?.length ?? 1
 }
 
 /**

@@ -1,0 +1,2155 @@
+{
+  "id": "run-twice",
+  "stake": {
+    "limit": "no-limit",
+    "smallBlind": 5,
+    "bigBlind": 10,
+    "currency": "USDT"
+  },
+  "tableSize": 6,
+  "hasHistory": true,
+  "timeline": {
+    "seats": [
+      {
+        "seat": 1,
+        "screenName": "3c4b3ad3",
+        "position": "UTG",
+        "startingStack": 1067
+      },
+      {
+        "seat": 2,
+        "screenName": "a67431ea",
+        "position": "HJ",
+        "startingStack": 1000
+      },
+      {
+        "seat": 3,
+        "screenName": "a9373981",
+        "position": "CO",
+        "startingStack": 1236
+      },
+      {
+        "seat": 4,
+        "screenName": "7160fe9f",
+        "position": "BTN",
+        "startingStack": 1564
+      },
+      {
+        "seat": 5,
+        "screenName": "Hero",
+        "position": "SB",
+        "startingStack": 1000
+      },
+      {
+        "seat": 6,
+        "screenName": "adf6e033",
+        "position": "BB",
+        "startingStack": 636
+      }
+    ],
+    "buttonSeat": 4,
+    "hero": {
+      "screenName": "Hero",
+      "cards": [
+        "Qs",
+        "5d"
+      ]
+    },
+    "states": [
+      {
+        "street": "preflop",
+        "toAct": "3c4b3ad3",
+        "action": null,
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 15,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1236,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1564,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "a67431ea",
+        "action": {
+          "street": "preflop",
+          "screenName": "3c4b3ad3",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 15,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1236,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1564,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "a9373981",
+        "action": {
+          "street": "preflop",
+          "screenName": "a67431ea",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 15,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1236,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1564,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "7160fe9f",
+        "action": {
+          "street": "preflop",
+          "screenName": "a9373981",
+          "type": "raise",
+          "amount": 15,
+          "to": 25,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 40,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1211,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1564,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "Hero",
+        "action": {
+          "street": "preflop",
+          "screenName": "7160fe9f",
+          "type": "raise",
+          "amount": 49,
+          "to": 74,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 114,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1211,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1490,
+            "bet": 74,
+            "folded": false,
+            "allIn": false,
+            "committed": 74
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": false,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "adf6e033",
+        "action": {
+          "street": "preflop",
+          "screenName": "Hero",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 114,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1211,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1490,
+            "bet": 74,
+            "folded": false,
+            "allIn": false,
+            "committed": 74
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": false,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "a9373981",
+        "action": {
+          "street": "preflop",
+          "screenName": "adf6e033",
+          "type": "fold",
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 114,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1211,
+            "bet": 25,
+            "folded": false,
+            "allIn": false,
+            "committed": 25
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1490,
+            "bet": 74,
+            "folded": false,
+            "allIn": false,
+            "committed": 74
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": "7160fe9f",
+        "action": {
+          "street": "preflop",
+          "screenName": "a9373981",
+          "type": "raise",
+          "amount": 166,
+          "to": 240,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 329,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 996,
+            "bet": 240,
+            "folded": false,
+            "allIn": false,
+            "committed": 240
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1490,
+            "bet": 74,
+            "folded": false,
+            "allIn": false,
+            "committed": 74
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "preflop",
+        "toAct": null,
+        "action": {
+          "street": "preflop",
+          "screenName": "7160fe9f",
+          "type": "call",
+          "amount": 166,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [],
+        "pot": 495,
+        "pots": [],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 996,
+            "bet": 240,
+            "folded": false,
+            "allIn": false,
+            "committed": 240
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1324,
+            "bet": 240,
+            "folded": false,
+            "allIn": false,
+            "committed": 240
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 5,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 10,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 1236,
+        "spr": null
+      },
+      {
+        "street": "flop",
+        "toAct": "a9373981",
+        "action": null,
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s"
+        ],
+        "pot": 495,
+        "pots": [
+          {
+            "amount": 495,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 996,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 240
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1324,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 240
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 996,
+        "spr": 2.012121212121212
+      },
+      {
+        "street": "flop",
+        "toAct": "7160fe9f",
+        "action": {
+          "street": "flop",
+          "screenName": "a9373981",
+          "type": "bet",
+          "amount": 109,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s"
+        ],
+        "pot": 604,
+        "pots": [
+          {
+            "amount": 495,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 887,
+            "bet": 109,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1324,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 240
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 996,
+        "spr": 2.012121212121212
+      },
+      {
+        "street": "flop",
+        "toAct": null,
+        "action": {
+          "street": "flop",
+          "screenName": "7160fe9f",
+          "type": "call",
+          "amount": 109,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s"
+        ],
+        "pot": 713,
+        "pots": [
+          {
+            "amount": 495,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 887,
+            "bet": 109,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1215,
+            "bet": 109,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 996,
+        "spr": 2.012121212121212
+      },
+      {
+        "street": "turn",
+        "toAct": "a9373981",
+        "action": null,
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad"
+        ],
+        "pot": 713,
+        "pots": [
+          {
+            "amount": 713,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 887,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1215,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 887,
+        "spr": 1.244039270687237
+      },
+      {
+        "street": "turn",
+        "toAct": "7160fe9f",
+        "action": {
+          "street": "turn",
+          "screenName": "a9373981",
+          "type": "check",
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad"
+        ],
+        "pot": 713,
+        "pots": [
+          {
+            "amount": 713,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 887,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1215,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 887,
+        "spr": 1.244039270687237
+      },
+      {
+        "street": "turn",
+        "toAct": "a9373981",
+        "action": {
+          "street": "turn",
+          "screenName": "7160fe9f",
+          "type": "bet",
+          "amount": 190,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad"
+        ],
+        "pot": 903,
+        "pots": [
+          {
+            "amount": 713,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 887,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 349
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1025,
+            "bet": 190,
+            "folded": false,
+            "allIn": false,
+            "committed": 539
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 887,
+        "spr": 1.244039270687237
+      },
+      {
+        "street": "turn",
+        "toAct": "7160fe9f",
+        "action": {
+          "street": "turn",
+          "screenName": "a9373981",
+          "type": "raise",
+          "amount": 697,
+          "to": 887,
+          "allIn": true
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad"
+        ],
+        "pot": 1790,
+        "pots": [
+          {
+            "amount": 713,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 0,
+            "bet": 887,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1025,
+            "bet": 190,
+            "folded": false,
+            "allIn": false,
+            "committed": 539
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 887,
+        "spr": 1.244039270687237
+      },
+      {
+        "street": "turn",
+        "toAct": null,
+        "action": {
+          "street": "turn",
+          "screenName": "7160fe9f",
+          "type": "call",
+          "amount": 697,
+          "allIn": false
+        },
+        "result": null,
+        "run": null,
+        "runs": null,
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad"
+        ],
+        "pot": 2487,
+        "pots": [
+          {
+            "amount": 713,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 0,
+            "bet": 887,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 328,
+            "bet": 887,
+            "folded": false,
+            "allIn": false,
+            "committed": 1236
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 887,
+        "spr": 1.244039270687237
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "run": 0,
+        "runs": [
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "3d"
+            ],
+            "result": null
+          },
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad"
+            ],
+            "result": null
+          }
+        ],
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad",
+          "3d"
+        ],
+        "pot": 2487,
+        "pots": [
+          {
+            "amount": 2487,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 0,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 328,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1236
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "run": 0,
+        "runs": [
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "3d"
+            ],
+            "result": {
+              "revealed": [
+                {
+                  "screenName": "a9373981",
+                  "cards": [
+                    "10d",
+                    "Jd"
+                  ],
+                  "madeHand": {
+                    "category": "flush",
+                    "ranks": [
+                      "A"
+                    ],
+                    "cards": [
+                      "Ad",
+                      "Jd",
+                      "10d",
+                      "8d",
+                      "3d"
+                    ]
+                  }
+                },
+                {
+                  "screenName": "7160fe9f",
+                  "cards": [
+                    "As",
+                    "Ks"
+                  ],
+                  "madeHand": {
+                    "category": "two-pair",
+                    "ranks": [
+                      "A",
+                      "8"
+                    ],
+                    "cards": [
+                      "As",
+                      "Ad",
+                      "8d",
+                      "8h"
+                    ]
+                  }
+                }
+              ],
+              "pots": [
+                {
+                  "amount": 2487,
+                  "contestants": [
+                    "a9373981",
+                    "7160fe9f"
+                  ],
+                  "winners": [
+                    {
+                      "screenName": "a9373981",
+                      "amount": 1192
+                    }
+                  ]
+                }
+              ],
+              "rake": 100
+            }
+          },
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad"
+            ],
+            "result": null
+          }
+        ],
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad",
+          "3d"
+        ],
+        "pot": 2487,
+        "pots": [
+          {
+            "amount": 2487,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1192,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 328,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1236
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      },
+      {
+        "street": "turn",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "run": 1,
+        "runs": [
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "3d"
+            ],
+            "result": {
+              "revealed": [
+                {
+                  "screenName": "a9373981",
+                  "cards": [
+                    "10d",
+                    "Jd"
+                  ],
+                  "madeHand": {
+                    "category": "flush",
+                    "ranks": [
+                      "A"
+                    ],
+                    "cards": [
+                      "Ad",
+                      "Jd",
+                      "10d",
+                      "8d",
+                      "3d"
+                    ]
+                  }
+                },
+                {
+                  "screenName": "7160fe9f",
+                  "cards": [
+                    "As",
+                    "Ks"
+                  ],
+                  "madeHand": {
+                    "category": "two-pair",
+                    "ranks": [
+                      "A",
+                      "8"
+                    ],
+                    "cards": [
+                      "As",
+                      "Ad",
+                      "8d",
+                      "8h"
+                    ]
+                  }
+                }
+              ],
+              "pots": [
+                {
+                  "amount": 2487,
+                  "contestants": [
+                    "a9373981",
+                    "7160fe9f"
+                  ],
+                  "winners": [
+                    {
+                      "screenName": "a9373981",
+                      "amount": 1192
+                    }
+                  ]
+                }
+              ],
+              "rake": 100
+            }
+          },
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad"
+            ],
+            "result": null
+          }
+        ],
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad"
+        ],
+        "pot": 2487,
+        "pots": [
+          {
+            "amount": 2487,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1192,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 328,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1236
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 0,
+        "spr": 0
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
+        "result": null,
+        "run": 1,
+        "runs": [
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "3d"
+            ],
+            "result": {
+              "revealed": [
+                {
+                  "screenName": "a9373981",
+                  "cards": [
+                    "10d",
+                    "Jd"
+                  ],
+                  "madeHand": {
+                    "category": "flush",
+                    "ranks": [
+                      "A"
+                    ],
+                    "cards": [
+                      "Ad",
+                      "Jd",
+                      "10d",
+                      "8d",
+                      "3d"
+                    ]
+                  }
+                },
+                {
+                  "screenName": "7160fe9f",
+                  "cards": [
+                    "As",
+                    "Ks"
+                  ],
+                  "madeHand": {
+                    "category": "two-pair",
+                    "ranks": [
+                      "A",
+                      "8"
+                    ],
+                    "cards": [
+                      "As",
+                      "Ad",
+                      "8d",
+                      "8h"
+                    ]
+                  }
+                }
+              ],
+              "pots": [
+                {
+                  "amount": 2487,
+                  "contestants": [
+                    "a9373981",
+                    "7160fe9f"
+                  ],
+                  "winners": [
+                    {
+                      "screenName": "a9373981",
+                      "amount": 1192
+                    }
+                  ]
+                }
+              ],
+              "rake": 100
+            }
+          },
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "Qh"
+            ],
+            "result": null
+          }
+        ],
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad",
+          "Qh"
+        ],
+        "pot": 2487,
+        "pots": [
+          {
+            "amount": 2487,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1192,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 328,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1236
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 328,
+        "spr": 0.13188580619219945
+      },
+      {
+        "street": "river",
+        "toAct": null,
+        "action": null,
+        "result": {
+          "revealed": [
+            {
+              "screenName": "a9373981",
+              "cards": [
+                "10d",
+                "Jd"
+              ],
+              "madeHand": {
+                "category": "pair",
+                "ranks": [
+                  "8"
+                ],
+                "cards": [
+                  "8d",
+                  "8h"
+                ]
+              }
+            },
+            {
+              "screenName": "7160fe9f",
+              "cards": [
+                "As",
+                "Ks"
+              ],
+              "madeHand": {
+                "category": "two-pair",
+                "ranks": [
+                  "A",
+                  "8"
+                ],
+                "cards": [
+                  "As",
+                  "Ad",
+                  "8d",
+                  "8h"
+                ]
+              }
+            }
+          ],
+          "pots": [
+            {
+              "amount": 2487,
+              "contestants": [
+                "a9373981",
+                "7160fe9f"
+              ],
+              "winners": [
+                {
+                  "screenName": "a9373981",
+                  "amount": 1192
+                },
+                {
+                  "screenName": "7160fe9f",
+                  "amount": 1194
+                }
+              ]
+            }
+          ],
+          "rake": 100
+        },
+        "run": 1,
+        "runs": [
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "3d"
+            ],
+            "result": {
+              "revealed": [
+                {
+                  "screenName": "a9373981",
+                  "cards": [
+                    "10d",
+                    "Jd"
+                  ],
+                  "madeHand": {
+                    "category": "flush",
+                    "ranks": [
+                      "A"
+                    ],
+                    "cards": [
+                      "Ad",
+                      "Jd",
+                      "10d",
+                      "8d",
+                      "3d"
+                    ]
+                  }
+                },
+                {
+                  "screenName": "7160fe9f",
+                  "cards": [
+                    "As",
+                    "Ks"
+                  ],
+                  "madeHand": {
+                    "category": "two-pair",
+                    "ranks": [
+                      "A",
+                      "8"
+                    ],
+                    "cards": [
+                      "As",
+                      "Ad",
+                      "8d",
+                      "8h"
+                    ]
+                  }
+                }
+              ],
+              "pots": [
+                {
+                  "amount": 2487,
+                  "contestants": [
+                    "a9373981",
+                    "7160fe9f"
+                  ],
+                  "winners": [
+                    {
+                      "screenName": "a9373981",
+                      "amount": 1192
+                    }
+                  ]
+                }
+              ],
+              "rake": 100
+            }
+          },
+          {
+            "board": [
+              "8d",
+              "8h",
+              "7s",
+              "Ad",
+              "Qh"
+            ],
+            "result": {
+              "revealed": [
+                {
+                  "screenName": "a9373981",
+                  "cards": [
+                    "10d",
+                    "Jd"
+                  ],
+                  "madeHand": {
+                    "category": "pair",
+                    "ranks": [
+                      "8"
+                    ],
+                    "cards": [
+                      "8d",
+                      "8h"
+                    ]
+                  }
+                },
+                {
+                  "screenName": "7160fe9f",
+                  "cards": [
+                    "As",
+                    "Ks"
+                  ],
+                  "madeHand": {
+                    "category": "two-pair",
+                    "ranks": [
+                      "A",
+                      "8"
+                    ],
+                    "cards": [
+                      "As",
+                      "Ad",
+                      "8d",
+                      "8h"
+                    ]
+                  }
+                }
+              ],
+              "pots": [
+                {
+                  "amount": 2487,
+                  "contestants": [
+                    "a9373981",
+                    "7160fe9f"
+                  ],
+                  "winners": [
+                    {
+                      "screenName": "7160fe9f",
+                      "amount": 1194
+                    }
+                  ]
+                }
+              ],
+              "rake": 100
+            }
+          }
+        ],
+        "board": [
+          "8d",
+          "8h",
+          "7s",
+          "Ad",
+          "Qh"
+        ],
+        "pot": 2487,
+        "pots": [
+          {
+            "amount": 2487,
+            "contestants": [
+              "a9373981",
+              "7160fe9f"
+            ]
+          }
+        ],
+        "players": [
+          {
+            "screenName": "3c4b3ad3",
+            "stack": 1067,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a67431ea",
+            "stack": 1000,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 0
+          },
+          {
+            "screenName": "a9373981",
+            "stack": 1192,
+            "bet": 0,
+            "folded": false,
+            "allIn": true,
+            "committed": 1236
+          },
+          {
+            "screenName": "7160fe9f",
+            "stack": 1522,
+            "bet": 0,
+            "folded": false,
+            "allIn": false,
+            "committed": 1236
+          },
+          {
+            "screenName": "Hero",
+            "stack": 995,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 5
+          },
+          {
+            "screenName": "adf6e033",
+            "stack": 626,
+            "bet": 0,
+            "folded": true,
+            "allIn": false,
+            "committed": 10
+          }
+        ],
+        "effectiveStack": 328,
+        "spr": 0.13188580619219945
+      }
+    ],
+    "showdown": true
+  }
+}

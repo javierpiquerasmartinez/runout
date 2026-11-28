@@ -28,15 +28,30 @@ export function PokerTable({ view }: { view: TableView }) {
       <div className="poker-table__felt" />
 
       <div className="poker-table__middle">
-        <div className="poker-table__board" role="group" aria-label={t('room.table.board')}>
-          {view.board.map((card, index) =>
-            card ? (
-              <Card key={index} card={card} size="community" winning={winning.has(card)} />
-            ) : (
-              <CardSlot key={index} size="community" label={t('room.card.empty')} />
-            ),
-          )}
-        </div>
+        {view.runBoards ? (
+          // Run more than once: each Run's board, one above the other, the cards they share in the same columns.
+          <div className="poker-table__runs" role="group" aria-label={t('room.table.runs')}>
+            {view.runBoards.map((run) => (
+              <div
+                key={run.label}
+                className="poker-table__run"
+                role="group"
+                aria-label={run.label}
+                aria-current={run.state === 'current' ? 'step' : undefined}
+                data-state={run.state}
+              >
+                <span className="poker-table__run-label ro-mono">
+                  {run.state === 'done' && <Icon name="success" size={11} />}
+                  {run.label}
+                </span>
+                <Board cards={run.board} winning={run.state === 'current' ? winning : NONE} />
+                <span className="poker-table__run-note">{run.note}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Board cards={view.board} winning={winning} label={t('room.table.board')} />
+        )}
         {view.sidePots ? (
           <div className="poker-table__pots">
             {view.sidePots.map((pot, index) => (
@@ -90,6 +105,24 @@ export function PokerTable({ view }: { view: TableView }) {
           </span>
         )
       })}
+    </div>
+  )
+}
+
+const NONE = new Set<string>()
+
+/** Five board slots: the cards dealt, then an empty slot for each to come. */
+function Board({ cards, winning, label }: { cards: (string | null)[]; winning: Set<string>; label?: string }) {
+  const { t } = useI18n()
+  return (
+    <div className="poker-table__board" role={label ? 'group' : undefined} aria-label={label}>
+      {cards.map((card, index) =>
+        card ? (
+          <Card key={index} card={card} size="community" winning={winning.has(card)} />
+        ) : (
+          <CardSlot key={index} size="community" label={t('room.card.empty')} />
+        ),
+      )}
     </div>
   )
 }

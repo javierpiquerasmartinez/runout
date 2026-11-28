@@ -1,7 +1,7 @@
 import type { MessageKey } from '../i18n'
 import type { Translator } from '../i18n/translator'
 import type { Preferences } from '../preferences/preferences'
-import type { Action, HandWithTimeline, MadeHand, PlayerState, Position, Rank, Street, TableState } from './hand'
+import type { Action, HandResult, HandWithTimeline, MadeHand, PlayerState, Position, Rank, Street, TableState } from './hand'
 import { quantity, type Quantity } from './quantity'
 import { streetProgress, type StreetProgress } from './streetProgress'
 
@@ -89,12 +89,29 @@ export interface PayoutView {
   rake: string | null
 }
 
+/** One Run's board in a Hand run more than once, drawn one above the other. */
+export interface RunBoardView {
+  /** "Run 1". */
+  label: string
+  /** Paid out already, being dealt or paid now, or still to come. */
+  state: 'done' | 'current' | 'pending'
+  /** Five slots: its cards dealt so far, then null for the ones to come. */
+  board: (string | null)[]
+  /** Who won it and how much once it is paid ("Marta gana 119 BB"), or that it is still to deal. */
+  note: string | null
+}
+
 export interface TableView {
   /** How many seats the table has, taken or not. */
   slots: number
   seats: SeatView[]
   /** Five slots: the cards dealt so far, then null for the ones to come. */
   board: (string | null)[]
+  /**
+   * In a Hand run more than once, from the first card dealt after the
+   * all-in: every Run's board, in place of `board`. Otherwise null.
+   */
+  runBoards: RunBoardView[] | null
   /** Everything in the middle, bets in play included. */
   pot: string
   /** The pot as an Amount beside `pot`, when both units are shown. */
@@ -170,13 +187,17 @@ export function tableView(
   const heroSeat = seats.find((seat) => seat.screenName === hero.screenName)?.seat ?? seats[0]?.seat ?? 1
   const slots = Math.max(hand.tableSize, ...seats.map((seat) => seat.seat))
   const result = state.result
-  const winnings = new Map<string, number>()
-  for (const pot of result?.pots ?? []) {
-    for (const { screenName, amount } of pot.winners) {
-      winnings.set(screenName, (winnings.get(screenName) ?? 0) + amount)
-    }
-  }
-  const revealed = new Map(result?.revealed.map((r) => [r.screenName, r]))
+  // In a Hand run more than once, the table tells the Run on: who won it,
+  // with what. Cards shown at an earlier Run's Showdown stay face up.
+  const runs = state.runs ?? null
+  const paid = runs && state.run != null ? runs[state.run].result : result
+  const winnings = winningsOf(paid)
+  const revealed = new Map(paid?.revealed.map((r) => [r.screenName, r]))
+  // Whoever an earlier Run paid has chips again: no longer just all in.
+  const paidBefore = new Set((runs ?? []).flatMap((run) => [...winningsOf(run.result).keys()]))
+  const faceUp = new Map(
+    (runs ?? []).flatMap((run) => run.result?.revealed ?? []).map((r) => [r.screenName, r.cards]),
+  )
 
   const gathered = state.pots.reduce((sum, pot) => sum + pot.amount, 0)
   const inPlay = state.players.reduce((sum, p) => sum + p.bet, 0)
@@ -190,6 +211,7 @@ export function tableView(
         const isHero = seat.screenName === hero.screenName
         const stack = measure(player?.stack ?? seat.startingStack)
         const shown = revealed.get(seat.screenName)
+        const shownCards = shown?.cards ?? faceUp.get(seat.screenName)
         const won = winnings.get(seat.screenName)
         const outcome = [
           shown && madeHandLabel(shown.madeHand, i18n),
@@ -206,23 +228,41 @@ export function tableView(
           chip: player && !result ? chipOf(player, states, index, measure, preferences.potPercentage, i18n) : null,
           move: result ? null : moveOf(seat.screenName, states, index, i18n),
           allInLabel:
-            player?.allIn && won === undefined ? t('room.table.allIn', { amount: inUnit(player.committed) }) : null,
+            player?.allIn && won === undefined && !paidBefore.has(seat.screenName)
+              ? t('room.table.allIn', { amount: inUnit(player.committed) })
+              : null,
           folded: player?.folded ?? false,
           toAct: state.toAct === seat.screenName,
           dealer: seat.seat === buttonSeat,
           hero: isHero,
-          cards: isHero ? hero.cards : (shown?.cards ?? null),
-          revealed: !isHero && shown !== undefined,
+          cards: isHero ? hero.cards : (shownCards ?? null),
+          revealed: !isHero && shownCards !== undefined,
           winner: won !== undefined,
           outcome: outcome.length > 0 ? outcome.join(' · ') : null,
+          // A Run pays only part of the pot: what they won says it all.
           netResult:
-            won !== undefined && player
+            won !== undefined && player && !runs
               ? inUnit(won - player.committed, { signDisplay: 'always' })
               : null,
         }
       })
       .sort((a, b) => a.slot - b.slot),
-    board: Array.from({ length: 5 }, (_, i) => state.board[i] ?? null),
+    board: fiveSlots(state.board),
+    runBoards:
+      runs && state.run != null
+        ? runs.map((run, i) => {
+            const won = [...winningsOf(run.result)].map(([screenName, amount]) =>
+              t('room.log.wins', { name: nameOf(screenName), amount: inUnit(amount) }),
+            )
+            const runState = i < state.run! ? 'done' : i === state.run ? 'current' : 'pending'
+            return {
+              label: t('room.playback.run', { n: i + 1 }),
+              state: runState,
+              board: fiveSlots(run.board),
+              note: won.length > 0 ? won.join(', ') : runState === 'pending' ? t('room.table.runPending') : null,
+            }
+          })
+        : null,
     pot: pot.primary,
     potSecondary: pot.secondary,
     potDetail:
@@ -258,10 +298,10 @@ export function tableView(
     canGoForward: index < last,
     streets: streetProgress(hand.timeline, index),
     lastAction: lastActionOf(hand, index, nameOf, inUnit, i18n),
-    log: logOf(hand, index, winnings, nameOf, inUnit, i18n),
+    log: logOf(hand, index, paid, winnings, nameOf, inUnit, i18n),
     winningCards: [
       ...new Set(
-        (result?.revealed ?? []).filter((r) => winnings.has(r.screenName)).flatMap((r) => r.madeHand.cards),
+        (paid?.revealed ?? []).filter((r) => winnings.has(r.screenName)).flatMap((r) => r.madeHand.cards),
       ),
     ],
     payout: result
@@ -277,6 +317,22 @@ export function tableView(
         }
       : null,
   }
+}
+
+/** Five board slots: the cards dealt, then null for the ones to come. */
+function fiveSlots(board: string[]): (string | null)[] {
+  return Array.from({ length: 5 }, (_, i) => board[i] ?? null)
+}
+
+/** What each winner took, over every pot of a result. */
+function winningsOf(paid: HandResult | null): Map<string, number> {
+  const winnings = new Map<string, number>()
+  for (const pot of paid?.pots ?? []) {
+    for (const { screenName, amount } of pot.winners) {
+      winnings.set(screenName, (winnings.get(screenName) ?? 0) + amount)
+    }
+  }
+  return winnings
 }
 
 /** A quantity in the Display Unit, for a sentence: its primary figure alone. */
@@ -355,6 +411,17 @@ function lastActionOf(
   if (state.action) {
     return `${t(`room.playback.street.${state.action.street}`)} · ${actionLabel(state.action, nameOf, inUnit, i18n)}`
   }
+  if (state.run != null && state.runs) {
+    const run = t('room.playback.run', { n: state.run + 1 })
+    if (state.runs[state.run].result) {
+      const over = state.result ? ` · ${t('room.playback.handOver')}` : ''
+      return `${run} · ${t('room.playback.showdown')}${over}`
+    }
+    // A later Run begins from the cards dealt before the all-in.
+    const begins = hand.timeline.states[index - 1]?.run !== state.run
+    if (begins && state.run > 0) return `${run} · ${t('room.playback.runAgain', { street })}`
+    return `${run} · ${street} · ${t('room.playback.dealt')}`
+  }
   if (state.result) {
     return `${hand.timeline.showdown ? t('room.playback.showdown') : street} · ${t('room.playback.handOver')}`
   }
@@ -407,6 +474,7 @@ function chipOf(
 function logOf(
   hand: HandWithTimeline,
   index: number,
+  result: HandResult | null,
   winnings: Map<string, number>,
   nameOf: NameOf,
   inUnit: InUnit,
@@ -415,7 +483,6 @@ function logOf(
   const { t, formatNumber } = i18n
   const { states, showdown, hero } = hand.timeline
   const state = states[index]
-  const result = state.result
   const entries: LogView['entries'] = []
 
   if (result && showdown) {
@@ -451,7 +518,10 @@ function logOf(
   }
 
   return {
-    label: t(result && showdown ? 'room.playback.showdown' : `room.playback.street.${state.street}`),
+    label:
+      state.run != null
+        ? t('room.playback.run', { n: state.run + 1 })
+        : t(result && showdown ? 'room.playback.showdown' : `room.playback.street.${state.street}`),
     entries,
     aside,
   }

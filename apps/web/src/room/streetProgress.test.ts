@@ -95,4 +95,40 @@ describe('streetProgress', () => {
   it('has no next Street on the Final Street of a Hand that ended without Showdown', () => {
     expect(streetProgress(foldedOnTheFlop, 3)).toMatchObject({ previousStreet: 2, nextStreet: null })
   })
+
+  describe('in a Hand run twice', () => {
+    // All in on the turn: Run 1 deals its river (6) and pays (7), Run 2 goes
+    // back to the turn (8), deals its river (9) and ends the Hand (10).
+    const runs = [{}, {}]
+    const ranTwice = {
+      showdown: true,
+      states: [
+        ...(['preflop', 'preflop', 'flop', 'flop', 'turn', 'turn'] as Street[]).map((street) => ({ street, run: null, runs: null })),
+        { street: 'river' as Street, run: 0, runs },
+        { street: 'river' as Street, run: 0, runs },
+        { street: 'turn' as Street, run: 1, runs },
+        { street: 'river' as Street, run: 1, runs },
+        { street: 'river' as Street, run: 1, runs },
+      ],
+    }
+
+    it('has the Streets dealt before the all-in, then a segment per Run instead of the river and Showdown', () => {
+      expect(states(streetProgress(ranTwice, 9))).toEqual([
+        ['preflop', 'completed'],
+        ['flop', 'completed'],
+        ['turn', 'completed'],
+        ['run-1', 'completed'],
+        ['run-2', 'current'],
+      ])
+      expect(streetProgress(ranTwice, 5).segments.map((s) => s.target)).toEqual([0, 2, 4, 6, 8])
+    })
+
+    it('steps by Street from Run to Run, and finishes on the last Run’s Showdown', () => {
+      expect(streetProgress(ranTwice, 5)).toMatchObject({ previousStreet: 4, nextStreet: 6 })
+      expect(streetProgress(ranTwice, 7)).toMatchObject({ previousStreet: 6, nextStreet: 8 })
+      expect(streetProgress(ranTwice, 9)).toMatchObject({ previousStreet: 8, nextStreet: null })
+      expect(streetProgress(ranTwice, 10).finished).toBe(true)
+      expect(streetProgress(ranTwice, 7).segments[3].state).toBe('current')
+    })
+  })
 })

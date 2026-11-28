@@ -10,6 +10,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent,
 } from 'react'
+import { TimesRun } from './TimesRun'
 import { flushSync } from 'react-dom'
 import { api, reasonOf, type FailureReason } from '../backend/api'
 import { useI18n, type MessageKey } from '../i18n'
@@ -825,6 +826,7 @@ function LoadedHand({
             </span>
             <span className="room-stage__divider" />
             <span className="room-stage__title">{positionsLabel(entry, i18n)}</span>
+            <TimesRun count={entry.overview.timesRun ?? 1} />
             <span className="room-stage__by">
               {t('room.stage.loadedBy', { name: entry.author.displayName, date: playedAtLabel(entry, i18n) })}
             </span>

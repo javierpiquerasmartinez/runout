@@ -20,6 +20,7 @@ describe('Replay: a Hand’s overview', () => {
       finalPot: 105,
       finalStreet: 'river',
       showdown: true,
+      timesRun: 1,
     });
   });
 
@@ -31,6 +32,7 @@ describe('Replay: a Hand’s overview', () => {
         finalPot: 25,
         finalStreet: 'preflop',
         showdown: false,
+        timesRun: 1,
       },
       // The Hero folded, so the Positions are in the order they acted.
       {
@@ -38,19 +40,36 @@ describe('Replay: a Hand’s overview', () => {
         finalPot: 55,
         finalStreet: 'flop',
         showdown: false,
+        timesRun: 1,
       },
       {
         positions: ['CO', 'BB'],
         finalPot: 65,
         finalStreet: 'turn',
         showdown: false,
+        timesRun: 1,
       },
       {
         positions: ['BTN', 'BB'],
         finalPot: 65,
         finalStreet: 'flop',
         showdown: false,
+        timesRun: 1,
       },
     ]);
+  });
+
+  it('counts how many times a Hand was run', () => {
+    const coinpoker = readFileSync(
+      new URL('../import/fixtures/coinpoker-session.txt', import.meta.url),
+      'utf8',
+    );
+    const twice = importHandHistory(coinpoker).hands.at(-1)!;
+
+    expect(overview(twice)).toMatchObject({
+      finalStreet: 'river',
+      showdown: true,
+      timesRun: 2,
+    });
   });
 });

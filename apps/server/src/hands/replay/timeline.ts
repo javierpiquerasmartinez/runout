@@ -56,6 +56,27 @@ export interface TableState {
   spr: number | null;
   /** How the Hand ended, on its last state only. */
   result: HandResult | null;
+  /**
+   * In a Hand run more than once, which Run is being dealt or paid, 0 for
+   * Run 1, from the first card dealt after the all-in; otherwise null.
+   */
+  run: number | null;
+  /**
+   * In a Hand run more than once, from the first card dealt after the
+   * all-in: every Run's board as far as it has been dealt, a Run not begun
+   * holding the cards dealt before the all-in, and how it was paid once its
+   * Showdown is reached. Otherwise null.
+   */
+  runs: RunState[] | null;
+}
+
+export interface RunState {
+  board: string[];
+  /**
+   * What this Run paid out: its winners and their share of the pots, and
+   * the hands shown, labelled on this Run's board. Null until its Showdown.
+   */
+  result: HandResult | null;
 }
 
 export interface Pot {
@@ -162,11 +183,16 @@ export function timeline(hand: Hand): Timeline {
   // A Splash is in the middle from the start, gathered like any pot.
   const splash = hand.splash ?? 0;
   const states: TableState[] = [];
+  // A Hand run more than once: the Run being dealt, and every Run so far.
+  let run: number | null = null;
+  let runs: RunState[] | null = null;
   const push = (
     state: Pick<TableState, 'street' | 'toAct' | 'action' | 'result'>,
   ) =>
     states.push({
       ...state,
+      run,
+      runs: runs && runs.map((each) => ({ ...each })),
       board,
       pot: potOf(players) + splash,
       pots: potsOf(players, splash),
@@ -183,9 +209,10 @@ export function timeline(hand: Hand): Timeline {
     unreturned = [];
     players = players.map((p) => ({ ...p, bet: 0 }));
   };
-  const deal = (street: Street, toAct: string | null) => {
+  const deal = (street: Street, toAct: string | null, from = hand.board) => {
     gather();
-    board = hand.board.slice(0, BOARD_SIZE[street]);
+    board = from.slice(0, BOARD_SIZE[street]);
+    if (runs && run !== null) runs[run] = { ...runs[run], board };
     effectiveStack = secondDeepest(
       players.filter((p) => !p.folded).map((p) => p.stack),
     );
@@ -230,22 +257,72 @@ export function timeline(hand: Hand): Timeline {
   // Whatever the board still holds (an all-in runout) is dealt Street by
   // Street, then the Hand ends: the pots are paid out.
   unreturned = hand.returned;
-  const finalStreet = streetOf(hand.board.length);
   const reached = STREETS.indexOf(hand.actions.at(-1)?.street ?? 'preflop');
-  for (const street of STREETS.slice(reached + 1)) {
-    if (STREETS.indexOf(street) > STREETS.indexOf(finalStreet)) break;
-    deal(street, null);
-  }
-  gather();
-  board = hand.board;
-  const result = resultOf(hand, players, board, splash);
-  // Winnings come in last, so they don't count as a Stack to play with.
-  for (const { winners } of result.pots) {
-    for (const { screenName, amount } of winners) {
-      update(screenName, (p) => ({ ...p, stack: p.stack + amount }));
+  const runOut = (from: string[]) => {
+    const finalStreet = streetOf(from.length);
+    for (const street of STREETS.slice(reached + 1)) {
+      if (STREETS.indexOf(street) > STREETS.indexOf(finalStreet)) break;
+      deal(street, null, from);
     }
+    gather();
+    board = from;
+    return finalStreet;
+  };
+  // Winnings come in last, so they don't count as a Stack to play with.
+  const payOut = (paid: HandResult) => {
+    for (const { winners } of paid.pots) {
+      for (const { screenName, amount } of winners) {
+        update(screenName, (p) => ({ ...p, stack: p.stack + amount }));
+      }
+    }
+  };
+
+  if (!hand.runs) {
+    const finalStreet = runOut(hand.board);
+    const result = resultOf(hand, players, board, splash);
+    payOut(result);
+    push({ street: finalStreet, toAct: null, action: null, result });
+  } else {
+    // Each Run is dealt from the cards dealt before the all-in to its own
+    // Showdown, which pays only what that Run collected. The Splash goes
+    // with Run 1, so every Run's payouts add up to the Hand's.
+    const shared = BOARD_SIZE[STREETS[reached]];
+    runs = hand.runs.map((each) => ({
+      board: each.slice(0, shared),
+      result: null,
+    }));
+    hand.runs.forEach((runBoard, index) => {
+      run = index;
+      if (index > 0) {
+        board = runBoard.slice(0, shared);
+        push({
+          street: STREETS[reached],
+          toAct: null,
+          action: null,
+          result: null,
+        });
+      }
+      const finalStreet = runOut(runBoard);
+      const paid = resultOf(
+        {
+          ...hand,
+          collected: hand.collected.filter((each) => each.run === index),
+        },
+        players,
+        runBoard,
+        index === 0 ? splash : 0,
+      );
+      payOut(paid);
+      runs![index] = { board: runBoard, result: paid };
+      const last = index === hand.runs!.length - 1;
+      push({
+        street: finalStreet,
+        toAct: null,
+        action: null,
+        result: last ? resultOf(hand, players, runBoard, splash) : null,
+      });
+    });
   }
-  push({ street: finalStreet, toAct: null, action: null, result });
 
   return {
     seats,

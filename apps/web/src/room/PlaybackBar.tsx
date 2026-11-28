@@ -3,7 +3,8 @@ import { IconButton } from '../ui/IconButton'
 import { guardLocked, lockedProps } from '../ui/locked'
 import { Toggle } from '../ui/Toggle'
 import type { RoomSync } from './roomClient'
-import type { StreetProgress } from './streetProgress'
+import type { Street } from './hand'
+import type { Stop, StreetProgress } from './streetProgress'
 import { SyncIndicator } from './SyncIndicator'
 import type { GuestsFollowing } from './syncView'
 import type { TableView } from './tableView'
@@ -93,10 +94,19 @@ export function PlaybackBar({ view, room, onGoTo }: { view: TableView; room?: Pl
   )
 }
 
+/** A segment's name: a Street, Showdown, or a Run ("Run 2"). */
+function stopLabel(stop: Stop, t: ReturnType<typeof useI18n>['t']): string {
+  if (stop === 'showdown') return t('room.playback.showdown')
+  if (stop.startsWith('run-')) return t('room.playback.run', { n: Number(stop.slice(4)) })
+  return t(`room.playback.street.${stop as Street}`)
+}
+
 /**
  * Four equal Street segments plus Showdown, as in board B of "Especificación
  * del reproductor": equal widths so the Street reads at a glance, whatever
- * each one's number of Actions. A segment jumps to its Street's start.
+ * each one's number of Actions. A segment jumps to its Street's start. A
+ * Hand run more than once has a segment per Run in place of the river and
+ * Showdown.
  */
 function StreetBar({
   streets,
@@ -111,7 +121,7 @@ function StreetBar({
   return (
     <div className="street-bar" role="group" aria-label={t('room.playback.streets')} data-finished={streets.finished || undefined}>
       {streets.segments.map(({ stop, state, progress, target }) => {
-        const label = t(stop === 'showdown' ? 'room.playback.showdown' : `room.playback.street.${stop}`)
+        const label = stopLabel(stop, t)
         const unreached = target === null ? t(stop === 'showdown' ? 'room.playback.noShowdown' : 'room.playback.notReached') : undefined
         const reason = masterOnly ?? unreached
         return (

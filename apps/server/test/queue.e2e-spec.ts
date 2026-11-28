@@ -26,6 +26,7 @@ interface QueueEntry {
     positions: string[];
     finalPot: number;
     finalStreet: string;
+    timesRun: number;
     showdown: boolean;
   };
 }
@@ -107,6 +108,7 @@ describe('Pasting Hands into the Queue (e2e)', () => {
           finalPot: 105,
           finalStreet: 'river',
           showdown: true,
+          timesRun: 1,
         },
       },
     ];
