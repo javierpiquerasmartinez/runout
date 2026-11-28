@@ -65,4 +65,36 @@
       <action no="17" player="Fir" type="4" sum="$0" cards=""/>
     </round>
   </game>
+  <game gamecode="6100000402">
+    <general>
+      <startdate>2013-12-19 20:01:52</startdate>
+      <players>
+        <player seat="1" name="" chips="$0" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-"/>
+        <player seat="2" name="Oak" chips="$9.80" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-"/>
+        <player seat="3" name="Birch" chips="$21.12" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-"/>
+        <player seat="5" name="Cedar" chips="$19.93" dealer="1" win="$0.52" bet="$0.32" rebuy="0" addon="0" reg_code="-"/>
+        <player seat="6" name="Elm" chips="$11.74" dealer="0" win="$0" bet="$0.02" rebuy="0" addon="0" reg_code="-"/>
+        <player seat="8" name="Maplewood" chips="$22.64" dealer="0" win="$0" bet="$0.07" rebuy="0" addon="0" reg_code="-"/>
+        <player seat="10" name="Fir" chips="$5.54" dealer="0" win="$0" bet="$0.12" rebuy="0" addon="0" reg_code="-"/>
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Cedar" type="15" sum="$0.02" cards="[cards]"/>
+      <action no="2" player="Elm" type="15" sum="$0.02" cards="[cards]"/>
+      <action no="3" player="Maplewood" type="15" sum="$0.02" cards="[cards]"/>
+      <action no="4" player="Fir" type="15" sum="$0.02" cards="[cards]"/>
+      <action no="5" player="Birch" type="8" sum="$0" cards="[cards]"/>
+      <action no="6" player="Maplewood" type="1" sum="$0.05" cards="[cards]"/>
+      <action no="7" player="Fir" type="2" sum="$0.10" cards="[cards]"/>
+    </round>
+    <round no="1">
+      <action no="8" player="Elm" type="9" sum="$0" cards=""/>
+      <cards type="Pocket" player="Cedar">X X</cards>
+      <action no="9" player="Cedar" type="23" sum="$0.30" cards=""/>
+      <cards type="Pocket" player="Maplewood">S9 C3</cards>
+      <action no="10" player="Maplewood" type="0" sum="$0" cards=""/>
+      <cards type="Pocket" player="Fir">X X</cards>
+      <action no="11" player="Fir" type="0" sum="$0" cards=""/>
+    </round>
+  </game>
 </session>

@@ -638,7 +638,9 @@ const CORPUS: CorpusEntry[] = [
   {
     // An ante table: four antes, one posted by a player who then sits out
     // (code 9), one player sitting out from the start (code 8), one seated
-    // with no Action at all, and an empty seat written with no name.
+    // with no Action at all, and an empty seat written with no name. In the
+    // second Hand everyone folds to a raise: the player who posted an ante
+    // and sat out was never in it, so there is no Showdown.
     file: 'ipoker-antes.xml',
     format: 'ipoker',
     hands: [
@@ -735,6 +737,16 @@ const CORPUS: CorpusEntry[] = [
         ],
         collected: [{ screenName: 'Maplewood', amount: 31 }],
         rake: 2,
+      },
+      {
+        siteHandId: '6100000402',
+        buttonSeat: 5,
+        hero: { screenName: 'Maplewood', cards: ['9s', '3c'] },
+        returned: [{ screenName: 'Cedar', amount: 20 }],
+        showdown: false,
+        shown: [],
+        collected: [{ screenName: 'Cedar', amount: 32 }],
+        rake: 1,
       },
     ],
     discarded: [],

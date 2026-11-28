@@ -211,8 +211,15 @@ export function parseIPokerHand(block: string): Hand {
   // The money must add up to the cent, Rake and all.
   if (rake < 0 || rake !== leftInPot) throw new Discard('unbalanced');
 
+  // Only players dealt in can reach a Showdown, not one who posted an ante
+  // and sat out.
+  const dealtIn = new Set(
+    seats.filter((seat) => !seat.sittingOut).map((seat) => seat.screenName),
+  );
   const stillIn = new Set(
-    [...play.posts, ...play.actions].map((move) => move.screenName),
+    [...play.posts, ...play.actions]
+      .map((move) => move.screenName)
+      .filter((screenName) => dealtIn.has(screenName)),
   );
   for (const action of play.actions) {
     if (action.type === 'fold') stillIn.delete(action.screenName);
