@@ -351,7 +351,10 @@ const NOT_IMPORTED: Record<Language, Record<string, string>> = {
     'too-many-seats': 'Más de nueve asientos',
     'no-hero': 'No indica el jugador héroe',
     malformed: 'No se ha podido leer',
+    unbalanced: 'Las cantidades no cuadran',
     'run-it-twice': 'Board repartido más de una vez',
+    'old-export':
+      'Exportación demasiado antigua para saber cuándo se jugó: importa el XML del cliente',
   },
   en: {
     'unrecognised-format': 'Not recognised',
@@ -359,7 +362,10 @@ const NOT_IMPORTED: Record<Language, Record<string, string>> = {
     'too-many-seats': 'More than nine seats',
     'no-hero': "Doesn't say who the hero is",
     malformed: "Couldn't be read",
+    unbalanced: "The amounts don't add up",
     'run-it-twice': 'Board run more than once',
+    'old-export':
+      "Export too old to say when it was played: import the client's XML instead",
   },
 };
 

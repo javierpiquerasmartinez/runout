@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7430000801">
+ <general>
+  <client_version>19.1.2.3</client_version>
+  <mode>real</mode>
+  <gametype>Holdem NL $10/$20</gametype>
+  <tablename>Tudela, 913000801</tablename>
+  <tablecurrency>USD</tablecurrency>
+  <duration>00:01:02</duration>
+  <gamecount>1</gamecount>
+  <startdate>2019-06-14 01:12:09</startdate>
+  <currency>USD</currency>
+  <nickname>Maplewood</nickname>
+  <tablesize>6</tablesize>
+  <bets>$1,295</bets>
+  <wins>$2,550</wins>
+  <chipsin>$1,295</chipsin>
+  <chipsout>$2,550</chipsout>
+  <statuspoints>0.00</statuspoints>
+  <awardpoints>0.00</awardpoints>
+  <ipoints>0.00</ipoints>
+ </general>
+ <game gamecode="6300000801">
+  <general>
+   <startdate>2019-06-14 01:12:09</startdate>
+   <players>
+    <player seat="2" name="Alder" chips="$2,000" dealer="1" win="$0" bet="$0"/>
+    <player seat="3" name="Maplewood" chips="$1,295" dealer="0" win="$2,550" bet="$1,295"/>
+    <player seat="5" name="Birch" chips="$19,695.50" dealer="0" win="$0" bet="$1,295"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Maplewood" sum="$10" type="1"/>
+   <action no="2" player="Birch" sum="$20" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">SA HA</cards>
+   <action no="3" player="Alder" sum="$0" type="0"/>
+   <action no="4" player="Maplewood" sum="$60" type="23"/>
+   <action no="5" player="Birch" sum="$1,295" type="23"/>
+   <action no="6" player="Maplewood" sum="$1,235" type="3"/>
+  </round>
+  <round no="2">
+   <cards type="Flop" player="">C9 D9 S4</cards>
+  </round>
+  <round no="3">
+   <cards type="Turn" player="">H2</cards>
+  </round>
+  <round no="4">
+   <cards type="River" player="">CK</cards>
+   <cards type="Pocket" player="Birch">CQ DQ</cards>
+  </round>
+ </game>
+</session>

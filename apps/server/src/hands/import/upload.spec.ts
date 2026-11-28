@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { strToU8, zipSync } from 'fflate';
-import { readUpload, UnreadableUpload } from './upload.js';
+import { readUpload, TextStreamDecoder, UnreadableUpload } from './upload.js';
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -36,6 +36,66 @@ describe('Reading an uploaded Hand History file', () => {
     });
 
     expect(readUpload('march.zip', zip)).toBe('first\n\nsecond');
+  });
+
+  it('reads an .xml file, as the iPoker client saves its sessions', () => {
+    const text = fixture('ipoker-session.xml');
+
+    expect(readUpload('alcala.xml', Buffer.from(text, 'utf8'))).toBe(text);
+  });
+
+  it('reads a file saved in cp1252, as older iPoker clients write the €, though it declares utf-8', () => {
+    const bytes = readFileSync(
+      new URL('./fixtures/ipoker-cp1252.xml', import.meta.url),
+    );
+
+    const text = readUpload('malaga.xml', bytes);
+
+    expect(text).toContain('<?xml version="1.0" encoding="utf-8"?>');
+    expect(text).toContain('<gametype>Holdem NL €0.05/€0.10</gametype>');
+    expect(text).toContain('<tablename>Málaga, 913000301</tablename>');
+  });
+
+  it('keeps reading a UTF-8 file as UTF-8 past a stray byte that cannot be UTF-8, whole or in pieces', () => {
+    const bytes = Buffer.concat([
+      Buffer.from('€1 ', 'utf8'),
+      Buffer.from([0xff]),
+      Buffer.from(' €2 ', 'utf8'),
+      // A character the file ends before completing.
+      Buffer.from([0xe2, 0x82]),
+    ]);
+    const expected = '€1 � €2 �';
+
+    expect(readUpload('session.txt', bytes)).toBe(expected);
+    for (let size = 1; size <= bytes.length; size++) {
+      const decoder = new TextStreamDecoder();
+      let text = '';
+      for (let start = 0; start < bytes.length; start += size) {
+        text += decoder.decode(bytes.subarray(start, start + size));
+      }
+      expect(text + decoder.end()).toBe(expected);
+    }
+  });
+
+  it('reads each file in a zip in its own encoding', () => {
+    const zip = zipSync({
+      'old.xml': Buffer.from([0x80, 0x31]),
+      'new.xml': strToU8('€2'),
+    });
+
+    expect(readUpload('tables.zip', zip)).toBe('€1\n\n€2');
+  });
+
+  it('extracts the .xml files in a zip like its .txt files', () => {
+    const zip = zipSync({
+      'tables/alcala.xml': strToU8('first'),
+      'tables/notes.pdf': strToU8('not a hand history'),
+      '__MACOSX/tables/._alcala.xml': strToU8('resource fork'),
+      'tables/stars.txt': strToU8('second'),
+      'tables/vantaa.XML': strToU8('third'),
+    });
+
+    expect(readUpload('tables.zip', zip)).toBe('first\n\nsecond\n\nthird');
   });
 
   it('recognises a zip by its content, whatever its name', () => {

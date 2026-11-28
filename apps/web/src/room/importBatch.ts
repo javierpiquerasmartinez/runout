@@ -8,8 +8,8 @@ import type { QueueEntry } from './roomClient'
  */
 
 /** The formats the server reads. Mirrors the server's (ADR 0001: no shared code). */
-export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker'
-export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax', 'coinpoker']
+export type SourceFormat = 'pokerstars' | 'ggpoker' | 'winamax' | 'coinpoker' | 'ipoker' | 'ipoker-pt4'
+export const SOURCE_FORMATS: SourceFormat[] = ['pokerstars', 'ggpoker', 'winamax', 'coinpoker', 'ipoker', 'ipoker-pt4']
 
 export type DiscardReason =
   | 'unrecognised-format'
@@ -17,7 +17,9 @@ export type DiscardReason =
   | 'too-many-seats'
   | 'no-hero'
   | 'malformed'
+  | 'unbalanced'
   | 'run-it-twice'
+  | 'old-export'
   | 'duplicate'
 
 /** Where the dialog imports into: a Room's Queue, or the Importer's own Library. */

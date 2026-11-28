@@ -130,7 +130,14 @@ describe('Importing Hand History files through a preview (e2e)', () => {
     expect(sessionPreview.body).toEqual({
       id: expect.any(String),
       format: 'pokerstars',
-      tried: ['pokerstars', 'ggpoker', 'winamax', 'coinpoker'],
+      tried: [
+        'pokerstars',
+        'ggpoker',
+        'winamax',
+        'coinpoker',
+        'ipoker',
+        'ipoker-pt4',
+      ],
       hands: [
         expect.objectContaining({ board: [] }),
         expect.objectContaining({ board: expect.any(Array) }),
@@ -283,7 +290,14 @@ describe('Importing Hand History files through a preview (e2e)', () => {
 
     expect(detected.body).toMatchObject({
       format: null,
-      tried: ['pokerstars', 'ggpoker', 'winamax', 'coinpoker'],
+      tried: [
+        'pokerstars',
+        'ggpoker',
+        'winamax',
+        'coinpoker',
+        'ipoker',
+        'ipoker-pt4',
+      ],
       hands: [],
       discarded: [{ reason: 'unrecognised-format' }],
     });
@@ -347,10 +361,47 @@ describe('Importing Hand History files through a preview (e2e)', () => {
       code,
       'hh.txt',
       freshHandHistory('pokerstars-showdown.txt'),
-      'ipoker',
+      'partypoker',
     ).expect(400);
 
     expect(res.body).toEqual({ reason: 'invalid-format' });
+  });
+
+  it('reads the XML session an iPoker client saved, uploaded as an .xml file, its Hero matched by Screen Name', async () => {
+    const master = await newAccount(running.httpServer);
+    const code = await createRoom(master.token);
+    await join(master.token, code, 'Javier');
+    await request(running.httpServer)
+      .put('/api/identities/me/screen-names')
+      .set('Authorization', `Bearer ${master.token}`)
+      .send({ screenNames: ['maplewood'] })
+      .expect(200);
+
+    const res = await upload(
+      master.token,
+      code,
+      'alcala.xml',
+      freshHandHistory('ipoker-showdown.xml'),
+    ).expect(201);
+
+    expect(res.body).toMatchObject({
+      format: 'ipoker',
+      hands: [
+        {
+          hero: 'Maplewood',
+          heroNamed: true,
+          author: { identityId: master.id, displayName: 'Javier' },
+          heroMatched: true,
+          // 22:14:03 on a Spanish clock in January (CET, UTC+1).
+          playedAt: '2026-01-15T21:14:03.000Z',
+          stake: { bigBlind: 10, currency: 'EUR' },
+          board: ['10d', '7s', '2h', 'Kc', '4d'],
+          overview: { finalPot: 795, showdown: true, timesRun: 1 },
+        },
+      ],
+      discarded: [],
+    });
+    await confirm(master.token, code, [(res.body as Preview).id]).expect(201);
   });
 
   it('refuses a preview from someone who is not a Participant of the Room', async () => {

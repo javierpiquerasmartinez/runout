@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7430000301">
+ <general>
+  <client_version>17.1.1.12</client_version>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Málaga, 913000301</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <duration>00:00:40</duration>
+  <gamecount>1</gamecount>
+  <startdate>2016-03-11 23:40:12</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+  <bets>€0.10</bets>
+  <wins>€0.10</wins>
+  <chipsin>€10</chipsin>
+  <chipsout>€10.05</chipsout>
+  <statuspoints>0.00</statuspoints>
+  <awardpoints>0.00</awardpoints>
+  <ipoints>0.00</ipoints>
+ </general>
+ <game gamecode="6300000301">
+  <general>
+   <startdate>2016-03-11 23:40:12</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0"/>
+    <player seat="2" name="Birch" chips="€7.25" dealer="0" win="€0" bet="€0.05"/>
+    <player seat="3" name="Maplewood" chips="€10" dealer="0" win="€0.15" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Birch" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">SJ C4</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+   <action no="4" player="Birch" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>

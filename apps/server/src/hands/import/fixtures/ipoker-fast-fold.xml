@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001201">
+ <general>
+  <client_version>26.1.1.31</client_version>
+  <mode>real</mode>
+  <gametype>Holdem NL $0.05/$0.10</gametype>
+  <tablename>Speed - Zone Poker - Texans</tablename>
+  <tablecurrency>USD</tablecurrency>
+  <smallblind>$0.05</smallblind>
+  <bigblind>$0.10</bigblind>
+  <duration>00:00:40</duration>
+  <gamecount>2</gamecount>
+  <startdate>2026-05-04 23:10:00</startdate>
+  <currency>USD</currency>
+  <nickname>Maplewood</nickname>
+  <tablesize>6</tablesize>
+  <bets>$0.05</bets>
+  <wins>$0.25</wins>
+  <chipsin>$10</chipsin>
+  <chipsout>$10.20</chipsout>
+  <statuspoints>0.00</statuspoints>
+  <awardpoints>0.00</awardpoints>
+  <ipoints>0.00</ipoints>
+ </general>
+ <game gamecode="6100001201">
+  <general>
+   <startdate>2026-05-04 23:10:02</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="$10" dealer="0" win="$0" bet="$0"/>
+    <player seat="2" name="Birch" chips="$8.40" dealer="1" win="$0" bet="$0"/>
+    <player seat="3" name="Maplewood" chips="$10" dealer="0" win="$0" bet="$0.05"/>
+    <player seat="4" name="Cedar" chips="$9.60" dealer="0" win="$0.10" bet="$0.10"/>
+    <player seat="5" name="Elm" chips="$11.10" dealer="0" win="$0" bet="$0"/>
+    <player seat="6" name="Fir" chips="$6.80" dealer="0" win="$0" bet="$0"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Maplewood" sum="$0.05" type="1"/>
+   <action no="2" player="Cedar" sum="$0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">C7 H2</cards>
+   <action no="3" player="Elm" sum="$0" type="0"/>
+   <action no="4" player="Fir" sum="$0" type="0"/>
+   <action no="5" player="Alder" sum="$0" type="0"/>
+   <action no="6" player="Birch" sum="$0" type="0"/>
+   <action no="7" player="Maplewood" sum="$0" type="0"/>
+  </round>
+ </game>
+ <game gamecode="6100001247">
+  <general>
+   <startdate>2026-05-04 23:10:09</startdate>
+   <players>
+    <player seat="1" name="Oak" chips="$12.30" dealer="0" win="$0" bet="$0"/>
+    <player seat="2" name="Pine" chips="$4.75" dealer="0" win="$0" bet="$0"/>
+    <player seat="3" name="Rowan" chips="$10" dealer="1" win="$0" bet="$0"/>
+    <player seat="4" name="Willow" chips="$15.05" dealer="0" win="$0" bet="$0.05"/>
+    <player seat="5" name="Maplewood" chips="$9.95" dealer="0" win="$0.10" bet="$0.10"/>
+    <player seat="6" name="Hazel" chips="$7.20" dealer="0" win="$0" bet="$0"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Willow" sum="$0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="$0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">SA D3</cards>
+   <action no="3" player="Hazel" sum="$0" type="0"/>
+   <action no="4" player="Oak" sum="$0" type="0"/>
+   <action no="5" player="Pine" sum="$0" type="0"/>
+   <action no="6" player="Rowan" sum="$0" type="0"/>
+   <action no="7" player="Willow" sum="$0" type="0"/>
+  </round>
+ </game>
+</session>

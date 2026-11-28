@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7430001201">
+<general>
+<client_version>21.3.1.2</client_version>
+<mode>real</mode>
+<gametype>Holdem No limit $0.05/$0.10 Ante $0.00</gametype>
+<tablename>Zamora, 913001201</tablename>
+<tablecurrency>USD</tablecurrency>
+<startdate>2021-09-04 10:15:30</startdate>
+<currency>USD</currency>
+<nickname>Maplewood</nickname>
+</general>
+<game gamecode="6300001201"><general><startdate>2021-09-04 10:15:30</startdate>
+<players><player seat="1" name="Alder" chips="$10.00" dealer="1" win="$0.00" bet="$0.05" />
+<player seat="3" name="Maplewood" chips="$10.00" dealer="0" win="$0.10" bet="$0.10" />
+</players>
+</general>
+<round no="0"><action no="1" player="Alder" type="1" sum="$0.05" />
+<action no="2" player="Maplewood" type="2" sum="$0.10" />
+</round>
+<round no="1"><cards type="Pocket" player="Alder">x x</cards>
+<cards type="Pocket" player="Maplewood">D5 C5</cards>
+<action no="3" player="Alder" type="0" sum="$0.00" />
+</round>
+</game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7430001202">
+<general>
+<client_version>21.3.1.2</client_version>
+<mode>real</mode>
+<gametype>Holdem Pot limit $0.05/$0.10</gametype>
+<tablename>Zamora, 913001202</tablename>
+<tablecurrency>USD</tablecurrency>
+<startdate>2021-09-04 10:20:02</startdate>
+<currency>USD</currency>
+<nickname>Maplewood</nickname>
+</general>
+<game gamecode="6300001202"><general><startdate>2021-09-04 10:20:02</startdate>
+<players><player seat="1" name="Alder" chips="$10.00" dealer="0" win="$0.10" bet="$0.10" />
+<player seat="3" name="Maplewood" chips="$10.05" dealer="1" win="$0.00" bet="$0.05" />
+</players>
+</general>
+<round no="0"><action no="1" player="Maplewood" type="1" sum="$0.05" />
+<action no="2" player="Alder" type="2" sum="$0.10" />
+</round>
+<round no="1"><cards type="Pocket" player="Alder">X X</cards>
+<cards type="Pocket" player="Maplewood">H9 S3</cards>
+<action no="3" player="Maplewood" type="0" sum="$0.00" />
+</round>
+</game>
+</session>
