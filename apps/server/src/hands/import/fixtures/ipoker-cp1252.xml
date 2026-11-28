@@ -25,7 +25,7 @@
    <players>
     <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0"/>
     <player seat="2" name="Birch" chips="€7.25" dealer="0" win="€0" bet="€0.05"/>
-    <player seat="3" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+    <player seat="3" name="Maplewood" chips="€10" dealer="0" win="€0.15" bet="€0.10"/>
    </players>
   </general>
   <round no="0">

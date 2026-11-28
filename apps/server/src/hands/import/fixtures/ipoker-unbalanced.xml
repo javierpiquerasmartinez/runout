@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400000901">
+ <general>
+  <client_version>26.1.1.31</client_version>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Cuenca, 912000901</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <smallblind>€0.05</smallblind>
+  <bigblind>€0.10</bigblind>
+  <duration>00:01:40</duration>
+  <gamecount>2</gamecount>
+  <startdate>2026-07-20 21:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+  <tablesize>6</tablesize>
+  <bets>€0.35</bets>
+  <wins>€0</wins>
+  <chipsin>€10.30</chipsin>
+  <chipsout>€9.95</chipsout>
+  <statuspoints>0.00</statuspoints>
+  <awardpoints>0.00</awardpoints>
+  <ipoints>0.00</ipoints>
+ </general>
+ <game gamecode="6100000901">
+  <general>
+   <startdate>2026-07-20 21:00:05</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="0" win="€0" bet="€0"/>
+    <player seat="2" name="Birch" chips="€8.40" dealer="1" win="€0" bet="€0"/>
+    <player seat="3" name="Maplewood" chips="€10.30" dealer="0" win="€0" bet="€0.05"/>
+    <player seat="4" name="Cedar" chips="€9.60" dealer="0" win="€0.12" bet="€0.10"/>
+    <player seat="5" name="Elm" chips="€11.10" dealer="0" win="€0" bet="€0"/>
+    <player seat="6" name="Fir" chips="€6.80" dealer="0" win="€0" bet="€0"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Maplewood" sum="€0.05" type="1"/>
+   <action no="2" player="Cedar" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">C7 H2</cards>
+   <action no="3" player="Elm" sum="€0" type="0"/>
+   <action no="4" player="Fir" sum="€0" type="0"/>
+   <action no="5" player="Alder" sum="€0" type="0"/>
+   <action no="6" player="Birch" sum="€0" type="0"/>
+   <action no="7" player="Maplewood" sum="€0" type="0"/>
+  </round>
+ </game>
+ <game gamecode="6100000902">
+  <general>
+   <startdate>2026-07-20 21:00:41</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="0" win="€0.72" bet="€0.70" rakeamount="€0.05"/>
+    <player seat="2" name="Birch" chips="€8.40" dealer="0" win="€0" bet="€0"/>
+    <player seat="3" name="Maplewood" chips="€10.25" dealer="1" win="€0" bet="€0.30"/>
+    <player seat="4" name="Cedar" chips="€9.65" dealer="0" win="€0" bet="€0.05"/>
+    <player seat="5" name="Elm" chips="€11.10" dealer="0" win="€0" bet="€0.10"/>
+    <player seat="6" name="Fir" chips="€6.80" dealer="0" win="€0" bet="€0"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Cedar" sum="€0.05" type="1"/>
+   <action no="2" player="Elm" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">D9 D8</cards>
+   <action no="3" player="Fir" sum="€0" type="0"/>
+   <action no="4" player="Alder" sum="€0.30" type="23"/>
+   <action no="6" player="Maplewood" sum="€0.30" type="3"/>
+   <action no="5" player="Birch" sum="€0" type="0"/>
+   <action no="8" player="Elm" sum="€0" type="0"/>
+   <action no="7" player="Cedar" sum="€0" type="0"/>
+  </round>
+  <round no="2">
+   <cards type="Flop" player="">S2 C7 HQ</cards>
+   <action no="9" player="Alder" sum="€0.40" type="5"/>
+   <action no="10" player="Maplewood" sum="€0" type="0"/>
+  </round>
+ </game>
+ <game gamecode="6100000903">
+  <general>
+   <startdate>2026-07-20 21:01:30</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="0" win="€0" bet="€0"/>
+    <player seat="2" name="Birch" chips="€8.40" dealer="1" win="€0" bet="€0"/>
+    <player seat="3" name="Maplewood" chips="€10.30" dealer="0" win="€0" bet="€0.06"/>
+    <player seat="4" name="Cedar" chips="€9.60" dealer="0" win="€0.10" bet="€0.10"/>
+    <player seat="5" name="Elm" chips="€11.10" dealer="0" win="€0" bet="€0"/>
+    <player seat="6" name="Fir" chips="€6.80" dealer="0" win="€0" bet="€0"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Maplewood" sum="€0.05" type="1"/>
+   <action no="2" player="Cedar" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">C7 H2</cards>
+   <action no="3" player="Elm" sum="€0" type="0"/>
+   <action no="4" player="Fir" sum="€0" type="0"/>
+   <action no="5" player="Alder" sum="€0" type="0"/>
+   <action no="6" player="Birch" sum="€0" type="0"/>
+   <action no="7" player="Maplewood" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>

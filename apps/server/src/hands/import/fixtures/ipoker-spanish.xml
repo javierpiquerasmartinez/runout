@@ -22,7 +22,7 @@
 		 <general>
 		  <startdate>2011-11-04 18:46:19</startdate>
 		  <players>
-		   <player seat="3" name="Alder" chips="$0.88" dealer="1" win="$0" bet="$0" rebuy="0" addon="0"/><player seat="6" name="Birch" chips="$1.12" dealer="0" win="$0.12" bet="$0.12" rebuy="0" addon="0"/><player seat="9" name="Maplewood" chips="$1" dealer="0" win="$0" bet="$0.06" rebuy="0" addon="0"/>
+		   <player seat="3" name="Alder" chips="$0.88" dealer="1" win="$0" bet="$0" rebuy="0" addon="0"/><player seat="6" name="Birch" chips="$1.12" dealer="0" win="$0.18" bet="$0.12" rebuy="0" addon="0"/><player seat="9" name="Maplewood" chips="$1" dealer="0" win="$0" bet="$0.06" rebuy="0" addon="0"/>
 		  </players>
 		 </general>
 		 <round no="0">

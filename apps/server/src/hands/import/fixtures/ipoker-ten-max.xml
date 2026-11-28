@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400000801">
+  <general>
+    <mode>real</mode>
+    <gametype>Holdem NL $0.05/$0.10</gametype>
+    <tablename>Ambia, 98000801</tablename>
+    <tablecurrency>USD</tablecurrency>
+    <duration>N/A</duration>
+    <gamecount>N/A</gamecount>
+    <startdate>2014-01-06 17:00:00</startdate>
+    <currency>USD</currency>
+    <nickname>Maplewood</nickname>
+    <bets>N/A</bets>
+    <wins>N/A</wins>
+    <chipsin>N/A</chipsin>
+    <chipsout>N/A</chipsout>
+    <ipoints>N/A</ipoints>
+    <statuspoints>N/A</statuspoints>
+    <awardpoints>N/A</awardpoints>
+  </general>
+  <game gamecode="6100000801">
+    <general>
+      <startdate>2014-01-06 17:09:38</startdate>
+      <players>
+        <player seat="1" name="Alder" chips="$10" dealer="0" win="$0" bet="$0.05" rebuy="0" addon="0" reg_code="-" />
+        <player seat="2" name="Birch" chips="$10" dealer="0" win="$0.15" bet="$0.10" rebuy="0" addon="0" reg_code="-" />
+        <player seat="3" name="Cedar" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="4" name="Elm" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="5" name="Fir" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="6" name="Oak" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="7" name="Pine" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="8" name="Rowan" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="9" name="Willow" chips="$10" dealer="0" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+        <player seat="10" name="Maplewood" chips="$10" dealer="1" win="$0" bet="$0" rebuy="0" addon="0" reg_code="-" />
+      </players>
+    </general>
+    <round no="0">
+      <action no="1" player="Alder" type="1" sum="$0.05" cards="[cards]" />
+      <action no="2" player="Birch" type="2" sum="$0.10" cards="[cards]" />
+    </round>
+    <round no="1">
+      <cards type="Pocket" player="Maplewood">S9 S4</cards>
+      <action no="3" player="Cedar" type="0" sum="$0" cards="" />
+      <action no="4" player="Elm" type="0" sum="$0" cards="" />
+      <action no="5" player="Fir" type="0" sum="$0" cards="" />
+      <action no="6" player="Oak" type="0" sum="$0" cards="" />
+      <action no="7" player="Pine" type="0" sum="$0" cards="" />
+      <action no="8" player="Rowan" type="0" sum="$0" cards="" />
+      <action no="9" player="Willow" type="0" sum="$0" cards="" />
+      <action no="10" player="Maplewood" type="0" sum="$0" cards="" />
+      <action no="11" player="Alder" type="0" sum="$0" cards="" />
+    </round>
+  </game>
+</session>

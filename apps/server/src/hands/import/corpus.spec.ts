@@ -596,6 +596,347 @@ const CORPUS: CorpusEntry[] = [
     discarded: [],
   },
   {
+    // A client from before version 20, which counts the uncalled bet in the
+    // `win` of whoever made it. Six seats on iPoker's ten table positions.
+    file: 'ipoker-old-client.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000301',
+        playedAt: '2013-07-30T16:26:02.000Z',
+        tableSize: 6,
+        buttonSeat: 10,
+        stake: { ...USD_05_10, currency: 'GBP' },
+        hero: { screenName: 'Maplewood', cards: ['Ac', 'Qh'] },
+        actions: expect.arrayContaining([
+          {
+            street: 'preflop',
+            screenName: 'Cedar',
+            type: 'call',
+            amount: 484,
+            allIn: true,
+          },
+        ]) as Hand['actions'],
+        board: ['5d', '7c', '9d', 'Jd', 'Qd'],
+        returned: [{ screenName: 'Maplewood', amount: 46 }],
+        showdown: true,
+        shown: [
+          { screenName: 'Maplewood', cards: ['Ac', 'Qh'] },
+          { screenName: 'Cedar', cards: ['Kd', 'Ks'] },
+        ],
+        collected: [{ screenName: 'Cedar', amount: 1142 }],
+        rake: 81,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // An ante table: four antes, one posted by a player who then sits out
+    // (code 9), one player sitting out from the start (code 8), one seated
+    // with no Action at all, and an empty seat written with no name.
+    file: 'ipoker-antes.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000401',
+        playedAt: '2013-12-19T19:00:35.000Z',
+        tableSize: 9,
+        buttonSeat: 10,
+        stake: USD_05_10,
+        seats: [
+          { seat: 2, screenName: 'Oak', startingStack: 980, sittingOut: true },
+          {
+            seat: 3,
+            screenName: 'Birch',
+            startingStack: 2112,
+            sittingOut: true,
+          },
+          {
+            seat: 5,
+            screenName: 'Cedar',
+            startingStack: 2000,
+            sittingOut: false,
+          },
+          { seat: 6, screenName: 'Elm', startingStack: 1176, sittingOut: true },
+          {
+            seat: 8,
+            screenName: 'Maplewood',
+            startingStack: 2245,
+            sittingOut: false,
+          },
+          {
+            seat: 10,
+            screenName: 'Fir',
+            startingStack: 566,
+            sittingOut: false,
+          },
+        ],
+        hero: { screenName: 'Maplewood', cards: ['Jh', '4d'] },
+        posts: [
+          { screenName: 'Cedar', kind: 'ante', amount: 2 },
+          { screenName: 'Elm', kind: 'ante', amount: 2 },
+          { screenName: 'Maplewood', kind: 'ante', amount: 2 },
+          { screenName: 'Fir', kind: 'ante', amount: 2 },
+          { screenName: 'Cedar', kind: 'small-blind', amount: 5 },
+          { screenName: 'Maplewood', kind: 'big-blind', amount: 10 },
+        ],
+        actions: [
+          {
+            street: 'preflop',
+            screenName: 'Fir',
+            type: 'call',
+            amount: 10,
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Cedar',
+            type: 'fold',
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Maplewood',
+            type: 'check',
+            allIn: false,
+          },
+          {
+            street: 'flop',
+            screenName: 'Maplewood',
+            type: 'check',
+            allIn: false,
+          },
+          { street: 'flop', screenName: 'Fir', type: 'check', allIn: false },
+          {
+            street: 'turn',
+            screenName: 'Maplewood',
+            type: 'check',
+            allIn: false,
+          },
+          { street: 'turn', screenName: 'Fir', type: 'check', allIn: false },
+          {
+            street: 'river',
+            screenName: 'Maplewood',
+            type: 'check',
+            allIn: false,
+          },
+          { street: 'river', screenName: 'Fir', type: 'check', allIn: false },
+        ],
+        returned: [],
+        showdown: true,
+        shown: [
+          { screenName: 'Maplewood', cards: ['Jh', '4d'] },
+          { screenName: 'Fir', cards: ['6c', '7d'] },
+        ],
+        collected: [{ screenName: 'Maplewood', amount: 31 }],
+        rake: 2,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // All-ins (codes 6 and 7) as a raise, a bet and a call for less, a side
+    // pot, and Hole Cards nobody saw (`X X`).
+    file: 'ipoker-all-ins.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000501',
+        playedAt: '2026-03-10T21:00:00.000Z',
+        hero: { screenName: 'Maplewood', cards: ['Ks', 'Kh'] },
+        actions: [
+          {
+            street: 'preflop',
+            screenName: 'Cedar',
+            type: 'call',
+            amount: 10,
+            allIn: false,
+          },
+          { street: 'preflop', screenName: 'Fir', type: 'fold', allIn: false },
+          {
+            street: 'preflop',
+            screenName: 'Alder',
+            type: 'raise',
+            amount: 490,
+            to: 500,
+            allIn: true,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Maplewood',
+            type: 'call',
+            amount: 490,
+            allIn: false,
+          },
+          {
+            street: 'preflop',
+            screenName: 'Cedar',
+            type: 'call',
+            amount: 490,
+            allIn: false,
+          },
+          {
+            street: 'flop',
+            screenName: 'Maplewood',
+            type: 'bet',
+            amount: 300,
+            allIn: false,
+          },
+          {
+            street: 'flop',
+            screenName: 'Cedar',
+            type: 'raise',
+            amount: 400,
+            to: 700,
+            allIn: true,
+          },
+          {
+            street: 'flop',
+            screenName: 'Maplewood',
+            type: 'call',
+            amount: 400,
+            allIn: false,
+          },
+        ],
+        board: ['2c', '7d', '9h', 'Jc', '3s'],
+        returned: [],
+        showdown: true,
+        shown: [
+          { screenName: 'Alder', cards: ['As', 'Ah'] },
+          { screenName: 'Maplewood', cards: ['Ks', 'Kh'] },
+          { screenName: 'Cedar', cards: ['Qs', 'Qh'] },
+        ],
+        collected: [
+          { screenName: 'Alder', amount: 1440 },
+          { screenName: 'Maplewood', amount: 1360 },
+        ],
+        rake: 100,
+      },
+      {
+        siteHandId: '6100000502',
+        hero: { screenName: 'Maplewood', cards: ['8c', '8d'] },
+        actions: expect.arrayContaining([
+          {
+            street: 'flop',
+            screenName: 'Fir',
+            type: 'bet',
+            amount: 340,
+            allIn: true,
+          },
+          {
+            street: 'flop',
+            screenName: 'Maplewood',
+            type: 'call',
+            amount: 190,
+            allIn: true,
+          },
+        ]) as Hand['actions'],
+        returned: [{ screenName: 'Fir', amount: 150 }],
+        collected: [{ screenName: 'Fir', amount: 380 }],
+        rake: 20,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // Table sizes from sessions that don't write one, by the table positions
+    // their seats take: two at 3 and 8, nine with 7 left out, ten with all.
+    file: 'ipoker-heads-up.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000601',
+        tableSize: 2,
+        buttonSeat: 3,
+        posts: [
+          { screenName: 'Maplewood', kind: 'small-blind', amount: 5 },
+          { screenName: 'Birch', kind: 'big-blind', amount: 10 },
+        ],
+        returned: [{ screenName: 'Birch', amount: 5 }],
+        collected: [{ screenName: 'Birch', amount: 10 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    file: 'ipoker-nine-max.xml',
+    format: 'ipoker',
+    hands: [{ siteHandId: '6100000701', tableSize: 9, buttonSeat: 10 }],
+    discarded: [],
+  },
+  {
+    // Ten seats are more than a Hand is replayed with, on any Poker Site.
+    file: 'ipoker-ten-max.xml',
+    format: 'ipoker',
+    hands: [],
+    discarded: ['too-many-seats'],
+  },
+  {
+    // Money that doesn't add up, never given a Rake to make it: a win bigger
+    // than the pot, a `rakeamount` other than what is left in the pot, and a
+    // `bet` other than what the player's Actions put in.
+    file: 'ipoker-unbalanced.xml',
+    format: 'ipoker',
+    hands: [],
+    discarded: ['unbalanced', 'unbalanced', 'unbalanced'],
+  },
+  {
+    // Fast-fold (Zone, Speed): a new table of opponents every Hand, read as
+    // ordinary cash Hands.
+    file: 'ipoker-fast-fold.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100001201',
+        tableName: 'Speed - Zone Poker - Texans',
+        tableSize: 6,
+        stake: USD_05_10,
+        hero: { screenName: 'Maplewood', cards: ['7c', '2h'] },
+      },
+      {
+        siteHandId: '6100001247',
+        tableName: 'Speed - Zone Poker - Texans',
+        buttonSeat: 3,
+        hero: { screenName: 'Maplewood', cards: ['As', '3d'] },
+        returned: [{ screenName: 'Maplewood', amount: 5 }],
+        collected: [{ screenName: 'Maplewood', amount: 10 }],
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A session per game: pot-limit and fixed-limit hold'em are read, as on
+    // the other Poker Sites; Omaha (`Omaha PL`, and five-card Omaha written
+    // just `PL`), Six Plus hold'em and tournaments are not.
+    file: 'ipoker-other-games.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100001101',
+        stake: { ...USD_05_10, limit: 'pot-limit' },
+      },
+      {
+        siteHandId: '6100001102',
+        stake: { ...USD_05_10, limit: 'fixed-limit' },
+      },
+    ],
+    discarded: [
+      'not-cash-holdem',
+      'not-cash-holdem',
+      'not-cash-holdem',
+      'not-cash-holdem',
+    ],
+  },
+  {
+    // Written by hand: no real iPoker Hand run twice has turned up, so its
+    // Runs (`board1win`, `board2win`) aren't read yet.
+    file: 'ipoker-run-it-twice.xml',
+    format: 'ipoker',
+    hands: [],
+    discarded: ['run-it-twice'],
+  },
+  {
     // PokerTracker 4's export of the Hand in ipoker-showdown.xml.
     file: 'ipoker-pt4-showdown.txt',
     format: 'ipoker-pt4',
@@ -748,7 +1089,6 @@ const CORPUS: CorpusEntry[] = [
         siteHandId: '6300000301',
         playedAt: '2016-03-11T22:40:12.000Z',
         tableName: 'Málaga, 913000301',
-        tableSize: 6,
         stake: EUR_05_10,
         hero: { screenName: 'Maplewood', cards: ['Js', '4c'] },
         returned: [{ screenName: 'Maplewood', amount: 5 }],
@@ -935,6 +1275,9 @@ const CORPUS: CorpusEntry[] = [
         siteHandId: '6300001101',
         playedAt: '2024-02-10T11:00:00.000Z',
         stake: EUR_05_10,
+        returned: [{ screenName: 'Maplewood', amount: 5 }],
+        collected: [{ screenName: 'Maplewood', amount: 10 }],
+        rake: 0,
       },
     ],
     discarded: [

@@ -22,7 +22,7 @@
 		 <general>
 		  <startdate>2012-02-23 17:54:57</startdate>
 		  <players>
-		   <player seat="3" name="Alder" chips="€50" dealer="1" win="€0" bet="€0.25" rebuy="0" addon="0"/><player seat="8" name="Maplewood" chips="€50" dealer="0" win="€0.50" bet="€0.50" rebuy="0" addon="0"/>
+		   <player seat="3" name="Alder" chips="€50" dealer="1" win="€0" bet="€0.25" rebuy="0" addon="0"/><player seat="8" name="Maplewood" chips="€50" dealer="0" win="€0.75" bet="€0.50" rebuy="0" addon="0"/>
 		  </players>
 		 </general>
 		 <round no="0">

@@ -29,8 +29,20 @@ const TIME_ZONE = 'Europe/Madrid';
 /** The most seats a table can have: anything bigger isn't replayed. */
 const MAX_SEATS = 9;
 
-/** The table sizes iPoker deals, for a session that doesn't say its own. */
-const TABLE_SIZES = [2, 6, 8, 9, 10];
+/**
+ * Where iPoker seats each table size on its ten table positions, smallest
+ * first: a session that doesn't say its table size is the smallest whose
+ * positions hold every seat taken.
+ */
+const TABLE_LAYOUTS: [size: number, seats: number[]][] = [
+  [2, [3, 8]],
+  [6, [1, 3, 5, 6, 8, 10]],
+  [9, [1, 2, 3, 4, 5, 6, 8, 9, 10]],
+  [10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]],
+];
+
+/** Games iPoker names that aren't hold'em, whether or not their Stakes follow. */
+const OTHER_GAMES = /^(?:Omaha|Six Plus Holdem|[57] Card Stud|PL)\b/;
 
 /** The limits of `<gametype>`, as clients in English, Spanish and Russian write them. */
 const LIMITS: Record<string, Stake['limit']> = {
@@ -68,6 +80,15 @@ const BOARD_CARDS: Record<string, Street> = {
   River: 'river',
 };
 
+/** The table size of a Hand whose session doesn't write one, from the seats taken. */
+export function ipokerTableSize(seats: Pick<Seat, 'seat'>[]): number {
+  const taken = seats.map(({ seat }) => seat);
+  const layout = TABLE_LAYOUTS.find(([, positions]) =>
+    taken.every((seat) => positions.includes(seat)),
+  );
+  return layout ? layout[0] : Math.max(...taken);
+}
+
 export function isIPokerHand(block: string): boolean {
   return IPOKER_SESSION.opens.test(block) && /<game[\s>]/.test(block);
 }
@@ -97,15 +118,33 @@ export function parseIPokerHand(block: string): Hand {
   const gameGeneral = body(game.body, 'general') ?? '';
   const startdate = text(gameGeneral, 'startdate');
   if (!startdate) throw new Discard('malformed');
-  const players = elements(gameGeneral, 'player').map(
-    ({ attributes }) => attributes,
-  );
+  const players = elements(gameGeneral, 'player')
+    .map(({ attributes }) => attributes)
+    // An empty seat may be written as a player with no name and nothing in.
+    .filter(
+      (player) =>
+        player.name !== '' ||
+        ![player.chips, player.bet, player.win].every(
+          (written) => written === undefined || amount(written) === 0,
+        ),
+    );
+  // A Hand run more than once pays each Run apart (`board2win`) and deals
+  // a board per Run; one board is not the whole of it.
+  if (
+    players.some((player) => 'board2win' in player) ||
+    elements(game.body, 'cards').some(
+      ({ attributes }) => (attributes.board ?? 'board1') !== 'board1',
+    )
+  ) {
+    throw new Discard('run-it-twice');
+  }
+  const rounds = readRounds(game.body);
   const seats: Seat[] = players
     .map((player) => ({
       seat: Number(player.seat),
       screenName: player.name ?? '',
       startingStack: amount(player.chips ?? ''),
-      sittingOut: false,
+      sittingOut: sitsOut(player.name ?? '', rounds),
     }))
     .sort((a, b) => a.seat - b.seat);
   if (
@@ -117,16 +156,13 @@ export function parseIPokerHand(block: string): Hand {
     throw new Discard('malformed');
   }
   const tableSize =
-    Number(text(general, 'tablesize')) ||
-    TABLE_SIZES.find((size) => size >= seats.at(-1)!.seat) ||
-    seats.at(-1)!.seat;
+    Number(text(general, 'tablesize')) || ipokerTableSize(seats);
   if (tableSize > MAX_SEATS || seats.length > MAX_SEATS) {
     throw new Discard('too-many-seats');
   }
   const dealer = players.find((player) => player.dealer === '1');
   if (!dealer) throw new Discard('malformed');
 
-  const rounds = readRounds(game.body);
   const nickname = text(general, 'nickname');
   const heroCards = rounds.pockets.get(nickname ?? '');
   if (!nickname || !seats.some((seat) => seat.screenName === nickname)) {
@@ -139,15 +175,22 @@ export function parseIPokerHand(block: string): Hand {
   // What each player put in, as the game itself totals it.
   for (const player of players) {
     if (amount(player.bet ?? '') !== (play.putIn.get(player.name) ?? 0)) {
-      throw new Discard('malformed');
+      throw new Discard('unbalanced');
     }
   }
   const returned = uncalledBets({ ...play, stake: handStake });
+  // Before version 20 the client counts an uncalled bet in the `win` of
+  // whoever made it, as if they had won it back.
+  const winsReturned = !returnsUncalledBets(general);
   const collected = players
-    .map((player) => ({
-      screenName: player.name,
-      amount: amount(player.win ?? ''),
-    }))
+    .map((player) => {
+      const back = winsReturned
+        ? (returned.find((bet) => bet.screenName === player.name)?.amount ?? 0)
+        : 0;
+      const won = amount(player.win ?? '') - back;
+      if (won < 0) throw new Discard('unbalanced');
+      return { screenName: player.name, amount: won };
+    })
     .filter((won) => won.amount > 0);
   const inPot =
     [...play.putIn.values()].reduce((sum, put) => sum + put, 0) -
@@ -159,7 +202,7 @@ export function parseIPokerHand(block: string): Hand {
       ? rakeAmounts.reduce((sum, player) => sum + amount(player.rakeamount), 0)
       : leftInPot;
   // The money must add up to the cent, Rake and all.
-  if (rake < 0 || rake !== leftInPot) throw new Discard('malformed');
+  if (rake < 0 || rake !== leftInPot) throw new Discard('unbalanced');
 
   const stillIn = new Set(
     [...play.posts, ...play.actions].map((move) => move.screenName),
@@ -210,7 +253,8 @@ function stakeOf(gametype: string, tableCurrency: string | null): Stake {
   if (!holdem) {
     // Omaha (`PL €0.05/€0.10`, `Omaha PL …`) and the rest of iPoker's games.
     throw new Discard(
-      /\S+\/\S+$/.test(gametype) && !gametype.startsWith('Holdem ')
+      OTHER_GAMES.test(gametype) ||
+        (/\S+\/\S+$/.test(gametype) && !gametype.startsWith('Holdem '))
         ? 'not-cash-holdem'
         : 'malformed',
     );
@@ -240,6 +284,16 @@ function stakeOf(gametype: string, tableCurrency: string | null): Stake {
   };
 }
 
+/**
+ * Whether the client hands uncalled bets back apart from what was won: from
+ * version 20 on, or earlier when the session says so.
+ */
+function returnsUncalledBets(general: string): boolean {
+  if (text(general, 'uncalled_bet_enabled') === 'true') return true;
+  const major = Number(text(general, 'client_version')?.split('.')[0]);
+  return major >= 20;
+}
+
 interface Written {
   no: number;
   street: Street;
@@ -253,23 +307,27 @@ function readRounds(game: string): {
   actions: Written[];
   board: string[];
   pockets: Map<string, string[]>;
+  /** Who was dealt Hole Cards, seen or not. */
+  dealt: Set<string>;
 } {
   const actions: Written[] = [];
   const board: string[] = [];
   const pockets = new Map<string, string[]>();
+  const dealt = new Set<string>();
   for (const round of elements(game, 'round')) {
     const street = ROUNDS[round.attributes.no ?? ''];
     if (!street) throw new Discard('malformed');
     for (const cards of elements(round.body, 'cards')) {
       const { type, player } = cards.attributes;
-      const dealt = decode(cards.body).trim().split(/\s+/);
+      const faces = decode(cards.body).trim().split(/\s+/);
       if (type === 'Pocket') {
+        if (player) dealt.add(player);
         // Cards nobody saw are written `X`.
-        if (dealt.every((card) => card !== 'X') && player) {
-          pockets.set(player, dealt.map(card));
+        if (faces.every((card) => card !== 'X') && player) {
+          pockets.set(player, faces.map(card));
         }
       } else if (BOARD_CARDS[type ?? ''] === street) {
-        board.push(...dealt.map(card));
+        board.push(...faces.map(card));
       } else {
         throw new Discard('malformed');
       }
@@ -290,8 +348,24 @@ function readRounds(game: string): {
       throw new Discard('malformed');
     }
   });
-  return { actions, board, pockets };
+  return { actions, board, pockets, dealt };
 }
+
+/**
+ * Whether a player is seated but not dealt in: they sit out (code 8 or 9),
+ * or the game neither deals them cards nor has them do anything.
+ */
+function sitsOut(
+  screenName: string,
+  rounds: { actions: Written[]; dealt: Set<string> },
+): boolean {
+  const theirs = rounds.actions.filter(({ player }) => player === screenName);
+  if (theirs.some(({ type }) => SITTING_OUT.has(type))) return true;
+  return theirs.length === 0 && !rounds.dealt.has(screenName);
+}
+
+/** Action codes for a player who sits out the Hand: 8 from its start, 9 on not posting. */
+const SITTING_OUT = new Set(['8', '9']);
 
 /** The posts and Actions, and what each player put in altogether. */
 function readPlay(
@@ -306,8 +380,15 @@ function readPlay(
   const putIn = new Map<string, number>();
   let street: Street = 'preflop';
   let bets = new Map<string, number>();
+  const notDealt = new Set(
+    seats.filter((seat) => seat.sittingOut).map((seat) => seat.screenName),
+  );
   for (const { street: on, player: screenName, type, sum } of written) {
     if (!stacks.has(screenName)) throw new Discard('malformed');
+    // Someone not dealt in may only have posted an ante first.
+    if (notDealt.has(screenName) && type !== '15' && !SITTING_OUT.has(type)) {
+      throw new Discard('malformed');
+    }
     if (on !== street) {
       street = on;
       bets = new Map();
@@ -334,6 +415,18 @@ function readPlay(
         });
         break;
       }
+      case '15': {
+        // An ante is dead money: no part of the bet on the Street.
+        if (street !== 'preflop') throw new Discard('malformed');
+        const posted = amount(sum);
+        putIn.set(screenName, (putIn.get(screenName) ?? 0) + posted);
+        posts.push({ screenName, kind: 'ante', amount: posted });
+        break;
+      }
+      case '8':
+      case '9':
+        // Sitting out: seated, not dealt in, nothing to replay.
+        break;
       case '0':
         actions.push({ street, screenName, type: 'fold', allIn });
         break;
@@ -350,6 +443,31 @@ function readPlay(
           amount: chips,
           allIn: paid(chips),
         });
+        break;
+      }
+      case '6':
+      case '7': {
+        // An all-in writes what the player put in with it: a call, a bet or
+        // a raise, whichever it came to.
+        const chips = amount(sum);
+        const to = bet + chips;
+        let move: Action;
+        if (to <= facing) {
+          move = { street, screenName, type: 'call', amount: chips, allIn };
+        } else if (facing === 0) {
+          move = { street, screenName, type: 'bet', amount: chips, allIn };
+        } else {
+          move = {
+            street,
+            screenName,
+            type: 'raise',
+            amount: to - facing,
+            to,
+            allIn,
+          };
+        }
+        if (chips === 0 || !paid(chips)) throw new Discard('malformed');
+        actions.push({ ...move, allIn: true });
         break;
       }
       case '23': {
