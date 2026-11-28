@@ -39,12 +39,9 @@ export function parseIPokerPt4Hand(block: string): Hand {
   const first = lines[0];
   if (!HEADER.test(first)) throw new Discard('malformed');
   const header = first.match(CURRENT_HEADER);
+  // Only a header without `/GMT` is an old export, whose time is unknown.
   if (!header) {
-    throw new Discard(
-      / Version:/.test(first) && first.endsWith('/GMT')
-        ? 'malformed'
-        : 'old-export',
-    );
+    throw new Discard(first.endsWith('/GMT') ? 'malformed' : 'old-export');
   }
   const [, siteHandId, uncalled, game, year, month, day, time] = header;
   // Only the layout that leaves uncalled bets out of the pot is known.

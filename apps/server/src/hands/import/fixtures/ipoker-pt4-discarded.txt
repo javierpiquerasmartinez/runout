@@ -74,3 +74,19 @@ Maplewood: Fold
 *** SUMMARY ***
 Total pot €0.10 Rake €0.00
 Birch: wins €0.10
+
+
+GAME #3700000101 Texas Hold'em NL $1/$2 2018-12-24 10:34:39/GMT
+Table Zone Poker - Jalón
+Seat 1: Maplewood ($200.00 in chips)
+Seat 3: Alder ($185.88 in chips)
+Seat 5: Birch ($200.00 in chips) DEALER
+Maplewood: Post SB $1
+Alder: Post BB $2
+*** HOLE CARDS ***
+Dealt to Maplewood [C8 D3]
+Birch: Fold
+Maplewood: Fold
+*** SUMMARY ***
+Total pot $2.00 Rake $0.00
+Alder: wins $2.00

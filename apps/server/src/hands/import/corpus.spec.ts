@@ -1098,11 +1098,19 @@ const CORPUS: CorpusEntry[] = [
   {
     // A Hand that doesn't balance, an export from before PT4 wrote the
     // client version and GMT, a Hand run twice (how PT4 writes one is a
-    // guess until a real one turns up) and Omaha.
+    // guess until a real one turns up), Omaha, and a header in GMT that
+    // writes no client version (fpdb-3's 2018 Zone sample): its time is
+    // known, so it isn't an old export, but its layout isn't read.
     file: 'ipoker-pt4-discarded.txt',
     format: 'ipoker-pt4',
     hands: [],
-    discarded: ['unbalanced', 'old-export', 'run-it-twice', 'not-cash-holdem'],
+    discarded: [
+      'unbalanced',
+      'old-export',
+      'run-it-twice',
+      'not-cash-holdem',
+      'malformed',
+    ],
   },
   {
     // Saved in cp1252 by an older client, the € as the byte 0x80, though
