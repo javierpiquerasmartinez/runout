@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001101">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001101</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <startdate>2024-02-10 12:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001101">
+  <general>
+   <startdate>2024-02-10 12:00:00</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001102">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001102</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <startdate>01/23/2017 22:27:48</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001102">
+  <general>
+   <startdate>01/23/2017 22:27:48</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001103">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001103</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <startdate>20-Abr-2012 20:11:15</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001103">
+  <general>
+   <startdate>20-Abr-2012 20:11:15</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001104">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem BL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001104</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <startdate>2024-02-10 12:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001104">
+  <general>
+   <startdate>2024-02-10 12:00:00</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001105">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL kr0.05/kr0.10</gametype>
+  <tablename>Elche, 912001105</tablename>
+  <startdate>2024-02-10 12:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001105">
+  <general>
+   <startdate>2024-02-10 12:00:00</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="kr10" dealer="1" win="kr0" bet="kr0.05"/>
+    <player seat="2" name="Maplewood" chips="kr10" dealer="0" win="kr0.10" bet="kr0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="kr0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="kr0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="kr0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001106">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001106</tablename>
+  <tablecurrency>XYZ</tablecurrency>
+  <startdate>2024-02-10 12:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001106">
+  <general>
+   <startdate>2024-02-10 12:00:00</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001107">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001107</tablename>
+  <tablecurrency>GBP</tablecurrency>
+  <startdate>2024-02-10 12:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001107">
+  <general>
+   <startdate>2024-02-10 12:00:00</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>
+
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400001108">
+ <general>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>Elche, 912001108</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <startdate>2024-02-10 12:00:00</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+ </general>
+ <game gamecode="6100001108">
+  <general>
+   <startdate>2024-02-10 12:00:00</startdate>
+   <players>
+    <player seat="1" name="Alder" chips="€10.5.0" dealer="1" win="€0" bet="€0.05"/>
+    <player seat="2" name="Maplewood" chips="€10" dealer="0" win="€0.10" bet="€0.10"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Alder" sum="€0.05" type="1"/>
+   <action no="2" player="Maplewood" sum="€0.10" type="2"/>
+  </round>
+  <round no="1">
+   <cards type="Pocket" player="Maplewood">S8 D8</cards>
+   <action no="3" player="Alder" sum="€0" type="0"/>
+  </round>
+ </game>
+</session>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+	<session sessioncode="7400000601">
+			<general>
+	    	<mode>real</mode>
+	      		<gametype>Holdem NL $0.10/$0.25</gametype>
+	          <tablename>Lorca, 912000601</tablename>
+	          <duration>00:01</duration>
+	          <gamecount>1</gamecount>
+	          <startdate>20-Apr-2012 20:11:15</startdate>
+	          <currency>USD</currency>
+	          <nickname>Maplewood</nickname>
+	          <bets>$0.25</bets>
+	          <wins>$0</wins>
+	          <chipsin>$25</chipsin>
+			  		<chipsout>$24.75</chipsout>
+			  		<ipoints>0.50</ipoints>
+        		<statuspoints>0.50</statuspoints>
+			  		<awardpoints>0.50</awardpoints>
+
+	    </general>
+	    <game gamecode="6100000601">
+		 <general>
+		  <startdate>20-Apr-2012 20:11:15</startdate>
+		  <players>
+		   <player seat="4" name="Alder" chips="$31.40" dealer="1" win="$0.50" bet="$0.75" rebuy="0" addon="0"/><player seat="7" name="Maplewood" chips="$25" dealer="0" win="$0" bet="$0.25" rebuy="0" addon="0"/>
+		  </players>
+		 </general>
+		 <round no="0">
+	 <action no="1" player="Alder" type="1" sum="$0.10" cards="[cards]"/><action no="2" player="Maplewood" type="2" sum="$0.25" cards="[cards]"/>
+	</round>
+	<round no="1">
+	 <cards type="Pocket" player="Alder">X X</cards><action no="3" player="Alder" type="23" sum="$0.75" cards=""/><cards type="Pocket" player="Maplewood">S7 D2</cards><action no="4" player="Maplewood" type="0" sum="$0" cards=""/>
+	</round>
+
+		</game>
+	</session>

@@ -3,7 +3,12 @@ import type { Hand } from '../hand.js';
 import { Discard, type DiscardReason } from './discard.js';
 import { parseBlock, pieceCutter, recogniseBlock } from './import.js';
 import type { Piece } from './pieces.js';
-import { isHandHistoryEntry, UnreadableUpload, ZIP_MAGIC } from './upload.js';
+import {
+  isHandHistoryEntry,
+  TextStreamDecoder,
+  UnreadableUpload,
+  ZIP_MAGIC,
+} from './upload.js';
 
 /*
  * Stored files read as a stream of Hands, however large: a .txt or .xml
@@ -160,7 +165,7 @@ async function* textsOf(file: SourceFile): AsyncGenerator<TextPiece> {
   yield* isZip ? zipTexts(bytes) : decoded(bytes);
 }
 
-/** A text's bytes, decoded as they come: UTF-8 unless a byte order mark says UTF-16. */
+/** A text's bytes, decoded as they come, as reading the whole file decodes them. */
 async function* decoded(
   bytes: AsyncIterable<Uint8Array>,
 ): AsyncGenerator<TextPiece> {
@@ -220,41 +225,4 @@ async function* zipTexts(
   yield* out.splice(0);
   // Streaming passes over bytes that are no zip without a word.
   if (entries === 0) throw new UnreadableUpload('not-a-zip');
-}
-
-/** Decodes a text arriving in pieces, deciding its encoding from its first two bytes. */
-class TextStreamDecoder {
-  private decoder: TextDecoder | null = null;
-  private start: Uint8Array = new Uint8Array(0);
-
-  decode(chunk: Uint8Array): string {
-    if (!this.decoder) {
-      this.start = concat(this.start, chunk);
-      if (this.start.length < 2) return '';
-      this.decoder = new TextDecoder(encodingOf(this.start));
-      return this.decoder.decode(this.start, { stream: true });
-    }
-    return this.decoder.decode(chunk, { stream: true });
-  }
-
-  end(): string {
-    if (!this.decoder) {
-      if (this.start.length === 0) return '';
-      return new TextDecoder('utf-8').decode(this.start);
-    }
-    return this.decoder.decode();
-  }
-}
-
-function encodingOf(start: Uint8Array): string {
-  if (start[0] === 0xff && start[1] === 0xfe) return 'utf-16le';
-  if (start[0] === 0xfe && start[1] === 0xff) return 'utf-16be';
-  return 'utf-8';
-}
-
-function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const joined = new Uint8Array(a.length + b.length);
-  joined.set(a);
-  joined.set(b, a.length);
-  return joined;
 }

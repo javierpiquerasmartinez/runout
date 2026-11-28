@@ -7,6 +7,7 @@ import {
   type SourceFile,
 } from './hand-reader.js';
 import { importHandHistory } from './import.js';
+import { readUpload } from './upload.js';
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -131,6 +132,37 @@ describe('Reading the Hands of stored files as a stream', () => {
 
     expect(siteHandIds(read)).toEqual(
       importHandHistory(content).hands.map((hand) => hand.siteHandId),
+    );
+  });
+
+  it('reads a file saved in cp1252, alone or in a zip, as reading it uploaded does', async () => {
+    const bytes = readFileSync(
+      new URL('./fixtures/ipoker-cp1252.xml', import.meta.url),
+    );
+    const zip = zipSync({ 'tables/malaga.xml': bytes });
+
+    const read = await all([
+      file('malaga.xml', bytes, 3),
+      file('tables.zip', zip, 50),
+    ]);
+
+    const hands = read.flatMap((item) =>
+      item.kind === 'hand' ? [item.hand] : [],
+    );
+    expect(hands).toHaveLength(2);
+    for (const hand of hands) {
+      expect(hand).toMatchObject({
+        siteHandId: '6100000301',
+        tableName: 'Málaga, 912000301',
+        stake: { smallBlind: 5, bigBlind: 10, currency: 'EUR' },
+      });
+    }
+    expect(
+      read.flatMap((item) => (item.kind === 'hand' ? [item.text] : [])),
+    ).toEqual(
+      importHandHistory(readUpload('malaga.xml', bytes)).texts.flatMap(
+        (text) => [text, text],
+      ),
     );
   });
 

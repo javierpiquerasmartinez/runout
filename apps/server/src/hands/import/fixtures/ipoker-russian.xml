@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+	<session sessioncode="7400001001">
+			<general>
+	    	<mode>real</mode>
+	      		<gametype>Holdem БЛ €0.25/€0.50</gametype>
+	          <tablename>Mieres, 912001001</tablename>
+	          <duration>00:01</duration>
+	          <gamecount>1</gamecount>
+	          <startdate>2012-02-23 17:54:57</startdate>
+	          <currency>EUR</currency>
+	          <nickname>Maplewood</nickname>
+	          <bets>€0.50</bets>
+	          <wins>€0.50</wins>
+	          <chipsin>€50</chipsin>
+			  		<chipsout>€50.25</chipsout>
+			  		<ipoints>1.05</ipoints>
+        		<statuspoints>1.05</statuspoints>
+			  		<awardpoints>1.05</awardpoints>
+
+	    </general>
+	    <game gamecode="6100001001">
+		 <general>
+		  <startdate>2012-02-23 17:54:57</startdate>
+		  <players>
+		   <player seat="3" name="Alder" chips="€50" dealer="1" win="€0" bet="€0.25" rebuy="0" addon="0"/><player seat="8" name="Maplewood" chips="€50" dealer="0" win="€0.50" bet="€0.50" rebuy="0" addon="0"/>
+		  </players>
+		 </general>
+		 <round no="0">
+	 <action no="1" player="Alder" type="1" sum="€0.25" cards="[cards]"/><action no="2" player="Maplewood" type="2" sum="€0.50" cards="[cards]"/>
+	</round>
+	<round no="1">
+	 <cards type="Pocket" player="Alder">X X</cards><action no="3" player="Alder" type="0" sum="€0" cards=""/><cards type="Pocket" player="Maplewood">D10 D4</cards>
+	</round>
+
+		</game>
+	</session>

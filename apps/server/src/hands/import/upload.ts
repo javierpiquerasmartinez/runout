@@ -67,13 +67,125 @@ export function isHandHistoryEntry(path: string): boolean {
   );
 }
 
-/** UTF-8 unless a byte order mark says UTF-16; the mark itself is dropped. */
 function decode(bytes: Uint8Array): string {
-  const encoding =
-    bytes[0] === 0xff && bytes[1] === 0xfe
-      ? 'utf-16le'
-      : bytes[0] === 0xfe && bytes[1] === 0xff
-        ? 'utf-16be'
-        : 'utf-8';
-  return new TextDecoder(encoding).decode(bytes);
+  const decoder = new TextStreamDecoder();
+  return decoder.decode(bytes) + decoder.end();
+}
+
+/**
+ * Decodes a file's text, whole or arriving in pieces, the same way either
+ * way: UTF-8 unless a byte order mark says UTF-16, the mark itself dropped.
+ * Older iPoker clients save their files in cp1252 (the € as the byte 0x80),
+ * whatever their XML declaration says, so from the first byte that can't be
+ * UTF-8 on, the rest is read as cp1252. Everything before it is ASCII in
+ * such a file, which reads the same in both.
+ */
+export class TextStreamDecoder {
+  private encoding: 'utf-16le' | 'utf-16be' | 'utf-8' | 'cp1252' | null = null;
+  private decoder: TextDecoder | null = null;
+  /** Bytes not decoded yet: the file's first one, or a character cut across pieces. */
+  private held: Uint8Array = new Uint8Array(0);
+
+  decode(chunk: Uint8Array): string {
+    return this.read(chunk, false);
+  }
+
+  end(): string {
+    if (!this.encoding) {
+      // Too short to hold a byte order mark.
+      if (this.held.length === 0) return '';
+      return this.read(new Uint8Array(0), true) + this.end();
+    }
+    const held = this.held;
+    this.held = new Uint8Array(0);
+    if (this.encoding !== 'utf-8') return this.decoder!.decode();
+    // A character the text ends before completing can't be UTF-8.
+    return held.length === 0 ? '' : this.toCp1252(held);
+  }
+
+  private read(chunk: Uint8Array, ending: boolean): string {
+    let bytes = concat(this.held, chunk);
+    this.held = new Uint8Array(0);
+    if (!this.encoding) {
+      // Three bytes tell a byte order mark from none.
+      if (bytes.length < 3 && !ending) {
+        this.held = bytes;
+        return '';
+      }
+      if (bytes[0] === 0xff && bytes[1] === 0xfe) this.encoding = 'utf-16le';
+      else if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+        this.encoding = 'utf-16be';
+      } else {
+        this.encoding = 'utf-8';
+        if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+          bytes = bytes.subarray(3);
+        }
+      }
+      if (this.encoding !== 'utf-8') {
+        this.decoder = new TextDecoder(this.encoding);
+      }
+    }
+    if (this.encoding !== 'utf-8') {
+      return this.decoder!.decode(bytes, { stream: true });
+    }
+    const { valid, invalid } = utf8Prefix(bytes);
+    const text = UTF8.decode(bytes.subarray(0, valid));
+    if (invalid) return text + this.toCp1252(bytes.subarray(valid));
+    // What is left is the start of a character the next piece completes.
+    this.held = bytes.slice(valid);
+    return text;
+  }
+
+  private toCp1252(bytes: Uint8Array): string {
+    this.encoding = 'cp1252';
+    this.decoder = new TextDecoder('windows-1252');
+    return this.decoder.decode(bytes, { stream: true });
+  }
+}
+
+const UTF8 = new TextDecoder('utf-8', { ignoreBOM: true });
+
+/**
+ * How many of the bytes are whole UTF-8 characters, and whether the ones
+ * after them can't be UTF-8 (rather than a character cut short at the end).
+ */
+function utf8Prefix(bytes: Uint8Array): { valid: number; invalid: boolean } {
+  let at = 0;
+  while (at < bytes.length) {
+    const lead = bytes[at];
+    if (lead < 0x80) {
+      at++;
+      continue;
+    }
+    const length = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : 2;
+    // The range the byte after the lead may take, ruling out overlong
+    // forms, surrogates and anything past U+10FFFF.
+    const [low, high] =
+      lead === 0xe0
+        ? [0xa0, 0xbf]
+        : lead === 0xed
+          ? [0x80, 0x9f]
+          : lead === 0xf0
+            ? [0x90, 0xbf]
+            : lead === 0xf4
+              ? [0x80, 0x8f]
+              : [0x80, 0xbf];
+    if (lead < 0xc2 || lead > 0xf4) return { valid: at, invalid: true };
+    for (let next = 1; next < length; next++) {
+      if (at + next >= bytes.length) return { valid: at, invalid: false };
+      const byte = bytes[at + next];
+      const [min, max] = next === 1 ? [low, high] : [0x80, 0xbf];
+      if (byte < min || byte > max) return { valid: at, invalid: true };
+    }
+    at += length;
+  }
+  return { valid: at, invalid: false };
+}
+
+function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
+  if (a.length === 0) return b;
+  const joined = new Uint8Array(a.length + b.length);
+  joined.set(a);
+  joined.set(b, a.length);
+  return joined;
 }

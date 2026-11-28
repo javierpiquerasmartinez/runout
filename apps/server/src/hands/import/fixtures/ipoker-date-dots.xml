@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<session sessioncode="7400000501">
+ <general>
+  <client_version>21.1.1.9</client_version>
+  <mode>real</mode>
+  <gametype>Holdem NL €0.05/€0.10</gametype>
+  <tablename>100BB Lleida 11, 912000501</tablename>
+  <tablecurrency>EUR</tablecurrency>
+  <duration>00:00:31</duration>
+  <gamecount>1</gamecount>
+  <startdate>18.05.2021 18:26:13</startdate>
+  <currency>EUR</currency>
+  <nickname>Maplewood</nickname>
+  <bets>€0.35</bets>
+  <wins>€0.25</wins>
+  <chipsin>€9.90</chipsin>
+  <chipsout>€10.05</chipsout>
+  <statuspoints>0.00</statuspoints>
+  <awardpoints>0.00</awardpoints>
+  <ipoints>0.00</ipoints>
+ </general>
+ <game gamecode="6100000501">
+  <general>
+   <startdate>18.05.2021 18:26:13</startdate>
+   <players>
+    <player seat="1" win="€0" name="Alder" bet="€0" dealer="1" chips="€11.59"/>
+    <player seat="3" win="€0" name="Birch" bet="€0.05" dealer="0" chips="€15.50"/>
+    <player seat="6" win="€0" name="Cedar" bet="€0.10" dealer="0" chips="€10"/>
+    <player seat="8" win="€0.25" name="Maplewood" bet="€0.35" dealer="0" chips="€9.90"/>
+   </players>
+  </general>
+  <round no="0">
+   <action no="1" player="Birch" type="1" cards="" sum="€0.05"/>
+   <action no="2" player="Cedar" type="2" cards="" sum="€0.10"/>
+  </round>
+  <round no="1">
+   <cards player="Maplewood" type="Pocket">CA DQ</cards>
+   <action no="3" player="Maplewood" type="23" cards="" sum="€0.35"/>
+   <cards player="Alder" type="Pocket">X X</cards>
+   <action no="4" player="Alder" type="0" cards="" sum="€0"/>
+   <cards player="Birch" type="Pocket">X X</cards>
+   <action no="5" player="Birch" type="0" cards="" sum="€0"/>
+   <cards player="Cedar" type="Pocket">X X</cards>
+   <action no="6" player="Cedar" type="0" cards="" sum="€0"/>
+  </round>
+ </game>
+</session>

@@ -3,6 +3,7 @@ import type { Hand, SourceFormat } from '../hand.js';
 import { overview } from '../replay/overview.js';
 import { timeline } from '../replay/timeline.js';
 import { importHandHistory, type DiscardReason } from './import.js';
+import { readUpload } from './upload.js';
 
 /*
  * The fixture corpus: one entry per file in ./fixtures, each with what it
@@ -595,6 +596,216 @@ const CORPUS: CorpusEntry[] = [
     discarded: [],
   },
   {
+    // Saved in cp1252 by an older client, the € as the byte 0x80, though
+    // its XML declaration says utf-8.
+    file: 'ipoker-cp1252.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        site: 'ipoker',
+        siteHandId: '6100000301',
+        playedAt: '2016-03-11T22:40:12.000Z',
+        tableName: 'Málaga, 912000301',
+        tableSize: 6,
+        stake: EUR_05_10,
+        hero: { screenName: 'Maplewood', cards: ['Js', '4c'] },
+        returned: [{ screenName: 'Maplewood', amount: 5 }],
+        collected: [{ screenName: 'Maplewood', amount: 10 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // Dates written year first with slashes, as clients wrote them in 2017.
+    file: 'ipoker-date-slashes.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000401',
+        // Spanish winter time, one hour ahead of UTC.
+        playedAt: '2017-01-23T21:27:48.000Z',
+        stake: { ...EUR_05_10, smallBlind: 1, bigBlind: 2 },
+        hero: { screenName: 'Maplewood', cards: ['8h', 'Kh'] },
+        showdown: true,
+        collected: [{ screenName: 'Cedar', amount: 15 }],
+        rake: 1,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // Dates written day first with dots, as clients wrote them in 2021.
+    file: 'ipoker-date-dots.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000501',
+        // Spanish summer time, two hours ahead of UTC.
+        playedAt: '2021-05-18T16:26:13.000Z',
+        stake: EUR_05_10,
+        returned: [{ screenName: 'Maplewood', amount: 25 }],
+        collected: [{ screenName: 'Maplewood', amount: 25 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // Dates with the month's name, as clients wrote them in 2012, in a
+    // session too old to name its currency other than by its sign.
+    file: 'ipoker-date-month.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000601',
+        playedAt: '2012-04-20T18:11:15.000Z',
+        stake: USD_10_25,
+        hero: { screenName: 'Maplewood', cards: ['7s', '2d'] },
+        returned: [{ screenName: 'Alder', amount: 50 }],
+        collected: [{ screenName: 'Alder', amount: 50 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // Amounts with the decimal comma and the sign after them, as French
+    // skins write them.
+    file: 'ipoker-decimal-comma.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000701',
+        stake: { ...EUR_05_10, smallBlind: 1, bigBlind: 2 },
+        seats: [
+          {
+            seat: 1,
+            screenName: 'Alder',
+            startingStack: 196,
+            sittingOut: false,
+          },
+          {
+            seat: 2,
+            screenName: 'Birch',
+            startingStack: 237,
+            sittingOut: false,
+          },
+          {
+            seat: 4,
+            screenName: 'Maplewood',
+            startingStack: 200,
+            sittingOut: false,
+          },
+          {
+            seat: 5,
+            screenName: 'Cedar',
+            startingStack: 150,
+            sittingOut: false,
+          },
+        ],
+        hero: { screenName: 'Maplewood', cards: ['Jh', 'Js'] },
+        showdown: true,
+        collected: [{ screenName: 'Maplewood', amount: 27 }],
+        rake: 3,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // Amounts with thousands separators, at high Stakes.
+    file: 'ipoker-thousands.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000801',
+        stake: { ...USD_05_10, smallBlind: 1000, bigBlind: 2000 },
+        seats: [
+          {
+            seat: 2,
+            screenName: 'Alder',
+            startingStack: 200000,
+            sittingOut: false,
+          },
+          {
+            seat: 3,
+            screenName: 'Maplewood',
+            startingStack: 129500,
+            sittingOut: false,
+          },
+          {
+            seat: 5,
+            screenName: 'Birch',
+            startingStack: 1969550,
+            sittingOut: false,
+          },
+        ],
+        hero: { screenName: 'Maplewood', cards: ['As', 'Ah'] },
+        showdown: true,
+        collected: [{ screenName: 'Maplewood', amount: 255000 }],
+        rake: 4000,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A client set to Spanish: no limit is `SL`, sin límite.
+    file: 'ipoker-spanish.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100000901',
+        stake: { ...USD_05_10, smallBlind: 1, bigBlind: 2 },
+        hero: { screenName: 'Maplewood', cards: ['3h', 'Jc'] },
+        returned: [{ screenName: 'Birch', amount: 6 }],
+        collected: [{ screenName: 'Birch', amount: 12 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A client set to Russian: no limit is `БЛ`, без лимита.
+    file: 'ipoker-russian.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100001001',
+        stake: { ...EUR_05_10, smallBlind: 25, bigBlind: 50 },
+        hero: { screenName: 'Maplewood', cards: ['10d', '4d'] },
+        collected: [{ screenName: 'Maplewood', amount: 50 }],
+        rake: 0,
+      },
+    ],
+    discarded: [],
+  },
+  {
+    // A session per variant no client is known to write, each left out
+    // rather than read wrongly: a date with the month first, a month named
+    // in Spanish, a limit in an unknown language, an unknown currency sign,
+    // a table currency that is none, one the blinds' sign contradicts, and
+    // an Amount no client writes. The first session, written as clients do,
+    // is read.
+    file: 'ipoker-unrecognised.xml',
+    format: 'ipoker',
+    hands: [
+      {
+        siteHandId: '6100001101',
+        playedAt: '2024-02-10T11:00:00.000Z',
+        stake: EUR_05_10,
+      },
+    ],
+    discarded: [
+      'malformed',
+      'malformed',
+      'malformed',
+      'malformed',
+      'malformed',
+      'malformed',
+      'malformed',
+    ],
+  },
+  {
     // PokerTracker 4's forum layout has no exact Amounts to replay.
     file: 'pokertracker-forum.txt',
     format: null,
@@ -610,8 +821,12 @@ const CORPUS: CorpusEntry[] = [
   },
 ];
 
+/** A fixture's text, decoded as an upload of it would be. */
 function fixture(name: string): string {
-  return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+  return readUpload(
+    name,
+    readFileSync(new URL(`./fixtures/${name}`, import.meta.url)),
+  );
 }
 
 describe('Hand History import: the fixture corpus', () => {

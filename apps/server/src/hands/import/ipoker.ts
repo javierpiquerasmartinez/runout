@@ -1,7 +1,7 @@
-import type { Action, Hand, Post, Seat, Street } from '../hand.js';
+import type { Action, Hand, Post, Seat, Stake, Street } from '../hand.js';
 import { Discard } from './discard.js';
 import type { SessionLayout } from './pieces.js';
-import { amount, stake, uncalledBets, wallClockTime } from './reading.js';
+import { uncalledBets, wallClockTime } from './reading.js';
 
 /*
  * iPoker's layout, as its client saves it with "Store Hand History Locally"
@@ -32,12 +32,26 @@ const MAX_SEATS = 9;
 /** The table sizes iPoker deals, for a session that doesn't say its own. */
 const TABLE_SIZES = [2, 6, 8, 9, 10];
 
-const LIMITS: Record<string, string> = {
-  NL: 'no limit',
-  PL: 'pot limit',
-  L: 'limit',
-  FL: 'limit',
+/** The limits of `<gametype>`, as clients in English, Spanish and Russian write them. */
+const LIMITS: Record<string, Stake['limit']> = {
+  NL: 'no-limit',
+  PL: 'pot-limit',
+  // Spanish: sin límite, límite de bote.
+  SL: 'no-limit',
+  LP: 'pot-limit',
+  // Russian: без лимита.
+  БЛ: 'no-limit',
+  L: 'fixed-limit',
+  FL: 'fixed-limit',
 };
+
+const CURRENCY_SIGNS: Record<string, string> = {
+  '€': 'EUR',
+  $: 'USD',
+  '£': 'GBP',
+};
+
+const CURRENCY_CODES = new Set(Intl.supportedValuesOf('currency'));
 
 /** The Street each round is, by its `no`; round 0 holds the blinds. */
 const ROUNDS: Record<string, Street> = {
@@ -71,20 +85,9 @@ export function parseIPokerHand(block: string): Hand {
   if (/<tournament/.test(general) || text(general, 'mode') === 'play') {
     throw new Discard('not-cash-holdem');
   }
-  const gametype = text(general, 'gametype') ?? '';
-  const holdem = gametype.match(/^Holdem (NL|PL|FL|L) (\S+)\/(\S+)$/);
-  if (!holdem) {
-    // Omaha (`PL €0.05/€0.10`, `Omaha PL …`) and the rest of iPoker's games.
-    throw new Discard(
-      /\S+\/\S+$/.test(gametype) ? 'not-cash-holdem' : 'malformed',
-    );
-  }
-  const currency = text(general, 'tablecurrency') ?? '';
-  const handStake = stake(
-    LIMITS[holdem[1]],
-    holdem[2],
-    holdem[3],
-    /^[A-Z]{3}$/.test(currency) ? currency : undefined,
+  const handStake = stakeOf(
+    text(general, 'gametype') ?? '',
+    text(general, 'tablecurrency'),
   );
   const siteHandId = game.attributes.gamecode;
   if (!siteHandId || !/^\d+$/.test(siteHandId)) throw new Discard('malformed');
@@ -193,6 +196,47 @@ export function parseIPokerHand(block: string): Hand {
     collected,
     rake,
     fees: 0,
+  };
+}
+
+/**
+ * The Stakes of a session's `<gametype>` (`Holdem NL €0.05/€0.10`) in the
+ * currency of its table: `<tablecurrency>` where the client writes it,
+ * otherwise the sign of the blinds (`€`, or a code such as `RSD`). Not
+ * `<currency>`, the player's account's, which can differ.
+ */
+function stakeOf(gametype: string, tableCurrency: string | null): Stake {
+  const holdem = gametype.match(/^Holdem (\S+) (\S+)\/(\S+)$/);
+  if (!holdem) {
+    // Omaha (`PL €0.05/€0.10`, `Omaha PL …`) and the rest of iPoker's games.
+    throw new Discard(
+      /\S+\/\S+$/.test(gametype) && !gametype.startsWith('Holdem ')
+        ? 'not-cash-holdem'
+        : 'malformed',
+    );
+  }
+  const limit = LIMITS[holdem[1]];
+  if (!limit) throw new Discard('malformed');
+  const signs = [holdem[2], holdem[3]].map((blind) =>
+    blind.replace(/[\d.,]/g, ''),
+  );
+  if (signs[0] !== signs[1]) throw new Discard('malformed');
+  const signed =
+    CURRENCY_SIGNS[signs[0]] ??
+    (CURRENCY_CODES.has(signs[0]) ? signs[0] : undefined);
+  const currency = tableCurrency || signed;
+  if (
+    !currency ||
+    !CURRENCY_CODES.has(currency) ||
+    (signs[0] !== '' && signed !== currency)
+  ) {
+    throw new Discard('malformed');
+  }
+  return {
+    limit,
+    smallBlind: amount(holdem[2]),
+    bigBlind: amount(holdem[3]),
+    currency,
   };
 }
 
@@ -330,6 +374,24 @@ function readPlay(
   return { posts, actions, putIn };
 }
 
+/**
+ * An Amount in hundredths, as each client writes it: `€1,026.75`, `0,01€`,
+ * `RSD45.70`, `$1,295`. A separator followed by one or two digits at the
+ * end is the decimal one, a dot or a comma; one followed by three digits
+ * groups thousands, as a space may too. Anything else isn't read.
+ */
+function amount(written: string): number {
+  const match = written.match(
+    /^[^\d\s]*\s*(\d{1,3}(?:([,.  ])\d{3})?(?:\2\d{3})*|\d+)(?:([.,])(\d{1,2}))?\s*[^\d\s]*$/,
+  );
+  // The same mark can't both group thousands and set off the cents.
+  if (!match || (match[2] && match[2] === match[3])) {
+    throw new Discard('malformed');
+  }
+  const whole = Number(match[1].replace(/\D/g, ''));
+  return whole * 100 + Number((match[4] ?? '').padEnd(2, '0'));
+}
+
 /** `HA` → "Ah", `D10` → "10d": iPoker writes the suit first. */
 function card(written: string): string {
   const match = written.match(/^([SHDC])(10|[2-9JQKA])$/);
@@ -337,14 +399,47 @@ function card(written: string): string {
   return `${match[2]}${match[1].toLowerCase()}`;
 }
 
-/** `2026-07-20 21:00:05` on a Spanish wall clock, in ISO 8601. */
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/**
+ * A date on a Spanish wall clock, in ISO 8601, in each layout iPoker's
+ * clients have written: `2026-07-20`, `2017/01/23`, `18.05.2021` and
+ * `20-Apr-2012`, each followed by `21:00:05`.
+ */
 function madridTime(written: string): string {
   const match = written.match(
-    /^(\d{4})-(\d{2})-(\d{2}) (\d{1,2}):(\d{2}):(\d{2})$/,
+    /^(?:(\d{4})([-/])(\d{2})\2(\d{2})|(\d{2})\.(\d{2})\.(\d{4})|(\d{2})-([A-Z][a-z]{2})-(\d{4})) (\d{1,2}):(\d{2}):(\d{2})$/,
   );
   if (!match) throw new Discard('malformed');
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23) {
+  const [year, month, day] = match[1]
+    ? [match[1], match[3], match[4]].map(Number)
+    : match[5]
+      ? [match[7], match[6], match[5]].map(Number)
+      : [Number(match[10]), MONTHS.indexOf(match[9]) + 1, Number(match[8])];
+  const [hour, minute, second] = match.slice(11).map(Number);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
     throw new Discard('malformed');
   }
   return wallClockTime(TIME_ZONE, year, month, day, hour, minute, second);
