@@ -1,5 +1,6 @@
 import type { Hand, Stake } from '../hand.js';
 import { Discard } from './discard.js';
+import { ipokerTableSize } from './ipoker.js';
 import { amount, firstLine, linesOf, stake, utcTime } from './reading.js';
 import { readHand } from './stars-layout.js';
 
@@ -26,9 +27,6 @@ const LIMITS: Record<string, string> = {
   PL: 'pot limit',
   FL: 'limit',
 };
-
-/** The seats a 6-max table takes on iPoker's ten-seat numbering. */
-const SIX_MAX_SEATS = new Set([1, 3, 5, 6, 8, 10]);
 
 const SEAT = /^Seat (\d+): (.+) \((\S+) in chips\)( DEALER)?$/;
 
@@ -84,7 +82,7 @@ export function parseIPokerPt4Hand(block: string): Hand {
       stake: handStake,
       playedAt: utcTime(`${year}/${month}/${day} ${time}`),
       tableName: table[1],
-      tableSize: tableSize(seats.map((seat) => seat.seat)),
+      tableSize: ipokerTableSize(seats),
       buttonSeat: dealers[0].seat,
     },
     { site: 'ipoker', format: 'ipoker-pt4', separator: ': ' },
@@ -95,17 +93,6 @@ export function parseIPokerPt4Hand(block: string): Hand {
   const kept = putIn - sum(hand.returned.map((back) => back.amount));
   if (won !== pot || kept !== won + hand.rake) throw new Discard('unbalanced');
   return hand;
-}
-
-/**
- * PT4 writes no table size. iPoker numbers seats as a ten-seat table, so a
- * 6-max table sits players in 1, 3, 5, 6, 8 and 10; anything else is read
- * by its highest seat.
- */
-function tableSize(seats: number[]): number {
-  const highest = Math.max(...seats);
-  if (highest <= 6 || seats.every((seat) => SIX_MAX_SEATS.has(seat))) return 6;
-  return highest <= 9 ? 9 : 10;
 }
 
 function sum(amounts: number[]): number {

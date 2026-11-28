@@ -528,7 +528,7 @@ const CORPUS: CorpusEntry[] = [
         siteHandId: '6100000201',
         // Spanish winter time, one hour ahead of UTC.
         playedAt: '2026-01-15T21:14:03.000Z',
-        buttonSeat: 4,
+        buttonSeat: 6,
         stake: EUR_05_10,
         seats: [
           {
@@ -538,30 +538,35 @@ const CORPUS: CorpusEntry[] = [
             sittingOut: false,
           },
           {
-            seat: 2,
+            seat: 3,
             screenName: 'Birch',
             startingStack: 1235,
             sittingOut: false,
           },
           {
-            seat: 3,
+            seat: 5,
             screenName: 'Maplewood',
             startingStack: 1000,
             sittingOut: false,
           },
           {
-            seat: 4,
+            seat: 6,
             screenName: 'Cedar',
             startingStack: 965,
             sittingOut: false,
           },
           {
-            seat: 5,
+            seat: 8,
             screenName: 'Elm',
             startingStack: 1105,
             sittingOut: false,
           },
-          { seat: 6, screenName: 'Fir', startingStack: 690, sittingOut: false },
+          {
+            seat: 10,
+            screenName: 'Fir',
+            startingStack: 690,
+            sittingOut: false,
+          },
         ],
         hero: { screenName: 'Maplewood', cards: ['Ah', 'Ks'] },
         actions: expect.arrayContaining([
@@ -949,7 +954,7 @@ const CORPUS: CorpusEntry[] = [
         playedAt: '2026-01-15T21:14:03.000Z',
         tableName: 'Alcalá, 912000201',
         tableSize: 6,
-        buttonSeat: 4,
+        buttonSeat: 6,
         stake: EUR_05_10,
         hero: { screenName: 'Maplewood', cards: ['Ah', 'Ks'] },
         board: ['10d', '7s', '2h', 'Kc', '4d'],
@@ -1068,6 +1073,15 @@ const CORPUS: CorpusEntry[] = [
       },
     ],
     discarded: [],
+  },
+  {
+    // PT4 writes no table size: it is worked out from the table positions
+    // taken, as for a session that doesn't write one. Two at 3 and 8 are
+    // heads-up; 4 and 7 fit only the ten-seat table, which isn't replayed.
+    file: 'ipoker-pt4-table-sizes.txt',
+    format: 'ipoker-pt4',
+    hands: [{ siteHandId: '6100001601', tableSize: 2, buttonSeat: 3 }],
+    discarded: ['too-many-seats'],
   },
   {
     // A Hand that doesn't balance, an export from before PT4 wrote the

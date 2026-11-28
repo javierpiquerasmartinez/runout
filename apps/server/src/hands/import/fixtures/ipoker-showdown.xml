@@ -20,11 +20,11 @@
    <startdate>2026-01-15 22:14:03</startdate>
    <players>
     <player seat="1" name="Alder" chips="€10" dealer="0" win="€0" bet="€0"/>
-    <player seat="2" name="Birch" chips="€12.35" dealer="0" win="€0" bet="€3.90" rakeamount="€0.20"/>
-    <player seat="3" name="Maplewood" chips="€10" dealer="0" win="€7.55" bet="€3.90" rakeamount="€0.20"/>
-    <player seat="4" name="Cedar" chips="€9.65" dealer="1" win="€0" bet="€0"/>
-    <player seat="5" name="Elm" chips="€11.05" dealer="0" win="€0" bet="€0.05"/>
-    <player seat="6" name="Fir" chips="€6.90" dealer="0" win="€0" bet="€0.10"/>
+    <player seat="3" name="Birch" chips="€12.35" dealer="0" win="€0" bet="€3.90" rakeamount="€0.20"/>
+    <player seat="5" name="Maplewood" chips="€10" dealer="0" win="€7.55" bet="€3.90" rakeamount="€0.20"/>
+    <player seat="6" name="Cedar" chips="€9.65" dealer="1" win="€0" bet="€0"/>
+    <player seat="8" name="Elm" chips="€11.05" dealer="0" win="€0" bet="€0.05"/>
+    <player seat="10" name="Fir" chips="€6.90" dealer="0" win="€0" bet="€0.10"/>
    </players>
   </general>
   <round no="0">

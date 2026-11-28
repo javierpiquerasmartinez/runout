@@ -84,7 +84,10 @@ const BOARD_CARDS: Record<string, Street> = {
   River: 'river',
 };
 
-/** The table size of a Hand whose session doesn't write one, from the seats taken. */
+/**
+ * The table size of a Hand whose session doesn't write one, or of PT4's
+ * export, which never does, from the seats taken.
+ */
 export function ipokerTableSize(seats: Pick<Seat, 'seat'>[]): number {
   const taken = seats.map(({ seat }) => seat);
   const layout = TABLE_LAYOUTS.find(([, positions]) =>
